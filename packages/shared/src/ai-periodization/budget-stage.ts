@@ -17,11 +17,12 @@ import {
 import { resolveMeasuredRestSec } from '@trainingai/shared/workout/time-profile'
 import { normalizeMuscle } from '@trainingai/shared/muscles'
 import { volumeLandmarks } from '@trainingai/shared/ai-periodization/volume-targets'
-import { durationDirection, fitBudgetMin, type DurationPreset } from '@trainingai/shared/workout/duration-model'
+import { durationDirection, fitBudgetMin, fitBudgetWholeMin, type DurationPreset } from '@trainingai/shared/workout/duration-model'
 import type { PrescriptionSignals } from '@trainingai/shared/ai-periodization/signals'
 import { UNCLASSIFIED_EXERCISE_ROLE } from '@trainingai/shared/workout/exercise-role'
 import { prescriptionFigures } from '@trainingai/shared/ai-periodization/prescription-figures'
 import { phaseSetsMax } from '@trainingai/shared/ai-periodization/prompt'
+import { capitalize } from '@trainingai/shared/format/capitalize'
 import type { PrescriptionFigures } from '@trainingai/shared/types/ai-periodization'
 
 /** One exercise as the budget stage receives it — its PRE-budget shape. The stage changes `sets`,
@@ -216,7 +217,8 @@ export function applyBudgetStage(
   // (51 less the lifter's p75 margin, e.g. 39) is how a plan said "to fit the 51-min working
   // budget, X was dropped" while estimating itself at 35 — true of neither number. The estimate is
   // the same median-pace figure the fit compared against `fitMin`, so it can never exceed this one.
-  const fittedBudgetMin = fitMin > 0 ? Math.round(fitMin) : 0
+  // Rounded down, as the prompt states it to the model (`fitBudgetWholeMin`), so the two agree.
+  const fittedBudgetMin = fitBudgetWholeMin(signals)
   const marginTaken = fitMin < signals.effectiveTimeBudgetMin
   const budgetPhrase = marginTaken
     ? `about ${fittedBudgetMin} min of work (the session's time less warm-up, and less a margin so a slower-than-usual day still finishes on time)`
@@ -232,10 +234,19 @@ export function applyBudgetStage(
       .filter(ex => droppedIds.has(ex.sessionExerciseId)).map(ex => ex.name).join(', ')
     notes.push(`To keep today's plan to ${budgetPhrase}, ${names} ${droppedIds.size === 1 ? 'was' : 'were'} dropped for today — accessories go first, then whatever trains the muscles furthest ahead of their weekly target — so the remaining work keeps more of its sets rather than every exercise being cut to a token two.`)
   }
-  if (fittedBudgetMin > 0 && estimatedSessionDurationMin > fittedBudgetMin) {
+  // The estimate is a whole minute rounded to nearest, so it is compared with the fit's figure
+  // rounded the same way: a 46 against 45.8 planned is the fit landing on budget, not an overrun.
+  if (fittedBudgetMin > 0 && estimatedSessionDurationMin > Math.round(fitMin)) {
+    // The estimate is at the lifter's median pace and the planned figure already holds back a
+    // margin for a slower day. Past the planned figure but inside the working budget, a usual day
+    // still finishes on time and only a slower one runs over; past the working budget, even a usual
+    // day does.
+    const overrun = estimatedSessionDurationMin > signals.effectiveTimeBudgetMin
+      ? 'expect to run over'
+      : 'a slower-than-usual day may run over'
     notes.push(droppedIds.size > 0
-      ? `Even so, the ${activeExercises.length} exercises kept are estimated at ${estimatedSessionDurationMin} min of work against the ${fittedBudgetMin} planned — a session is never cut below ${activeExercises.length}, so expect to run over.`
-      : `Note: even at minimum sets this session is estimated at ${estimatedSessionDurationMin} min of work against the ${fittedBudgetMin} planned — it has more exercises than the time budget fits. Consider removing an accessory from this session or raising its time budget.`)
+      ? `Even so, the ${activeExercises.length} exercises kept are estimated at ${estimatedSessionDurationMin} min of work against the ${fittedBudgetMin} planned — a session is never cut below ${activeExercises.length}, so ${overrun}.`
+      : `Note: even at minimum sets this session is estimated at ${estimatedSessionDurationMin} min of work against the ${fittedBudgetMin} planned, so ${overrun} — it has more exercises than the time budget fits. Consider removing an accessory from this session or raising its time budget.`)
   }
   const budgetNote = notes.map(n => ` ${n}`).join('')
 
@@ -255,18 +266,46 @@ export function applyBudgetStage(
   }
 }
 
-// A sentence of model reasoning that names a duration in minutes — "within the 39-minute budget",
-// "about 45 min". Code owns the one sentence about time (`budgetNote`), so any such sentence the
-// model wrote is removed whole (#3767). Seconds ("90 s rest") are not durations of the session.
+// A minutes figure — "within the 39-minute budget", "about 45 min". Seconds ("90 s rest") never
+// match. Code owns what the plan says about the session's time (`budgetNote`), so a model clause
+// stating minutes is removed (#3767) — but only that clause, and never one about rest between sets
+// ("Rest 3 minutes between heavy sets" is a prescription, not a session length).
 const MINUTES_FIGURE = /\b\d+(?:\.\d+)?\s*-?\s*(?:min|mins|minute|minutes)\b/i
+const ABOUT_REST = /\brest(?:s|ed|ing)?\b/i
+const statesSessionMinutes = (text: string) => MINUTES_FIGURE.test(text) && !ABOUT_REST.test(text)
+
+// Sentence ends: terminal punctuation, then space, then a capital or an opening quote. "approx. 40
+// min" and "72.5%" therefore stay inside one sentence, so a removal never leaves "Sets held at
+// approx." behind.
+const SENTENCE_BREAK = /(?<=[.!?])\s+(?=["'(A-Z])/
+// Clause joints inside a sentence: ", and", ", but", ", so", ", while", ";", " — ".
+const CLAUSE_BREAK = /(,\s+(?:and|but|so|while)\s+|;\s+|\s+—\s+)/
+
+/** One sentence with its minutes clauses removed; '' when nothing of it is left. */
+function withoutMinutesClauses(sentence: string): string {
+  if (!statesSessionMinutes(sentence)) return sentence
+  const end = /[.!?]$/.exec(sentence)?.[0] ?? ''
+  const body = end ? sentence.slice(0, -1) : sentence
+  // split with a capture group interleaves the joints: [clause, joint, clause, joint, clause].
+  const parts = body.split(CLAUSE_BREAK)
+  const clauses = parts.filter((_, i) => i % 2 === 0)
+  let out = ''
+  for (let i = 0; i < clauses.length; i++) {
+    if (statesSessionMinutes(clauses[i])) continue
+    // The joint before a clause goes with it, unless it now opens the sentence.
+    out += out === '' ? clauses[i].trim() : `${parts[2 * i - 1]}${clauses[i]}`
+  }
+  if (out === '') return ''
+  // A later clause that now opens the sentence starts with a capital.
+  return `${capitalize(out.trim())}${end}`
+}
 
 /**
- * The model's reasoning with every sentence that states minutes removed, then the code-owned
- * budget note appended. The one place a plan's reasoning is assembled, for generation and re-fit
- * alike, so a re-fit of a plan stored before #3767 drops the model's minutes too.
+ * The model's reasoning with every clause that states the session's minutes removed, then the
+ * code-owned budget note appended. The one place a plan's reasoning is assembled, for generation
+ * and re-fit alike, so a re-fit of a plan stored before #3767 drops the model's minutes too.
  */
 export function reasoningWithBudgetNote(modelReasoning: string, budgetNote: string): string {
-  // Split on sentence-ending punctuation followed by space, so "72.5%" stays one sentence.
-  const kept = modelReasoning.trim().split(/(?<=[.!?])\s+/).filter(s => s && !MINUTES_FIGURE.test(s)).join(' ')
+  const kept = modelReasoning.trim().split(SENTENCE_BREAK).map(withoutMinutesClauses).filter(Boolean).join(' ')
   return `${kept}${budgetNote}`.trim()
 }

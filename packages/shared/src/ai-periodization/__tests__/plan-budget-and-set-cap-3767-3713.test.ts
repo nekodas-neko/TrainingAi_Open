@@ -85,7 +85,22 @@ describe('#3767 — one time budget, and an estimate that fits it', () => {
     expect(res.estimatedSessionDurationMin).toBeGreaterThan(10)
     expect(res.estimatedSessionDurationMin).toBeLessThan(WORKING)
     expect(res.budgetNote).toContain('against the 10 planned')
+    // Inside the working budget at median pace: only a slower day runs over.
+    expect(res.budgetNote).toContain('a slower-than-usual day may run over')
+    expect(res.budgetNote).not.toContain('expect to run over')
+  })
+
+  it('says to expect an overrun once the median estimate is past the working budget too', () => {
+    const res = applyBudgetStage(stage(SIX, 3), signalsFor(SIX, 'strength', 10, 8), 60, undefined, new Set(), undefined, 'accumulation')
+    expect(res.estimatedSessionDurationMin).toBeGreaterThan(10)
+    expect(res.budgetNote).toContain('against the 8 planned')
     expect(res.budgetNote).toContain('expect to run over')
+  })
+
+  it('names the planned figure rounded down, as the prompt gives it to the model', () => {
+    const res = applyBudgetStage(stage(SIX, 3), signalsFor(SIX, 'strength', WORKING, 39.7), 60, undefined, new Set(), undefined, 'accumulation')
+    expect(res.fittedBudgetMin).toBe(39)
+    expect(res.budgetNote).toContain('about 39 min of work')
   })
 
   it('a session with no time limit states no budget at all', () => {
@@ -106,6 +121,23 @@ describe('#3767 — one time budget, and an estimate that fits it', () => {
       expect(reasoningWithBudgetNote(s, '')).toBe('')
     }
     expect(reasoningWithBudgetNote('Rest 90 s between sets.', '')).toBe('Rest 90 s between sets.')
+  })
+
+  it('keeps the clause of a mixed sentence that says nothing about minutes', () => {
+    expect(reasoningWithBudgetNote('Bench moves up 2.5% because RPE ran low, and volume stays inside a 39-minute plan.', ''))
+      .toBe('Bench moves up 2.5% because RPE ran low.')
+    expect(reasoningWithBudgetNote('Squat holds; the plan fits 40 min. Row adds a set.', ''))
+      .toBe('Squat holds. Row adds a set.')
+  })
+
+  it('leaves no fragment: an abbreviation is not a sentence end, and a later clause opens with a capital', () => {
+    expect(reasoningWithBudgetNote('Sets held at approx. 40 min of work. Row adds a set.', ''))
+      .toBe('Row adds a set.')
+    expect(reasoningWithBudgetNote('Volume fits a 39-minute plan, and the squat holds.', '')).toBe('The squat holds.')
+  })
+
+  it('keeps rest stated in minutes: that is a prescription, not the session\'s length', () => {
+    expect(reasoningWithBudgetNote('Rest 3 minutes between heavy sets.', '')).toBe('Rest 3 minutes between heavy sets.')
   })
 
   it('with nothing to add and nothing removed, the reasoning is unchanged', () => {

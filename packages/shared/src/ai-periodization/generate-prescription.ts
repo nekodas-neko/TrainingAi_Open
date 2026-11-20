@@ -743,6 +743,8 @@ async function runPrescriptionGeneration(
     sets: Object.fromEntries(parsed.exercises.map(ex => [ex.session_exercise_id, ex.sets])),
     reasoning: parsed.reasoning,
     ...(autoreg.earnedSetIds.size > 0 && { earnedSetIds: [...autoreg.earnedSetIds] }),
+    // #3713: the phase the stage below caps against. A cap guard may rewrite `phase` after it.
+    phase: parsed.phase as PeriodizationPhase,
   }
 
   const budget = applyBudgetStage(

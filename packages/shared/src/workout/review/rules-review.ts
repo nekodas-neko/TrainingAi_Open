@@ -10,7 +10,6 @@ import {
   type BudgetStageExercise,
 } from '@trainingai/shared/ai-periodization/budget-stage'
 import type { PrescriptionSignals } from '@trainingai/shared/ai-periodization/signals'
-import { phaseSetsMax } from '@trainingai/shared/ai-periodization/prompt'
 import type { ReviewModelExercise, ReviewProposal, ReviewProposalExercise } from '@trainingai/shared/workout/review/reconcile'
 
 
@@ -74,7 +73,10 @@ export function buildRulesReview(params: {
   const muscleVolume = buildBudgetMuscleVolume(signals)
   const beforeSets = new Map(exercises.map(ex => [ex.sessionExerciseId, ex.sets]))
 
-  const plausible = applyRoleSetPlausibility(buildTimedExercises(exercises, signals), muscleVolume, phaseSetsMax(signals.trainingGoal, signals.phase))
+  // Role ceilings only, no phase cap (#3713): the review starts from the program's own sets, the
+  // lifter's choice, and the rules-fallback plan leaves those uncapped too. Capping them here would
+  // report a phase cut as a time trim ("trimmed to fit the N-min working budget").
+  const plausible = applyRoleSetPlausibility(buildTimedExercises(exercises, signals), muscleVolume)
 
   const dropped = dropToBudget(plausible, budgetMin, new Set(), muscleVolume, { refit: subset => subset.map(e => ({ ...e })) })
   const kept = estimateSessionDurationSec(dropped.exercises) > budgetMin * 60

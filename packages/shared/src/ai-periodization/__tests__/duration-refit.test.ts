@@ -356,3 +356,28 @@ it('turning the time limit off restores work and full rests from the saved basel
   expect(unlimited.prescription.reasoning).not.toContain('0-min')
   expect(unlimited.prescription.durationPreset).toBe(0)
 })
+
+// #3713 review follow-up: a cap guard rewrites `phase` to the NEXT phase on an offer while the loads
+// stay the old phase's. A re-fit capped against `stored.phase` would hand a pending "move to deload"
+// deload's 3 sets at accumulation's loads. It caps against the phase the loads were written for.
+describe('a re-fit caps sets against the phase the loads were written for (#3713)', () => {
+  const offer = (over: Partial<AiPrescription> = {}) => storedPrescription({
+    phase: 'deload', phaseAction: 'transition_recommended', ...over,
+  })
+  const maxSets = (p: AiPrescription) => Math.max(...p.exercises.map(e => e.sets))
+
+  it('a pending move to deload re-fits at accumulation\'s cap (hypertrophy: 4), not deload\'s (3)', async () => {
+    const res = await refit('long', periodizationState({ prescription: offer() }))
+    if (!res.ok) throw new Error(res.reason)
+    expect(maxSets(res.prescription)).toBe(4)
+    // The offer itself is untouched: still a move to deload.
+    expect(res.prescription.phase).toBe('deload')
+  })
+
+  it('reads the phase generation recorded, whatever the stored phase and the session phase say', async () => {
+    const recorded = offer({ refitBaseline: { sets: { ...BASELINE_SETS }, reasoning: 'r', phase: 'deload' } })
+    const res = await refit('long', periodizationState({ prescription: recorded }))
+    if (!res.ok) throw new Error(res.reason)
+    expect(maxSets(res.prescription)).toBe(3)
+  })
+})

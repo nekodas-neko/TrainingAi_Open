@@ -117,6 +117,12 @@ export function fitBudgetMin(budget: { effectiveTimeBudgetMin: number; planningB
   return budget.planningBudgetMin ?? budget.effectiveTimeBudgetMin
 }
 
+/** `fitBudgetMin` as whole minutes, rounded down: the one figure the prompt gives the model and the
+ *  plan's budget note names (#3767), so the two never differ by a rounding. 0 means no time limit. */
+export function fitBudgetWholeMin(budget: { effectiveTimeBudgetMin: number; planningBudgetMin?: number }): number {
+  return Math.max(0, Math.floor(fitBudgetMin(budget)))
+}
+
 // A per-day override of the session's configured time budget: "I've got 30 minutes before
 // work" / "it's Saturday, I've got two hours". Deliberately NOT stored on the program —
 // it's a choice about today, so it lives only on the prescription it produced. 'standard'

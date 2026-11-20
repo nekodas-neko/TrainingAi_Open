@@ -154,6 +154,11 @@ export interface AiPrescription {
     /** Exercises that earned a set through RPE autoregulation — trimmed last, so the re-fit
      *  protects them exactly as the generation that produced them did. */
     earnedSetIds?: string[]
+    /** The phase the generation's budget stage capped the sets against, i.e. the phase the loads
+     *  were written for (#3713). A cap guard can rewrite `phase` to the NEXT phase afterwards while
+     *  the loads stay this one's, so a re-fit reads this, never `phase`. Absent before #3713:
+     *  `phaseOfLoads` falls back. */
+    phase?: PeriodizationPhase
   }
   // Fingerprint of the inputs consumption-day re-evaluation
   // (lib/ai-periodization/reevaluate.ts) last ran against — see reevaluationKey(). Lets

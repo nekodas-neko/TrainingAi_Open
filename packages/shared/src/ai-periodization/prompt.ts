@@ -1,7 +1,7 @@
 import type { PrescriptionSignals } from './signals'
 import type { SessionPeriodization } from '@trainingai/shared/types/ai-periodization'
 import { volumeLandmarks } from './volume-targets'
-import { SECONDS_PER_REP, SET_SETUP_SEC, fitBudgetMin } from '@trainingai/shared/workout/duration-model'
+import { SECONDS_PER_REP, SET_SETUP_SEC, fitBudgetMin, fitBudgetWholeMin } from '@trainingai/shared/workout/duration-model'
 import { PCT_BANDS } from '@trainingai/shared/workout/time-profile'
 import { displayOneRm, displayOneRmDelta } from '@trainingai/shared/1rm'
 import { FEVER_TEMP_Z } from '@trainingai/shared/health/illness-radar'
@@ -70,8 +70,13 @@ export function intensityZone(trainingGoal: string, phase: string): IntensityZon
 
 /**
  * The most sets any exercise may carry in `phase` (#3713) — the zone's `setsMax`, which is the
- * same for every role (`intensityZoneForRole` passes it through unchanged). Null when the phase is
- * unknown, so the caller falls back to the role ceiling alone rather than guessing a phase.
+ * same for every role (`intensityZoneForRole` passes it through unchanged).
+ *
+ * - No phase (null, undefined, empty): returns null, and the caller applies the role ceiling alone.
+ * - A phase string the goal's zone table does not name (e.g. `baseline`): returns that goal's
+ *   ACCUMULATION `setsMax`, because `intensityZone` falls back to accumulation for any unknown
+ *   phase. Never null for a non-empty string. An unknown goal reads strength's table, as
+ *   `intensityZone` does.
  */
 export function phaseSetsMax(trainingGoal: string, phase: string | null | undefined): number | null {
   if (!phase) return null
@@ -341,7 +346,7 @@ export function buildUserPrompt(
 
   return `Current date: ${today}
 Program goal: ${signals.trainingGoal}
-Time budget: ${fitBudgetMin(signals) === 0 ? 'No time limit. Choose appropriate training volume; do not trim or add work to fit a duration.' : `${Math.floor(fitBudgetMin(signals))} min`}
+Time budget: ${fitBudgetMin(signals) === 0 ? 'No time limit. Choose appropriate training volume; do not trim or add work to fit a duration.' : `${fitBudgetWholeMin(signals)} min`}
 
 Phase: ${phaseLine(signals)}
 
