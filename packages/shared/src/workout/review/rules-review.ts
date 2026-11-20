@@ -73,6 +73,9 @@ export function buildRulesReview(params: {
   const muscleVolume = buildBudgetMuscleVolume(signals)
   const beforeSets = new Map(exercises.map(ex => [ex.sessionExerciseId, ex.sets]))
 
+  // Role ceilings only, no phase cap (#3713): the review starts from the program's own sets, the
+  // lifter's choice, and the rules-fallback plan leaves those uncapped too. Capping them here would
+  // report a phase cut as a time trim ("trimmed to fit the N-min working budget").
   const plausible = applyRoleSetPlausibility(buildTimedExercises(exercises, signals), muscleVolume)
 
   const dropped = dropToBudget(plausible, budgetMin, new Set(), muscleVolume, { refit: subset => subset.map(e => ({ ...e })) })

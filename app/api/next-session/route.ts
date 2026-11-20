@@ -4,7 +4,7 @@ import { getRepository } from "@/lib/data";
 import { DEFAULT_TZ } from "@trainingai/shared/date-utils";
 import { estimateProgramSessionMin } from "@trainingai/shared/workout/program-session-duration";
 import { prescriptionDrivesLoad } from "@trainingai/shared/ai-periodization/apply-prescription";
-import { prescriptionAgedOut } from "@trainingai/shared/ai-periodization/prescription-expiry";
+import { serveStoredPrescription } from "@trainingai/shared/ai-periodization/program-phase";
 
 export async function GET() {
   const session = await auth();
@@ -32,11 +32,12 @@ export async function GET() {
     ]);
     // Reflect a Workout Review "drop this cycle" in the home card's exercise count / duration
     // estimate, matching what the workout screen will actually show.
-    const p = state?.prescription;
     // #3716: an aged-out prescription is not the plan (#3700), so neither its drops nor its
-    // duration reach the Home card. Opening the session regenerates it.
-    const drives = !!p && !!state && !prescriptionAgedOut(state)
-      && prescriptionDrivesLoad(p.phaseAction, state.prescriptionStatus);
+    // duration reach the Home card. Opening the session regenerates it. #3907: nor does a plan whose
+    // deload has ended (#3876), by the same served-plan check as the card's read.
+    const served = state ? await serveStoredPrescription(repo, userId, recommendation.program, state, tz) : null;
+    const p = served?.prescription;
+    const drives = !!p && !!served && prescriptionDrivesLoad(p.phaseAction, served.prescriptionStatus);
     if (drives && p.droppedExerciseIds?.length) {
       const dropped = new Set(p.droppedExerciseIds);
       recommendation.session = {

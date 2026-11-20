@@ -1450,8 +1450,12 @@ export interface WorkoutRepository {
   /** #3766: every raw model phase answer of these session types since `since`, with when it was given. */
   listModelPhaseAnswers(userId: string, programSessionIds: string[], since: Date): Promise<import('@trainingai/shared/ai-periodization/program-phase').PhaseAnswer[]>
   /** `status` is written atomically with the prescription — see the slice for why (Q-54). With
-   *  `generatedFor`, stored only while the slot is still in that phase and start (#3766); false if not. */
-  storePrescription(userId: string, programSessionId: string, prescription: AiPrescription, expiresAt: Date, status?: PrescriptionStatus, generatedFor?: { phase: PeriodizationPhase; phaseStartedAt: Date }): Promise<boolean>
+   *  `generatedFor`, stored only while the slot is still in that phase and start (#3766), and while
+   *  the session's structure stamp still matches when one is given (#3895); false if not. */
+  storePrescription(userId: string, programSessionId: string, prescription: AiPrescription, expiresAt: Date, status?: PrescriptionStatus, generatedFor?: import('@trainingai/shared/types/ai-periodization').PrescriptionGeneratedFor): Promise<boolean>
+  /** #3895: a stamp of what the session's plan is made from (budget and live exercises), read at a
+   *  generation's start and re-checked by `storePrescription`. Null when the session is not the user's. */
+  getSessionStructureStamp(userId: string, programSessionId: string): Promise<string | null>
   /** BF-199 Phase 1. Evidence only: nothing reads it to decide anything. */
   recordPrescriptionShadow(userId: string, programSessionId: string, shadow: import('@trainingai/shared/ai-periodization/prescription-shadow').PrescriptionShadow): Promise<void>
   clearProgramPrescriptions(userId: string, programId: string): Promise<void>
@@ -1584,6 +1588,8 @@ export interface WorkoutRepository {
   upsertOuraCloudSleepPeriods(userId: string, rows: import('./postgres/slices/oura').OuraCloudSleepPeriodRow[]): Promise<number>
   /** #2982: Oura's per-day series, goals, contributors and stress label; sets only the fields each row carries. */
   upsertOuraCloudDaily(userId: string, rows: import('./postgres/slices/oura').OuraCloudDailyRow[]): Promise<number>
+  /** #3905: Oura's stored readiness contributors per day in `[from, to]`, for the webhook's duplicate check. */
+  getOuraCloudReadinessContributors(userId: string, from: string, to: string): Promise<{ date: string; readinessContributors: Record<string, number | null> | null }[]>
   /** #2985: Oura's stored MET series and 5-minute activity class per day, for the MET cascade. */
   getOuraCloudActivitySeries(userId: string, from: string, to: string): Promise<import('./postgres/slices/oura').OuraCloudActivitySeries[]>
   /** #3597: every per-minute movement series for the days in `[from, to]`, from each connector that

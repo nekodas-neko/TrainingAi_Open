@@ -126,11 +126,27 @@ function fingerprint(night: object): string {
  * score: it is never ours (#3000). The webhook skips an unchanged document, the usual duplicate, so
  * it starts no readiness scoring on the per-user lock the morning's sleep writes wait on.
  */
-export function readinessDocumentChanged(incoming: object, stored: object | undefined): boolean {
+export function readinessDocumentChanged(
+  incoming: object, stored: object | undefined,
+  /** #3905: the document's contributors, stored apart from the day row (`oura_cloud_daily`). Readiness
+   *  falls back on their `recovery_index` when a night has no recovery hours, so a revision that
+   *  changes only them is a change. `incoming` undefined means the document carried none. */
+  contributors?: { incoming: unknown; stored: unknown },
+): boolean {
   const prior = (stored ?? {}) as Record<string, unknown>
-  return Object.entries(incoming)
+  const dayChanged = Object.entries(incoming)
     .filter(([k]) => k !== 'date' && k !== 'readinessScore')
     .some(([k, v]) => JSON.stringify(v ?? null) !== JSON.stringify(prior[k] ?? null))
+  if (dayChanged || contributors?.incoming === undefined) return dayChanged
+  return sortedJson(contributors.incoming) !== sortedJson(contributors.stored)
+}
+
+/** JSON with object keys sorted: Postgres `jsonb` hands keys back in its own order, not Oura's. */
+function sortedJson(value: unknown): string {
+  return JSON.stringify(value ?? null, (_k, v: unknown) =>
+    v && typeof v === 'object' && !Array.isArray(v)
+      ? Object.fromEntries(Object.entries(v as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b)))
+      : v)
 }
 
 /**
@@ -208,6 +224,21 @@ export type NightRescoreTarget = NightRescoreRepo | ScoringNightRescore
  */
 export function rescoreReadinessAfterAnswer(repo: NightRescoreRepo, scoreToday: TodayReadinessScorer): ScoringNightRescore {
   return { repo, scoreToday, deferReadiness: job => { void job().catch(err => console.error('[rescore-nights] deferred readiness scoring failed:', err)) } }
+}
+
+/**
+ * #3905: holds a target's deferred readiness jobs until `release`, which hands them to the target's
+ * own `deferReadiness`. `writeOuraCloudData` releases after every write in the batch is awaited, so a
+ * job never races a write it reads (the contributors). A target with nothing to defer passes through.
+ */
+export function holdDeferredReadiness(target: NightRescoreTarget | undefined): { target: NightRescoreTarget | undefined; release: () => void } {
+  if (!target || !('repo' in target) || !target.deferReadiness) return { target, release: () => {} }
+  const defer = target.deferReadiness
+  const held: (() => Promise<void>)[] = []
+  return {
+    target: { ...target, deferReadiness: job => { held.push(job) } },
+    release: () => { for (const job of held.splice(0)) defer(job) },
+  }
 }
 
 /** The repository and readiness scoring a target carries. */

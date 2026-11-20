@@ -16,6 +16,7 @@ import { WorkoutJournalStore, type JournalState } from './WorkoutJournalStore';
 import { healthReadPaths } from '../../../core/sync/health-invalidation';
 import { emptyJournal } from './workout';
 import { useWorkoutResources } from '../data/WorkoutDataProvider';
+import { onResume } from '../../../core/sync/resume';
 
 const empty: JournalState = {
   data: emptyJournal({ origin: '', userId: '' }),
@@ -91,10 +92,8 @@ export function WorkoutJournalStateProvider({
       return;
     }
     void controller.initialize();
-    const listener = AppState.addEventListener('change', (state) => {
-      if (state === 'active') {
-        void controller.sync();
-      }
+    const listener = onResume(() => {
+      void controller.sync();
     });
     const retry = setInterval(() => {
       if (AppState.currentState === 'active') {

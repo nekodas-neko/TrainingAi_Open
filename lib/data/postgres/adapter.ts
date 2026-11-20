@@ -8558,7 +8558,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     })
   }
 
-  async storePrescription(userId: string, programSessionId: string, prescription: AiPrescription, expiresAt: Date, status?: PrescriptionStatus, generatedFor?: { phase: PeriodizationPhase; phaseStartedAt: Date }) { return period.storePrescription(this.db, userId, programSessionId, prescription, expiresAt, status, generatedFor) }
+  async storePrescription(userId: string, programSessionId: string, prescription: AiPrescription, expiresAt: Date, status?: PrescriptionStatus, generatedFor?: import('@trainingai/shared/types/ai-periodization').PrescriptionGeneratedFor) { return period.storePrescription(this.db, userId, programSessionId, prescription, expiresAt, status, generatedFor) }
+  async getSessionStructureStamp(userId: string, programSessionId: string) { return period.getSessionStructureStamp(this.db, userId, programSessionId) }
   async clearProgramPrescriptions(userId: string, programId: string) { return period.clearProgramPrescriptions(this.db, userId, programId) }
   async updatePrescriptionStatus(userId: string, programSessionId: string, status: PrescriptionStatus) { return period.updatePrescriptionStatus(this.db, userId, programSessionId, status) }
   async voidSessionPrescription(userId: string, programSessionId: string) { return period.voidSessionPrescription(this.db, userId, programSessionId) }
@@ -8665,6 +8666,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async upsertOuraCloudHeartrate(userId: string, rows: { timestamp: Date; bpm: number; context?: string | null }[], tz: string) { return oura.upsertOuraCloudHeartrate(this.db, userId, rows, tz) }
   async upsertOuraCloudSleepPeriods(userId: string, rows: oura.OuraCloudSleepPeriodRow[]) { return oura.upsertOuraCloudSleepPeriods(this.db, userId, rows) }
   async upsertOuraCloudDaily(userId: string, rows: oura.OuraCloudDailyRow[]) { return oura.upsertOuraCloudDaily(this.db, userId, rows) }
+  async getOuraCloudReadinessContributors(userId: string, from: string, to: string) { return oura.getOuraCloudReadinessContributors(this.db, userId, from, to) }
   async upsertOuraSessions(userId: string, rows: oura.OuraSessionRow[]) { return oura.upsertOuraSessions(this.db, userId, rows) }
   async tombstoneOuraSessions(userId: string, ids: string[]) { return oura.tombstoneOuraSessions(this.db, userId, ids) }
   async tombstoneOuraSessionsAbsent(userId: string, range: { from: string; to: string; keepIds: string[]; dryRun?: boolean }) { return oura.tombstoneOuraSessionsAbsent(this.db, userId, range) }

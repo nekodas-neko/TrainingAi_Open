@@ -20,7 +20,7 @@ import { timeLimitLabel } from '@trainingai/shared/workout/duration-model';
 import { View } from 'react-native';
 import { useTheme } from '../../shared/theme/ThemeProvider';
 import type { LibraryExercise, SavedStyle } from '../workouts/data/models';
-import { selectExercise, normalizeSupersets, type ProgramDraft } from './editor-model';
+import { selectExercise, normalizeSupersets, progressionSetLabel, type ProgramDraft } from './editor-model';
 import { exerciseBlocks, reorderExerciseBlocks, reorderSupersetMembers } from './reorder-model';
 import { defaultStyleIdForSlot } from '@trainingai/shared/workout/default-style';
 
@@ -94,7 +94,7 @@ export function SessionEditor({
           onPress={() => setChoosing(item.id!)}
         />
         <Picker
-          label="Progression set"
+          label={progressionSetLabel(draft.phaseMode)}
           value={item.styleId ?? ''}
           options={[
             { value: '', label: 'Default' },

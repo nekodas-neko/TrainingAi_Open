@@ -4,7 +4,8 @@ import { shouldTriggerEmergencyDeload, type EmergencySignals, type EmergencyStat
 import type { IllnessFlag } from '@trainingai/shared/health/illness-radar'
 import { recostPrescription, rowNumbersMoved, type FigureSignals } from './prescription-figures'
 import { prescriptionAgedOut } from './prescription-expiry'
-import { deloadEndDue, type ProgramDeloadCheck } from './phase-guards'
+import { deloadEndDue, phaseOfLoads, type ProgramDeloadCheck } from './phase-guards'
+import { phaseSetsMax } from './prompt'
 
 // Cheap fresh-signals subset for consumption-day re-evaluation — deliberately NOT the full
 // 30-signal aggregation (aggregateSignals), which is too expensive to run on every
@@ -192,6 +193,9 @@ export function reevaluatePrescriptionForToday(
   // the first read of the day turned a stored 2×6 @ 50% back into the program as written. The bar
   // kept deloading while the card described the full session. `Full` is the way back for those.
   const deloadIsPrescribed = prescription.deload === true || state.phase === 'deload'
+  // #3713: a revert puts back the recorded full numbers, capped to the phase the plan's loads were
+  // written for. A plan stored before the cap reached `preDeload` recorded the model's raw count.
+  const revertSetsCap = phaseSetsMax(signals.trainingGoal, phaseOfLoads(prescription, state.phase)) ?? Infinity
   let changed = false
   const exercises: AiPrescriptionExercise[] = prescription.exercises.map(ex => {
     const wasDeloaded = ex.deloaded === true
@@ -214,7 +218,7 @@ export function reevaluatePrescriptionForToday(
       changed = true
       return {
         ...ex,
-        sets: ex.preDeload.sets,
+        sets: Math.min(ex.preDeload.sets, revertSetsCap),
         reps: ex.preDeload.reps,
         pct: ex.preDeload.pct,
         restSec: ex.preDeload.restSec,

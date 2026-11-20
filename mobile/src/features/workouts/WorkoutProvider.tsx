@@ -7,10 +7,10 @@ import {
   useSyncExternalStore,
   type PropsWithChildren,
 } from 'react';
-import { AppState } from 'react-native';
 import { useAccountContext } from '../account/AccountProvider';
 import { useLocalStorage } from '../../core/storage/StorageProvider';
 import { WorkoutCatalogStore, type CatalogState } from './WorkoutCatalogStore';
+import { onResume } from '../../core/sync/resume';
 
 type WorkoutContext = CatalogState & {
   signedIn: boolean;
@@ -75,10 +75,8 @@ export function WorkoutCatalogProvider({
       return;
     }
     void controller.initialize();
-    const listener = AppState.addEventListener('change', (state) => {
-      if (state === 'active') {
-        void controller.refreshIfStale();
-      }
+    const listener = onResume(() => {
+      void controller.refreshIfStale();
     });
     return () => {
       listener.remove();

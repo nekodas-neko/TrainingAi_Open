@@ -1,5 +1,5 @@
-import { intensityZone } from '@trainingai/shared/ai-periodization/prompt'
-import { applyStoredRoleCaps } from '@trainingai/shared/ai-periodization/role-plausibility'
+import { intensityZone, phaseSetsMax } from '@trainingai/shared/ai-periodization/prompt'
+import { applyStoredRoleCaps, roleCeiling } from '@trainingai/shared/ai-periodization/role-plausibility'
 import type { PeriodizationPhase } from '@trainingai/shared/types/ai-periodization'
 
 export interface ReconcileExercise {
@@ -222,6 +222,11 @@ export function reconcilePrescription(params: ReconcileParams): ReconcileResult 
   // only guards a future change to that guarantee, not today's expected path.
   const byId = new Map(exercises.map(ex => [ex.sessionExerciseId, ex]))
   const preDeloadById = new Map<string, { sets: number; reps: number; pct: number; restSec: number }>()
+  // #3713: the full numbers are what `Full` and a cleared soreness put back, so they carry the same
+  // phase cap as every other row. Before this they kept the model's raw count (6 sets on a squat in
+  // strength accumulation, where the phase allows 5), which no later stage re-capped.
+  const setsCap = phaseSetsMax(params.trainingGoal, phase)
+  const roleById = new Map(params.signalExercises.map(e => [e.sessionExerciseId, e.role]))
   for (const id of params.deloadedIds) {
     let target = byId.get(id)
     if (!target) {
@@ -230,7 +235,9 @@ export function reconcilePrescription(params: ReconcileParams): ReconcileResult 
       exercises.push(target)
       byId.set(id, target)
     }
-    preDeloadById.set(id, { sets: target.sets, reps: target.reps, pct: target.pct, restSec: target.restSec })
+    const role = roleById.get(id)
+    const fullSets = role != null ? Math.min(target.sets, roleCeiling(role, setsCap)) : Math.min(target.sets, setsCap ?? Infinity)
+    preDeloadById.set(id, { sets: fullSets, reps: target.reps, pct: target.pct, restSec: target.restSec })
     target.sets = params.deloadOverride.sets
     target.reps = params.deloadOverride.reps
     target.pct = params.deloadOverride.pct

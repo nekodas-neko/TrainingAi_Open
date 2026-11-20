@@ -17,6 +17,7 @@ import { useReportsContext } from '../../../development/diagnostics/ReportsProvi
 import { diagnosticsAvailable } from '../../../development/diagnostics/client';
 import { formatDayAndTime } from '@trainingai/shared/date-utils';
 import { useWorkoutContext } from '../../workouts/WorkoutProvider';
+import { importPermissionNote, importStatusError } from '../data/device-import';
 
 export function DataScreen() {
   const health = useHealthContext();
@@ -78,7 +79,7 @@ export function DataScreen() {
           <StatusIndicator
             label={`${deviceHealthName} sync`}
             busy={imported.busy}
-            error={imported.error}
+            error={importStatusError(imported)}
             onRetry={() => void imported.refresh()}
           />
         </Stack>
@@ -93,11 +94,12 @@ export function DataScreen() {
           calculations.
         </AppText>
         <AppText variant="caption" tone="muted">
-          {imported.completed
-            ? `Last synced ${formatDayAndTime(imported.completed.completedAt, timezone)} · ${imported.completed.nights} sleep nights`
-            : imported.store
-              ? 'Readings are saved before upload. Your dashboard updates after they sync.'
-              : 'Sign in to sync your health readings.'}
+          {importPermissionNote(imported, deviceHealthName) ??
+            (imported.completed
+              ? `Last synced ${formatDayAndTime(imported.completed.completedAt, timezone)} · ${imported.completed.nights} sleep nights`
+              : imported.store
+                ? 'Readings are saved before upload. Your dashboard updates after they sync.'
+                : 'Sign in to sync your health readings.')}
         </AppText>
         {imported.completed?.hrv && (
           <AppText variant="caption">

@@ -19,6 +19,8 @@ import { useWorkoutDraft } from '../../workouts/data/useWorkoutDraft';
 import { useWorkoutResources } from '../../workouts/data/WorkoutDataProvider';
 import { nutritionPaths } from './models';
 import { NutritionStore, emptyNutrition } from './NutritionStore';
+import { onResume } from '../../../core/sync/resume';
+import { dayKinds, reloadDayOnReconnect } from './reconnect';
 const Context = createContext<{
   store: NutritionStore | null;
   today: string;
@@ -68,10 +70,8 @@ export function NutritionStoreProvider({
 }: PropsWithChildren<{ store: NutritionStore | null; today: string; timezone: string }>) {
   useEffect(() => {
     void store?.initialize().then(() => store.sync());
-    const subscription = AppState.addEventListener('change', (state) => {
-      if (state === 'active') {
-        void store?.sync();
-      }
+    const subscription = onResume(() => {
+      void store?.sync();
     });
     const timer = setInterval(() => {
       if (AppState.currentState === 'active') {
@@ -84,6 +84,10 @@ export function NutritionStoreProvider({
       store?.cancel();
     };
   }, [store]);
+  useEffect(() => {
+    const listener = reloadDayOnReconnect(store, today);
+    return () => listener.remove();
+  }, [store, today]);
   const { value: preferences, setValue: setPreferences } = useWorkoutDraft(
     'nutrition-preferences',
     z.object({ region: z.string().max(10) }),
@@ -114,18 +118,7 @@ export function useNutrition(date?: string) {
   const day = date ?? context.today;
   const refresh = useCallback(
     async (manual = false) => {
-      const kinds = [
-        'mealTypes',
-        'foods',
-        'meals',
-        'supplements',
-        'targets',
-        'logs',
-        'answers',
-        'checkin',
-        'mealStatuses',
-      ] as const;
-      await Promise.all(kinds.map((kind) => context.store?.refresh(kind, day, manual)));
+      await Promise.all(dayKinds.map((kind) => context.store?.refresh(kind, day, manual)));
     },
     [context.store, day],
   );
