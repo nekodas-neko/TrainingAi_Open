@@ -129,6 +129,9 @@ const newFilter = (sources: FirstHandSources | null) =>
     (row) => row.sourcePackage,
     (row) => row.id,
   );
+/** The tap's answer when Import history has no read permission to use (#3923 review). */
+export const IMPORT_NEEDS_PERMISSION =
+  'Needs permission: allow TrainingAi to read your data in Health Connect to import history.';
 export class HealthConnectImportStore {
   private disk: Disk;
   private state = emptyHealthConnectImport;
@@ -192,6 +195,7 @@ export class HealthConnectImportStore {
       // #3906: a first read not yet made (`enabled && !token`) is not a change waiting to upload.
       // Counted, it never cleared without a permission and made every rerun skip the throttle.
       pending: this.disk.queue.length + (this.disk.needsRebuild || this.disk.scan ? 1 : 0),
+      // Kept in step with `owed()`.
       skipped: this.disk.skipped,
       skippedFirstHand: this.disk.skippedFirstHand,
       completed: this.disk.completed,
@@ -239,9 +243,17 @@ export class HealthConnectImportStore {
   cancel() {
     this.canceled = true;
   }
-  /** Batches saved and waiting to upload: the only thing that lets a rerun skip the throttle. */
-  queued() {
-    return this.disk.queue.length > 0;
+  /**
+   * Work this install owes: saved batches, a rebuild, or a scan in progress. A rerun with any of it
+   * skips the throttle, so a long history import keeps its pace. A first read not yet made does
+   * not count (#3906): without a permission it never clears.
+   */
+  owed() {
+    return this.disk.queue.length > 0 || this.disk.needsRebuild || !!this.disk.scan;
+  }
+  /** Switched on, with the first read not made yet: it may run once a permission is granted. */
+  awaitingFirstRead() {
+    return this.disk.enabled && !this.disk.token && !this.disk.scan;
   }
   /** The granted read types; with none and `ask`, asks for every type once more (a tap, not a sync). */
   private async granted(ask: boolean) {
@@ -294,7 +306,8 @@ export class HealthConnectImportStore {
       await this.reader.historyPermission();
     }
     // #3906: without a read permission, clearing the token would only queue a read that cannot run.
-    if (!(await this.granted(true)).length) return;
+    // Said as the tap's own outcome, since the switch's note does not show while it is off.
+    if (!(await this.granted(true)).length) throw new Error(IMPORT_NEEDS_PERMISSION);
     await this.write({
       ...this.disk,
       from,

@@ -18,7 +18,7 @@ import { deviceUploadsWaiting, useQueued } from './device-uploads';
 import type { WorkoutResources } from '../../workouts/data/WorkoutResources';
 import { importPermissionNote, importStatusError } from '../../health/data/device-import';
 import { deviceHealthName } from '../../../integrations/device-health/platform';
-import { SYNC_NOW_LIMIT_MS, SYNC_NOW_SLOW, withDeadline } from '../../../core/sync/deadline';
+import { syncNowRunner } from '../../../core/sync/deadline';
 export function useNativeDataActions() {
   const health = useHealthData(),
     home = useHome(),
@@ -33,6 +33,7 @@ export function useNativeDataActions() {
   const [busy, setBusy] = useState(false),
     [error, setError] = useState<string | null>(null),
     [message, setMessage] = useState<string | null>(null);
+  const [runSync] = useState(() => syncNowRunner({ setBusy, setError, setMessage }));
   const activities = useActivities(),
     history = useHistoryQueue(),
     download = useHistoryDownload().download;
@@ -55,20 +56,9 @@ export function useNativeDataActions() {
     if (busy || !resources) {
       return;
     }
-    setBusy(true);
-    setError(null);
-    setMessage(null);
-    try {
-      await withDeadline(run(resources, restore), SYNC_NOW_LIMIT_MS, SYNC_NOW_SLOW);
-    } catch (cause) {
-      setError(
-        cause instanceof Error ? cause.message : 'Could not sync. Your saved records are kept.',
-      );
-    } finally {
-      setBusy(false);
-    }
+    await runSync(() => run(resources, restore));
   }
-  async function run(resources: WorkoutResources, restore: boolean) {
+  async function run(resources: WorkoutResources, restore: boolean): Promise<string> {
     await Promise.all([
       health.store?.sync(),
       home.store?.sync(),
@@ -110,11 +100,11 @@ export function useNativeDataActions() {
     const note = imported.store
       ? importPermissionNote(imported.store.getSnapshot(), deviceHealthName)
       : null;
-    setMessage(
+    return (
       (restore
         ? 'Account data refreshed. Your history is now saving to this phone for offline use.'
         : 'Sync finished. Any changes still waiting to upload remain saved on this phone.') +
-        (note ? ` ${note}` : ''),
+      (note ? ` ${note}` : '')
     );
   }
   async function clearAccount() {

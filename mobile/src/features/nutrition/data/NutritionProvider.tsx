@@ -19,7 +19,8 @@ import { useWorkoutDraft } from '../../workouts/data/useWorkoutDraft';
 import { useWorkoutResources } from '../../workouts/data/WorkoutDataProvider';
 import { nutritionPaths } from './models';
 import { NutritionStore, emptyNutrition } from './NutritionStore';
-import { onReconnect, onResume } from '../../../core/sync/resume';
+import { onResume } from '../../../core/sync/resume';
+import { dayKinds, reloadDayOnReconnect } from './reconnect';
 const Context = createContext<{
   store: NutritionStore | null;
   today: string;
@@ -61,17 +62,6 @@ export function NutritionProvider({ children }: PropsWithChildren) {
     </NutritionStoreProvider>
   );
 }
-const dayKinds = [
-  'mealTypes',
-  'foods',
-  'meals',
-  'supplements',
-  'targets',
-  'logs',
-  'answers',
-  'checkin',
-  'mealStatuses',
-] as const;
 export function NutritionStoreProvider({
   store,
   today,
@@ -95,10 +85,7 @@ export function NutritionStoreProvider({
     };
   }, [store]);
   useEffect(() => {
-    // #3913: a day that failed offline reloads once the connection is back; fresh kinds stay put.
-    const listener = onReconnect(() => {
-      for (const kind of dayKinds) void store?.refresh(kind, today);
-    });
+    const listener = reloadDayOnReconnect(store, today);
     return () => listener.remove();
   }, [store, today]);
   const { value: preferences, setValue: setPreferences } = useWorkoutDraft(

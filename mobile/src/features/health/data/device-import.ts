@@ -28,8 +28,8 @@ export type DeviceImportState = {
     setEnabled(enabled: boolean): Promise<void>;
     importHistory(from: string): Promise<void>;
     run(manual?: boolean): Promise<void>;
-    /** Batches waiting to upload; only these let a rerun skip the throttle (#3906). */
-    queued(): boolean;
+    /** Work owed (batches, a rebuild, a scan in progress): lets a rerun skip the throttle (#3906). */
+    owed(): boolean;
   } | null;
   refresh: () => Promise<void>;
 };

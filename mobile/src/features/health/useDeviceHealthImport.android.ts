@@ -55,10 +55,11 @@ export function useDeviceHealthImport(): DeviceImportState {
   useEffect(() => {
     void store?.run();
     const subscription = AppState.addEventListener('change', (state) => {
-      if (state === 'active') void store?.run(store.queued());
+      // Back from Health Connect's own settings, a permission granted there reads at once.
+      if (state === 'active') void store?.run(store.owed() || store.awaitingFirstRead());
     });
     const timer = setInterval(() => {
-      if (AppState.currentState === 'active') void store?.run(store.queued());
+      if (AppState.currentState === 'active') void store?.run(store.owed());
     }, 60000);
     return () => {
       clearInterval(timer);

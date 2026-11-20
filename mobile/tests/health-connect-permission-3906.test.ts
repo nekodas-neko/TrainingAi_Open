@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { HealthConnectImportStore } from '../src/features/health/data/HealthConnectImportStore.ts';
+import {
+  HealthConnectImportStore,
+  IMPORT_NEEDS_PERMISSION,
+} from '../src/features/health/data/HealthConnectImportStore.ts';
 import { HealthConnectPersistence } from '../src/features/health/data/health-connect-persistence.ts';
 import {
   importPermissionNote,
@@ -26,6 +29,7 @@ function fixture() {
   let granted: HealthConnectType[] = [];
   let grantOnRequest: HealthConnectType[] = [];
   let clock = start;
+  let endless = false;
   const reader: HealthConnectReader = {
     permissions: async () => {
       calls.permissions++;
@@ -38,7 +42,7 @@ function fixture() {
     },
     history: async () => {
       calls.reads++;
-      return { records: [], pageToken: null, skipped: 0 };
+      return { records: [], pageToken: endless ? `page-${calls.reads}` : null, skipped: 0 };
     },
     changes: async () => {
       calls.reads++;
@@ -65,6 +69,9 @@ function fixture() {
     },
     advance: (ms: number) => {
       clock += ms;
+    },
+    endlessHistory: () => {
+      endless = true;
     },
   };
 }
@@ -103,7 +110,11 @@ test('#3906: Import history with no permission asks, and without one leaves the 
   f.grant([]);
   const reads = f.calls.reads,
     requests = f.calls.requests;
-  await f.store.importHistory(new Date(start - 10 * 86_400_000).toISOString());
+  await assert.rejects(
+    f.store.importHistory(new Date(start - 10 * 86_400_000).toISOString()),
+    new Error(IMPORT_NEEDS_PERMISSION),
+    'the tap says why nothing happened',
+  );
   assert.equal(f.calls.requests, requests + 1, 'the tap asks for permission');
   const disk = await f.disk();
   assert.equal(disk.token, 'cursor-1', 'the token is not cleared for a read that cannot run');
@@ -120,13 +131,57 @@ test('#3906: with nothing queued, the minute and foreground reruns keep the 5-mi
   // What useDeviceHealthImport does every 60 s and on every return to the foreground.
   for (let minute = 1; minute <= 4; minute++) {
     f.advance(60_000);
-    await f.store.run(f.store.queued());
+    await f.store.run(f.store.owed());
   }
-  assert.equal(f.store.queued(), false);
+  assert.equal(f.store.owed(), false);
   assert.equal(f.calls.permissions, asked, 'no rerun every minute');
   f.advance(60_000);
-  await f.store.run(f.store.queued());
+  await f.store.run(f.store.owed());
   assert.equal(f.calls.permissions, asked + 1, 'the throttled run still happens');
+});
+
+test('#3906 review: a long import with nothing queued keeps its pace, not the 5-minute throttle', async () => {
+  const f = fixture();
+  f.grant(['Steps']);
+  f.grantOnRequest(['Steps']);
+  f.endlessHistory();
+  await f.store.setEnabled(true);
+  await f.store.run(true);
+  assert.ok((await f.disk()).scan, 'the scan is still going');
+  assert.equal((await f.disk()).queue.length, 0, 'with no batch waiting');
+  assert.equal(f.store.owed(), true);
+  const reads = f.calls.reads;
+  f.advance(60_000);
+  await f.store.run(f.store.owed());
+  assert.ok(f.calls.reads > reads, 'the minute rerun reads the next pages at once');
+});
+
+test('#3906 review: a permission granted in Health Connect settings reads on the return, not 5 minutes later', async () => {
+  const f = fixture();
+  await f.store.setEnabled(true);
+  await f.store.run(true);
+  assert.equal(f.store.getSnapshot().needsPermission, true);
+  assert.equal(f.store.owed(), false);
+  assert.equal(f.store.awaitingFirstRead(), true);
+  f.grant(['Steps']);
+  f.advance(30_000);
+  // What useDeviceHealthImport does on a return to the foreground.
+  await f.store.run(f.store.owed() || f.store.awaitingFirstRead());
+  assert.ok(f.calls.reads > 0);
+  assert.equal(f.store.getSnapshot().needsPermission, false);
+  assert.equal(f.store.awaitingFirstRead(), false);
+});
+
+test('#3923 review: Import history with the switch off and no permission still answers the tap', async () => {
+  const f = fixture();
+  await f.store.initialize();
+  assert.equal(f.store.getSnapshot().enabled, false);
+  await assert.rejects(
+    f.store.importHistory(new Date(start - 10 * 86_400_000).toISOString()),
+    new Error(IMPORT_NEEDS_PERMISSION),
+  );
+  assert.equal(f.calls.requests, 1, 'the permission sheet was offered first');
+  assert.equal(f.store.getSnapshot().enabled, false, 'the switch is left as it was');
 });
 
 test('#3906: switching off clears the status, and an off switch never shows the permission error', async () => {

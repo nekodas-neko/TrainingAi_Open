@@ -315,7 +315,8 @@ export function createApiClient(
     try {
       return await Promise.race([attempt(), expired]);
     } catch (error) {
-      // An error status is an answer; only a request that never got one says the network is down.
+      // An error status is an answer. Only a request that never reached the server says the network
+      // is down; a timeout does not (a slow route on a working network times out too).
       if (error instanceof ApiError) connectivity.reached();
       else connectivity.failed(error);
       // Every screen's server faults pass here, so they are reported once, with their path. The

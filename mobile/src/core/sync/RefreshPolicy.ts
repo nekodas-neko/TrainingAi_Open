@@ -5,6 +5,9 @@ export class RefreshPolicy {
   private retryAt = 0;
   private failures = 0;
   private failedIn: number;
+  // A return voids a backoff once per run of failures: a route that keeps failing while the rest
+  // of the app answers goes back to its own backoff instead of re-firing on every return.
+  private voided = false;
 
   constructor(
     private now = Date.now,
@@ -16,17 +19,21 @@ export class RefreshPolicy {
 
   shouldRefresh() {
     const now = this.now();
-    return (
-      // #3913: a backoff from before the connection came back is void.
-      (now >= this.retryAt || this.network.generation() !== this.failedIn) &&
-      (this.checkedAt === null || now < this.checkedAt || now - this.checkedAt >= this.staleAfter)
-    );
+    const stale =
+      this.checkedAt === null || now < this.checkedAt || now - this.checkedAt >= this.staleAfter;
+    if (!stale) return false;
+    if (now >= this.retryAt) return true;
+    // #3913: a backoff from before the connection came back is void, once.
+    if (this.voided || this.network.generation() === this.failedIn) return false;
+    this.voided = true;
+    return true;
   }
 
   succeeded(checkedAt = this.now()) {
     this.checkedAt = checkedAt;
     this.retryAt = 0;
     this.failures = 0;
+    this.voided = false;
   }
 
   failed() {
@@ -40,5 +47,6 @@ export class RefreshPolicy {
     this.checkedAt = null;
     this.retryAt = 0;
     this.failures = 0;
+    this.voided = false;
   }
 }

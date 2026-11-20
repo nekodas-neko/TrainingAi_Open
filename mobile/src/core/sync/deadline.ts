@@ -17,3 +17,50 @@ export function withDeadline<T>(work: Promise<T>, ms: number, message: string): 
     }),
   ]).finally(() => clearTimeout(timer));
 }
+
+type SyncNowView = {
+  setBusy: (busy: boolean) => void;
+  setError: (error: string | null) => void;
+  setMessage: (message: string | null) => void;
+};
+const failureText = (cause: unknown) =>
+  cause instanceof Error ? cause.message : 'Could not sync. Your saved records are kept.';
+
+/**
+ * Sync now, one run at a time (#3923 review). A tap while a run is still going waits on that run
+ * rather than starting a second one beside it. A run that outlives the deadline shows
+ * `SYNC_NOW_SLOW`, and when it does finish its own outcome replaces that.
+ */
+export function syncNowRunner(view: SyncNowView, limit = SYNC_NOW_LIMIT_MS) {
+  let current: Promise<string> | null = null;
+  return async (start: () => Promise<string>) => {
+    if (!current) {
+      const run = start();
+      current = run;
+      run.then(
+        (message) => {
+          view.setError(null);
+          view.setMessage(message);
+        },
+        (cause: unknown) => {
+          view.setMessage(null);
+          view.setError(failureText(cause));
+        },
+      );
+      void run.catch(() => {}).finally(() => {
+        if (current === run) current = null;
+      });
+    }
+    view.setBusy(true);
+    view.setError(null);
+    view.setMessage(null);
+    try {
+      await withDeadline(current, limit, SYNC_NOW_SLOW);
+    } catch (cause) {
+      // The run's own failure is already shown by the handler above.
+      if (cause instanceof Error && cause.message === SYNC_NOW_SLOW) view.setError(SYNC_NOW_SLOW);
+    } finally {
+      view.setBusy(false);
+    }
+  };
+}
