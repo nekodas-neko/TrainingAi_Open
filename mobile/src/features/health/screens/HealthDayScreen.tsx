@@ -213,11 +213,6 @@ export function DayReadThrough({
           ['metabolicAge', 'Metabolic age', 'yr'],
           ['subcutaneousFatPct', 'Subcut. fat', '%'],
           ['fatFreeMassKg', 'Fat-free mass', 'kg'],
-          ['restingHeartRate', 'Resting HR', 'bpm'],
-          ['hrvMs', 'HRV', 'ms'],
-          ['spo2Pct', 'SpO₂', '%'],
-          ['steps', 'Steps', ''],
-          ['distanceKm', 'Distance', 'km'],
         ] as const
       ).flatMap(([key, label, unit]) => {
         const value = key === 'bodyFatCorrected' ? displayFat(body) : body[key];
@@ -225,9 +220,26 @@ export function DayReadThrough({
           ? [
               {
                 label,
-                value: metricValue(value, unit, key === 'steps' || key === 'bmrKcal' ? 0 : 1),
+                value: metricValue(value, unit, key === 'bmrKcal' ? 0 : 1),
               },
             ]
+          : [];
+      })
+    : [];
+  // Resting HR, HRV, SpO₂, steps and distance are not body composition, so they get their own card.
+  const vitals = body
+    ? (
+        [
+          ['restingHeartRate', 'Resting HR', 'bpm'],
+          ['hrvMs', 'HRV', 'ms'],
+          ['spo2Pct', 'SpO₂', '%'],
+          ['steps', 'Steps', ''],
+          ['distanceKm', 'Distance', 'km'],
+        ] as const
+      ).flatMap(([key, label, unit]) => {
+        const value = body[key];
+        return value != null
+          ? [{ label, value: metricValue(value, unit, key === 'steps' ? 0 : 1) }]
           : [];
       })
     : [];
@@ -317,6 +329,14 @@ export function DayReadThrough({
             <AppText variant="title">{metricValue(body.weightKg, 'kg', 1)}</AppText>
           )}
           <KeyValueGrid rows={rows} />
+        </Card>
+      )}
+      {vitals.length > 0 && (
+        <Card>
+          <AppText variant="eyebrow" tone="muted">
+            Daily vitals
+          </AppText>
+          <KeyValueGrid rows={vitals} />
         </Card>
       )}
       {!data.exercises.length &&

@@ -17,6 +17,9 @@ export const STRENGTH_MARKER_LABEL_WIDTH = 20;
 /** Where the dashed 60 / 70 / 80 guides sit on a strength bar. */
 export const STRENGTH_BAR_MARKERS = [60, 70, 80] as const;
 
+/** The guides that carry a number. 60 / 70 / 80 sit 11 px apart, closer than a label is wide, so only the outer two are named; 70 still has its dashed guide. */
+export const STRENGTH_BAR_LABELLED_MARKERS = [60, 80] as const;
+
 /** Fills below this still show a sliver, so a low lift never reads as an empty bar. */
 export const STRENGTH_BAR_MIN_PCT = 4;
 

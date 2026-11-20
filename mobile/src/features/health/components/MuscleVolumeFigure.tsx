@@ -36,17 +36,21 @@ export function MuscleVolumeFigure({
   const assignments = rows
     .filter((row) => row.sets > 0)
     .map((row) => ({ muscle: row.muscle, color: row.color }));
+  const legend = muscleLegendItems(hasTargets, {
+    bad: palette.bad,
+    warn: palette.warn,
+    good: palette.good,
+    untrained: theme.anatomy.untrained,
+  });
   return (
     <>
-      <Legend
-        centered
-        items={muscleLegendItems(hasTargets, {
-          bad: palette.bad,
-          warn: palette.warn,
-          good: palette.good,
-          untrained: theme.anatomy.untrained,
-        })}
-      />
+      {/* The "colours match the bars" note is a caption of its own, not another legend item. */}
+      {legend.some((item) => item.shape === 'text') && (
+        <AppText variant="micro" tone="muted" style={{ textAlign: 'center' }}>
+          {legend.find((item) => item.shape === 'text')?.label}
+        </AppText>
+      )}
+      <Legend centered items={legend.filter((item) => item.shape !== 'text')} />
       <MuscleMap assignments={assignments} />
       {/* weekly-muscle-sets-card.tsx: space-y-2 rows, each a text-xs label, mb-0.5, then an h-2 bar. */}
       <Stack gap="sm">

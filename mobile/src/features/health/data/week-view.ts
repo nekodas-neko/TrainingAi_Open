@@ -86,3 +86,10 @@ export function flowDigest(digest: string) {
     .filter(Boolean)
     .join(' ');
 }
+
+/** `description` already opens with the exercise name, which the row shows on its left. */
+export function prDetail(pr: { exerciseName: string; description: string }) {
+  return pr.description.startsWith(pr.exerciseName)
+    ? pr.description.slice(pr.exerciseName.length).trim()
+    : pr.description;
+}

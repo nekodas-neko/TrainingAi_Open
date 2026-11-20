@@ -25,6 +25,7 @@ import {
   flowDigest,
   trainingHeadline,
   volumeTickLabel,
+  prDetail,
   weekdayInitial,
   weekdayName,
   weekMuscleRows,
@@ -166,7 +167,7 @@ export function HealthWeekScreen({ week, onBack }: { week: string; onBack: () =>
                       {pr.exerciseName}
                     </AppText>
                     <AppText variant="micro" tone="muted">
-                      {pr.description}
+                      {prDetail(pr)}
                     </AppText>
                   </Stack>
                 ))}
