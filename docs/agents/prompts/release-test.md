@@ -7,7 +7,11 @@ whether it is safe to ship. You run on the owner's machine.
 2. `pnpm check:rules` and the full `pnpm test` against local Postgres.
 3. **If the release carries a migration:** restore a recent production snapshot locally, apply the
    migration, and check the data it touches survives.
-4. `pnpm dev`, and walk every user-visible change the release issue lists.
+4. `pnpm dev` with its output saved to a file, then the route smoke against it:
+   `BASE_URL=http://localhost:<port> SERVER_LOG=<that file> node scripts/ci/route-smoke.mjs`. It signs
+   in as the seeded user, GETs the main pages and read routes, and fails on an unexpected status or
+   an error in the server log (#3919). CI runs the same script on every code PR (`Route smoke`).
+   Then walk every user-visible change the release issue lists.
 5. **Device pass**, for the checks the release issue lists and any open `type: device-check`
    issues touched by the release. Name the screen, orientation and navigation mode for each — three-button
    navigation reports every safe-area inset as `0`, which hides clearance bugs. Run it in

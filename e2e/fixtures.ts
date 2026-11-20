@@ -1,10 +1,10 @@
 import { join } from 'node:path'
 import { expect, type Locator, type Page, type Route } from '@playwright/test'
 import { tapOnceItLands } from './tap-retry'
+import { SEED_EMAIL } from './seed-user'
 
 /** Seeded by `scripts/local-db/seed.sql`. Idempotent — `pnpm db:local` will not re-seed. */
-export const SEED_EMAIL = 'test@local.dev'
-export const SEED_PASSWORD = 'testpass123'
+export { SEED_EMAIL, SEED_PASSWORD } from './seed-user'
 
 export const STORAGE_STATE = join(__dirname, '.auth', 'seed-user.json')
 
