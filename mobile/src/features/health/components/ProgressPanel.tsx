@@ -24,12 +24,14 @@ import {
   progressSpec,
   weightsSpec,
 } from '../data/models';
+import { formatDateDisplay } from '@trainingai/shared/date-utils';
 import { TREND_VIEW_NOTE } from '@trainingai/shared/health/trend-view-notes';
 import { HealthMetricCard } from './HealthMetricCard';
 import { RestPrescriptionSummary } from './RestPrescriptionSummary';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { bandColor } from '../../../shared/theme/tokens';
 import {
+  STRENGTH_BAR_LABELLED_MARKERS,
   STRENGTH_BAR_MARKERS,
   STRENGTH_BAR_WIDTH,
   STRENGTH_MARKER_LABEL_WIDTH,
@@ -141,7 +143,7 @@ function StrengthBar({ pct, color }: { pct: number; color: string }) {
   return (
     <View style={{ width: STRENGTH_BAR_WIDTH }}>
       <View style={{ height: theme.sizes.strengthMarkerRow }}>
-        {STRENGTH_BAR_MARKERS.map((marker) => (
+        {STRENGTH_BAR_LABELLED_MARKERS.map((marker) => (
           <AppText
             key={marker}
             variant="strengthMarker"
@@ -268,9 +270,16 @@ function StrengthWorkingCard() {
             });
             return (
               <Stack key={exercise.exercise} direction="row" align="center" gap="md">
-                <AppText variant="caption" numberOfLines={1} style={{ flex: 1 }}>
-                  {exercise.exercise}
-                </AppText>
+                <Stack gap="none" style={{ flex: 1, minWidth: 0 }}>
+                  <AppText variant="caption" numberOfLines={1}>
+                    {exercise.exercise}
+                  </AppText>
+                  {exercise.date ? (
+                    <AppText variant="micro" tone="muted" numberOfLines={1}>
+                      {formatDateDisplay(exercise.date, 'short')}
+                    </AppText>
+                  ) : null}
+                </Stack>
                 <StrengthBar pct={metric.pct} color={bandColor(metric.color, theme.status)} />
                 <View style={{ width: theme.sizes.touchTarget + theme.spacing.lg, alignItems: 'flex-end' }}>
                   {/* strength-progress-card.tsx: text-xs font-bold leading-tight over a text-[9px] font-semibold delta. */}

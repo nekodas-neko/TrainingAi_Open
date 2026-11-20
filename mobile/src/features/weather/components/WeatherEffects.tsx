@@ -63,7 +63,7 @@ function Clouds({
       <Svg width={width} height={height}>
         <Defs>
           <RadialGradient id={id}>
-            <Stop offset="0" stopColor="#ffffff" stopOpacity=".9" />
+            <Stop offset="0" stopColor="#ffffff" stopOpacity="0.9" />
             <Stop offset="1" stopColor="#ffffff" stopOpacity="0" />
           </RadialGradient>
         </Defs>
@@ -222,7 +222,7 @@ function Fog({
       <Svg width={width} height={height}>
         <Defs>
           <RadialGradient id={id}>
-            <Stop offset="0" stopColor="#dde1eb" stopOpacity=".8" />
+            <Stop offset="0" stopColor="#dde1eb" stopOpacity="0.8" />
             <Stop offset="1" stopColor="#dde1eb" stopOpacity="0" />
           </RadialGradient>
         </Defs>

@@ -57,13 +57,13 @@ export function BackgroundScene({
         </LinearGradient>
         <LinearGradient id={id + 'scrim'} x1="0" y1="0" x2="0" y2="1">
           <Stop offset="0" stopColor={scrimColor} stopOpacity={scrimTop} />
-          <Stop offset=".5" stopColor={scrimColor} stopOpacity={scrimTop} />
+          <Stop offset="0.5" stopColor={scrimColor} stopOpacity={scrimTop} />
           <Stop offset="1" stopColor={scrimColor} stopOpacity={scrimBottom} />
         </LinearGradient>
         <RadialGradient id={id + 'celestial'}>
-          <Stop offset="0" stopColor={rgb(phase.celestialGlow)} stopOpacity=".55" />
-          <Stop offset=".35" stopColor={rgb(phase.celestialColor)} stopOpacity=".3" />
-          <Stop offset=".7" stopColor={rgb(phase.celestialColor)} stopOpacity="0" />
+          <Stop offset="0" stopColor={rgb(phase.celestialGlow)} stopOpacity="0.55" />
+          <Stop offset="0.35" stopColor={rgb(phase.celestialColor)} stopOpacity="0.3" />
+          <Stop offset="0.7" stopColor={rgb(phase.celestialColor)} stopOpacity="0" />
         </RadialGradient>
         {palette &&
           palette.glow.map((color, index) => (
