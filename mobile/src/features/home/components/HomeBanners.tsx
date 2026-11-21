@@ -33,6 +33,7 @@ import {
 import { useActivities } from '../../activities/data/ActivityProvider';
 import { DetectedWalkSheet } from './DetectedWalkSheet';
 import {
+  offeredToday,
   recordedSpans,
   visibleWalks,
   walkCandidatesSpec,
@@ -66,17 +67,25 @@ export function HomeBanners({
   const activity = useActivities();
   const candidates = useWorkoutResource(walkCandidatesSpec(health.today));
   const session = activity.session;
+  // Today's offers, the latest answer's and the ones held from earlier answers until answered.
+  const offered = useMemo(
+    () => offeredToday(candidates.data, home.offeredWalks, health.today, health.timezone),
+    [candidates.data, home.offeredWalks, health.today, health.timezone],
+  );
+  useEffect(() => {
+    if (home.ready) void home.store?.holdWalks(offered).catch(reportError);
+  }, [home.ready, home.store, offered]);
   // Offered walks minus the answered ones and any overlapping an activity this phone holds or is
   // recording, so a walk saved here never comes back from a cached answer (#3625).
   const detected = useMemo(
     () =>
-      visibleWalks(candidates.data?.walks, home.answeredWalks, [
+      visibleWalks(offered, home.answeredWalks, [
         ...recordedSpans(activity.rows, health.timezone),
         ...(session?.startMs != null
           ? [{ startMs: session.startMs, endMs: session.endMs ?? Date.now() }]
           : []),
       ]),
-    [candidates.data, home.answeredWalks, activity.rows, health.timezone, session],
+    [offered, home.answeredWalks, activity.rows, health.timezone, session],
   );
   const newest = detected[0];
   const [expanded, setExpanded] = useState(false);

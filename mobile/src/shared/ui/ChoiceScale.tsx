@@ -37,6 +37,8 @@ export function ChoiceScale({
             minHeight: large ? theme.sizes.loggingControl : theme.sizes.touchTarget,
             justifyContent: 'center',
             alignItems: 'center',
+            // A label that wraps (#3745's "Harder than expected") stays centred, off the edges.
+            paddingHorizontal: theme.spacing.xs,
             borderRadius: theme.radii.small,
             backgroundColor: colorForValue
               ? value === option.value
@@ -51,6 +53,7 @@ export function ChoiceScale({
             accessibilityRole="text"
             variant={large ? 'heading' : colorForValue ? 'micro' : 'label'}
             style={{
+              textAlign: 'center',
               color: disabled
                 ? theme.colors.disabled
                 : colorForValue

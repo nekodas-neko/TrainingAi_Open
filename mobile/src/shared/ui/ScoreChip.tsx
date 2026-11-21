@@ -191,7 +191,7 @@ export function ScoreChip({
               <Svg width="100%" height="100%" style={{ position: 'absolute' }}>
                 <Defs>
                   <RadialGradient id={id}>
-                    <Stop offset="0" stopColor={color} stopOpacity=".28" />
+                    <Stop offset="0" stopColor={color} stopOpacity="0.28" />
                     <Stop offset="1" stopColor={color} stopOpacity="0" />
                   </RadialGradient>
                 </Defs>

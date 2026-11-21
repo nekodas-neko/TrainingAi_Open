@@ -8,14 +8,15 @@ package expo.modules.pictureinpicture
 /** The current app's PipPolicy, grown for the phase card (#3266): which phases open the window. */
 object PipPolicy {
   const val IDLE = "idle"
-  private val ACTIVE_PHASES = setOf("rest", "set", "complete", "summary", "paused")
+  // "ready" is an exercise before its first set (#3734); it opened the window as "rest" before.
+  private val ACTIVE_PHASES = setOf("ready", "rest", "set", "complete", "summary", "paused")
 
   /**
    * The phases the system enters picture-in-picture from on its own, with the smooth shrink: a set,
    * a rest, and a pause (which holds a set or a rest). The others still open the window from
    * onUserLeaveHint, as before, so no phase that opened a window stops opening one.
    */
-  private val AUTO_ENTER_PHASES = setOf("set", "rest", "paused")
+  private val AUTO_ENTER_PHASES = setOf("set", "ready", "rest", "paused")
 
   /** The most buttons the system shows (`config_pictureInPictureMaxNumberOfActions`). */
   const val MAX_ACTIONS = 3
@@ -35,8 +36,9 @@ object PipPolicy {
   fun entersOnLeave(phase: String?, sdk: Int): Boolean =
     isActivePhase(phase) && !(sdk >= SDK_S && autoEnters(phase))
 
-  /** The window's width : height. Portrait while lifting, square for everything else. */
-  fun aspect(phase: String?): Pair<Int, Int> = if (phase == "set") 3 to 4 else 1 to 1
+  /** The window's width : height: one 3:4 card in every state (#3734, option A). */
+  @Suppress("UNUSED_PARAMETER")
+  fun aspect(phase: String?): Pair<Int, Int> = 3 to 4
 }
 
 /** The strap's latest reading, as JS sends it (`PipHeartRate` in usePictureInPicture.ts). */
@@ -72,8 +74,25 @@ data class PipStatus(
   val nextUp: String? = null,
   /** The strap's reading; null with no strap, in which case the window shows no heart rate. */
   val hr: PipHeartRate? = null,
-  /** `#rrggbb` per set of this exercise, in order, for the set dots. */
+  /** `#rrggbb` per set of this exercise, in order, for the set segments. */
   val setColors: List<String> = emptyList(),
+  // #3734: where the lifter is, and the clock when nothing else runs.
+  val sessionName: String? = null,
+  /** 1-based place among the session's exercises, and how many; 0 when unknown. */
+  val exerciseIndex: Int = 0,
+  val exerciseCount: Int = 0,
+  /** Now minus this is the workout's running time; null for an older app that does not send it. */
+  val workoutFrom: Long? = null,
+  /** The exercise Next moves to: its place, set count and first load. */
+  val nextUpIndex: Int = 0,
+  val nextUpSets: Int = 0,
+  val nextUpLoad: String? = null,
+  /** #3745: the answer buttons are offered until this wall time; null when the window doesn't ask. */
+  val effortUntil: Long? = null,
+  /** The answer the question stands on: -1, 0 or 1; the window shows it selected. */
+  val effortAnswer: Int? = null,
+  /** The app's accent, `#rrggbb`, or null for the window's own green. */
+  val accent: String? = null,
 )
 
 /** The heart-rate line: `bpm` is null once the reading is too old to show. */
@@ -82,52 +101,49 @@ data class PipHeartView(val bpm: Int?, val zoneName: String?, val zoneColor: Str
 /** One of the window's buttons. `icon` names a drawable; `action` is what JS is told. */
 data class PipButton(val action: String, val label: String, val icon: String)
 
-/** One frame of the window. Clocks are anchors in wall time; the view's chronometers count. */
+/** The six states of the card (#3734, option A). */
+enum class PipCardState { READY, LIFTING, RESTING, REST_OVER, EXERCISE_DONE, PAUSED }
+
+/** One frame of the window. Clocks are anchors in wall time; the view's chronometer counts. */
 sealed class PipFrame {
+  /** No workout data, the warm-up or the review: a card with the name, never a blank window. */
   data class Placeholder(val name: String, val hint: Boolean, val nextUp: String? = null) : PipFrame()
 
-  /** A running set: the portrait card (3:4). */
-  data class Working(
-    val name: String,
-    /** "Set 3 of 4". */
-    val setLabel: String,
-    /** "80" and "kg", the load's big part; null when the load is not a weight. */
-    val weight: String?,
-    val unit: String?,
-    /** "× 8" or "8 reps"; null when unknown. */
-    val reps: String?,
-    val sets: Int,
-    val setsDone: Int,
-    val setColors: List<String>,
-    /** The running set's own colour, which pulses. */
-    val setColor: String?,
-    /** What the set clock counts up from; null stands at 0:00. */
+  /**
+   * The one card, in every state: a band in the state's colour holding a clock that always counts,
+   * and the same four facts below it.
+   */
+  data class Card(
+    val state: PipCardState,
+    /** `#rrggbb`: the band, the state word, the bar and the current set's segment. */
+    val color: String,
+    /** "READY", "LIFTING", "RESTING", "REST OVER", "EXERCISE DONE", "PAUSED". */
+    val stateWord: String,
+    /** "Set 1 of 2", "Next 2 of 2", or empty. */
+    val setLine: String,
+    /** What the clock counts from; null stands at 0:00 (an older app that sends no workout start). */
     val countsFrom: Long?,
-    val hr: PipHeartView?,
-  ) : PipFrame()
-
-  /** A rest: the square (1:1) with its ring. */
-  data class Resting(
-    val name: String,
-    /** "REST · NEXT 3/4", "REST OVER", "REST · DONE". */
-    val eyebrow: String,
-    /** What the clock counts from (the rest's start); null stands still. */
-    val countsFrom: Long?,
-    /** The rest's length in seconds, counted down to; null counts up from the start. */
+    /** A rest's length: the clock counts down to it, then up past it with a "+". Null counts up. */
     val targetSec: Long?,
-    /** Past the target: the clock reads "+0:12" and the ring is red and full. */
-    val over: Boolean,
-    /** How much of the ring is left: 1 at the start, 0 at the target; 1 once over. */
-    val fraction: Float,
-    /** The next set's load, "80 kg × 8"; null when unknown. */
+    val clockLabel: String,
+    /** The rest bar's fill, 1 at the rest's start; null where the state has no bar. */
+    val bar: Float?,
+    val name: String,
+    /** "Exercise 2 of 5 · Push A". */
+    val where: String,
+    /** "27.5 kg × 7"; null when unknown, never made up. */
     val load: String?,
+    /** "first set", "next set", or null. */
+    val loadLabel: String?,
+    val sets: Int,
+    /** Segments drawn in their set colours. */
+    val setsDone: Int,
+    /** The segment drawn in the state colour; null for none. */
+    val current: Int?,
+    val setColors: List<String>,
+    /** The lifting segment pulses. */
+    val pulse: Boolean,
     val hr: PipHeartView?,
-  ) : PipFrame()
-
-  /** A pause: how long it has lasted, and what it is holding. */
-  data class Paused(
-    val countsFrom: Long?,
-    val caption: String,
   ) : PipFrame()
 }
 
@@ -135,78 +151,188 @@ object PipPresenter {
   /** A reading older than this is "—", as the strap's own stale limit (STALE_MS in StrapSession.ts). */
   const val HR_STALE_MS = 8_000L
 
+  const val READY_COLOR = "#cfd8dc"
+  const val LIFT_COLOR = "#56ee66"
+  const val OVER_COLOR = "#ff6467"
+  /** The dark warning status token (#3441), as the in-app chips. */
+  const val PAUSED_COLOR = "#efaf00"
+  /** The app's green, for an app that sends no accent. */
+  const val DEFAULT_ACCENT = "#00c84e"
+
   /**
-   * The window for the workout at one instant. A phase with no timer (the summary once Next has
-   * nothing to time, the workout done, no data yet) shows the placeholder, never a blank window;
-   * "Tap Next" only where the window has a Next button.
+   * The window for the workout at one instant (#3734, option A). `phase` is the app's
+   * (`pipPhaseFor`); `status` the workout status payload. The warm-up, the review and a missing
+   * status show the placeholder, never a blank window.
    */
   fun present(phase: String, status: PipStatus?, setColor: String?, nowMs: Long): PipFrame {
     if (status == null) return PipFrame.Placeholder("", false)
-    return when {
-      phase == "paused" -> paused(status, nowMs)
-      phase == "set" -> working(status, setColor, nowMs)
-      phase == "rest" || phase == "complete" || (phase == "summary" && status.phase == "resting") ->
-        resting(status, nowMs)
-      phase == "summary" -> PipFrame.Placeholder(status.exerciseName, true, status.nextUp)
+    val accent = status.accent ?: DEFAULT_ACCENT
+    return when (phase) {
+      "paused" -> paused(status, accent, nowMs)
+      "set" -> lifting(status, setColor, nowMs)
+      "ready" -> ready(status, nowMs)
+      "rest", "complete" ->
+        if (status.sets > 0 && status.setsDone >= status.sets) exerciseDone(status, accent, nowMs, false)
+        else resting(status, accent, nowMs)
+      "summary" -> exerciseDone(status, accent, nowMs, asksEffort(phase, status, nowMs))
       else -> PipFrame.Placeholder(status.exerciseName, false)
     }
   }
 
-  private fun working(status: PipStatus, setColor: String?, nowMs: Long): PipFrame.Working {
-    val parts = splitLoad(status.load)
-    return PipFrame.Working(
-      name = status.exerciseName,
-      setLabel = "Set ${minOf(status.setsDone + 1, maxOf(status.sets, 1))} of ${status.sets}",
-      weight = parts.weight,
-      unit = parts.unit,
-      reps = parts.reps,
-      sets = status.sets,
-      setsDone = status.setsDone,
-      setColors = status.setColors,
-      setColor = setColor,
-      countsFrom = status.setStartedAt,
-      hr = heartView(status.hr, nowMs),
+  private fun where(index: Int, status: PipStatus): String {
+    val session = status.sessionName?.takeIf { it.isNotBlank() }
+    val place = if (index > 0 && status.exerciseCount > 0) "Exercise $index of ${status.exerciseCount}" else null
+    return listOfNotNull(place, session).joinToString(" · ")
+  }
+
+  private fun setOf(n: Int, sets: Int) = "${minOf(n, maxOf(sets, 1))} of $sets"
+
+  /** The clock when nothing else runs: the workout's running time. */
+  private fun workoutClock(status: PipStatus) = status.workoutFrom
+
+  private fun card(
+    state: PipCardState, color: String, word: String, status: PipStatus, nowMs: Long,
+    setLine: String, countsFrom: Long?, targetSec: Long?, clockLabel: String, bar: Float?,
+    loadLabel: String?, current: Int?, pulse: Boolean = false,
+  ) = PipFrame.Card(
+    state = state, color = color, stateWord = word, setLine = setLine,
+    countsFrom = countsFrom, targetSec = targetSec, clockLabel = clockLabel, bar = bar,
+    name = status.exerciseName, where = where(status.exerciseIndex, status),
+    load = status.load, loadLabel = loadLabel.takeIf { status.load != null },
+    sets = status.sets, setsDone = status.setsDone, current = current,
+    setColors = status.setColors, pulse = pulse, hr = heartView(status.hr, nowMs),
+  )
+
+  private fun ready(status: PipStatus, nowMs: Long) = card(
+    PipCardState.READY, READY_COLOR, "READY", status, nowMs,
+    setLine = "Set ${setOf(status.setsDone + 1, status.sets)}",
+    countsFrom = workoutClock(status), targetSec = null, clockLabel = "workout time", bar = null,
+    loadLabel = "first set", current = status.setsDone,
+  )
+
+  // The running set's own colour (`setColor`) is no longer drawn: the card's current segment takes
+  // the state's colour, as every state's does (#3734).
+  @Suppress("UNUSED_PARAMETER")
+  private fun lifting(status: PipStatus, setColor: String?, nowMs: Long): PipFrame.Card {
+    val timed = status.setStartedAt != null
+    return card(
+      PipCardState.LIFTING, LIFT_COLOR, "LIFTING", status, nowMs,
+      setLine = "Set ${setOf(status.setsDone + 1, status.sets)}",
+      countsFrom = status.setStartedAt ?: workoutClock(status), targetSec = null,
+      clockLabel = if (timed) "this set" else "workout time", bar = null,
+      loadLabel = null, current = status.setsDone, pulse = true,
     )
   }
 
-  private fun resting(status: PipStatus, nowMs: Long): PipFrame.Resting {
+  /** The rest's length in whole seconds, or null for an untimed rest. */
+  private fun target(status: PipStatus): Long? {
+    val start = status.restStartedAt ?: return null
+    val end = status.restEndsAt ?: return null
+    return maxOf(0L, (end - start) / 1000).takeIf { it > 0 }
+  }
+
+  private fun resting(status: PipStatus, accent: String, nowMs: Long): PipFrame.Card {
     val start = status.restStartedAt
-    val end = status.restEndsAt
-    val targetSec = if (start != null && end != null) maxOf(0L, (end - start) / 1000) else 0L
-    val timed = targetSec > 0
+    val target = target(status)
+    val next = "Next ${setOf(status.setsDone + 1, status.sets)}"
+    if (start == null) {
+      // No rest to count at all: the workout's clock.
+      return card(
+        PipCardState.RESTING, accent, "RESTING", status, nowMs, next,
+        workoutClock(status), null, "workout time", null, "next set", status.setsDone,
+      )
+    }
+    if (target == null) {
+      return card(
+        PipCardState.RESTING, accent, "RESTING", status, nowMs, next,
+        start, null, "since the last set", null, "next set", status.setsDone,
+      )
+    }
     val elapsed = seconds(start, nowMs)
-    val over = timed && elapsed >= targetSec
-    val done = status.setsDone >= status.sets
-    return PipFrame.Resting(
-      name = status.exerciseName,
-      eyebrow = when {
-        over -> "REST OVER"
-        done -> "REST · DONE"
-        else -> "REST · NEXT ${status.setsDone + 1}/${status.sets}"
-      },
-      countsFrom = start,
-      targetSec = if (timed) targetSec else null,
-      over = over,
-      // The ring empties as the rest runs out, and sits full and red once it is over.
-      fraction = when {
-        !timed -> 0f
-        over -> 1f
-        else -> 1f - elapsed.toFloat() / targetSec
-      },
-      load = if (done) null else status.load,
-      hr = heartView(status.hr, nowMs),
+    val over = elapsed >= target
+    return card(
+      if (over) PipCardState.REST_OVER else PipCardState.RESTING,
+      if (over) OVER_COLOR else accent,
+      if (over) "REST OVER" else "RESTING",
+      status, nowMs, next, start, target,
+      if (over) "past the ${formatTime(target)} rest" else "left of ${formatTime(target)} rest",
+      if (over) 1f else 1f - elapsed.toFloat() / target,
+      "next set", status.setsDone,
     )
   }
 
-  private fun paused(status: PipStatus, nowMs: Long): PipFrame.Paused {
+  /**
+   * `asking`: the three buttons rate the exercise just finished, so the card keeps its name and
+   * place and asks the question; "Next: …" only follows once the window stops asking.
+   */
+  private fun exerciseDone(status: PipStatus, accent: String, nowMs: Long, asking: Boolean): PipFrame.Card {
+    val start = status.restStartedAt
+    val target = if (status.phase == "resting") target(status) else null
+    val elapsed = seconds(start, nowMs)
+    val over = target != null && elapsed >= target
+    val next = status.nextUp
+    val base = card(
+      if (over) PipCardState.REST_OVER else PipCardState.EXERCISE_DONE,
+      if (over) OVER_COLOR else accent,
+      if (over) "REST OVER" else "EXERCISE DONE",
+      status, nowMs, "",
+      if (target != null) start else workoutClock(status), target,
+      when {
+        target == null -> "workout time"
+        over -> "past the ${formatTime(target)} rest"
+        else -> "left of ${formatTime(target)} rest"
+      },
+      when {
+        target == null -> null
+        over -> 1f
+        else -> 1f - elapsed.toFloat() / target
+      },
+      null, null,
+    )
+    if (asking) {
+      return base.copy(
+        stateWord = ASKS_EFFORT,
+        setLine = effortLabel(status.effortAnswer),
+        load = null,
+        loadLabel = null,
+      )
+    }
+    // What comes next: its name, its place, its first set and its sets, all still to do.
+    return if (next != null) base.copy(
+      name = "Next: $next",
+      where = where(status.nextUpIndex, status),
+      load = status.nextUpLoad,
+      loadLabel = if (status.nextUpLoad != null) "first set" else null,
+      sets = status.nextUpSets,
+      setsDone = 0,
+      current = null,
+    ) else base.copy(load = null, loadLabel = null)
+  }
+
+  private fun paused(status: PipStatus, accent: String, nowMs: Long): PipFrame.Card {
     val end = status.restEndsAt
     val at = status.pausedAt
     // What is left of the rest, as it was when the workout stopped.
     val left = if (end != null && at != null && end > at) (end - at + 999) / 1000 else null
-    return PipFrame.Paused(
-      countsFrom = at,
-      caption = if (left != null) "${status.exerciseName} · rest ${formatTime(left)} left" else status.exerciseName,
+    val inSet = status.setStartedAt != null && status.phase != "resting"
+    val done = status.sets > 0 && status.setsDone >= status.sets
+    val card = card(
+      PipCardState.PAUSED, PAUSED_COLOR, "PAUSED", status, nowMs,
+      setLine = when {
+        done -> ""
+        inSet -> "Set ${setOf(status.setsDone + 1, status.sets)}"
+        else -> "Next ${setOf(status.setsDone + 1, status.sets)}"
+      },
+      countsFrom = at, targetSec = null,
+      clockLabel = if (left != null) "paused for · ${formatTime(left)} of rest left" else "paused for",
+      bar = null, loadLabel = if (inSet) "this set" else "next set", current = status.setsDone,
     )
+    val next = status.nextUp
+    return if (done && next != null) card.copy(
+      name = "Next: $next", where = where(status.nextUpIndex, status), load = status.nextUpLoad,
+      loadLabel = if (status.nextUpLoad != null) "first set" else null,
+      sets = status.nextUpSets, setsDone = 0, current = null,
+    ) else card
   }
 
   /** Null with no strap; a bpm of null once the reading is stale, which the window draws as "—". */
@@ -216,26 +342,41 @@ object PipPresenter {
     return PipHeartView(if (fresh) hr.bpm else null, hr.zoneName, hr.zoneColor)
   }
 
-  /** What a load string splits into: the weight (big) and its unit, and the reps (smaller). */
-  data class LoadParts(val weight: String?, val unit: String?, val reps: String?)
+  /** #3745: "how did it feel?", answered in the window for the first seconds of the last rest. */
+  val EFFORT_BUTTONS = listOf(
+    PipButton("effortEasier", "Easier", "easier"),
+    PipButton("effortAsExpected", "As expected", "expected"),
+    PipButton("effortHarder", "Harder", "harder"),
+  )
 
-  /**
-   * "80 kg × 8" → 80 / kg / × 8; "80 kg" → 80 / kg; "8 reps" → reps only. Nothing is made up: a
-   * load that is none of these shows whole as the weight line.
-   */
-  fun splitLoad(load: String?): LoadParts {
-    val text = load?.trim()?.takeIf { it.isNotEmpty() } ?: return LoadParts(null, null, null)
-    val cross = text.indexOf(" × ")
-    val left = if (cross >= 0) text.substring(0, cross).trim() else text
-    val reps = if (cross >= 0) "× " + text.substring(cross + 3).trim() else null
-    if (cross < 0 && text.endsWith(" reps")) return LoadParts(null, null, text)
-    val weight = Regex("^(-?[0-9][0-9.,]*)\\s*(kg|lb)$").find(left)
-    return if (weight != null) LoadParts(weight.groupValues[1], weight.groupValues[2], reps)
-    else LoadParts(left, null, reps)
+  /** The state word while the window asks about the exercise just finished. */
+  const val ASKS_EFFORT = "HOW DID IT FEEL?"
+
+  /** The answer the question stands on, as the rest card names it; As expected by default. */
+  fun effortLabel(answer: Int?): String = when (answer) {
+    -1 -> "Easier than expected"
+    1 -> "Harder than expected"
+    else -> "As expected"
+  }
+
+  /** The three answers, the current one marked selected (its filled icon, and its label says so). */
+  fun effortButtons(answer: Int?): List<PipButton> {
+    val selected = (answer ?: 0).coerceIn(-1, 1) + 1
+    return EFFORT_BUTTONS.mapIndexed { index, button ->
+      if (index == selected) button.copy(label = "${button.label}, selected", icon = "${button.icon}Selected")
+      else button
+    }
+  }
+
+  /** Whether the window is offering the answer buttons at `nowMs`. */
+  fun asksEffort(phase: String, status: PipStatus?, nowMs: Long): Boolean {
+    val until = status?.effortUntil ?: return false
+    return phase == "summary" && nowMs < until
   }
 
   /** The buttons for a phase, at most `PipPolicy.MAX_ACTIONS`; the middle one is the main one. */
-  fun buttons(phase: String, status: PipStatus?): List<PipButton> {
+  fun buttons(phase: String, status: PipStatus?, nowMs: Long = System.currentTimeMillis()): List<PipButton> {
+    if (asksEffort(phase, status, nowMs)) return effortButtons(status?.effortAnswer)
     val list = when (phase) {
       "set" -> listOf(
         PipButton("repsDown", "Reps -", "minus"),
@@ -245,6 +386,10 @@ object PipPresenter {
       "rest" -> listOfNotNull(
         // +30 s moves a timed rest's end; an untimed rest has none to move.
         if (status?.restEndsAt != null) PipButton("restPlus", "+30 s", "plus30") else null,
+        PipButton("log", "Start set", "start"),
+        PipButton("pause", "Pause", "pause"),
+      )
+      "ready" -> listOf(
         PipButton("log", "Start set", "start"),
         PipButton("pause", "Pause", "pause"),
       )
@@ -260,8 +405,10 @@ object PipPresenter {
   fun title(status: PipStatus?): String? = status?.exerciseName?.takeIf { it.isNotBlank() }
 
   /** The line under the title: where the set is, or that the workout is held. */
-  fun subtitle(phase: String, status: PipStatus?): String? = when {
+  fun subtitle(phase: String, status: PipStatus?, nowMs: Long = System.currentTimeMillis()): String? = when {
     status == null -> null
+    asksEffort(phase, status, nowMs) -> "How did it feel?"
+    phase == "ready" -> "Ready"
     phase == "paused" -> "Paused"
     phase == "set" -> "Set ${minOf(status.setsDone + 1, maxOf(status.sets, 1))} of ${status.sets}"
     phase == "rest" -> "Resting"
@@ -310,6 +457,17 @@ object PipPresenter {
       nextUp = (map["nextUp"] as? String)?.takeIf { it.isNotBlank() },
       hr = heartRate(map["hr"]),
       setColors = (map["setColors"] as? List<*>)?.mapNotNull { color(it) } ?: emptyList(),
+      sessionName = (map["sessionName"] as? String)?.takeIf { it.isNotBlank() },
+      exerciseIndex = int("exerciseIndex"),
+      exerciseCount = int("exerciseCount"),
+      workoutFrom = long("workoutFrom"),
+      nextUpIndex = int("nextUpIndex"),
+      nextUpSets = int("nextUpSets"),
+      nextUpLoad = (map["nextUpLoad"] as? String)?.takeIf { it.isNotBlank() },
+      effortUntil = ((map["effortAsk"] as? Map<*, *>)?.get("until") as? Number)?.toLong(),
+      effortAnswer = ((map["effortAsk"] as? Map<*, *>)?.get("answer") as? Number)?.toInt()
+        ?.takeIf { it in -1..1 },
+      accent = color(map["accent"]),
     )
   }
 

@@ -6,6 +6,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.526.0",
+    date: "2026-11-20",
+    changes: [
+      "Both apps: a workout plan names one time budget, the one it was fitted to, and its note says plainly when a slower day may run over. A lift's set count is held to your phase's range, so one lift can no longer jump two sets in a single plan.",
+      "Both apps: changing a lift through the trainer chat rebuilds that session's plan instead of leaving the old one in place, and undoing the change can no longer bring back a plan made for the other lift. On an AI-planned program the chat no longer offers the progression style, which that plan does not use.",
+      "Both apps: a deload plan whose deload has already ended can no longer be accepted from a stale screen.",
+      "TrainingAi Preview: after the network drops and comes back, screens recover by themselves without restarting the app, Sync now finishes and says what it did, and a paused history download resumes.",
+      "TrainingAi Preview: Health Connect switched on with no permission reads as Needs permission. It is no longer counted as a change waiting to upload, and it no longer makes Sync now fail.",
+      "Behind the scenes: a readiness update from Oura that changes only its contributors is scored straight away, and the database gains storage for the new per-exercise effort answer (easier, as expected, harder), which nothing shows or uses yet.",
+    ],
+  },
+  {
     version: "1.525.0",
     date: "2026-11-20",
     changes: [

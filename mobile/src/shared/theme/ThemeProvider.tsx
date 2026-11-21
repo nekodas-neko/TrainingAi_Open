@@ -70,7 +70,7 @@ function useThemeController({
     previewCustomHue: setPreviewHue,
     /** The factor text is drawn at; for sizes that must track text, such as a row fitting a label. */
     textScale: textScale(fontScale),
-    /** Pass to every Text and TextInput so none shrinks below its token size (text-scale.ts). */
+    /** Pass to every Text and TextInput so each follows the system font scale (text-scale.ts). */
     allowFontScaling: scalesText(fontScale),
   };
 }

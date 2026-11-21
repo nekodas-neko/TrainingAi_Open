@@ -14,7 +14,7 @@ precedence — which are [`devices`](../devices/README.md). Zone-based pacing of
 | Live HR | `lib/live-hr/` |
 | Zones & max HR | `packages/shared/src/health/hr-zones.ts`, `zone-minutes.ts`, `zone-quota.ts` |
 | Smoothing & windows | `packages/shared/src/health/hr-smoothing.ts`, `hr-window-merge.ts`, `observed-hr.ts`, `hr-episode-detection.ts`, `hr-change-display.ts` |
-| HRV | `packages/shared/src/health/rmssd.ts`, `hrv-5min.ts`, `hrv-frequency.ts`, `tachogram.ts`, `daytime-hrv.ts`, `daytime-hrv-model.ts` |
+| HRV | `packages/shared/src/health/rmssd.ts`, `hrv-frequency.ts`, `tachogram.ts`, `daytime-hrv.ts`, `daytime-hrv-model.ts` |
 | Recovery profiles | `packages/shared/src/health/hr-recovery-profile.ts`, `compute-hr-recovery-profile.ts`, `hr-recovery-by-exercise.ts`, `hr-recovery-trend.ts`, `hr-profile.ts` |
 | Tables | `body_metrics` (hrv_ms, resting_heart_rate), `set_hr_stats`, `workout_hr_stats` |
 

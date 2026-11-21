@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { getRepositoryAsync } from '@/lib/data'
 import { DEFAULT_TZ, todayInTz, normalizeDateParam } from '@trainingai/shared/date-utils'
-import { fromZonedTime } from 'date-fns-tz'
+import { readStressDay, type StressDayMethod, type StressDaySpan } from '@/lib/health/stress-day'
 import { rateLimit } from '@/lib/rate-limit'
 import { reportServerError } from '@/lib/observability'
 
@@ -29,6 +29,11 @@ import { reportServerError } from '@/lib/observability'
  * included, rather than special-casing today to the live one: one chart, one baseline, days that are
  * comparable with each other. Today's stored series therefore ends at the last rollup rather than at
  * this minute, which is the honest cost of that choice and is why `throughMs` is reported.
+ *
+ * **Since the ring moved to Oura Cloud (17 Oct) nothing writes those buckets** (#2860 F1). From the
+ * switch day on, a day with none stored gets a series computed on read from heart rate while still
+ * (`lib/health/stress-day.ts`), on a different ruler, which `method` names. A day never mixes the two.
+ * Display only: no score reads this route.
  */
 export interface StressDayResponse {
   date: string
@@ -36,6 +41,11 @@ export interface StressDayResponse {
   series: { t: number; level: number }[]
   /** Last bucket's start, or null when the day has none — a day the rollup has not reached yet. */
   throughMs: number | null
+  /** Which ruler the levels are on (`ring_dhrv` stored, `still_hr` computed on read); null with no series. */
+  method: StressDayMethod | null
+  /** Half hours left out for movement, and the day's sleep, for the chart's strip (#3939). Empty on `ring_dhrv` days. */
+  moving: StressDaySpan[]
+  asleep: StressDaySpan[]
 }
 
 export async function GET(req: NextRequest) {
@@ -55,21 +65,15 @@ export async function GET(req: NextRequest) {
   const date = norm.replace(/\//g, '-')
 
   try {
-    // The user's local day, not the server's. `fromZonedTime` is what `hr-day` uses for the same job.
-    const [y, m, d] = date.split('-').map(Number)
-    const from = fromZonedTime(new Date(y, m - 1, d, 0, 0, 0), tz)
-    const to   = fromZonedTime(new Date(y, m - 1, d, 23, 59, 59), tz)
-
     const repo = await getRepositoryAsync()
-    const rows = await repo.getOuraDaytimeStressBuckets(userId, from, to)
-
-    // Ascending by query, but mapped without re-sorting on purpose: `toSegments` in the chart sorts
-    // anyway, precisely because a day assembled from stored rows carries no ordering guarantee.
-    const series = rows.map(r => ({ t: r.bucketMid.getTime(), level: r.level }))
+    const { series, method, moving, asleep } = await readStressDay(repo, userId, date, tz)
     const body: StressDayResponse = {
       date,
       series,
       throughMs: series.length ? series[series.length - 1].t : null,
+      method,
+      moving,
+      asleep,
     }
     return NextResponse.json(body, { headers: { 'Cache-Control': 'private, no-store' } })
   } catch (err) {

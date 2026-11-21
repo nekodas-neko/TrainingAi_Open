@@ -8,6 +8,7 @@
 //
 // Runs only against a real local dev Postgres — skips cleanly in CI without DATABASE_URL.
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest'
+import { clientBackendPid, waitUntilBlockedBy } from '@/lib/__tests__/helpers/lock-wait'
 
 const canRun = !!process.env.DATABASE_URL
 const TEST_USER_ID = '00000000-0000-4000-8000-0000000005cd'
@@ -77,16 +78,11 @@ describe.skipIf(!canRun)('scale_raw_samples — a re-sent reading does not doubl
         `INSERT INTO scale_raw_samples (user_id, measured_at, raw_hex, decoded, status)
          VALUES ($1, $2, $3, '{}', 'confirmed') RETURNING id`, [TEST_USER_ID, MEASURED_AT, RAW_HEX])
 
+      const holder = await clientBackendPid(other)
       const mine = insert(TEST_USER_ID)
-      // Commit only once this call is actually waiting on the other row's lock.
-      for (let i = 0; i < 200; i++) {
-        const { rows } = await pool.query(
-          `SELECT 1 FROM pg_stat_activity
-            WHERE datname = current_database() AND wait_event_type = 'Lock'
-              AND query ILIKE 'insert into "scale_raw_samples"%'`)
-        if (rows.length > 0) break
-        await new Promise(r => setTimeout(r, 10))
-      }
+      // Commit only once this call is actually waiting on the other row's lock (#3929: scoped to
+      // this holder, so another session's lock wait cannot end the wait early).
+      await waitUntilBlockedBy(pool, holder)
       await other.query('COMMIT')
 
       expect((await mine).id).toBe(Number(theirs.id))

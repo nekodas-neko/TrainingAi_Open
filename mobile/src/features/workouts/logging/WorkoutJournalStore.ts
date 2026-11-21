@@ -13,6 +13,8 @@ import { ApiError } from '../../account/api/client.ts';
 import type { AccountConnection } from '../../account/session.ts';
 import { readSessionResponse, type SessionPreview } from '../catalog.ts';
 import { nextExerciseFlow, supersetNext, workoutFlow } from './flow.ts';
+import { answerEffort, askEffort, settleLeftEffort, showEffort } from './effort.ts';
+import type { EffortVsPlan } from '@trainingai/shared/workout/effort-vs-plan';
 import {
   expectedRpe,
   initialWeight,
@@ -76,7 +78,8 @@ function replaceWorkout(
   return {
     ...data,
     workouts: data.workouts.map((workout) =>
-      workout.id === id ? update(workout) : workout,
+      // #3745: leaving a rest card drops the defaults its lifter never saw.
+      workout.id === id ? settleLeftEffort(workout, update(workout)) : workout,
     ),
   };
 }
@@ -544,6 +547,28 @@ export class WorkoutJournalStore {
       }),
     );
 
+  /** #3745: the lifter's answer on the rest card or in the window, marked `tapped`. */
+  answerEffort = (workoutId: string, exerciseId: string, vsPlan: EffortVsPlan) =>
+    this.edit((data) =>
+      replaceWorkout(data, workoutId, (workout) => answerEffort(workout, exerciseId, vsPlan)),
+    );
+
+  /**
+   * #3745: the question about these exercises is on screen. Queued behind any running action rather
+   * than refused while busy, since the set that opened the card is still saving when it shows.
+   */
+  showEffort = (workoutId: string, exerciseIds: readonly string[]): Promise<void> => {
+    const workout = this.current.data.workouts.find((x) => x.id === workoutId);
+    if (!this.current.ready || !workout || workout.status !== 'active') return Promise.resolve();
+    if (showEffort(workout, exerciseIds) === workout) return Promise.resolve();
+    return this.write((data) => ({
+      ...data,
+      workouts: data.workouts.map((x) =>
+        x.id === workoutId && x.status === 'active' ? showEffort(x, exerciseIds) : x,
+      ),
+    })).catch(() => undefined);
+  };
+
   rateSet = (workoutId: string, exerciseId: string, setId: string, rpe: number) =>
     this.edit((data) =>
       replaceWorkout(data, workoutId, (workout) =>
@@ -672,7 +697,7 @@ export class WorkoutJournalStore {
           0,
           effectiveRestSec(restSeconds) + workout.restAdjustmentSeconds,
         );
-        return {
+        const recorded: WorkoutRecord = {
           ...next,
           flow: {
             stage: summary ? 'summary' : 'exercise',
@@ -713,6 +738,8 @@ export class WorkoutJournalStore {
               ? { exerciseId, setId, startedAt: now, endsAt: now + restSeconds * 1000 }
               : null,
         };
+        // #3745: the rest card opens on "how did it feel?", starting on As expected.
+        return summary ? askEffort(recorded, exerciseId) : recorded;
       }),
     );
   };
@@ -839,6 +866,9 @@ export class WorkoutJournalStore {
           relogOf: source.relogOf ?? source.id,
           supersetGroup: null,
           readyStartedAt: now,
+          effortVsPlan: null,
+          effortSource: null,
+          effortShown: false,
           sets: source.sets.map((set) => ({
             ...set,
             id: setIds.get(set.id)!,
@@ -907,6 +937,10 @@ export class WorkoutJournalStore {
               relogOf: source.relogOf ?? source.id,
               retired: true,
               sets: recorded,
+              // Left before its last set: no answer (#3745).
+              effortVsPlan: null,
+              effortSource: null,
+              effortShown: false,
             }
           : null;
         const basis = { ...source, ...alternative, target80: null, latestWeight: null };
@@ -920,6 +954,9 @@ export class WorkoutJournalStore {
           lastDate: alternative.lastDate ?? null,
           // #3671: the swapped-out exercise's record is not this one's.
           allTimePr1rm: alternative.allTimePr1rm ?? null,
+          effortVsPlan: null,
+          effortSource: null,
+          effortShown: false,
           prevFromBaseline: alternative.prevFromBaseline ?? false,
           latestWeight: null,
           target80: null,

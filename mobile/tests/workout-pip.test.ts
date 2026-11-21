@@ -77,7 +77,9 @@ test('only an active workout past its warm-up opens the window (#2908)', () => {
   assert.equal(pipPhaseFor(workout({ status: 'completed' })), 'idle');
   assert.equal(pipPhaseFor(workout({ flow: { stage: 'warmup', exerciseId: ids.bench } })), 'pre');
   assert.equal(pipPhaseFor(workout({ flow: { stage: 'review', exerciseId: ids.bench } })), 'done');
-  assert.equal(pipPhaseFor(workout()), 'rest');
+  // #3734: before the exercise's first set is Ready, not a rest of 0:00; after one it is a rest.
+  assert.equal(pipPhaseFor(workout()), 'ready');
+  assert.equal(pipPhaseFor(recorded(1)), 'rest');
   assert.equal(
     pipPhaseFor(workout({ runningSet: { exerciseId: ids.bench, setId: ids.set(1) } })),
     'set',
@@ -88,8 +90,8 @@ test('only an active workout past its warm-up opens the window (#2908)', () => {
   );
   assert.equal(pipPhaseFor(recorded(3)), 'complete');
   assert.deepEqual(
-    (['idle', 'pre', 'set', 'rest', 'complete', 'summary', 'done'] as const).filter(allowsPip),
-    ['set', 'rest', 'complete', 'summary'],
+    (['idle', 'pre', 'ready', 'set', 'rest', 'complete', 'summary', 'done'] as const).filter(allowsPip),
+    ['ready', 'set', 'rest', 'complete', 'summary'],
   );
 });
 

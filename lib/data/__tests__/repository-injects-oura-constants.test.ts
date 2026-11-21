@@ -22,14 +22,12 @@ describe.skipIf(!canRun)('getRepository — Oura constants injection', () => {
     const daytime = await import('@/lib/health/daytime-stress')
     const steps = await import('@/lib/oura-models/steps-motion-decoder')
     const resilience = await import('@/lib/health/stress-resilience')
-    const cumulative = await import('@/lib/oura-models/cumulative-stress')
     hasDaytimeStressConstants = daytime.hasDaytimeStressConstants
     hasStepsDecoderConstants = steps.hasStepsDecoderConstants
     clearAll = () => {
       daytime.__clearDaytimeStressConstants()
       steps.__clearStepsDecoderConstants()
       resilience.__clearResilienceConstants()
-      cumulative.__clearCumulativeStressConstants()
     }
   })
 

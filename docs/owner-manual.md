@@ -333,8 +333,8 @@ Everything merged during the week ships together. **A hotfix goes out off-schedu
 production is actually broken**; anything less waits for Tuesday.
 
 1. 🤖 The Orchestrator bumps the version, picks the candidate commit, opens a **release issue**
-   with the checklist, and has the Implementer run the release test (full suite, local run of the
-   changed flows, the device pass).
+   with the checklist, and has the Implementer run the release test (full suite, the route smoke,
+   local run of the changed flows, the device pass).
 2. 🤖 It sends you the **release summary** in chat, and posts it on the release issue:
    > **Release v1.487.0: ready for your OK**
    > **New for you:** …

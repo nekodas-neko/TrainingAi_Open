@@ -31,9 +31,14 @@ export const walkCandidatesSpec = (today: string) => ({
         durationMin: z.number().finite(),
       }),
     ),
+    // The day's logged activities and source-recorded workouts; absent from a server before #3625.
+    covered: z
+      .array(z.object({ startMs: z.number().finite(), endMs: z.number().finite() }))
+      .default([]),
   }),
 });
-export type DetectedWalk = z.infer<ReturnType<typeof walkCandidatesSpec>['schema']>['walks'][number];
+export type WalkCandidates = z.infer<ReturnType<typeof walkCandidatesSpec>['schema']>;
+export type DetectedWalk = WalkCandidates['walks'][number];
 
 /** How long an answered walk is remembered (`RING_WALK_MEMORY_MS`): the server offers today's only. */
 export const ANSWERED_WALK_MEMORY_MS = 3 * 24 * 60 * 60 * 1000;
@@ -78,6 +83,42 @@ export function visibleWalks(
     }
   }
   return kept;
+}
+
+/**
+ * Today's walks to consider: the server's latest answer, plus any walk an earlier answer offered
+ * today that nobody has answered yet. The current app keeps every offer in its persisted store until
+ * it is saved or dismissed (`auto-detection-store`'s `pendingSessions`), so a later answer that no
+ * longer lists the walk, or a refresh that fails, does not take it off its card; on 20 Nov it offered
+ * a walk Preview had dropped (#3625). A held walk still goes when the latest answer lists a logged
+ * activity or a source's own workout over it (no duplicate), when the answer has a newer version of
+ * it, and when it started on another day: the card shows clock times with no date (#3706).
+ */
+export function offeredToday(
+  answer: WalkCandidates | null | undefined,
+  held: readonly DetectedWalk[],
+  today: string,
+  timezone: string,
+): DetectedWalk[] {
+  const onToday = (walk: Span) => toAestDay(new Date(walk.startMs), timezone) === today;
+  // By each walk's own start, not the answer's date: that is in the profile's timezone.
+  const current = (answer?.walks ?? []).filter(onToday);
+  const covered = answer?.covered ?? [];
+  const kept = held.filter(
+    (walk) =>
+      onToday(walk) &&
+      !current.some((other) => overlaps(other, walk)) &&
+      !covered.some((span) => overlaps(span, walk)),
+  );
+  return [...current, ...kept];
+}
+
+/** Whether two walk lists hold the same spans, so an unchanged answer writes nothing. */
+export function sameWalks(a: readonly Span[], b: readonly Span[]) {
+  return (
+    a.length === b.length &&
+    a.every((walk, i) => walk.startMs === b[i]!.startMs && walk.endMs === b[i]!.endMs)
+  );
 }
 
 /** The answered list with `startMs` added and anything past the memory dropped. */

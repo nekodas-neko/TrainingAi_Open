@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { pictureInPicture } from '../../../integrations/pip/platform';
 import type { PictureInPicture } from '../../../integrations/pip/types';
 import type { WorkoutStatusPayload } from '../../../integrations/workout-status/types';
@@ -6,6 +6,7 @@ import type { WorkoutJournalStore } from '../logging/WorkoutJournalStore';
 import type { WorkoutRecord } from '../logging/workout';
 import { workoutStatusFor } from '../status/workout-status';
 import { pipCommand, pipPhaseFor, pipSetColor, pipSetColors, type PipAction } from './pip';
+import { effortQuestionWindow } from '../logging/effort';
 
 export type PipHeartRate = NonNullable<WorkoutStatusPayload['hr']>;
 /** At most one heart-rate update a second reaches the window (#3266). */
@@ -20,6 +21,9 @@ export const HR_PUSH_MS = 1_000;
 export function createPipReporter(
   native: Pick<PictureInPicture, 'setPhase'> | null,
   now: () => number = Date.now,
+  accent: string | null = null,
+  /** #3745: the window has been sent the question about this exercise, so it is on screen. */
+  onEffortAsked: (exerciseId: string) => void = () => {},
 ) {
   let last: string | null = null;
   let closed = false;
@@ -31,7 +35,17 @@ export function createPipReporter(
     const phase = pipPhaseFor(workout);
     const status = workoutStatusFor(workout);
     const setColor = pipSetColor(workout);
-    const withHr = status && { ...status, hr, setColors: pipSetColors(workout) };
+    const asked = effortQuestionWindow(workout, now());
+    if (asked && !workout.exercises.find((x) => x.id === asked.exerciseId)?.effortShown) {
+      onEffortAsked(asked.exerciseId);
+    }
+    const withHr = status && {
+      ...status,
+      hr,
+      setColors: pipSetColors(workout),
+      effortAsk: asked && { until: asked.until, answer: asked.answer },
+      accent,
+    };
     const key = JSON.stringify([phase, withHr, setColor]);
     if (key === last) return;
     last = key;
@@ -40,6 +54,12 @@ export function createPipReporter(
   return {
     update(next: WorkoutRecord) {
       workout = next;
+      send();
+    },
+    /** The app's accent changed: the window redraws in it, on the same reporter. */
+    setAccent(next: string | null) {
+      if (next === accent) return;
+      accent = next;
       send();
     },
     /** The strap's latest reading, or null when there is none to show. */
@@ -69,14 +89,26 @@ export function createPipReporter(
  * The workout screen's half of picture-in-picture: its phase, and the window's buttons. Returns the
  * reporter, which the strap's heart-rate reader feeds (`PipHeartRate`).
  */
-export function useWorkoutPip(workout: WorkoutRecord, controller: WorkoutJournalStore) {
-  const reporter = useMemo(() => createPipReporter(pictureInPicture), []);
-  // A layout effect runs inside the commit, so a change made from a window button reaches the
-  // native view without waiting on JS timers, which are paused while the app is in PiP.
-  useLayoutEffect(() => reporter.update(workout), [reporter, workout]);
-  useEffect(() => () => reporter.close(), [reporter]);
+export function useWorkoutPip(
+  workout: WorkoutRecord,
+  controller: WorkoutJournalStore,
+  /** The app's accent for the always-dark window (`pipAccent`); null keeps the window's own. */
+  accent: string | null = null,
+) {
   const latest = useRef({ workout, controller });
   latest.current = { workout, controller };
+  // One reporter for the workout. A new one per accent let the old one's cleanup send "idle" after
+  // the new one had sent the phase, which its own unchanged key then never resent.
+  const [reporter] = useState(() =>
+    createPipReporter(pictureInPicture, Date.now, accent, (exerciseId) =>
+      latest.current.controller.showEffort(latest.current.workout.id, [exerciseId]),
+    ),
+  );
+  // A layout effect runs inside the commit, so a change made from a window button reaches the
+  // native view without waiting on JS timers, which are paused while the app is in PiP.
+  useLayoutEffect(() => reporter.setAccent(accent), [reporter, accent]);
+  useLayoutEffect(() => reporter.update(workout), [reporter, workout]);
+  useEffect(() => () => reporter.close(), [reporter]);
   useEffect(() => {
     const subscription = pictureInPicture?.addListener('onAction', (event) =>
       runPipAction(latest.current.workout, latest.current.controller, event.action),
@@ -98,11 +130,17 @@ export function runPipAction(
     | 'adjustRest'
     | 'pause'
     | 'resume'
+    | 'answerEffort'
   >,
   action: PipAction,
+  now: number = Date.now(),
 ) {
-  const command = pipCommand(workout, action);
+  const command = pipCommand(workout, action, now);
   if (!command) return;
+  if (command.type === 'effort') {
+    void controller.answerEffort(workout.id, command.exerciseId, command.value);
+    return;
+  }
   if (command.type === 'restPlus') void controller.adjustRest(workout.id, 30);
   else if (command.type === 'pause') void controller.pause(workout.id);
   else if (command.type === 'resume') void controller.resume(workout.id);

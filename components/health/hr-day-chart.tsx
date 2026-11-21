@@ -17,6 +17,7 @@ import {
 } from 'chart.js'
 import { useHeroColorScheme } from './detail-hero'
 import { stressOverlay } from './hr-stress-overlay'
+import { resolveColor } from '@trainingai/shared/chart-colors'
 import { bucketAverage, hrChartDomain } from '@trainingai/shared/health/hr-smoothing'
 import { withGapBreaks, interpolateGaps } from './hr-day-chart-gaps'
 import {
@@ -182,7 +183,8 @@ function HrDayChartBase({ readings, date, workoutSessions = [], compact = false,
       // `62 bpm` invites the two to be compared as if they shared units.
       ...(hasStress ? [{
         data:            stress!.points,
-        borderColor:     stressColor,
+        // The canvas cannot read a CSS variable and drew this line black (#2860 F1 check).
+        borderColor:     resolveColor(stressColor),
         pointRadius:     0,
         fill:            false,
         tension:         0.4,

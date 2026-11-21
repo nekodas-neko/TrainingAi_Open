@@ -55,16 +55,24 @@ export interface StillRhr {
   coverageMin: number
 }
 
+/** One heart-rate reading that passed the still gate, with the minutes it stands for (by their start). */
+export interface StillReading {
+  tsMs: number
+  bpm: number
+  minutes: number[]
+}
+
 /**
- * The median heart rate of the day's still readings, with their coverage, or null when fewer than
- * `minCoverageMin` still minutes stand behind them.
+ * The day's heart-rate readings that stand for still, waking, measured minutes only, in input order.
+ * The gate behind `stillDaytimeRhr`, shared with the daytime stress series (`still-hr-stress.ts`) so
+ * the two never disagree about what "still" means.
  */
-export function stillDaytimeRhr(inp: StillRhrInput, minCoverageMin = STILL_RHR_MIN_COVERAGE_MIN): StillRhr | null {
+export function stillReadings(inp: StillRhrInput): StillReading[] {
   const met: TimedSample[] = inp.met
     .filter(m => Number.isFinite(m.value))
     .map(m => ({ ds: m.tsMs, value: m.value }))
     .sort((a, b) => a.ds - b.ds)
-  if (met.length === 0) return null
+  if (met.length === 0) return []
 
   const exclude: ExclusionWindow[] = [
     ...metActiveWindows(met, MET_MINUTE_MS, MET_ACTIVE_THRESHOLD),
@@ -80,7 +88,7 @@ export function stillDaytimeRhr(inp: StillRhrInput, minCoverageMin = STILL_RHR_M
   }
 
   const cover = Math.max(0, inp.hrCoverMs ?? 0)
-  const qualifying: (TimedSample & { minutes: number[] })[] = []
+  const qualifying: StillReading[] = []
   for (const h of inp.hr) {
     if (h.tsMs < inp.dayStartMs || h.tsMs >= inp.dayEndMs) continue
     if (!(h.bpm >= HR_PLAUSIBLE_MIN && h.bpm <= HR_PLAUSIBLE_MAX)) continue
@@ -93,13 +101,23 @@ export function stillDaytimeRhr(inp: StillRhrInput, minCoverageMin = STILL_RHR_M
     for (let k = first; k <= last; k++) minutes.push(k * MET_MINUTE_MS)
     if (minutes.length === 0) continue
     if (!minutes.every(m => measured.has(m) && stillMinutes.has(m))) continue
-    qualifying.push({ ds: h.tsMs, value: h.bpm, minutes })
+    qualifying.push({ tsMs: h.tsMs, bpm: h.bpm, minutes })
   }
+  return qualifying
+}
+
+/**
+ * The median heart rate of the day's still readings, with their coverage, or null when fewer than
+ * `minCoverageMin` still minutes stand behind them.
+ */
+export function stillDaytimeRhr(inp: StillRhrInput, minCoverageMin = STILL_RHR_MIN_COVERAGE_MIN): StillRhr | null {
+  const qualifying = stillReadings(inp)
+  if (qualifying.length === 0) return null
 
   const covered = new Set<number>()
   for (const q of qualifying) for (const m of q.minutes) covered.add(m)
   if (covered.size < minCoverageMin) return null
 
-  const bpm = medianGated(qualifying)
+  const bpm = medianGated(qualifying.map(q => ({ ds: q.tsMs, value: q.bpm })))
   return bpm == null ? null : { bpm, coverageMin: covered.size }
 }
