@@ -290,7 +290,10 @@ BEGIN
     WHERE body_battery_daily.anchor_source = 'default';
 
   -- ── An unusual-day readiness verdict for today, still unanswered (Home's unusual-day card) ────
+  -- Coherent with the day's live readiness: seed.sql's inputs score today 69, so the verdict is
+  -- frozen at 69 against a band of 54-66 (over it). The seed used to freeze 78 against 57-69.5,
+  -- which left the card stating a live score the frozen direction did not fit (#3659).
   UPDATE readiness_verdicts
-     SET verdict = 'good', score = 78, band_median = 63, band_low = 57, band_high = 69.5
-   WHERE user_id = uid AND date = today AND response_state = 'none' AND verdict = 'normal';
+     SET verdict = 'good', score = 69, band_median = 60, band_low = 54, band_high = 66
+   WHERE user_id = uid AND date = today AND response_state = 'none';
 END $$;

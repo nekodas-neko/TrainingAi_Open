@@ -1,10 +1,12 @@
 // What Home's readiness card says today (#2106). A usual score is stated and nothing is asked; a
 // score outside the user's own band is asked about. The band and the verdict come from the server
-// (`/api/readiness-verdict`), never from a client copy of the rule.
+// (`/api/readiness-verdict`); "outside the band" is the shared rule, not a client copy (#3659).
 //
 // The answers are NOT validation of the score. Only unusual days are asked, so an ordinary-looking
 // day the user would have called bad is never sampled; nothing here or downstream may describe an
 // answer as agreement with the score (#2106, OR-171).
+
+import { readinessVerdictOfScore } from '@trainingai/shared/health/readiness-verdict-band';
 
 export type ReadinessVerdictData = {
   verdict: 'poor' | 'normal' | 'good';
@@ -47,31 +49,35 @@ export function readinessPrompt(
   feelAnswered = false,
   /**
    * Today's live readiness (`readinessDisplayScore`), as the score chips show it (#3659). The
-   * verdict is frozen at its first read and today can be re-scored after it, so its own score is
-   * only the fallback until the live one loads. The verdict still picks the band and the wording.
+   * verdict is frozen at its first read and today can be re-scored after it.
    */
   liveScore?: number | null,
 ): ReadinessPrompt {
   if (!verdict) {
     return { kind: 'silent' };
   }
-  const score = Math.round(liveScore ?? verdict.score);
-  if (verdict.verdict === 'normal') {
+  const answered = verdict.responseState !== 'none' || feelAnswered;
+  // Answered or skipped: the sentence is about the day that was answered, so it keeps the frozen
+  // score and direction together. A live score is never mixed with a frozen direction.
+  // Unanswered: decide again from the live score against the verdict's own band, by the shared
+  // rule. It is judged on the rounded numbers the sentence prints, so it cannot contradict itself.
+  const score = Math.round(answered ? verdict.score : (liveScore ?? verdict.score));
+  const band = { low: Math.round(verdict.band.low), high: Math.round(verdict.band.high) };
+  const direction = answered ? verdict.verdict : readinessVerdictOfScore(score, band);
+  if (direction === 'normal') {
     return {
       kind: 'usual',
       line: `Readiness ${score} is a usual day for you (usual ${range(verdict)}).`,
     };
   }
-  const low = verdict.verdict === 'poor';
-  if (verdict.responseState !== 'none' || feelAnswered) {
-    return {
-      kind: 'usual',
-      line: `Readiness ${score} is ${low ? 'under' : 'over'} your usual ${range(verdict)}.`,
-    };
+  const low = direction === 'poor';
+  const line = `Readiness ${score} is ${low ? 'under' : 'over'} your usual ${range(verdict)}.`;
+  if (answered) {
+    return { kind: 'usual', line };
   }
   return {
     kind: 'ask',
-    line: `Readiness ${score} is ${low ? 'under' : 'over'} your usual ${range(verdict)}.`,
+    line,
     eyebrow: low ? 'Readiness is low today' : 'Readiness is high today',
     title: `${score} is ${low ? 'under' : 'over'} your usual ${range(verdict)}. How do you feel?`,
     answered: false,

@@ -19,6 +19,7 @@
 import { iqrBand } from '@trainingai/shared/stats'
 import { readinessModelVersionOf, readinessScaleOf } from './readiness-decision-thresholds'
 import { toCurrentReadinessScale } from './readiness-scale'
+import { readinessVerdictOfScore } from './readiness-verdict-band'
 
 export { readinessModelVersionOf, readinessScaleOf }
 
@@ -137,7 +138,7 @@ export function readinessVerdictForDay(
   const band = iqrBand(baseline.map(d => d.score as number), READINESS_VERDICT_IQR_MULTIPLIER)
   if (!band) return null
 
-  const verdict: ReadinessVerdict = score < band.low ? 'poor' : score > band.high ? 'good' : 'normal'
+  const verdict: ReadinessVerdict = readinessVerdictOfScore(score, band)
   const baselineSameVersionDays = target.modelVersion === null
     ? 0
     : baseline.filter(d => d.modelVersion === target.modelVersion).length
