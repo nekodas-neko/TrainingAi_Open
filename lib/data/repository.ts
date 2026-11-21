@@ -759,7 +759,7 @@ export interface WorkoutRepository {
   confirmEarlyDeload(userId: string, programId: string, today: string, timezone?: string): Promise<void>
 
   // ── Workout Logging ────────────────────────────────────────────────────────
-  createWorkoutSession(userId: string, sessionId: string | undefined, sessionName: string, startedAt: Date, phaseId?: string, phaseType?: ProgramPhaseType, isEarlyDeload?: boolean): Promise<WorkoutSession>
+  createWorkoutSession(userId: string, sessionId: string | undefined, sessionName: string, startedAt: Date, phaseId?: string, phaseType?: ProgramPhaseType, isEarlyDeload?: boolean, intensityMode?: 'full' | 'deload' | null, wasOverride?: boolean): Promise<WorkoutSession>
   // Returns true if a new row was inserted, false if a session with this id already existed
   ensureWorkoutSession(userId: string, sessionId: string, programSessionId: string | undefined, sessionName: string, startedAt: Date, phaseId?: string, phaseType?: ProgramPhaseType, isEarlyDeload?: boolean, intensityMode?: 'full' | 'deload' | null, wasOverride?: boolean): Promise<EnsuredWorkoutSession>
   /** Q-473 — true when this call stamped `completed_at`, false when it was already stamped (a

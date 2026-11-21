@@ -311,6 +311,37 @@ describe('POST /api/workout-review/session/[sessionId]', () => {
     expect((await beforeOf(SQUAT)).pct).toBe(99)
   })
 
+  // #3968: the review read the stored plan without asking whether it had aged out. Every other
+  // reader goes through the served-plan check (`serveStoredPrescription`), and so does this one now.
+  it('diffs against the base style when the stored plan has expired', async () => {
+    getSessionPeriodization.mockResolvedValue(state({
+      prescriptionStatus: 'accepted',
+      prescriptionExpiresAt: new Date(Date.now() - 60_000),
+      prescription: { phaseAction: 'stay', exercises: [{ sessionExerciseId: SQUAT, sets: 9, reps: 9, pct: 99, restSec: 999 }] },
+    }))
+    expect(await beforeOf(SQUAT)).toEqual({ sets: 3, reps: 5, pct: 80, restSec: 180 })
+  })
+
+  it('still diffs against an accepted plan that has not expired yet', async () => {
+    getSessionPeriodization.mockResolvedValue(state({
+      prescriptionStatus: 'accepted',
+      prescriptionExpiresAt: new Date(Date.now() + 3_600_000),
+      prescription: { phaseAction: 'stay', exercises: [{ sessionExerciseId: SQUAT, sets: 9, reps: 9, pct: 99, restSec: 999 }] },
+    }))
+    expect((await beforeOf(SQUAT)).pct).toBe(99)
+  })
+
+  it('diffs against the base style when the plan\'s deload has ended (#3876)', async () => {
+    // An accepted deload plan, in a deload phase that has already run its sessions: the card hides it,
+    // and so must the review.
+    getSessionPeriodization.mockResolvedValue(state({
+      phase: 'deload', sessionsInPhase: 99,
+      prescriptionStatus: 'accepted',
+      prescription: { phaseAction: 'stay', deload: true, exercises: [{ sessionExerciseId: SQUAT, sets: 9, reps: 9, pct: 40, restSec: 999 }] },
+    }))
+    expect((await beforeOf(SQUAT)).pct).toBe(80)
+  })
+
   it('falls back to a role default when an exercise has no progression style', async () => {
     // primary 3×5@80, secondary 3×8@72, accessory 3×12@65
     expect(await beforeOf(SQUAT)).toEqual({ sets: 3, reps: 5, pct: 80, restSec: 180 })

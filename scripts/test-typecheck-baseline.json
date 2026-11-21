@@ -76,6 +76,6 @@
   "packages/shared/src/running/__tests__/prescription.test.ts": 1,
   "packages/shared/src/session-explain/__tests__/build-explain-data.test.ts": 1,
   "packages/shared/src/workout/__tests__/complete-workout.test.ts": 4,
-  "packages/shared/src/workout/__tests__/log-exercise.test.ts": 25,
+  "packages/shared/src/workout/__tests__/log-exercise.test.ts": 23,
   "packages/shared/src/workout/__tests__/session-data-manual-deload.test.ts": 7
 }

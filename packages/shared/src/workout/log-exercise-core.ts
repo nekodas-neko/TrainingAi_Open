@@ -201,6 +201,7 @@ export async function logExerciseWithRepo(
       const ws = await repo.createWorkoutSession(
         userId, sessionId, sessionName, sessionStart,
         currentPhaseId, currentPhaseType, sessionIsEarlyDeload,
+        intensityMode ?? null, wasOverride ?? false,
       );
       wsId = ws.id;
     }
