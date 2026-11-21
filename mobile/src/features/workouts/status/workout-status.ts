@@ -76,7 +76,7 @@ function statusWhileRunning(workout: WorkoutRecord | null): WorkoutStatusPayload
   const flow = workoutFlow(workout);
   const exercise = workout.exercises.find((x) => x.id === flow.exerciseId);
   if (!exercise) return { ...base, phase: 'ready' };
-  const place = sessionPlace(workout, exercise.relogOf ?? exercise.id);
+  const place = sessionPlace(workout, exercise);
   const named = {
     ...base,
     ...place,
@@ -113,16 +113,20 @@ function statusWhileRunning(workout: WorkoutRecord | null): WorkoutStatusPayload
     // With no rest timed, the window counts up from the last set (the current app's rest anchor).
     restStartedAt: workout.rest?.startedAt ?? workout.restAnchor?.startedAt ?? null,
     nextUp: upNext?.name ?? null,
-    nextUpIndex: upNext ? sessionPlace(workout, upNext.id).exerciseIndex : 0,
+    nextUpIndex: upNext ? sessionPlace(workout, upNext).exerciseIndex : 0,
     nextUpSets: upNext?.sets.length ?? 0,
     nextUpLoad: upNext ? knownLoad(upNext, upNext.sets[0]) : null,
   };
 }
 
 /** "Exercise 2 of 5", counted as the workout screen counts: re-logs and swapped-out ones aside. */
-function sessionPlace(workout: WorkoutRecord, exerciseId: string) {
+/** "Exercise n of m": a re-log takes the place of the exercise it repeats, and is not one more. */
+export function sessionPlace(
+  workout: WorkoutRecord,
+  exercise: Pick<WorkoutRecord['exercises'][number], 'id' | 'relogOf'>,
+) {
   const listed = workout.exercises.filter((x) => !x.retired && !x.relogOf);
-  const index = listed.findIndex((x) => x.id === exerciseId);
+  const index = listed.findIndex((x) => x.id === (exercise.relogOf ?? exercise.id));
   return { exerciseIndex: index + 1, exerciseCount: listed.length };
 }
 

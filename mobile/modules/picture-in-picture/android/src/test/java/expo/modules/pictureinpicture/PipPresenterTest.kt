@@ -109,13 +109,15 @@ class PipPresenterTest {
         listOf("#60a5fa", "#34d399"),
         sessionName = "Upper body", exerciseIndex = 2, exerciseCount = 5, workoutFrom = t0 - 600_000,
         nextUpIndex = 3, nextUpSets = 3, nextUpLoad = "20 kg × 12", effortUntil = t0 + 20_000,
-        accent = "#00c84e",
+        effortAnswer = 0, accent = "#00c84e",
       ),
       read,
     )
     // An older app's payload, without the new keys, still reads.
     val old = PipPresenter.fromMap(mapOf("exerciseName" to "Squat", "phase" to "resting"))!!
-    assertEquals(listOf(0, 0, null, null, null), listOf(old.exerciseIndex, old.exerciseCount, old.workoutFrom, old.effortUntil, old.accent))
+    assertEquals(listOf(0, 0, null, null, null, null), listOf(old.exerciseIndex, old.exerciseCount, old.workoutFrom, old.effortUntil, old.effortAnswer, old.accent))
+    // An answer outside the three is not shown as one.
+    assertNull(PipPresenter.fromMap(mapOf("exerciseName" to "Squat", "phase" to "resting", "effortAsk" to mapOf("until" to 1.0, "answer" to 2.0)))!!.effortAnswer)
     assertNull(PipPresenter.fromMap(mapOf("exerciseName" to "Squat", "phase" to "ready", "accent" to "green"))!!.accent)
     assertNull(PipPresenter.fromMap(null))
     assertNull(PipPresenter.fromMap(mapOf("phase" to "working")))

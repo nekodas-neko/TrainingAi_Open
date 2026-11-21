@@ -279,6 +279,9 @@ class PictureInPictureModule : Module() {
     "easier" -> R.drawable.pip_easier
     "expected" -> R.drawable.pip_expected
     "harder" -> R.drawable.pip_harder
+    "easierSelected" -> R.drawable.pip_easier_selected
+    "expectedSelected" -> R.drawable.pip_expected_selected
+    "harderSelected" -> R.drawable.pip_harder_selected
     else -> R.drawable.pip_log
   }
 

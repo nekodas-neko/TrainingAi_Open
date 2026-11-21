@@ -172,7 +172,13 @@ class PipCardTest {
     val asked = base.copy(phase = "resting", setsDone = 2, restStartedAt = t0, restEndsAt = t0 + 90_000, effortUntil = t0 + 20_000)
     fun actions(phase: String, now: Long) = PipPresenter.buttons(phase, asked, now).map { it.action }
     assertEquals(listOf("effortEasier", "effortAsExpected", "effortHarder"), actions("summary", t0 + 1_000))
-    assertEquals(listOf("Easier", "As expected", "Harder"), PipPresenter.buttons("summary", asked, t0).map { it.label })
+    // The answer it stands on, As expected by default, is the selected one.
+    assertEquals(listOf("Easier", "As expected, selected", "Harder"), PipPresenter.buttons("summary", asked, t0).map { it.label })
+    assertEquals(listOf("easier", "expectedSelected", "harder"), PipPresenter.buttons("summary", asked, t0).map { it.icon })
+    assertEquals(
+      listOf("Easier", "As expected", "Harder, selected"),
+      PipPresenter.buttons("summary", asked.copy(effortAnswer = 1), t0).map { it.label },
+    )
     assertEquals("How did it feel?", PipPresenter.subtitle("summary", asked, t0 + 1_000))
     // Then the usual Next.
     assertEquals(listOf("log"), actions("summary", t0 + 20_000))
@@ -181,5 +187,29 @@ class PipCardTest {
     assertEquals(listOf("restPlus", "log", "pause"), actions("rest", t0 + 1_000))
     assertEquals(listOf("log"), PipPresenter.buttons("summary", asked.copy(effortUntil = null), t0).map { it.action })
     assertTrue(PipPresenter.EFFORT_BUTTONS.size <= PipPolicy.MAX_ACTIONS)
+  }
+
+  @Test fun `while it asks, the card names the exercise just finished, not the next one`() {
+    val asked = base.copy(
+      phase = "resting", setsDone = 2, restStartedAt = t0, restEndsAt = t0 + 90_000,
+      nextUp = "Cable fly", nextUpIndex = 3, nextUpSets = 3, nextUpLoad = "12.5 kg × 12",
+      effortUntil = t0 + 20_000, effortAnswer = 0,
+    )
+    val c = card("summary", asked, t0 + 5_000)
+    assertEquals("HOW DID IT FEEL?", c.stateWord)
+    assertEquals("As expected", c.setLine)
+    assertEquals("Incline press", c.name)
+    assertEquals("Exercise 2 of 5 · Push A", c.where)
+    assertEquals(2, c.sets)
+    assertEquals(2, c.setsDone)
+    assertNull(c.load)
+    assertEquals("left of 1:30 rest", c.clockLabel)
+    assertEquals("Easier than expected", card("summary", asked.copy(effortAnswer = -1), t0 + 5_000).setLine)
+    // Once the window stops asking: Exercise done, and what comes next.
+    val after = card("summary", asked, t0 + 20_000)
+    assertEquals("EXERCISE DONE", after.stateWord)
+    assertEquals("", after.setLine)
+    assertEquals("Next: Cable fly", after.name)
+    assertEquals("Exercise 3 of 5 · Push A", after.where)
   }
 }

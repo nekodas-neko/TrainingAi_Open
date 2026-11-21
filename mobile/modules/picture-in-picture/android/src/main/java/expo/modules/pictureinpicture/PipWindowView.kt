@@ -332,16 +332,21 @@ class PipWindowView(context: Context, private val frameAt: (Long) -> PipFrame) :
     private var sets = 0
     private var done = 0
     private var current: Int? = null
-    private var colors: List<String> = emptyList()
+    // Parsed once per state, not per segment per frame: the pulse redraws this many times a second.
+    private var colors: List<Int?> = emptyList()
     private var stateColor = Color.WHITE
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val rect = RectF()
+    private var parsedFrom: List<String>? = null
 
     fun set(sets: Int, done: Int, current: Int?, colors: List<String>, stateColor: Int) {
       this.sets = sets
       this.done = done
       this.current = current
-      this.colors = colors
+      if (colors != parsedFrom) {
+        parsedFrom = colors
+        this.colors = colors.map { parse(it) }
+      }
       this.stateColor = stateColor
       invalidate()
     }
@@ -355,7 +360,7 @@ class PipWindowView(context: Context, private val frameAt: (Long) -> PipFrame) :
       for (index in 0 until count) {
         paint.color = when {
           index == current -> stateColor
-          index < done -> parse(colors.getOrNull(index)) ?: stateColor
+          index < done -> colors.getOrNull(index) ?: stateColor
           else -> SEGMENT_OFF
         }
         if (index == current) paint.alpha = (pulseAlpha * 255).toInt()

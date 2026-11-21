@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { pipCommand, pipPhaseFor, workoutPhaseOf } from '../src/features/workouts/pip/pip.ts';
 import { createPipReporter } from '../src/features/workouts/pip/usePictureInPicture.ts';
 import { pipAccent } from '../src/features/workouts/pip/pip-accent.ts';
-import { workoutStatusFor } from '../src/features/workouts/status/workout-status.ts';
+import { sessionPlace, workoutStatusFor } from '../src/features/workouts/status/workout-status.ts';
 import { EFFORT_PIP_MS } from '../src/features/workouts/logging/effort.ts';
 import type { WorkoutRecord } from '../src/features/workouts/logging/workout.ts';
 
@@ -151,4 +151,35 @@ test('the window\'s copy carries the effort question for its first seconds, and 
 test('the accent the window takes is a #rrggbb from the dark palette', () => {
   assert.match(pipAccent('green', null)!, /^#[\da-f]{6}$/i);
   assert.match(pipAccent('green', 200)!, /^#[\da-f]{6}$/i);
+});
+
+test('a re-log takes the place of the exercise it repeats, as the next exercise too (#3734)', () => {
+  const relog = workout();
+  relog.exercises.push({ ...relog.exercises[2], id: ids.relog, logId: ids.relog, relogOf: ids.fly, sets: sets(6) });
+  assert.deepEqual(sessionPlace(relog, relog.exercises[3]), { exerciseIndex: 3, exerciseCount: 3 });
+  assert.deepEqual(sessionPlace(relog, relog.exercises[0]), { exerciseIndex: 1, exerciseCount: 3 });
+});
+
+test('changing the accent mid-workout redraws the window on the same reporter, never idle (#3734)', () => {
+  const sent: [string, { accent?: string } | null][] = [];
+  const reporter = createPipReporter(
+    { setPhase: (phase, status) => void sent.push([phase, status as { accent?: string } | null]) },
+    () => T0,
+    '#00c84e',
+  );
+  const open = workout();
+  reporter.update(open);
+  assert.equal(sent.length, 1);
+  reporter.setAccent('#3b82f6');
+  assert.equal(sent.length, 2, 'resent at once, with nothing else changed');
+  assert.deepEqual([sent[1][0], sent[1][1]?.accent], ['ready', '#3b82f6']);
+  reporter.setAccent('#3b82f6');
+  reporter.update(open);
+  assert.equal(sent.length, 2, 'the same accent sends nothing');
+  assert.ok(sent.every(([phase]) => phase !== 'idle'));
+  // Only the workout's end closes the window.
+  reporter.close();
+  assert.equal(sent.at(-1)![0], 'idle');
+  reporter.setAccent('#ff6467');
+  assert.equal(sent.at(-1)![0], 'idle', 'nothing after close');
 });

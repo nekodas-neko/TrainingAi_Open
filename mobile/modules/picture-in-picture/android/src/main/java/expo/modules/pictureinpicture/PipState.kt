@@ -89,6 +89,8 @@ data class PipStatus(
   val nextUpLoad: String? = null,
   /** #3745: the answer buttons are offered until this wall time; null when the window doesn't ask. */
   val effortUntil: Long? = null,
+  /** The answer the question stands on: -1, 0 or 1; the window shows it selected. */
+  val effortAnswer: Int? = null,
   /** The app's accent, `#rrggbb`, or null for the window's own green. */
   val accent: String? = null,
 )
@@ -170,9 +172,9 @@ object PipPresenter {
       "set" -> lifting(status, setColor, nowMs)
       "ready" -> ready(status, nowMs)
       "rest", "complete" ->
-        if (status.sets > 0 && status.setsDone >= status.sets) exerciseDone(status, accent, nowMs)
+        if (status.sets > 0 && status.setsDone >= status.sets) exerciseDone(status, accent, nowMs, false)
         else resting(status, accent, nowMs)
-      "summary" -> exerciseDone(status, accent, nowMs)
+      "summary" -> exerciseDone(status, accent, nowMs, asksEffort(phase, status, nowMs))
       else -> PipFrame.Placeholder(status.exerciseName, false)
     }
   }
@@ -259,7 +261,11 @@ object PipPresenter {
     )
   }
 
-  private fun exerciseDone(status: PipStatus, accent: String, nowMs: Long): PipFrame.Card {
+  /**
+   * `asking`: the three buttons rate the exercise just finished, so the card keeps its name and
+   * place and asks the question; "Next: …" only follows once the window stops asking.
+   */
+  private fun exerciseDone(status: PipStatus, accent: String, nowMs: Long, asking: Boolean): PipFrame.Card {
     val start = status.restStartedAt
     val target = if (status.phase == "resting") target(status) else null
     val elapsed = seconds(start, nowMs)
@@ -283,6 +289,14 @@ object PipPresenter {
       },
       null, null,
     )
+    if (asking) {
+      return base.copy(
+        stateWord = ASKS_EFFORT,
+        setLine = effortLabel(status.effortAnswer),
+        load = null,
+        loadLabel = null,
+      )
+    }
     // What comes next: its name, its place, its first set and its sets, all still to do.
     return if (next != null) base.copy(
       name = "Next: $next",
@@ -335,6 +349,25 @@ object PipPresenter {
     PipButton("effortHarder", "Harder", "harder"),
   )
 
+  /** The state word while the window asks about the exercise just finished. */
+  const val ASKS_EFFORT = "HOW DID IT FEEL?"
+
+  /** The answer the question stands on, as the rest card names it; As expected by default. */
+  fun effortLabel(answer: Int?): String = when (answer) {
+    -1 -> "Easier than expected"
+    1 -> "Harder than expected"
+    else -> "As expected"
+  }
+
+  /** The three answers, the current one marked selected (its filled icon, and its label says so). */
+  fun effortButtons(answer: Int?): List<PipButton> {
+    val selected = (answer ?: 0).coerceIn(-1, 1) + 1
+    return EFFORT_BUTTONS.mapIndexed { index, button ->
+      if (index == selected) button.copy(label = "${button.label}, selected", icon = "${button.icon}Selected")
+      else button
+    }
+  }
+
   /** Whether the window is offering the answer buttons at `nowMs`. */
   fun asksEffort(phase: String, status: PipStatus?, nowMs: Long): Boolean {
     val until = status?.effortUntil ?: return false
@@ -343,7 +376,7 @@ object PipPresenter {
 
   /** The buttons for a phase, at most `PipPolicy.MAX_ACTIONS`; the middle one is the main one. */
   fun buttons(phase: String, status: PipStatus?, nowMs: Long = System.currentTimeMillis()): List<PipButton> {
-    if (asksEffort(phase, status, nowMs)) return EFFORT_BUTTONS
+    if (asksEffort(phase, status, nowMs)) return effortButtons(status?.effortAnswer)
     val list = when (phase) {
       "set" -> listOf(
         PipButton("repsDown", "Reps -", "minus"),
@@ -432,6 +465,8 @@ object PipPresenter {
       nextUpSets = int("nextUpSets"),
       nextUpLoad = (map["nextUpLoad"] as? String)?.takeIf { it.isNotBlank() },
       effortUntil = ((map["effortAsk"] as? Map<*, *>)?.get("until") as? Number)?.toLong(),
+      effortAnswer = ((map["effortAsk"] as? Map<*, *>)?.get("answer") as? Number)?.toInt()
+        ?.takeIf { it in -1..1 },
       accent = color(map["accent"]),
     )
   }

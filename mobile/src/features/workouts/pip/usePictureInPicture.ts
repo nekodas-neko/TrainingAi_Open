@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { pictureInPicture } from '../../../integrations/pip/platform';
 import type { PictureInPicture } from '../../../integrations/pip/types';
 import type { WorkoutStatusPayload } from '../../../integrations/workout-status/types';
@@ -22,6 +22,8 @@ export function createPipReporter(
   native: Pick<PictureInPicture, 'setPhase'> | null,
   now: () => number = Date.now,
   accent: string | null = null,
+  /** #3745: the window has been sent the question about this exercise, so it is on screen. */
+  onEffortAsked: (exerciseId: string) => void = () => {},
 ) {
   let last: string | null = null;
   let closed = false;
@@ -34,6 +36,9 @@ export function createPipReporter(
     const status = workoutStatusFor(workout);
     const setColor = pipSetColor(workout);
     const asked = effortQuestionWindow(workout, now());
+    if (asked && !workout.exercises.find((x) => x.id === asked.exerciseId)?.effortShown) {
+      onEffortAsked(asked.exerciseId);
+    }
     const withHr = status && {
       ...status,
       hr,
@@ -49,6 +54,12 @@ export function createPipReporter(
   return {
     update(next: WorkoutRecord) {
       workout = next;
+      send();
+    },
+    /** The app's accent changed: the window redraws in it, on the same reporter. */
+    setAccent(next: string | null) {
+      if (next === accent) return;
+      accent = next;
       send();
     },
     /** The strap's latest reading, or null when there is none to show. */
@@ -84,16 +95,20 @@ export function useWorkoutPip(
   /** The app's accent for the always-dark window (`pipAccent`); null keeps the window's own. */
   accent: string | null = null,
 ) {
-  const reporter = useMemo(
-    () => createPipReporter(pictureInPicture, Date.now, accent),
-    [accent],
+  const latest = useRef({ workout, controller });
+  latest.current = { workout, controller };
+  // One reporter for the workout. A new one per accent let the old one's cleanup send "idle" after
+  // the new one had sent the phase, which its own unchanged key then never resent.
+  const [reporter] = useState(() =>
+    createPipReporter(pictureInPicture, Date.now, accent, (exerciseId) =>
+      latest.current.controller.showEffort(latest.current.workout.id, [exerciseId]),
+    ),
   );
   // A layout effect runs inside the commit, so a change made from a window button reaches the
   // native view without waiting on JS timers, which are paused while the app is in PiP.
+  useLayoutEffect(() => reporter.setAccent(accent), [reporter, accent]);
   useLayoutEffect(() => reporter.update(workout), [reporter, workout]);
   useEffect(() => () => reporter.close(), [reporter]);
-  const latest = useRef({ workout, controller });
-  latest.current = { workout, controller };
   useEffect(() => {
     const subscription = pictureInPicture?.addListener('onAction', (event) =>
       runPipAction(latest.current.workout, latest.current.controller, event.action),
