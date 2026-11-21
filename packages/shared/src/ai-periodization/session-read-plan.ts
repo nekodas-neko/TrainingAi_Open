@@ -47,9 +47,13 @@ export async function loadSessionReads(
   tz: string,
 ): Promise<StoredSessionRead[]> {
   const from = dateStrMidnightInTz(shiftDateStr(todayInTz(tz), -SESSION_READ_LOOKBACK_DAYS), tz)
+  // Worked out before either read starts: if this threw between the two calls, the first read's
+  // promise would be left with nobody listening, and its failure would surface as an unhandled
+  // rejection instead of the caller's "no read" (seen in CI on a session with no exercise list).
+  const names = session.exercises.map(e => e.exerciseName)
   const [logs, equipment] = await Promise.all([
     repo.getSessionReadLogs(userId, from, new Date()),
-    repo.getExerciseEquipment(session.exercises.map(e => e.exerciseName)),
+    repo.getExerciseEquipment(names),
   ])
   return sessionReadsFor(session, logs ?? [], {
     programStart: program.createdAt,
