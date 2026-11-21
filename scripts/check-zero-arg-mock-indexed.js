@@ -67,7 +67,7 @@ const BASELINE = {
   'lib/home/__tests__/rest-day-write.test.ts': 1,
   'lib/scale-ble/__tests__/apply-reading.test.ts': 6,
   'lib/user/__tests__/preferences-sync.test.ts': 2,
-  'packages/shared/src/workout/__tests__/log-exercise.test.ts': 8,
+  'packages/shared/src/workout/__tests__/log-exercise.test.ts': 7,
 };
 
 /** Sites in one file's source. Exported shape so the base-branch comparison runs the same code. */

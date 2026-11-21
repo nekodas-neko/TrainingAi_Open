@@ -4,7 +4,7 @@ const getActiveProgramWithPhases = vi.fn()
 const getActiveProgram           = vi.fn()
 const getExerciseType            = vi.fn(async () => 'barbell')
 const getDayLog                  = vi.fn(async () => [])
-const createWorkoutSession       = vi.fn(async () => ({ id: 'ws-1' }))
+const createWorkoutSession       = vi.fn(async (..._a: unknown[]) => ({ id: 'ws-1' }))
 const ensureWorkoutSession       = vi.fn()
 const setWorkoutSessionWarmupEnd = vi.fn(async () => {})
 const logExerciseAndSets         = vi.fn(async () => ({ exerciseLog: { id: 'el-1' } }))
@@ -140,7 +140,7 @@ describe('logExerciseFromPayload — ai_dynamic deload PR gate (AI-8)', () => {
     expect(upsertPersonalRecordIfBetter).not.toHaveBeenCalled()
     expect(result.isPR).toBe(false)
     expect(createWorkoutSession).toHaveBeenCalledWith(
-      'u1', 'ps-1', 'Push', expect.any(Date), undefined, 'deload', false,
+      'u1', 'ps-1', 'Push', expect.any(Date), undefined, 'deload', false, null, false,
     )
   })
 
@@ -162,13 +162,13 @@ describe('logExerciseFromPayload — ai_dynamic deload PR gate (AI-8)', () => {
     getSessionPeriodization.mockResolvedValue({ phase: 'baseline', baselineComplete: false } as never)
     await logExerciseFromPayload('u1', basePayload, TZ)
     expect(createWorkoutSession).toHaveBeenLastCalledWith(
-      'u1', 'ps-1', 'Push', expect.any(Date), undefined, 'baseline', false,
+      'u1', 'ps-1', 'Push', expect.any(Date), undefined, 'baseline', false, null, false,
     )
 
     getSessionPeriodization.mockResolvedValue({ phase: 'baseline', baselineComplete: true } as never)
     await logExerciseFromPayload('u1', basePayload, TZ)
     expect(createWorkoutSession).toHaveBeenLastCalledWith(
-      'u1', 'ps-1', 'Push', expect.any(Date), undefined, undefined, false,
+      'u1', 'ps-1', 'Push', expect.any(Date), undefined, undefined, false, null, false,
     )
   })
 
@@ -204,7 +204,7 @@ describe('logExerciseFromPayload — a deload overridden to full weight (#3877)'
     const result = await logExerciseFromPayload('u1', { ...basePayload, intensityMode: 'full', wasOverride: true }, TZ)
     expect(result.estimated1rm).toBeGreaterThan(0)
     expect(result.isPR).toBe(true)
-    expect(createWorkoutSession).toHaveBeenCalledWith('u1', 'ps-1', 'Push', expect.any(Date), undefined, undefined, false)
+    expect(createWorkoutSession).toHaveBeenCalledWith('u1', 'ps-1', 'Push', expect.any(Date), undefined, undefined, false, 'full', true)
   })
 
   // The three payload shapes that reach the server for an override to full weight: native sends
@@ -230,6 +230,20 @@ describe('logExerciseFromPayload — a deload overridden to full weight (#3877)'
     const result = await logExerciseFromPayload('u1', { ...basePayload, intensityMode: 'full', wasOverride: false }, TZ)
     expect(result.estimated1rm).toBe(0)
     expect(result.isPR).toBe(false)
+  })
+
+  // #3888: with no `workoutSessionId` and no open session of that name, the create branch stored
+  // neither field, so the session row read back as "no override" whatever the lifter chose.
+  it.each([
+    ['full, overridden', { intensityMode: 'full' as const, wasOverride: true }, 'full', true],
+    ['deload, overridden', { intensityMode: 'deload' as const, wasOverride: true }, 'deload', true],
+    ['deload, plan as given', { intensityMode: 'deload' as const, wasOverride: false }, 'deload', false],
+  ])('a session created without a client id stores the intensity mode and override — %s', async (_l, mode, wantMode, wantOverride) => {
+    await logExerciseFromPayload('u1', { ...basePayload, ...mode }, TZ)
+    expect(createWorkoutSession).toHaveBeenCalledTimes(1)
+    const call = createWorkoutSession.mock.calls[0]
+    expect(call[7]).toBe(wantMode)
+    expect(call[8]).toBe(wantOverride)
   })
 
   it('an override to the deload stays a deload', async () => {

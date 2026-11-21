@@ -1220,10 +1220,14 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async createWorkoutSession(
     userId: string, programSessionId: string | undefined, sessionName: string, startedAt: Date,
     phaseId?: string, phaseType?: ProgramPhaseType, isEarlyDeload = false,
+    // #3888: the same two fields `ensureWorkoutSession` stores, so a session started without a
+    // client id still records the lifter's Deload/Full choice.
+    intensityMode?: 'full' | 'deload' | null, wasOverride = false,
   ): Promise<WorkoutSession> {
     const [r] = await this.db.insert(s.workoutSessions)
-      .values({ userId, programSessionId: programSessionId ?? null, sessionName, startedAt, phaseId: phaseId ?? null, phaseType: phaseType ?? null, isEarlyDeload })
+      .values({ userId, programSessionId: programSessionId ?? null, sessionName, startedAt, phaseId: phaseId ?? null, phaseType: phaseType ?? null, isEarlyDeload, intensityMode: intensityMode ?? null, wasOverride })
       .returning()
+    if (!r) throw new Error('createWorkoutSession: insert returned no row')
     return {
       id: r.id, userId: r.userId, sessionId: r.programSessionId ?? undefined,
       sessionName: r.sessionName, startedAt: r.startedAt,

@@ -5,6 +5,7 @@ import { DEFAULT_TZ } from '@trainingai/shared/date-utils'
 import { aggregateSignals } from '@trainingai/shared/ai-periodization/signals'
 import { normalizeMuscle } from '@trainingai/shared/muscles'
 import { prescriptionDrivesLoad } from '@trainingai/shared/ai-periodization/apply-prescription'
+import { serveStoredPrescription } from '@trainingai/shared/ai-periodization/program-phase'
 import { rateLimit } from '@/lib/rate-limit'
 import { buildRulesReview, summarizeReconciledReview } from '@trainingai/shared/workout/review/rules-review'
 import { reconcileReview, type ReviewSignalExercise, type SetShape } from '@trainingai/shared/workout/review/reconcile'
@@ -70,6 +71,9 @@ export async function POST(
 
   // "Before" numbers: base style per exercise, overridden by the active prescription when
   // one is actually driving the bar (accepted / auto-applied / pending-stay).
+  // #3968: through the same served-plan check as every other reader, so a plan past its expiry
+  // (a one-day rest or swap answer) or one whose deload has ended is not taken as the "before".
+  const served = await serveStoredPrescription(repo, userId, program, state, tz)
   const styles = await repo.listProgressionStyles(userId)
   const styleById = new Map(styles.map(st => [st.id, st]))
   const positionById = new Map(programSession.exercises.map(ex => [ex.id, ex.position]))
@@ -77,8 +81,8 @@ export async function POST(
   for (const ex of programSession.exercises) {
     currentParams.set(ex.id, summarizeStyle(ex.styleId ? styleById.get(ex.styleId) : undefined, ex.exerciseRole))
   }
-  if (state.prescription && prescriptionDrivesLoad(state.prescription.phaseAction, state.prescriptionStatus)) {
-    for (const pe of state.prescription.exercises) {
+  if (served.prescription && prescriptionDrivesLoad(served.prescription.phaseAction, served.prescriptionStatus)) {
+    for (const pe of served.prescription.exercises) {
       currentParams.set(pe.sessionExerciseId, { sets: pe.sets, reps: pe.reps, pct: pe.pct, restSec: pe.restSec })
     }
   }
