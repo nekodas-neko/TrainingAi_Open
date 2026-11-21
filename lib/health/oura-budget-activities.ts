@@ -1,6 +1,6 @@
 import type { WorkoutRepository } from '@/lib/data/repository'
 import { shiftDateStr } from '@trainingai/shared/date-utils'
-import { sourceSessionActivities, type CountedMovement, type OuraBudgetActivity } from '@trainingai/shared/health/oura-workout-activities'
+import { sourceSessionActivities, type CountedMovement, type SourceBudgetActivity } from '@trainingai/shared/health/oura-workout-activities'
 import { budgetActivityLogs, HEALTH_CONNECT_SOURCE } from '@trainingai/shared/health/health-connect-workouts'
 import type { ActivityLog } from '@trainingai/shared/types/body'
 
@@ -24,7 +24,7 @@ export async function ouraBudgetActivities(
   tz: string,
   counted: CountedMovement,
   eveningBefore?: CountedMovement['activityLogs'],
-): Promise<OuraBudgetActivity[]> {
+): Promise<SourceBudgetActivity[]> {
   let rows: Awaited<ReturnType<WorkoutRepository['getSourceActivitySessions']>>
   try {
     rows = await repo.getSourceActivitySessions(userId, { from: shiftDateStr(from, -1), to: shiftDateStr(to, 1) })
@@ -62,7 +62,7 @@ export async function budgetMovement<T extends ActivityLog>(
   to: string,
   tz: string,
   counted: { activityLogs: readonly T[]; sessions: CountedMovement['sessions'] },
-): Promise<{ logs: T[]; oura: OuraBudgetActivity[] }> {
+): Promise<{ logs: T[]; oura: SourceBudgetActivity[] }> {
   // The evening before matters to the Health Connect check only when there is a copy to check.
   const eveningBefore = counted.activityLogs.some(l => l.externalSource === HEALTH_CONNECT_SOURCE)
     ? await readEveningBefore(repo, userId, from)

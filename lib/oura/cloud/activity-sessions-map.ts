@@ -13,9 +13,19 @@ export const OURA_TO_APP_TYPE: Readonly<Record<string, string>> = {
   elliptical: 'elliptical', hiit: 'hiit', yoga: 'yoga', stretching: 'stretch', strengthTraining: 'strength',
 }
 
+/** Oura spells an activity lowerCamel (`houseWork`); the generic vocabulary is lowercase words
+ *  (`house work`). Anything not lowerCamel is passed on untouched, as the energy budget's lookup
+ *  already tolerates other spellings. */
+export function genericActivityName(ouraActivity: string): string {
+  return /^[a-z][a-zA-Z]*$/.test(ouraActivity)
+    ? ouraActivity.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase()
+    : ouraActivity
+}
+
 export interface OuraWorkoutRow {
   day: string
   activity: string
+  calories?: number | null
   startDatetime: Date
   endDatetime: Date
   distanceM: number | null
@@ -30,10 +40,11 @@ export function ouraActivitySessions(rows: readonly OuraWorkoutRow[]): SourceAct
     return {
       day: w.day,
       activityType: appType ?? w.activity,
-      ...(appType ? {} : { unmappedActivity: w.activity }),
+      ...(appType ? {} : { unmappedActivity: genericActivityName(w.activity) }),
       start: w.startDatetime,
       end: w.endDatetime,
       distanceKm: w.distanceM != null && w.distanceM > 0 ? w.distanceM / 1000 : null,
+      calories: w.calories ?? null,
       dismissed: w.reviewed,
       source: OURA_CLOUD_CONNECTOR.healthSource,
     }

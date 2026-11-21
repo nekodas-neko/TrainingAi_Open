@@ -4,7 +4,8 @@
 // readers; #3875 found three more reading Oura's rows straight off and moved them:
 //   - the next-session AI input's daytime stress (`stressHigh` → `DaytimeHighStress`),
 //   - the health insight's temperature deviation (`temperatureDeviation` → `DailyTemperatureDeviation`),
-//   - the energy budget and the heart-rate recovery profile (`oura_workouts` → `SourceActivitySession`).
+//   - the energy budget and the heart-rate recovery profile (`oura_workouts` → `SourceActivitySession`),
+// and #3884 moved the day timeline and the walk offer the same way and renamed the budget's activity names.
 //
 // A source-text sweep, because the mistake is a field name on a row typed loosely enough to compile.
 // Whole-line comments are dropped: the history of where a value came from is worth keeping in them.
@@ -68,5 +69,24 @@ describe('readers take the generic shapes, never Oura\'s fields (#3875)', () => 
     expect(rules).not.toMatch(OURA_WORKOUTS)
     expect(rules).not.toMatch(OURA_WORKOUT_FIELDS)
     expect(rules).toContain('SourceActivitySession')
+  })
+
+  // #3884: the two routes that still read `getOuraWorkouts`, and the budget's Oura-named vocabulary.
+  it('the day timeline and the walk offer read activity sessions, not oura_workouts', () => {
+    for (const f of ['app/api/day-timeline/route.ts', 'app/api/activity-detection/walks/route.ts']) {
+      const code = codeOf(read(f))
+      expect(code, f).not.toMatch(OURA_WORKOUTS)
+      expect(code, f).not.toMatch(OURA_WORKOUT_FIELDS)
+      expect(code, f).toContain('getSourceActivitySessions(')
+    }
+  })
+
+  it('the energy budget costs an unmapped activity by the generic name, never Oura\'s', () => {
+    for (const f of [
+      'packages/shared/src/health/daily-energy.ts', 'packages/shared/src/health/workout-energy.ts',
+      'packages/shared/src/health/oura-workout-activities.ts', 'packages/shared/src/nutrition/day-budget.ts',
+    ]) {
+      expect(codeOf(read(f)), f).not.toMatch(/\bouraActivity\b|OURA_ON_FOOT_ACTIVITIES|metIdForOuraActivity|OuraBudgetActivity/)
+    }
   })
 })

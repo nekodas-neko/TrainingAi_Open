@@ -17,10 +17,13 @@ const repo = {
   listSleepSessions: vi.fn(async () => [] as { sleepStart: Date; sleepEnd: Date }[]),
   getDaySessionSummaries: vi.fn(async () => [] as { startedAt: Date; completedAt?: Date }[]),
   listActivityLogs: vi.fn(async () => [] as { date: string; startTime?: string; endTime?: string; durationMin?: number }[]),
-  getOuraWorkouts: vi.fn(async (): Promise<{ startDatetime: Date; endDatetime: Date }[]> => []),
+  // #3884: the route reads the generic session; the fixtures stay Oura's rows, mapped by the connector.
+  getOuraWorkouts: vi.fn(async (..._a: unknown[]): Promise<{ startDatetime: Date; endDatetime: Date }[]> => []),
+  getSourceActivitySessions: vi.fn(async (...a: unknown[]) => ouraActivitySessions((await repo.getOuraWorkouts(...a)).map(w => ({ day: '', activity: 'walking', distanceM: null, reviewed: false, ...w })))),
 }
 vi.mock('@/lib/data', () => ({ getRepositoryAsync: vi.fn(async () => repo) }))
 
+import { ouraActivitySessions } from '@/lib/oura/cloud/activity-sessions-map'
 import { GET } from '@/app/api/activity-detection/walks/route'
 
 const get = (q = '?date=2026/10/07') => GET(new NextRequest(`http://x/api/activity-detection/walks${q}`))

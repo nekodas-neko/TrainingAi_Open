@@ -159,8 +159,8 @@ export interface BudgetActivity {
   durationMin?: number | null
   distanceKm?: number | null
   steps?: number | null
-  /** An Oura workout's own activity name, for a type the app does not list (#3087). */
-  ouraActivity?: string
+  /** A source-recorded workout's own activity name, for a type the app does not list (#3087). */
+  unmappedActivity?: string
 }
 
 /** The day's measured movement: completed strength sessions that started that local day, the day's
@@ -193,7 +193,7 @@ export function activeEnergyForDay(input: {
       .filter(a => a.date === input.day)
       .map(a => ({
         activityType: a.activityType, durationMin: a.durationMin ?? null, distanceKm: a.distanceKm ?? null, steps: a.steps ?? null,
-        ...(a.ouraActivity != null ? { ouraActivity: a.ouraActivity } : {}),
+        ...(a.unmappedActivity != null ? { unmappedActivity: a.unmappedActivity } : {}),
       })),
     pedometerSteps: input.steps,
   })
