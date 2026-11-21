@@ -76,6 +76,9 @@
 - name: 'needs: owner'
   color: 'e99695'
   description: Waiting on a decision only the owner can make
+- name: 'needs: owner-review'
+  color: 'e99695'
+  description: Opened from outside the repository — the owner looks before any agent acts on it
 - name: 'needs: device'
   color: 'e99695'
   description: Waiting on a check that needs the phone
