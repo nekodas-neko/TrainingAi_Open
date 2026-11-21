@@ -1793,6 +1793,42 @@ SELECT
 FROM public.sleep_verdicts t
 WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
 
+CREATE VIEW claude_ro.source_day_tags AS
+SELECT
+  t.id,
+  t.user_id,
+  t.source,
+  t.source_record_id,
+  t.start_day,
+  t.end_day,
+  t.start_at,
+  t.end_at,
+  t.tag_codes,
+  t.custom_name,
+  t.comment,
+  t.deleted_at,
+  t.created_at,
+  t.updated_at
+FROM public.source_day_tags t
+WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
+
+CREATE VIEW claude_ro.source_rest_periods AS
+SELECT
+  t.id,
+  t.user_id,
+  t.source,
+  t.source_record_id,
+  t.start_day,
+  t.end_day,
+  t.start_at,
+  t.end_at,
+  t.episodes,
+  t.deleted_at,
+  t.created_at,
+  t.updated_at
+FROM public.source_rest_periods t
+WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
+
 CREATE VIEW claude_ro.step_live_windows AS
 SELECT
   t.id,

@@ -77,6 +77,8 @@
     "oura_redecode_jobs": {"class":"SERVER-ONLY","note":"server job queue; writer: oura.ts"},
     "oura_rollup_state": {"class":"SERVER-ONLY","note":"server rollup cursor; writer: oura.ts"},
     "oura_sessions": {"class":"SERVER-ONLY","note":"Oura Cloud connector -> server (#2982); session series and mood; the day timeline reads it (#3077)"},
+    "source_rest_periods": {"class":"SERVER-ONLY","note":"#3898 a connected source's rest periods, generic shape (connector guide §3h); stored, no reader; writer: none until #3898 step 2; deleted_at tombstone; no device copy"},
+    "source_day_tags": {"class":"SERVER-ONLY","note":"#3898 a connected source's day tags and notes, generic shape (connector guide §3i); stored, no reader; writer: none until #3898 step 2; deleted_at tombstone; no device copy"},
     "oura_tags": {"class":"SERVER-ONLY","note":"sensor ingest -> server; writer: none found by static grep (raw SQL / script)"},
     "oura_tokens": {"class":"SERVER-ONLY","note":"integration secret (Oura Cloud: gone for good); writer: none found by static grep (raw SQL / script)"},
     "oura_workouts": {"class":"SERVER-ONLY","note":"sensor ingest -> server; writer: oura.ts"},
