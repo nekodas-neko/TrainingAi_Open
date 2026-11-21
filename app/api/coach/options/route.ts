@@ -45,7 +45,7 @@ export async function GET(req: Request) {
   const parsed = QuerySchema.safeParse({
     source: url.searchParams.get('source'),
     sourceId: url.searchParams.get('sourceId') ?? undefined,
-    query: url.searchParams.get('query') || undefined,
+    query: url.searchParams.get('query')?.trim() || undefined,
   })
   if (!parsed.success) return NextResponse.json({ error: 'Invalid source' }, { status: 400 })
 
