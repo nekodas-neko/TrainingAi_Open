@@ -160,7 +160,7 @@ When phase_action is "transition_recommended", the "phase" field MUST be the pha
 moving TO, and it must differ from current_phase. A transition to the phase already in
 progress is invalid — use "stay" instead.
 
-Strength trend: use rm1_trend and rm1_change_kg only (current PR vs previous PR).
+Strength trend: use rm1_trend and rm1_change_kg only (the latest 1RM estimate vs the one before it; current_1rm is the all-time best and is not the figure compared).
 Do NOT compare current_1rm against baseline_1rm as a strength metric — baseline is only
 the starting weight anchor from the AMRAP week and will be exceeded quickly.
 
@@ -241,9 +241,12 @@ export function buildUserPrompt(
   // Q-19b: the change is reps for a bodyweight movement, kilograms otherwise. `rm1ChangeKg`
   // is a kg-domain delta by name, so it cannot be printed with a unit without this.
   const rm1Change = (ex: PrescriptionSignals['exercises'][number]): string => {
-    if (ex.current1rm == null) return `${ex.rm1ChangeKg > 0 ? '+' : ''}${ex.rm1ChangeKg.toFixed(1)} kg`
-    const previous = ex.current1rm - ex.rm1ChangeKg
-    return displayOneRmDelta(ex.current1rm, previous, ex.exerciseType)?.text
+    // The change is latest − previous estimate (#3891), so the delta is built from `latest1rm`,
+    // not from `current1rm` (the all-time best).
+    const latest = ex.latest1rm ?? ex.current1rm
+    if (latest == null) return `${ex.rm1ChangeKg > 0 ? '+' : ''}${ex.rm1ChangeKg.toFixed(1)} kg`
+    const previous = latest - ex.rm1ChangeKg
+    return displayOneRmDelta(latest, previous, ex.exerciseType)?.text
       ?? `${ex.rm1ChangeKg > 0 ? '+' : ''}${ex.rm1ChangeKg.toFixed(1)} kg`
   }
 

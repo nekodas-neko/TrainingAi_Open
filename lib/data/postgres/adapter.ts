@@ -2130,7 +2130,9 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   }
 
   /**
-   * The two most recent **real** 1RM estimates per exercise, newest first.
+   * The two most recent **real** 1RM estimates per exercise, newest first. These are the pair
+   * the strength trend compares (`computeRm1Trend`), from finished, not-deleted, non-deload
+   * sessions (#3891).
    *
    * `> 0`, not `IS NOT NULL` (Q-298). A deloaded exercise stores `estimated_1rm = 0` **on purpose**
    * — deload work is submaximal and must not read as a max — so `IS NOT NULL` admitted it as an
@@ -2182,6 +2184,11 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
           -- production has broken.
           AND el.exercise_deloaded = false
           AND el.deleted_at IS NULL AND ws.deleted_at IS NULL
+          -- #3891: this pair is the lift's strength trend, which feeds the plan. A session still
+          -- in progress has not produced an estimate to compare, and a deload session's work is
+          -- submaximal. NOT of a null-safe test, so an untagged (NULL phase_type) session stays in.
+          AND ws.completed_at IS NOT NULL
+          AND NOT ${period.wsIsDeloadSession}
       ) ranked
       WHERE rn = 1 OR (NOT is_baseline AND rn_kind = 2)
     `)

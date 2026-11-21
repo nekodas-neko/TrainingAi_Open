@@ -33,7 +33,7 @@ const getLastExerciseLogsBatch = vi.fn(async (_u: string, _n: string[], _p?: str
 const wasProgramSessionTrainedSince = vi.fn(async (_u: string, _s: string, _since: Date) => false)
 const revertAutoAdoptedBaseline = vi.fn(async (_u: string, _s: string) => null as Row | null)
 const listPersonalRecords = vi.fn(async (_u: string) => new Map<string, number>())
-const listPrevious1rm = vi.fn(async (_u: string) => new Map<string, number>())
+const listRecent1rm = vi.fn(async (_u: string) => new Map<string, { latest: number; previous?: number }>())
 const generatePrescriptionForSession = vi.fn(async (..._a: unknown[]) => generated() as Row)
 const listSessionPeriodizationForProgram = vi.fn(async (..._a: unknown[]) => [] as Row[])
 const refitPrescriptionToBudget = vi.fn(async (..._a: unknown[]) => ({ ok: false, reason: 'no_baseline' }) as Row)
@@ -47,7 +47,7 @@ vi.mock('@/lib/data', () => {
     advancePhase, storePrescription, updatePrescriptionStatus, getLastExerciseLogsBatch,
     wasProgramSessionTrainedSince,
     revertAutoAdoptedBaseline,
-    listPersonalRecords, listPrevious1rm,
+    listPersonalRecords, listRecent1rm,
       // #3766: the program's phase. A program move reaches the same spy as a per-type one; which of the
     // two the route picks is tested in program-phase-3766.test.ts.
     advanceProgramPhase: advancePhase,
@@ -136,7 +136,7 @@ beforeEach(() => {
   for (const m of [getActiveProgram, ensureSessionPeriodization, getSessionPeriodization,
     setBaselineComplete, advancePhase, storePrescription, updatePrescriptionStatus,
     getLastExerciseLogsBatch, wasProgramSessionTrainedSince,
-    listPersonalRecords, listPrevious1rm, generatePrescriptionForSession,
+    listPersonalRecords, listRecent1rm, generatePrescriptionForSession,
     refitPrescriptionToBudget,
     revertAutoAdoptedBaseline]) m.mockClear()
   getActiveProgram.mockResolvedValue(program())
@@ -146,7 +146,7 @@ beforeEach(() => {
   wasProgramSessionTrainedSince.mockResolvedValue(false)
   revertAutoAdoptedBaseline.mockResolvedValue(null)
   listPersonalRecords.mockResolvedValue(new Map())
-  listPrevious1rm.mockResolvedValue(new Map())
+  listRecent1rm.mockResolvedValue(new Map())
   generatePrescriptionForSession.mockResolvedValue(generated())
   // Declines by default, so every pre-existing case still exercises the generation path —
   // which is also what production does until a prescription carrying a baseline exists.
@@ -556,12 +556,12 @@ describe('GET …/session/[sessionId]', () => {
     expect(res.headers.get('Cache-Control')).toBe('private, no-store')
   })
 
-  it('derives the card signals from personal records, without the full aggregation', async () => {
+  it('derives the card signals from the latest two estimates (the PR is only the display value), without the full aggregation', async () => {
     listPersonalRecords.mockResolvedValue(new Map([['Squat', 120], ['Curl', 30]]))
-    listPrevious1rm.mockResolvedValue(new Map([['Squat', 110]]))
+    listRecent1rm.mockResolvedValue(new Map([['Squat', { latest: 100, previous: 110 }]]))
     const body = await (await getSession()).json()
     const squat = body.signals.exercises.find((e: Row) => e.sessionExerciseId === SQUAT)
-    expect(squat).toMatchObject({ name: 'Squat', role: 'primary', current1rm: 120, rm1Trend: 'up', rm1ChangeKg: 10 })
+    expect(squat).toMatchObject({ name: 'Squat', role: 'primary', current1rm: 120, latest1rm: 100, rm1Trend: 'down', rm1ChangeKg: -10 })
     // No previous record: a trend cannot be claimed, and the change is not invented.
     expect(body.signals.exercises.find((e: Row) => e.sessionExerciseId === CURL))
       .toMatchObject({ current1rm: 30, rm1Trend: 'flat', rm1ChangeKg: 0 })

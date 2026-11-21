@@ -867,6 +867,16 @@ export async function getSetTimingRows(db: Db, userId: string, exerciseNames: st
 export const wsIsBaselineSession = sql`ws.phase_type IS NOT DISTINCT FROM 'baseline'`
 
 /**
+ * A deload session, by any of the three markers a deload leaves (the same set `isReadableLog` in
+ * `session-read.ts` uses): the phase tag, the early-deload flag, the intensity mode.
+ *
+ * Null-safe on purpose (#3891): `ws.phase_type <> 'deload'` is NULL, not true, for the untagged
+ * rows that predate the phase tag, and a WHERE clause drops a NULL. A null phase type is unknown,
+ * not a deload, so it stays in. Write the exclusion as `NOT ${wsIsDeloadSession}`.
+ */
+export const wsIsDeloadSession = sql`(ws.phase_type IS NOT DISTINCT FROM 'deload' OR ws.is_early_deload OR ws.intensity_mode IS NOT DISTINCT FROM 'deload')`
+
+/**
  * 90-day estimated-1RM history per exercise, one point per session-day. It feeds the
  * strength-projection plateau detector (`signals.ts`) and, since LA-96, `/api/strength-trend`,
  * which used to carry a byte-identical copy of this query.

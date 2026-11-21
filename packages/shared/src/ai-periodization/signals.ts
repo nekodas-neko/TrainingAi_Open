@@ -42,6 +42,8 @@ export interface PrescriptionSignals {
     muscleAssignments: Array<{ muscle: string; role: 'main' | 'secondary' }>
     baseline1rm: number | null
     current1rm: number | null
+    /** Newer half of the pair the trend compares; optional so older fixtures still type. */
+    latest1rm?: number | null
     /** So the prompt renders a bodyweight 1RM as a rep max, not kilograms (Q-19b). */
     exerciseType: string | null
     rm1Trend: 'up' | 'flat' | 'down'
@@ -206,26 +208,55 @@ export interface CardExerciseSignal {
   name: string
   role: string
   current1rm: number | null
+  /** The latest real estimate: the newer half of the pair `rm1Trend` and `rm1ChangeKg` compare. */
+  latest1rm: number | null
   rm1Trend: 'up' | 'flat' | 'down'
   rm1ChangeKg: number
+}
+
+/** A lift's two most recent real estimates, newest first (`listRecent1rm`). */
+export interface Recent1rm { latest: number; previous?: number }
+
+/**
+ * THE strength-trend comparison, in one place (#3891): the lift's latest real estimate against the
+ * one before it. The card, autoregulation, the AI prompt and the phase-move reason all read this.
+ *
+ * It used to compare the all-time best (the personal record) with the second-latest estimate. The
+ * best can never sit below a later estimate, so that read "down" for none of the owner's lifts.
+ *
+ * Fewer than two estimates (none, or only a first one) reads flat with a change of 0, as before:
+ * a lift with nothing to compare must not read as a regression.
+ *
+ * To go back to the old comparison, change this function to take the PR as `latest` (see the PR
+ * for #3891, "How to revert").
+ */
+export function computeRm1Trend(recent: Recent1rm | undefined): { trend: 'up' | 'flat' | 'down'; changeKg: number } {
+  if (!recent || recent.previous == null) return { trend: 'flat', changeKg: 0 }
+  const status = oneRmTrendStatus(recent.latest, recent.previous)
+  return {
+    trend: status === 'up' ? 'up' : status === 'down' ? 'down' : 'flat',
+    changeKg: recent.latest - recent.previous,
+  }
 }
 
 export function buildCardExerciseSignals(
   exercises: Array<{ id: string; exerciseName: string; exerciseRole: string }>,
   allPrs: Map<string, number>,
-  prevPrs: Map<string, number>,
+  recent1rm: Map<string, Recent1rm>,
 ): CardExerciseSignal[] {
   return exercises.map(ex => {
-    const current1rm = allPrs.get(ex.exerciseName) ?? null
-    const prev1rm = prevPrs.get(ex.exerciseName) ?? null
-    const status = current1rm != null ? oneRmTrendStatus(current1rm, prev1rm) : 'none'
+    const recent = recent1rm.get(ex.exerciseName)
+    const { trend, changeKg } = computeRm1Trend(recent)
     return {
       sessionExerciseId: ex.id,
       name: ex.exerciseName,
       role: ex.exerciseRole,
-      current1rm,
-      rm1Trend: status === 'up' ? 'up' : status === 'down' ? 'down' : 'flat',
-      rm1ChangeKg: current1rm != null && prev1rm != null ? current1rm - prev1rm : 0,
+      // The personal record: the display value and the baseline hint's input. The trend below does
+      // NOT read it.
+      current1rm: allPrs.get(ex.exerciseName) ?? null,
+      latest1rm: recent?.latest ?? null,
+      rm1Trend: trend,
+      rm1ChangeKg: changeKg,
     }
   })
 }
@@ -272,11 +303,11 @@ export async function aggregateSignals(
   const today = todayInTz(tz)
   const todayMid = todayMidnightUtc(tz)
 
-  const [rawState, program, allPrs, prevPrs, injuries, styles] = await Promise.all([
+  const [rawState, program, allPrs, recent1rm, injuries, styles] = await Promise.all([
     repo.getSessionPeriodization(userId, programSessionId),
     options?.program ?? repo.getActiveProgram(userId),
     repo.listPersonalRecords(userId),
-    repo.listPrevious1rm(userId),
+    repo.listRecent1rm(userId),
     repo.listInjuries(userId),
     // RV-202: the program's own per-set numbers, so a failed model call has something
     // deterministic to fall back on. `SessionExercise` carries only `styleId`.
@@ -354,9 +385,9 @@ export async function aggregateSignals(
 
   // Build exercise signal array.
   // baseline1rm is retained as the starting weight anchor only — do NOT use
-  // it for strength trend comparison; use rm1Trend (current vs previous PR) instead.
+  // it for strength trend comparison; use rm1Trend (latest estimate vs the one before it) instead.
   const cardSignalsById = new Map(
-    buildCardExerciseSignals(programSession.exercises, allPrs, prevPrs).map(c => [c.sessionExerciseId, c]),
+    buildCardExerciseSignals(programSession.exercises, allPrs, recent1rm).map(c => [c.sessionExerciseId, c]),
   )
   const setsByStyleId = new Map(
     styles.map(st => [
@@ -389,6 +420,7 @@ export async function aggregateSignals(
       muscleAssignments,
       baseline1rm: baseline,
       current1rm: card.current1rm,
+      latest1rm: card.latest1rm,
       rm1Trend: card.rm1Trend,
       rm1ChangeKg: card.rm1ChangeKg,
       avgSetDurationSec: avgSetDurations[ex.exerciseName] ?? 45,
