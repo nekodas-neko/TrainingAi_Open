@@ -59,7 +59,7 @@ export function ListRow({
         <AppText variant="label" tone={titleTone}>
           {title}
         </AppText>
-        {subtitle && (
+        {!!subtitle && (
           <AppText
             variant="caption"
             tone="muted"

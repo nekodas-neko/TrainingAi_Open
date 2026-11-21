@@ -264,3 +264,6 @@ export function boundedTicks(min: number, max: number, maxTicks = 4): number[] {
   out.push(max);
   return out;
 }
+
+// The web Sparkline's fade (`fill`): 25% of the line's colour at the top, transparent at the floor.
+export const FADE_FILL_OPACITY = [0.25, 0] as const;

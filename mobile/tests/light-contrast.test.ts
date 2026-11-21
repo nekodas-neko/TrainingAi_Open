@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createTheme } from '../src/shared/theme/theme';
 import { batteryColor } from '../src/shared/battery-color';
+import { bodyCardColors, bodyHeadingColors } from '../src/shared/theme/tokens';
 import { palettes, type Brand } from '../src/shared/theme/palettes';
 
 function luminance(hex: string) {
@@ -166,4 +167,32 @@ test('no CSS variable survives mapping the calorie bar stops through bandColor',
       }
     }
   }
+});
+
+function blend(top: string, base: string, alpha: number) {
+  const channel = (hex: string, at: number) => parseInt(hex.slice(at, at + 2), 16);
+  return `#${[1, 3, 5]
+    .map((at) => Math.round(channel(top, at) * alpha + channel(base, at) * (1 - alpha)))
+    .map((v) => v.toString(16).padStart(2, '0'))
+    .join('')}`;
+}
+
+// #3019: the Body Weight and Sleep headings took the accent, 1.4:1 on its own wash in Light.
+// Card.tsx paints raised at 88% over the page, then the accent wash at 30% at its strong corner.
+test('the Body Weight and Sleep card headings reach 4.5:1 on their washes in Light', () => {
+  for (const brand of brands) {
+    const light = createTheme('light', brand);
+    const card = blend(light.colors.raised, light.colors.background, 0.88);
+    for (const key of ['weight', 'sleep'] as const) {
+      const wash = blend(bodyCardColors[key], card, 0.3);
+      const heading = bodyHeadingColors.light[key];
+      const ratio = contrast(heading, wash);
+      assert.ok(ratio >= 4.5, `${brand} ${key} heading ${heading} on ${wash}: ${ratio.toFixed(2)}:1`);
+      assert.ok(contrast(bodyCardColors[key], wash) < 4.5, 'the accent alone is the faint one');
+    }
+  }
+});
+
+test('Dark keeps the accent as the heading', () => {
+  assert.deepEqual(bodyHeadingColors.dark, { weight: bodyCardColors.weight, sleep: bodyCardColors.sleep });
 });

@@ -10,13 +10,15 @@ import { sleepChips, sleepTimeRange } from '../data/body-view';
 import type { HealthDetail } from '../screens/HealthDetailScreen';
 import { HealthMetricCard } from './HealthMetricCard';
 import { useCueColor } from './RangeBar';
-import { bodyCardColors } from '../../../shared/theme/tokens';
+import { useTheme } from '../../../shared/theme/ThemeProvider';
+import { bodyCardColors, bodyHeadingColors } from '../../../shared/theme/tokens';
 
 /**
  * Health > Body > Sleep: duration and bed-to-wake range, the score badge, the stage chips and the
  * efficiency, onset, overnight HRV, lowest heart rate and breathing chips, as the current app's card.
  */
 export function BodySleepCard({ openDetail }: { openDetail: (detail: HealthDetail) => void }) {
+  const { theme } = useTheme();
   const cueColor = useCueColor();
   const health = useHealthData();
   const readiness = useWorkoutResource(readinessSpec(health.today));
@@ -33,6 +35,7 @@ export function BodySleepCard({ openDetail }: { openDetail: (detail: HealthDetai
     <HealthMetricCard
       title="Sleep"
       accent={bodyCardColors.sleep}
+      headingColor={bodyHeadingColors[theme.mode].sleep}
       onOpen={() => openDetail('sleep')}
       caption={nightLabel}
     >

@@ -36,8 +36,9 @@ export function LevelHeader({
           minHeight: theme.sizes.touchTarget,
           borderRadius: theme.radii.card,
           borderWidth: 1,
-          borderColor: theme.colors.brandBorder,
-          backgroundColor: theme.colors.brandSurface,
+          // The current app's pill (profile-tab.tsx): brand at 30% for the outline, 10% for the wash.
+          borderColor: `${theme.colors.brand}4d`,
+          backgroundColor: `${theme.colors.brand}1a`,
           paddingHorizontal: theme.spacing.lg,
           paddingVertical: theme.spacing.sm,
           transform: [{ scale: pressed ? 0.95 : 1 }],
