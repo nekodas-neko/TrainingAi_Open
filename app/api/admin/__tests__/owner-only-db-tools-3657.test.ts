@@ -21,9 +21,16 @@ const query = async (sql: string) => {
     method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ sql }),
   }))
 }
-const snapshot = async () => {
+const snapshot = async (search = '?bulk=all') => {
   const { GET } = await import('@/app/api/admin/db-snapshot/route')
-  return GET(new NextRequest('http://localhost/api/admin/db-snapshot?bulk=all'))
+  return GET(new NextRequest(`http://localhost/api/admin/db-snapshot${search}`))
+}
+/** The read-only URL with the connection's own default owner scope set to `id`, standing in for a
+ *  `claude_readonly` role whose `app.claude_ro_owner` default names someone else. */
+const readonlyUrlDefaultingTo = (id: string) => {
+  const u = new URL(process.env.DATABASE_URL!)
+  u.searchParams.set('options', `-c app.claude_ro_owner=${id}`)
+  return u.toString()
 }
 const schema = async () => {
   const { GET } = await import('@/app/api/admin/db-query/route')
@@ -112,5 +119,43 @@ describe.skipIf(!canRun)('db-query and db-snapshot: an admin session must be the
     expect((await snapshot()).status).toBe(403)
     asUser(ADMIN)
     expect((await snapshot()).status).toBe(503)
+  })
+
+  // #3949 review N7: the rows a query reads are scoped to the owner the check resolved, set on the
+  // query itself, not to the read-only connection's default. Here the connection defaults to the
+  // second admin, the settings name the owner, and the owner's session reads as the owner.
+  it('db-query reads as the resolved owner even when the connection defaults to someone else', async () => {
+    vi.stubEnv('CLAUDE_DB_READONLY_URL', readonlyUrlDefaultingTo(ADMIN))
+    asUser(OWNER)
+    const res = await query(`SELECT current_setting('app.claude_ro_owner', true) AS owner, (SELECT count(*)::int FROM claude_ro.users) AS n, (SELECT id::text FROM claude_ro.users) AS id`)
+    expect(res.status).toBe(200)
+    expect((await res.json()).rows).toEqual([{ owner: OWNER, n: 1, id: OWNER }])
+  })
+
+  it('db-snapshot streams the resolved owner\'s rows even when the connection defaults to someone else', async () => {
+    vi.stubEnv('CLAUDE_DB_READONLY_URL', readonlyUrlDefaultingTo(ADMIN))
+    asUser(OWNER)
+    // Two rows for the owner and none for the second admin, so a count under the wrong scope reads 0.
+    await pool.query('DELETE FROM body_metrics WHERE user_id = ANY($1::uuid[])', [[OWNER, ADMIN]])
+    await pool.query(`INSERT INTO body_metrics (user_id, date, weight_kg) VALUES ($1, '2026-01-01', 70), ($1, '2026-01-02', 70)`, [OWNER])
+    try {
+      const res = await snapshot('?tables=users,body_metrics')
+      expect(res.status).toBe(200)
+      const lines = (await res.text()).trim().split('\n').map(l => JSON.parse(l))
+      expect(lines[0]).toMatchObject({ manifest: true, rowCounts: { users: 1, body_metrics: 2 } })
+      expect(lines.filter(l => l.table === 'users').map(l => l.row.id)).toEqual([OWNER])
+      expect(lines.filter(l => l.table === 'body_metrics').map(l => l.row.user_id)).toEqual([OWNER, OWNER])
+    } finally {
+      await pool.query('DELETE FROM body_metrics WHERE user_id = ANY($1::uuid[])', [[OWNER, ADMIN]])
+    }
+  })
+
+  it('the scope is the owner the check resolved, else resolved the same way, and none when unresolvable', async () => {
+    const { scopeOwnerFor } = await import('@/lib/admin/claude-token-auth')
+    for (const k of ['CLAUDE_RO_OWNER_USER_ID', 'ADMIN_EXPORT_USER_ID', 'WEBHOOK_USER_ID']) vi.stubEnv(k, '')
+    expect(await scopeOwnerFor({})).toBeNull()
+    vi.stubEnv('CLAUDE_RO_OWNER_USER_ID', OWNER)
+    expect(await scopeOwnerFor({})).toBe(OWNER)
+    expect(await scopeOwnerFor({ ownerId: OWNER })).toBe(OWNER)
   })
 })

@@ -1,4 +1,5 @@
 import type { Pool } from 'pg'
+import { runScoped } from '@/lib/data/postgres/readonly-client'
 
 /**
  * Core logic for the admin DB snapshot endpoint (Q-530,
@@ -153,6 +154,9 @@ export function subMillisecondIso(text: string): string | null {
 export async function* streamTableRows(
   pool: Pool, table: string, pkCols: string[], chunkSize = 5_000,
   since?: { column: string; date: Date },
+  /** #3949 review N7: when given, every page runs through `runScoped` with this owner set
+   *  explicitly (`SET LOCAL app.claude_ro_owner`), not under whatever the connection defaults to. */
+  ownerId?: string,
 ): AsyncGenerator<Record<string, unknown>> {
   const cols = pkCols.map(quoteIdent).join(', ')
   const keyText = pkCols.map((c, i) => `${quoteIdent(c)}::text AS ${quoteIdent(`__pk${i}`)}`).join(', ')
@@ -163,10 +167,10 @@ export async function* streamTableRows(
     if (cursor) clauses.push(`(${cols}) > (${pkCols.map((_, i) => `$${i + 1}`).join(', ')})`)
     if (since) { params.push(since.date); clauses.push(`${quoteIdent(since.column)} >= $${params.length}`) }
     const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : ''
-    const { rows } = await pool.query(
-      `SELECT *, ${keyText} FROM claude_ro.${quoteIdent(table)} ${where} ORDER BY ${cols} LIMIT ${chunkSize}`,
-      params,
-    )
+    const text = `SELECT *, ${keyText} FROM claude_ro.${quoteIdent(table)} ${where} ORDER BY ${cols} LIMIT ${chunkSize}`
+    const { rows } = ownerId
+      ? await runScoped(pool, text, { ownerId, values: params })
+      : await pool.query(text, params)
     let lastKey: string[] = []
     for (const row of rows) {
       lastKey = pkCols.map((_, i) => row[`__pk${i}`] as string)

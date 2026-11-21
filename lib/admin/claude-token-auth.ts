@@ -8,7 +8,7 @@ import { safeCompare } from '@/lib/security/constant-time'
 import { clientIp } from '@trainingai/shared/http/client-ip'
 
 export type AdminAuthOutcome =
-  | { ok: true; via: 'session' | 'token'; userId: string }
+  | { ok: true; via: 'session' | 'token'; userId: string; ownerId?: string }
   | { ok: false; status: number; error: string }
 
 /**
@@ -20,14 +20,32 @@ export type AdminAuthOutcome =
  * non-admin. An owner that cannot be resolved refuses everyone (fail closed). The agents use the
  * bearer token, which this does not change.
  */
-export async function requireOwnerSession(userId: string): Promise<{ ok: true } | { ok: false; status: 403 | 503; error: string }> {
+export async function requireOwnerSession(userId: string): Promise<{ ok: true; ownerId: string } | { ok: false; status: 403 | 503; error: string }> {
   let ownerId: string | null
   try {
     ownerId = await resolveOwnerUserId(await getRepository())
   } catch {
     return { ok: false, status: 503, error: 'Service unavailable' }
   }
-  return isOwnerUserId(userId, ownerId) ? { ok: true } : { ok: false, status: 403, error: 'Forbidden' }
+  return ownerId !== null && isOwnerUserId(userId, ownerId) ? { ok: true, ownerId } : { ok: false, status: 403, error: 'Forbidden' }
+}
+
+/**
+ * #3949 review N7: the owner a db-query or db-snapshot request reads as, set explicitly on every
+ * scoped query (`runScoped`'s `ownerId`, i.e. `SET LOCAL app.claude_ro_owner`) instead of left to
+ * the read-only role's default. It is the id the owner check resolved for this same request when
+ * there was one (a session), else resolved now the same way (`resolveOwnerUserId`, the settings
+ * `CLAUDE_RO_OWNER_USER_ID` → `ADMIN_EXPORT_USER_ID` → `WEBHOOK_USER_ID`, an existing active
+ * admin). So the person the check let in and the rows the query reads can never come from two
+ * different settings. Null when the owner cannot be resolved: the caller refuses and runs nothing.
+ */
+export async function scopeOwnerFor(authed: { ownerId?: string }): Promise<string | null> {
+  if (authed.ownerId) return authed.ownerId
+  try {
+    return await resolveOwnerUserId(await getRepository())
+  } catch {
+    return null
+  }
 }
 
 /**
@@ -81,6 +99,7 @@ export async function authorizeAdminRequest(
   if (opts.sessionOwnerOnly) {
     const owner = await requireOwnerSession(userId)
     if (!owner.ok) return owner
+    return { ok: true, via: 'session', userId, ownerId: owner.ownerId }
   }
   return { ok: true, via: 'session', userId }
 }

@@ -94,4 +94,28 @@ describe.skipIf(!canRun)('a new native sign-in from the same install revokes the
          FROM native_refresh_tokens WHERE user_id = $1`, [USER_A])
     expect(rows[0]).toEqual({ live: 1, total: 2 })
   })
+
+  // #3949 review N5: two sign-ins from one install at the same moment. An older family is held
+  // locked by a second connection, so both sign-ins are parked mid-way: without the per-install lock
+  // both had already searched (finding only the older family) and both survived. With it, the second
+  // waits before its search, then finds the first's family and revokes it.
+  it('two concurrent sign-ins from one install leave exactly one live', async () => {
+    const older = await create(USER_A, INSTALL)
+    const holder = await pool.connect()
+    await holder.query('BEGIN')
+    await holder.query('SELECT pg_advisory_xact_lock(hashtext($1::text))', [older.familyId])
+    const parked = async () => Number((await pool.query<{ n: string }>(
+      `SELECT count(*) AS n FROM pg_stat_activity
+        WHERE wait_event_type = 'Lock' AND wait_event = 'advisory' AND query LIKE '%pg_advisory_xact_lock%'
+          AND pid <> pg_backend_pid()`)).rows[0].n)
+    const both = Promise.all([create(USER_A, INSTALL), create(USER_A, INSTALL)])
+    for (let i = 0; i < 300 && await parked() < 2; i++) await new Promise(r => setTimeout(r, 10))
+    await holder.query('COMMIT')
+    holder.release()
+    await both
+    const { rows } = await pool.query<{ live: number; total: number }>(
+      `SELECT count(*) FILTER (WHERE revoked_at IS NULL)::int AS live, count(*)::int AS total
+         FROM native_refresh_tokens WHERE user_id = $1 AND device_id = $2`, [USER_A, INSTALL])
+    expect(rows[0]).toEqual({ live: 1, total: 3 })
+  })
 })

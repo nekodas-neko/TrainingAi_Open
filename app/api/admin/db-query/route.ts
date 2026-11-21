@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getPool } from '@/lib/data/postgres/client'
 import { getReadonlyPool, isReadonlyDbConfigured, describeReadonlyConnection, runScoped } from '@/lib/data/postgres/readonly-client'
-import { authorizeAdminRequest } from '@/lib/admin/claude-token-auth'
+import { authorizeAdminRequest, scopeOwnerFor } from '@/lib/admin/claude-token-auth'
 import { reportServerError } from '@/lib/observability'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 import { clientIp } from '@trainingai/shared/http/client-ip'
@@ -180,6 +180,14 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // #3949 review N7: the owner scope is set explicitly, to the owner this request's check resolved,
+  // never left to the read-only role's default (`scopeOwnerFor`). Unresolvable: nothing runs.
+  const runAs = scopedUserId ?? await scopeOwnerFor(authed)
+  if (!runAs) {
+    await logQuery({ sql, rowCount: null, durationMs: 0, truncated: false, ok: false, ip, error: 'owner scope unresolved' })
+    return NextResponse.json({ error: 'The owner account is not configured; nothing was run' }, { status: 503 })
+  }
+
   // An owner query logs after, best-effort; a scoped one already has its row and only finishes it.
   const record = (entry: Parameters<typeof logQuery>[0]) =>
     scopedUserId ? finishScopedLog(scopedLogId, entry) : logQuery(entry)
@@ -191,7 +199,7 @@ export async function POST(req: NextRequest) {
     // RV-190: through `runScoped`, never `pool.query`. The role's read-only flag, statement
     // timeout and owner scope are session DEFAULTS that a submitted query can simply `SET` — and
     // on a pool that is never reset, the override rode the connection into the next request.
-    const result = await runScoped(getReadonlyPool(), wrapped, { ownerId: scopedUserId })
+    const result = await runScoped(getReadonlyPool(), wrapped, { ownerId: runAs })
 
     const truncated = result.rows.length > MAX_ROWS
     const rows = truncated ? result.rows.slice(0, MAX_ROWS) : result.rows

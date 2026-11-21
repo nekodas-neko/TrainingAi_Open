@@ -8,7 +8,7 @@ import { randomUUID } from 'node:crypto';
 import { encode } from 'next-auth/jwt';
 
 type Row = {
-  id: string; userId: string; familyId: string; tokenHash: string; expiresAt: Date;
+  id: string; userId: string; familyId: string; tokenHash: string; expiresAt: Date; createdAt: Date;
   rotatedAt: Date | null; replacedBy: string | null; revokedAt: Date | null; revokedReason: string | null;
 };
 const db = vi.hoisted(() => ({
@@ -26,7 +26,7 @@ vi.mock('@/lib/data', () => ({
   getRepositoryAsync: async () => ({
     async createNativeRefreshToken(i: { userId: string; tokenHash: string; expiresAt: Date }) {
       guard();
-      const row: Row = { id: randomUUID(), familyId: randomUUID(), rotatedAt: null, replacedBy: null, revokedAt: null, revokedReason: null, ...i };
+      const row: Row = { id: randomUUID(), familyId: randomUUID(), createdAt: new Date(), rotatedAt: null, replacedBy: null, revokedAt: null, revokedReason: null, ...i };
       rows().push(row);
       return strip(row);
     },
@@ -45,7 +45,7 @@ vi.mock('@/lib/data', () => ({
       const old = rows().find(x => x.id === i.id && x.userId === i.userId && live(x));
       if (!old) return null;
       old.rotatedAt = new Date();
-      const next: Row = { id: randomUUID(), userId: i.userId, familyId: old.familyId, tokenHash: i.newTokenHash, expiresAt: i.expiresAt, rotatedAt: null, replacedBy: null, revokedAt: null, revokedReason: null };
+      const next: Row = { id: randomUUID(), userId: i.userId, familyId: old.familyId, tokenHash: i.newTokenHash, expiresAt: i.expiresAt, createdAt: new Date(), rotatedAt: null, replacedBy: null, revokedAt: null, revokedReason: null };
       rows().push(next);
       old.replacedBy = next.id;
       return strip(next);
@@ -57,7 +57,7 @@ vi.mock('@/lib/data', () => ({
       const successor = old && rows().find(x => x.id === old.replacedBy && x.userId === i.userId && !x.rotatedAt && !x.revokedAt);
       if (!old || !successor) return null;
       successor.revokedAt = new Date(); successor.revokedReason = 'rotation_reuse';
-      const next: Row = { id: randomUUID(), userId: i.userId, familyId: old.familyId, tokenHash: i.newTokenHash, expiresAt: i.expiresAt, rotatedAt: null, replacedBy: null, revokedAt: null, revokedReason: null };
+      const next: Row = { id: randomUUID(), userId: i.userId, familyId: old.familyId, tokenHash: i.newTokenHash, expiresAt: i.expiresAt, createdAt: new Date(), rotatedAt: null, replacedBy: null, revokedAt: null, revokedReason: null };
       rows().push(next);
       old.replacedBy = next.id;
       return strip(next);
@@ -320,7 +320,7 @@ describe('seven-day tokens issued before #2076', () => {
       token: { userId, isActive: true, nativeSessionKey: key },
     });
   const seed = (key: string, over: Partial<Row> = {}) =>
-    rows().push({ id: randomUUID(), userId: ALICE.id, familyId: randomUUID(), tokenHash: hashRefreshToken(key)!, expiresAt: new Date(Date.now() + 7 * 86_400_000), rotatedAt: null, replacedBy: null, revokedAt: null, revokedReason: null, ...over });
+    rows().push({ id: randomUUID(), userId: ALICE.id, familyId: randomUUID(), tokenHash: hashRefreshToken(key)!, expiresAt: new Date(Date.now() + 7 * 86_400_000), createdAt: new Date(), rotatedAt: null, replacedBy: null, revokedAt: null, revokedReason: null, ...over });
 
   it('keep working until they expire', async () => {
     const key = 'K'.repeat(43);

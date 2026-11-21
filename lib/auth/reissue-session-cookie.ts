@@ -1,7 +1,6 @@
 import { encode, getToken } from 'next-auth/jwt'
 import type { NextRequest, NextResponse } from 'next/server'
 import { SESSION_MAX_AGE_SECONDS } from './session'
-import { nowSeconds } from './session-cutoff'
 import { clearSessionCookies } from './clear-session-cookies'
 
 // Auth.js's own limits (`@auth/core/lib/utils/cookie.js`): a value over 3936 characters is split into
@@ -16,7 +15,9 @@ const cookieName = () => (secureCookie() ? '__Secure-authjs.session-token' : 'au
  * account's new sign-in cut-off, so it stays signed in while every other session is refused.
  *
  * The new cookie is the request's own session, decoded and re-encoded unchanged except for a fresh
- * `signedInAt` (and the expiry and ids `encode` sets). Nothing from the request body reaches it, and
+ * `signedInAt` (and the expiry and ids `encode` sets). The stamp is the caller's, read from the
+ * database clock after the change committed, so it is at or after the new cut-off; the cookie is
+ * renewed only when it decodes to `expectedUserId`. Nothing from the request body reaches it, and
  * it is only ever called after the caller proved the current password (or a fresh sign-in, for a
  * first one) and the change committed. A request without a readable web session cookie (a bearer
  * caller, a missing secret) gets no cookie and false: its own sign-in ended with the others.
@@ -28,7 +29,14 @@ const cookieName = () => (secureCookie() ? '__Secure-authjs.session-token' : 'au
  * Not reachable from `/api/auth/session`'s update: that takes client-supplied data, so the jwt
  * callback never re-stamps `signedInAt` and a client cannot move itself past a cut-off.
  */
-export async function reissueSessionCookie(req: NextRequest, res: NextResponse): Promise<boolean> {
+export async function reissueSessionCookie(
+  req: NextRequest,
+  res: NextResponse,
+  /** The user the route authenticated (`auth()`); the cookie must be theirs, or nothing is issued. */
+  expectedUserId: string,
+  /** The new `signedInAt`, read after the change committed (`signInStampFor`, database clock). */
+  signedInAt: number,
+): Promise<boolean> {
   const secret = process.env.AUTH_SECRET
   if (!secret) return false
   const name = cookieName()
@@ -39,12 +47,18 @@ export async function reissueSessionCookie(req: NextRequest, res: NextResponse):
     return false
   }
   if (!token || typeof token.userId !== 'string') return false
+  // #3949 review N2: only the session the route authenticated is renewed. A request whose cookie
+  // decodes to someone else (a bearer caller with a stray cookie, two sessions in one browser)
+  // gets nothing, so this can never mint a fresh session for an account that did not change its
+  // password.
+  if (token.userId !== expectedUserId) return false
+  if (!Number.isSafeInteger(signedInAt)) return false
   const { iat: _iat, exp: _exp, jti: _jti, ...claims } = token
   const value = await encode({
     secret,
     salt: name,
     maxAge: SESSION_MAX_AGE_SECONDS,
-    token: { ...claims, signedInAt: nowSeconds() },
+    token: { ...claims, signedInAt },
   })
   clearSessionCookies(req, res)
   const options = {

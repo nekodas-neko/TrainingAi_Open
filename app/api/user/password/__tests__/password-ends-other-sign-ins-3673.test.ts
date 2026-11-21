@@ -40,8 +40,8 @@ describe.skipIf(!canRun)('PATCH /api/user/password ends other sign-ins (#3673 it
       expiresAt: new Date(Date.now() + 86_400_000),
     })
   }
-  const cookieFor = (userId: string) =>
-    encode({ secret: SECRET, salt: COOKIE, token: { userId, sub: userId, isActive: true, signedInAt: signedInEarlier } })
+  const cookieFor = (userId: string, signedInAt = signedInEarlier) =>
+    encode({ secret: SECRET, salt: COOKIE, token: { userId, sub: userId, isActive: true, signedInAt } })
   const patch = async (body: unknown, cookie?: string, headers: Record<string, string> = {}) => {
     const { PATCH } = await import('@/app/api/user/password/route')
     return PATCH(new NextRequest('http://localhost/api/user/password', {
@@ -70,6 +70,10 @@ describe.skipIf(!canRun)('PATCH /api/user/password ends other sign-ins (#3673 it
     await pool.query('UPDATE users SET password_hash = $2, sign_ins_valid_from = NULL WHERE id = ANY($1::uuid[])', [[USER_A, USER_B], oldHash])
     await pool.query('DELETE FROM native_refresh_tokens WHERE user_id = ANY($1::uuid[])', [[USER_A, USER_B]])
     await pool.query(`DELETE FROM rate_limits WHERE key LIKE 'pw-change:00000000-0000-4000-8000-0000036730%'`)
+    const { _awaitRateLimitFlushes, _resetRateLimitL1 } = await import('@/lib/rate-limit')
+    await _awaitRateLimitFlushes()
+    await pool.query(`DELETE FROM rate_limits WHERE key LIKE 'pw-change:00000000-0000-4000-8000-0000036730%'`)
+    _resetRateLimitL1()
     mocks.session = { user: { id: USER_A }, signedInAt: signedInEarlier }
     await seedNative(USER_A)
     await seedNative(USER_A)
@@ -106,6 +110,46 @@ describe.skipIf(!canRun)('PATCH /api/user/password ends other sign-ins (#3673 it
     const token = await decode({ token: set!.value, secret: SECRET, salt: COOKIE })
     expect(token?.userId).toBe(USER_A)
     expect(token!.signedInAt as number).toBeGreaterThanOrEqual(Math.floor(stored.at!.getTime() / 1000))
+    expect(await accepted(USER_A, token!.signedInAt as number)).toBe(true)
+  })
+
+  // #3949 review item 7: the response sets a session cookie, so it is never cached.
+  it('the response that sets the new cookie is private, no-store', async () => {
+    const res = await patch({ currentPassword: OLD, newPassword: NEW }, await cookieFor(USER_A))
+    expect(res.status).toBe(200)
+    expect(res.cookies.get(COOKIE)?.value).toBeTruthy()
+    expect(res.headers.get('cache-control')).toBe('private, no-store')
+  })
+
+  // #3949 review N2: only the session the route authenticated is renewed. A cookie that decodes to
+  // another account (here B's, while the session is A's) is never re-issued.
+  it('never re-issues a cookie that is not the authenticated user\'s', async () => {
+    const res = await patch({ currentPassword: OLD, newPassword: NEW }, await cookieFor(USER_B))
+    expect(res.status).toBe(200)
+    expect(res.cookies.get(COOKIE)).toBeUndefined()
+    const { reissueSessionCookie } = await import('@/lib/auth/reissue-session-cookie')
+    const { NextResponse } = await import('next/server')
+    const req = new NextRequest('http://localhost/', { headers: { cookie: `${COOKIE}=${await cookieFor(USER_B)}` } })
+    const out = NextResponse.json({ ok: true })
+    expect(await reissueSessionCookie(req, out, USER_A, nowS())).toBe(false)
+    expect(out.cookies.get(COOKIE)).toBeUndefined()
+    expect(await reissueSessionCookie(req, out, USER_B, nowS())).toBe(true)
+  })
+
+  // #3949 review N1: one clock and a strict rule. A session stamped by the database clock just before
+  // the change (very likely the same second) is refused; the new cookie, stamped after it committed,
+  // is at or after the whole-second cut-off and passes.
+  it('a session stamped in the same second, just before the change, is refused', async () => {
+    const justBefore = await repo.signInStampFor(USER_A)
+    expect(await accepted(USER_A, justBefore)).toBe(true)
+    const res = await patch({ currentPassword: OLD, newPassword: NEW }, await cookieFor(USER_A, justBefore))
+    expect(res.status).toBe(200)
+    const at = (await pool.query<{ at: Date }>('SELECT sign_ins_valid_from AS at FROM users WHERE id = $1', [USER_A])).rows[0].at
+    expect(at.getTime() % 1000).toBe(0)
+    expect(at.getTime() / 1000).toBeGreaterThan(justBefore)
+    expect(await accepted(USER_A, justBefore)).toBe(false)
+    const token = await decode({ token: res.cookies.get(COOKIE)!.value, secret: SECRET, salt: COOKIE })
+    expect(token!.signedInAt).toBe(at.getTime() / 1000)
     expect(await accepted(USER_A, token!.signedInAt as number)).toBe(true)
   })
 

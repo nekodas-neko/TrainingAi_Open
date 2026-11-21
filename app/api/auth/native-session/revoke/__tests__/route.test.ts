@@ -34,7 +34,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.stubEnv('AUTH_SECRET', 'native-revocation-test-secret-long-enough');
   mocks.auth.mockResolvedValue({ user: { id: user.id } });
-  mocks.create.mockResolvedValue({ id: SESSION_ID, expiresAt: new Date(Date.now() + 60000) });
+  mocks.create.mockResolvedValue({ id: SESSION_ID, createdAt: new Date(), expiresAt: new Date(Date.now() + 60000) });
   mocks.findById.mockResolvedValue({
     id: SESSION_ID,
     userId: user.id,

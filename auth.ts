@@ -19,6 +19,19 @@ const nextAuth = NextAuth({
   callbacks: {
     ...authConfig.callbacks,
     signIn: authorizeSignIn,
+    // #3949 review N1: a sign-in's `signedInAt` comes from the database clock, the clock the sign-in
+    // cut-off is written with, and is never below the account's cut-off (`signInStampFor`). The edge
+    // config's callback stamps the app clock and cannot reach the database; this replaces that stamp
+    // for every provider, at sign-in only (`user` is present only then), after `authorizeSignIn` and
+    // any link it made have committed. A stamp that cannot be read fails the sign-in.
+    async jwt(params) {
+      const token = await authConfig.callbacks.jwt(params)
+      if (params.user) {
+        if (typeof token.userId !== 'string') throw new Error('Cannot stamp sign-in')
+        token.signedInAt = await (await getRepositoryAsync()).signInStampFor(token.userId)
+      }
+      return token
+    },
   },
 })
 

@@ -11,7 +11,8 @@ import { sessionTokenFrom } from '../session-token';
 import { randomBytes } from 'node:crypto';
 import { getRepositoryAsync } from '@/lib/data';
 import { hashRefreshToken } from '../refresh-token-hash';
-import { nowSeconds } from '../session-cutoff';
+import { issuedBeforeSignInCutoff } from '../session-cutoff';
+import { NativeSignInCutOffError } from '@/lib/data/postgres/slices/native-refresh-tokens';
 
 // #2076. A native sign-in is a refresh token (stored only as a hash, one family per device sign-in)
 // plus a one-day access token that names the refresh-token row it was issued with. The bearer check
@@ -37,9 +38,17 @@ function newRefreshToken() {
 
 const refreshExpiry = () => new Date(Date.now() + NATIVE_REFRESH_TOKEN_MAX_AGE_SECONDS * 1000);
 
-async function accessTokenFor(user: User, nativeTokenId: string) {
+/** The refresh row an access token is issued with: its id, and its `created_at` (database clock). */
+type IssuedRow = { id: string; createdAt: Date };
+
+async function accessTokenFor(user: User, row: IssuedRow) {
   const secret = process.env.AUTH_SECRET;
   if (!secret) throw new Error('Cannot issue session');
+  // #3949 review N1: the stamp is the row's own `created_at`, from the database clock that also
+  // writes the sign-in cut-off, and never below that cut-off (`createdAtFor`). No app clock is in
+  // the comparison. An unreadable time refuses to issue rather than stamp from another clock.
+  const signedInAt = Math.floor(new Date(row.createdAt).getTime() / 1000);
+  if (!Number.isSafeInteger(signedInAt)) throw new Error('Cannot issue session');
   const salt = NATIVE_SESSION_SALT;
   const accessToken = await encode({
     secret,
@@ -50,12 +59,12 @@ async function accessTokenFor(user: User, nativeTokenId: string) {
       userId: user.id,
       name: user.name ?? null,
       email: user.email,
-      nativeTokenId,
+      nativeTokenId: row.id,
       // #3369: the refresh-token row is what ties this token to a sign-in (a reset deletes it), so
       // the stamp is the issue time. That makes it right for the session cut-off, which only asks
       // "issued after the reset?", and wrong as a sign-in time: every rotation moves it. So
       // `/api/account/data-epoch` does not report it for a bearer request.
-      signedInAt: nowSeconds(),
+      signedInAt,
     },
   });
   const token = await decode({ token: accessToken, secret, salt });
@@ -101,7 +110,7 @@ export async function issueNativeSession(
     deviceId: device.id ?? null,
     expiresAt: refreshExpiry(),
   });
-  return response(await accessTokenFor(user, row.id), refresh.raw, row.expiresAt);
+  return response(await accessTokenFor(user, row), refresh.raw, row.expiresAt);
 }
 
 export type NativeRotation =
@@ -149,43 +158,56 @@ export async function rotateNativeSession(rawRefreshToken: string): Promise<Nati
   if (user.sessionsValidFrom && stored.createdAt.getTime() < user.sessionsValidFrom.getTime()) {
     return { ok: false, reason: 'invalid' };
   }
-  // #3829, the same for the sign-in cut-off: the link that sets it revokes every refresh token in the
-  // same transaction, so this only catches a row that raced it. Compared in whole seconds with the
-  // cut-off floored, as `signedInBeforeCutoff` does: the row's time is the database clock and the
-  // cut-off the app's, and a token issued in the same second as the link (an Apple link onto a
-  // pending account) must not be refused for a few milliseconds of skew. Fails closed on an invalid
-  // date.
-  if (user.signInsValidFrom
-    && !(Math.floor(stored.createdAt.getTime() / 1000) >= Math.floor(user.signInsValidFrom.getTime() / 1000))) {
+  // #3829, the same for the sign-in cut-off, under its strict rule (`issuedBeforeSignInCutoff`: a
+  // row issued before it is refused, no same-second survivor; both times are the database clock).
+  // An early exit only: the authoritative check runs again inside the rotation's transaction, after
+  // its family lock (#3949 review S3), so a sign-out that commits after this read still ends it.
+  if (issuedBeforeSignInCutoff(stored.createdAt, user.signInsValidFrom)) {
     return { ok: false, reason: 'invalid' };
   }
+  // A sign-out that committed between the read above and the rotation's family lock is found by the
+  // rotation itself (#3949 review S3), which throws and writes nothing: an ended sign-in, not reuse.
+  const endedByCutOff = (err: unknown): NativeRotation => {
+    if (err instanceof NativeSignInCutOffError) return { ok: false, reason: 'invalid' };
+    throw err;
+  };
   const next = newRefreshToken();
   if (stored.rotatedAt) {
-    const regranted = await repo.regrantNativeRefreshToken({
+    let regranted;
+    try {
+      regranted = await repo.regrantNativeRefreshToken({
+        userId: stored.userId,
+        id: stored.id,
+        newTokenHash: next.hash,
+        expiresAt: refreshExpiry(),
+        graceSeconds: NATIVE_REFRESH_REUSE_GRACE_SECONDS,
+      });
+    } catch (err) {
+      return endedByCutOff(err);
+    }
+    if (!regranted) return reuse();
+    return {
+      ok: true,
+      body: response(await accessTokenFor(user, regranted), next.raw, regranted.expiresAt),
+    };
+  }
+  if (stored.expiresAt.getTime() <= Date.now()) return { ok: false, reason: 'invalid' };
+  let rotated;
+  try {
+    rotated = await repo.rotateNativeRefreshToken({
       userId: stored.userId,
       id: stored.id,
       newTokenHash: next.hash,
       expiresAt: refreshExpiry(),
-      graceSeconds: NATIVE_REFRESH_REUSE_GRACE_SECONDS,
     });
-    if (!regranted) return reuse();
-    return {
-      ok: true,
-      body: response(await accessTokenFor(user, regranted.id), next.raw, regranted.expiresAt),
-    };
+  } catch (err) {
+    return endedByCutOff(err);
   }
-  if (stored.expiresAt.getTime() <= Date.now()) return { ok: false, reason: 'invalid' };
-  const rotated = await repo.rotateNativeRefreshToken({
-    userId: stored.userId,
-    id: stored.id,
-    newTokenHash: next.hash,
-    expiresAt: refreshExpiry(),
-  });
   // Null after the checks above means another request rotated (or revoked) it first.
   if (!rotated) return reuse();
   return {
     ok: true,
-    body: response(await accessTokenFor(user, rotated.id), next.raw, rotated.expiresAt),
+    body: response(await accessTokenFor(user, rotated), next.raw, rotated.expiresAt),
   };
 }
 

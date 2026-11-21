@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { createMobileAuthToken, consumeMobileAuthToken } from '../auth/mobile/tokens';
 vi.mock('@/lib/data', () => ({
   getRepositoryAsync: async () => ({
-    createNativeRefreshToken: async () => ({ id: 'synthetic-session', expiresAt: new Date(Date.now() + 86_400_000) }),
+    createNativeRefreshToken: async () => ({ id: 'synthetic-session', createdAt: new Date(), expiresAt: new Date(Date.now() + 86_400_000) }),
   }),
 }));
 

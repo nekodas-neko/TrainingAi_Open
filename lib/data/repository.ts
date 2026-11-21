@@ -692,10 +692,14 @@ export interface WorkoutRepository {
   updateUserProfile(userId: string, profile: Partial<Pick<User, 'displayName' | 'heightCm' | 'dateOfBirth' | 'weightGoalKg' | 'timezone' | 'sex' | 'activityLevel' | 'fitnessGoal'>>): Promise<User>
   touchLastGoalReviewAt(userId: string): Promise<void>
   updateUserAvatar(userId: string, avatar: string): Promise<User>
-  /** #3673 item 5: also ends every other sign-in (native families revoked, web sessions before `at` refused). */
-  updateUserPassword(userId: string, passwordHash: string, at?: Date): Promise<void>
-  /** #3854 item 1: refuse every sign-in of the account made before `at` (`users.sign_ins_valid_from`). */
-  endSignInsBefore(userId: string, at?: Date): Promise<void>
+  /** #3673 item 5: also ends every other sign-in (native families revoked, web sessions up to now refused). */
+  updateUserPassword(userId: string, passwordHash: string): Promise<void>
+  /** #3854 item 1: refuse every sign-in of the account made up to now (`users.sign_ins_valid_from`,
+   *  database clock), serialised against a native refresh in flight. */
+  endSignInsBefore(userId: string): Promise<void>
+  /** #3949 review N1: the `signedInAt` for a new web sign-in, from the database clock and never below
+   *  the account's sign-in cut-off. Throws when it cannot be read. */
+  signInStampFor(userId: string): Promise<number>
   /** #3797: a password it clears ends that password's native sign-ins; `activate` for a verified, invited address. */
   linkOAuthAccount(userId: string, oauthSub: string, opts?: { activate?: boolean }): Promise<boolean>
   getTimingBaselineDate(userId: string): Promise<string | null>

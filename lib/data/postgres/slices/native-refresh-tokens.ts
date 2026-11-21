@@ -56,6 +56,49 @@ async function lockFamily(tx: Pick<Db, 'execute'>, familyId: string) {
   await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${familyId}::text))`)
 }
 
+/** #3429 / #3949 review N5: one sign-in at a time per (account, install). Two sign-ins from one
+ *  install at the same moment would each look for the install's older families before the other's
+ *  existed, and both survive; with this, the second waits, then finds and revokes the first. Its own
+ *  two-key lock space (`pg_advisory_xact_lock(int, int)`), apart from the one-key family locks. */
+async function lockInstall(tx: Pick<Db, 'execute'>, userId: string, deviceId: string) {
+  await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('native-install'), hashtext(${userId}::text || ':' || ${deviceId}::text))`)
+}
+
+/**
+ * #3949 review N1: the `created_at` a new row gets. The database clock, raised to the account's
+ * sign-in cut-off (as a whole second, rounded up) when that is later, so a row written after a
+ * cut-off is never below it, even within the same second. Its access token is stamped from it
+ * (`lib/auth/mobile/session.ts`), so both sides of every sign-in comparison come from this clock.
+ */
+const createdAtFor = (userId: string) => sql`GREATEST(
+  clock_timestamp(),
+  (SELECT to_timestamp(ceil(extract(epoch FROM ${s.users.signInsValidFrom}))) FROM ${s.users} WHERE ${s.users.id} = ${userId})
+)`
+
+/** Thrown by a rotation or regrant when the presented row was issued before the account's sign-in
+ *  cut-off. The throw rolls the transaction back, so nothing is written, and the caller refuses the
+ *  token as invalid (an ended sign-in, not reuse). */
+export class NativeSignInCutOffError extends Error {
+  constructor() {
+    super('native sign-in was issued before the account\'s sign-in cut-off')
+    this.name = 'NativeSignInCutOffError'
+  }
+}
+
+/**
+ * #3949 review S3: read, inside the caller's transaction and after its family lock, whether the
+ * presented row was issued before the account's sign-in cut-off (`issuedBeforeSignInCutoff`'s rule,
+ * in SQL). A sign-out holds the same lock while it writes the cut-off (`endSignInsBefore` in the
+ * adapter), so this reads it committed or not at all. An account with no cut-off reads false.
+ */
+async function issuedBeforeCutOff(tx: Pick<Db, 'select'>, userId: string, id: string): Promise<boolean> {
+  const [row] = await tx.select({
+    before: sql<boolean>`${t.createdAt} < to_timestamp(ceil(extract(epoch FROM ${s.users.signInsValidFrom})))`,
+  }).from(t).innerJoin(s.users, eq(s.users.id, t.userId))
+    .where(and(eq(t.id, id), eq(t.userId, userId))).limit(1)
+  return row?.before === true
+}
+
 export interface RegrantNativeRefreshTokenInput {
   userId: string
   /** The rotated row the presented token resolved to. */
@@ -105,11 +148,16 @@ const toToken = (r: Record<keyof typeof COLUMNS, unknown>): NativeRefreshToken =
  *  the caller's user, so an install id sent from another account revokes nothing of this one's.
  *  The families are locked first (in a fixed order), so a rotation of one running at the same
  *  moment either commits before the revoke, whose UPDATE then sees its successor, or waits and finds
- *  its row revoked. No `deviceId` (an app from before #3280) revokes nothing. */
+ *  its row revoked. No `deviceId` (an app from before #3280) revokes nothing.
+ *
+ *  #3949 review N5: two sign-ins from one install at the same moment are serialised by a lock on
+ *  (account, install) taken before the search (`lockInstall`), so the second sees the first's family
+ *  and revokes it; without it both searched before either family existed, and both survived. */
 export async function createNativeRefreshToken(db: Db, input: CreateNativeRefreshTokenInput): Promise<NativeRefreshToken> {
   const deviceId = input.deviceId ?? null
   return db.transaction(async tx => {
     if (deviceId !== null) {
+      await lockInstall(tx, input.userId, deviceId)
       const older = await tx.selectDistinct({ familyId: t.familyId }).from(t)
         .where(and(eq(t.userId, input.userId), eq(t.deviceId, deviceId), isNull(t.revokedAt)))
         .orderBy(t.familyId)
@@ -132,6 +180,7 @@ export async function createNativeRefreshToken(db: Db, input: CreateNativeRefres
         deviceLabel: input.deviceLabel,
         deviceId,
         expiresAt: input.expiresAt,
+        createdAt: createdAtFor(input.userId),
       })
       .returning(COLUMNS)
     return toToken(row)
@@ -163,13 +212,16 @@ export async function findNativeRefreshTokenById(db: Db, userId: string, id: str
  * reach it, and only one matches `rotated_at IS NULL`. The loser gets `null`, which the refresh
  * route treats as reuse.
  */
-export async function rotateNativeRefreshToken(db: Db, input: RotateNativeRefreshTokenInput): Promise<NativeRefreshToken | null> {
+export async function rotateNativeRefreshToken(
+  db: Db, input: RotateNativeRefreshTokenInput,
+): Promise<NativeRefreshToken | null> {
   const { userId } = input
   return db.transaction(async tx => {
     const [row] = await tx.select({ familyId: t.familyId }).from(t)
       .where(and(eq(t.id, input.id), eq(t.userId, userId))).limit(1)
     if (!row) return null
     await lockFamily(tx, row.familyId)
+    if (await issuedBeforeCutOff(tx, userId, input.id)) throw new NativeSignInCutOffError()
     const [old] = await tx.update(t)
       .set({ rotatedAt: sql`now()`, lastUsedAt: sql`now()` })
       .where(and(
@@ -189,6 +241,7 @@ export async function rotateNativeRefreshToken(db: Db, input: RotateNativeRefres
         deviceLabel: old.deviceLabel,
         deviceId: old.deviceId,
         expiresAt: input.expiresAt,
+        createdAt: createdAtFor(userId),
       })
       .returning(COLUMNS)
     // By id alone: the UPDATE above, in this transaction, already proved the row is the caller's.
@@ -207,13 +260,16 @@ export async function rotateNativeRefreshToken(db: Db, input: RotateNativeRefres
  * takes its place in the family. Returns the new row, or `null` with nothing written when any
  * condition fails; the caller then treats the token as reused.
  */
-export async function regrantNativeRefreshToken(db: Db, input: RegrantNativeRefreshTokenInput): Promise<NativeRefreshToken | null> {
+export async function regrantNativeRefreshToken(
+  db: Db, input: RegrantNativeRefreshTokenInput,
+): Promise<NativeRefreshToken | null> {
   const { userId } = input
   return db.transaction(async tx => {
     const [row] = await tx.select({ familyId: t.familyId }).from(t)
       .where(and(eq(t.id, input.id), eq(t.userId, userId))).limit(1)
     if (!row) return null
     await lockFamily(tx, row.familyId)
+    if (await issuedBeforeCutOff(tx, userId, input.id)) throw new NativeSignInCutOffError()
     const [old] = await tx.select({ replacedBy: t.replacedBy, deviceLabel: t.deviceLabel, deviceId: t.deviceId })
       .from(t)
       .where(and(
@@ -242,6 +298,7 @@ export async function regrantNativeRefreshToken(db: Db, input: RegrantNativeRefr
         deviceLabel: old.deviceLabel,
         deviceId: old.deviceId,
         expiresAt: input.expiresAt,
+        createdAt: createdAtFor(userId),
       })
       .returning(COLUMNS)
     await tx.update(t)
