@@ -12,6 +12,7 @@
  * so Body Battery calls it only when today's persisted row is missing. The persist inside it means
  * that happens at most once a day; every later read on either route hits the stored row.
  */
+import { refreshUnansweredReadinessVerdict } from '@/lib/health/readiness-verdict-refresh'
 import { getRepository } from '@/lib/data'
 import { reportServerError } from '@/lib/observability'
 import type { OuraDailyDerivedPatch } from '@/lib/data/repository'
@@ -915,10 +916,12 @@ export async function buildReadinessPayload(
   // The outer catch is what keeps the merge itself inside the best-effort contract:
   // `mergeDerivedPersists` REFUSES a key claimed by two pillars, and that refusal must be a lost
   // write and a loud log line, never a failed read.
+  let readinessPersistedFor: string | null = null
   try {
     for (const group of mergeDerivedPersists(derivedPersists)) {
       try {
         await repo.upsertOuraDailyDerived(userId, group.day, group.patch)
+        if (group.pillars.includes('readiness')) readinessPersistedFor = group.day
       } catch (err) {
         console.error(`[readiness-score] derived persist failed for ${group.day} (${group.pillars.join('+')}) — read still served:`, err)
       }
@@ -926,6 +929,12 @@ export async function buildReadinessPayload(
   } catch (err) {
     console.error('[readiness-score] derived persist merge refused (read still served):', err)
   }
+
+  // #3976: today's readiness was just rewritten, so an unanswered verdict for the day follows it
+  // (Preview words the question from the live score). An answered or dismissed row is never touched,
+  // and a day with no row is left to the verdict's first read. Never throws; a fault is logged and
+  // the read is served.
+  if (readinessPersistedFor) await refreshUnansweredReadinessVerdict(repo, userId, readinessPersistedFor)
 
   const availability: ScoreAvailability = scoreAvailability({
     sleep: sleepScore100 != null,
