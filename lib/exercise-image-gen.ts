@@ -1,9 +1,13 @@
 import { GoogleGenAI, Modality } from '@google/genai';
 import sharp from 'sharp';
 import { takeDevAiCall } from '@/lib/ai/dev-call-budget';
+import { AI_SECTIONS, IMAGE_MODEL_ID, logAiCall } from '@/lib/ai/instrument';
 
-// Preview gives better consistency than stable release for now
-export const DEFAULT_MODEL = 'gemini-3.1-flash-image-preview';
+// Preview gives better consistency than stable release for now. The id lives in the AI call
+// settings table (lib/ai/instrument.ts) with every other model the app spends on.
+export const DEFAULT_MODEL = IMAGE_MODEL_ID;
+
+const SECTION = 'exercise-image' as const;
 
 export type ImageGenModel =
   | 'gemini-3.1-flash-image-preview'
@@ -314,23 +318,54 @@ function getAi() {
   return new GoogleGenAI({ apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY! });
 }
 
+/** One `ai_call_log` row per model request, the way `withAiLogging` writes one per attempt. */
+function logImageRequest(
+  model: string,
+  started: number,
+  ok: boolean,
+  usage?: { promptTokenCount?: number; candidatesTokenCount?: number; totalTokenCount?: number },
+): void {
+  logAiCall(
+    { section: SECTION, model },
+    {
+      latencyMs: Date.now() - started,
+      ok,
+      usage: usage && {
+        inputTokens: usage.promptTokenCount,
+        outputTokens: usage.candidatesTokenCount,
+        totalTokens: usage.totalTokenCount,
+      },
+    },
+  );
+}
+
 async function callGeminiImage(
   model: string,
   contents: Parameters<GoogleGenAI['models']['generateContent']>[0]['contents'],
 ): Promise<Buffer> {
   const ai = getAi();
   let lastError = '';
-  for (let attempt = 0; attempt < 3; attempt++) {
+  const attempts = 1 + AI_SECTIONS[SECTION].retries;
+  for (let attempt = 0; attempt < attempts; attempt++) {
     if (attempt > 0) await new Promise(r => setTimeout(r, 2000 * attempt));
     // #2816. This calls Gemini directly, outside instrument.ts, on the same key and balance —
     // so each attempt takes from the dev budget itself. A no-op in production.
     takeDevAiCall();
-    const response = await ai.models.generateContent({
-      model,
-      contents,
-      config: { responseModalities: [Modality.IMAGE] },
-    });
+    const started = Date.now();
+    let response: Awaited<ReturnType<typeof ai.models.generateContent>>;
+    try {
+      response = await ai.models.generateContent({
+        model,
+        contents,
+        config: { responseModalities: [Modality.IMAGE] },
+      });
+    } catch (err) {
+      logImageRequest(model, started, false);
+      throw err;
+    }
     const b64 = response.data;
+    // A reply with no image is a failed request, even though the provider answered.
+    logImageRequest(model, started, Boolean(b64), response.usageMetadata);
     if (b64) return Buffer.from(b64, 'base64');
     // Model returned text instead of image — capture it for the error message
     lastError = response.text ? `model said: "${response.text.slice(0, 120)}"` : 'no image in response';
@@ -341,12 +376,20 @@ async function callGeminiImage(
 async function callImagen(model: string, prompt: string): Promise<Buffer> {
   const ai = getAi();
   takeDevAiCall();
-  const response = await ai.models.generateImages({
-    model,
-    prompt,
-    config: { numberOfImages: 1, aspectRatio: '3:4' },
-  });
+  const started = Date.now();
+  let response: Awaited<ReturnType<typeof ai.models.generateImages>>;
+  try {
+    response = await ai.models.generateImages({
+      model,
+      prompt,
+      config: { numberOfImages: 1, aspectRatio: '3:4' },
+    });
+  } catch (err) {
+    logImageRequest(model, started, false);
+    throw err;
+  }
   const b64 = response.generatedImages?.[0]?.image?.imageBytes;
+  logImageRequest(model, started, Boolean(b64));
   if (!b64) throw new Error(`${model}: no image returned`);
   return Buffer.from(b64, 'base64');
 }

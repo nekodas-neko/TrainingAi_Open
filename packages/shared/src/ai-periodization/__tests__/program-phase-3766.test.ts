@@ -20,7 +20,6 @@ vi.mock('../signals', async importOriginal => ({
   aggregateSignals: async () => mocks.signals,
 }))
 vi.mock('@/lib/ai/instrument', () => ({
-  aiModel: () => ({}),
   // A copy: generation rewrites the answer in place.
   loggedGenerateObject: async () => ({ object: structuredClone(mocks.modelAnswer) }),
 }))

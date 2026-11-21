@@ -13,7 +13,6 @@ vi.mock('@/lib/rate-limit', () => ({ rateLimit: () => true }))
 const seen: unknown[] = []
 vi.mock('@/lib/ai/instrument', async importOriginal => ({
   ...(await importOriginal<typeof import('@/lib/ai/instrument')>()),
-  aiModel: () => ({}),
   loggedGenerateObject: async (meta: { fingerprint: unknown }, run: () => Promise<unknown>) => {
     seen.push(meta.fingerprint)
     return run()

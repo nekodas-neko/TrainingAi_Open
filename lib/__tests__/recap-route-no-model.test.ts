@@ -35,7 +35,6 @@ vi.mock('@/lib/data', () => ({
 }))
 vi.mock('ai', () => ({ generateText: (o: unknown) => generateText(o) }))
 vi.mock('@/lib/ai/instrument', () => ({
-  aiModel: () => ({}),
   loggedGenerateText: (...a: unknown[]) => loggedGenerateText(...a),
 }))
 // Refuses everything: if the route still consulted a limiter, every request below would be a 429.

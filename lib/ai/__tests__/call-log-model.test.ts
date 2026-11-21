@@ -50,7 +50,7 @@ describe('ai_call_log records the model actually used (Q-296)', () => {
 
   it('still records the default for a route that names no model', async () => {
     const { withAiLogging, AI_MODEL_ID } = await import('../instrument')
-    await withAiLogging({ section: 'health-insight' }, async () => ({ usage: {} }))
+    await withAiLogging({ section: 'prescription' }, async () => ({ usage: {} }))
     await flush()
     expect(logged[0].model).toBe(AI_MODEL_ID)
   })

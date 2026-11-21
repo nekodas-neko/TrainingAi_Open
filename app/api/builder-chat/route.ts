@@ -5,7 +5,7 @@ import { getRepository } from '@/lib/data'
 import { generateObject } from 'ai'
 import { PROSE_FIELD_GUARDS } from '@/lib/ai/prompt-guards'
 import { USER_TEXT_NOTE } from '@trainingai/shared/ai/untrusted-text'
-import { aiModel, loggedGenerateObject } from '@/lib/ai/instrument'
+import { loggedGenerateObject } from '@/lib/ai/instrument'
 import { aiPausedResponse } from '@/lib/ai/provider-paused'
 import { z } from 'zod'
 import { GeneratedProgramSchema } from '@trainingai/shared/validation/generated-program'
@@ -187,12 +187,11 @@ When responding, mention if a change improves or worsens weekly volume balance. 
   try {
     const { object: raw } = await loggedGenerateObject(
       { section: 'builder-chat', userId, fingerprint: message },
-      signal => generateObject({
-        model: aiModel(),
+      (signal, settings) => generateObject({
+        ...settings,
         schema: BuilderChatObjectSchema,
         system: `${systemPrompt}\n\n${PROSE_FIELD_GUARDS}`,
         prompt: userPrompt,
-        maxRetries: 0,
         abortSignal: signal,
       }),
     )

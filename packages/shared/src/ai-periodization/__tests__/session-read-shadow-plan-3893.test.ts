@@ -26,7 +26,6 @@ vi.mock('ai', async importOriginal => ({
   },
 }))
 vi.mock('@/lib/ai/instrument', () => ({
-  aiModel: () => ({}),
   loggedGenerateObject: async (_meta: unknown, run: (signal?: AbortSignal) => Promise<unknown>) => run(undefined),
 }))
 const { generatePrescriptionForSession } = await import('../generate-prescription')

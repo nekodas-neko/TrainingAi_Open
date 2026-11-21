@@ -13,7 +13,6 @@ vi.mock('ai', () => ({
 }))
 vi.mock('@/lib/rate-limit', () => ({ rateLimit: () => true }))
 vi.mock('@/lib/ai/instrument', () => ({
-  aiModel: () => ({}),
   loggedGenerateText: async (_meta: unknown, run: () => Promise<{ text: string }>) => run(),
 }))
 vi.mock('@/lib/data', () => ({

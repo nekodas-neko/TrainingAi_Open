@@ -206,7 +206,6 @@ Output field notes:
 - session_exercise_id: copy exactly from the exercise list — never invent one.
 - reasoning: 1-2 sentences. Never state a time budget or any duration in minutes: the app adds
   the sentence about time itself, and removes any minutes figure you write.
-- confidence: your certainty in this prescription, 0.0-1.0.
 
 ${PROSE_FIELD_GUARDS}`
 }
