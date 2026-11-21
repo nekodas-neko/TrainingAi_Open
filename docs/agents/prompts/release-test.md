@@ -15,7 +15,7 @@ whether it is safe to ship. You run on the owner's machine.
 4a. **The same smoke against a production build** (#3933), once the dev server is stopped (`next
    build` beside a running `pnpm dev` runs out of memory). A production server needs Postgres over
    SSL, reads the model constants from `.oura-constants/`, and lists the ONNX models in object
-   storage at boot; the scripts provide all three (the last as a local MinIO holding placeholder
+   storage at boot; the scripts provide all three (the last as a local S3Mock holding placeholder
    files, never the real bucket) and leave every guard as it is:
    ```
    export DATABASE_URL=$(scripts/ci/start-ssl-postgres.sh)   # Docker, port 5434, SSL on

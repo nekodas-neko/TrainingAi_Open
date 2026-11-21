@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# #3933. A throwaway S3-compatible store (MinIO in Docker) holding PLACEHOLDER model files, so a
+# #3933. A throwaway S3-compatible store (Adobe S3Mock in Docker; MinIO's images are no longer pullable) holding PLACEHOLDER model files, so a
 # production server can pass `checkModelAssets` (`instrumentation-node.ts`) in CI without a real
 # bucket credential. The guard is untouched: it still lists the bucket and still refuses a boot
 # that finds the files missing, empty or unreachable. Here they exist, as a few bytes of text.
@@ -26,21 +26,25 @@ BUCKET="trainingai-smoke"
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 
 docker rm -f "$S3_CONTAINER" >/dev/null 2>&1 || true
-docker run -d --name "$S3_CONTAINER" -p "$S3_PORT:9000" \
-  -e MINIO_ROOT_USER="$ACCESS_KEY" -e MINIO_ROOT_PASSWORD="$SECRET_KEY" \
-  minio/minio:RELEASE.2025-04-22T22-12-26Z server /data >/dev/null
+# S3Mock accepts any credentials; the ones below are only there because the app requires some.
+docker run -d --name "$S3_CONTAINER" -p "$S3_PORT:9090" \
+  -e COM_ADOBE_TESTING_S3MOCK_STORE_REGION=us-east-1 \
+  adobe/s3mock:4.12.4 >/dev/null
 
+# Create the bucket and put a placeholder at every key checkModelAssets lists. Retried until the
+# container answers.
+ok=""
 for _ in $(seq 1 30); do
-  curl -sf -o /dev/null "http://localhost:$S3_PORT/minio/health/live" && break
-  sleep 1
+  if STORAGE_ENDPOINT="http://localhost:$S3_PORT" STORAGE_ACCESS_KEY_ID="$ACCESS_KEY" \
+     STORAGE_SECRET_ACCESS_KEY="$SECRET_KEY" STORAGE_BUCKET_NAME="$BUCKET" \
+     node "$root/scripts/ci/seed-local-s3.mjs" >&2 2>/dev/null; then ok=1; break; fi
+  sleep 2
 done
-curl -sf -o /dev/null "http://localhost:$S3_PORT/minio/health/live" \
-  || { echo "local S3 did not come up" >&2; docker logs "$S3_CONTAINER" >&2; exit 1; }
-
-# Create the bucket and put a placeholder at every key checkModelAssets lists.
-STORAGE_ENDPOINT="http://localhost:$S3_PORT" STORAGE_ACCESS_KEY_ID="$ACCESS_KEY" \
-STORAGE_SECRET_ACCESS_KEY="$SECRET_KEY" STORAGE_BUCKET_NAME="$BUCKET" \
-  node "$root/scripts/ci/seed-local-s3.mjs" >&2
+if [ -z "$ok" ]; then
+  echo "local S3 did not come up and take the placeholder files" >&2
+  docker logs "$S3_CONTAINER" >&2 || true
+  exit 1
+fi
 
 echo "export STORAGE_ENDPOINT=http://localhost:$S3_PORT"
 echo "export STORAGE_ACCESS_KEY_ID=$ACCESS_KEY"

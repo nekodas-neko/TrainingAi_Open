@@ -16,7 +16,7 @@ name: Route smoke (production build)
 #   `.oura-constants/`, the directory a deploy downloads its set into.
 #
 # - Model assets: production refuses to boot unless object storage lists every ONNX model
-#   (`instrumentation-node.ts`). `scripts/ci/start-local-s3.sh` runs MinIO in the job with
+#   (`instrumentation-node.ts`). `scripts/ci/start-local-s3.sh` runs S3Mock in the job with
 #   placeholder files at those keys and throwaway credentials made up there (not secrets), so no
 #   real bucket credential is in the repo's Actions (owner decision on #3933, option 2). The guard
 #   is untouched; the job never exercises the real bucket listing, which the release workflow does.
