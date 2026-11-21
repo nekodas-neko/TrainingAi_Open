@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { RPE_SOURCES } from './rpe-source';
+import { ExerciseEffortSchema } from './effort-vs-plan';
 import { PushedEditedAtSchema } from '../sync/edited-at';
 
 export const LogExercisePayloadSchema = z.object({
@@ -41,6 +42,9 @@ export const LogExercisePayloadSchema = z.object({
   intensityMode:        z.enum(['full', 'deload']).optional(),
   wasOverride:          z.boolean().optional(),
   exerciseDeloaded:     z.boolean().optional(),
+  // #3745: "how did this exercise feel?", answered after its last set. Optional: an older build
+  // sends none, and the server then keeps whatever answer the row already holds.
+  effort:               ExerciseEffortSchema.optional(),
   estimated1rm:         z.number().optional(),
   target80:             z.number().optional(),
   // Issue 2721: when the phone made this log (epoch ms), for the outbox push. A stale copy older than

@@ -1,3 +1,4 @@
+import type { EffortSource, EffortVsPlan } from '../workout/effort-vs-plan'
 import type { ProgramPhaseType } from './program'
 
 import type { RpeSource } from '../workout/rpe-source'
@@ -42,6 +43,9 @@ export interface ExerciseLog {
   interExerciseRestSec?: number
   prepTimeSec?: number
   exerciseDeloaded?: boolean
+  /** #3745: the after-the-last-set answer, -1 / 0 / +1 against the plan, and who chose it. */
+  effortVsPlan?: EffortVsPlan | null
+  effortSource?: EffortSource | null
   /** `exercise_library.exercise_type` via `exercise_id`, null when the log has none. Decides a
    *  display unit — see `isBodyweightType` in `1rm.ts` (RV-219). */
   exerciseType?: string | null

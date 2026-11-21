@@ -8,17 +8,25 @@ import type { WorkoutExercise, WorkoutRecord } from '../logging/workout';
 import { exerciseResult } from '../logging/summary';
 import { formatSetLoad } from '../logging/targets';
 import { RestCard } from './WorkoutClocks';
+import { EffortQuestion } from './EffortQuestion';
+import { effortQuestionExercises } from '../logging/effort';
+import type { EffortVsPlan } from '@trainingai/shared/workout/effort-vs-plan';
 
 export function ExerciseSummary({
   workout,
   exercise,
   next,
   onEdit,
+  onEffort,
+  busy = false,
 }: {
   workout: WorkoutRecord;
   exercise: WorkoutExercise;
   next?: WorkoutExercise;
   onEdit?: (id: string) => void;
+  /** #3745: the answer to "how did it feel?" for one of the exercises this card asks about. */
+  onEffort?: (exerciseId: string, value: EffortVsPlan) => void;
+  busy?: boolean;
 }) {
   const result = exerciseResult(workout, exercise);
   const { theme } = useTheme();
@@ -52,6 +60,18 @@ export function ExerciseSummary({
   return (
     <>
       <RestCard workout={workout} controls={false} />
+      {onEffort && workout.status === 'active' && (
+        <Card style={compact}>
+          {effortQuestionExercises(workout, exercise.id).map((asked) => (
+            <EffortQuestion
+              key={asked.id}
+              exercise={asked}
+              disabled={busy}
+              onAnswer={(value) => onEffort(asked.id, value)}
+            />
+          ))}
+        </Card>
+      )}
       <AppText variant="caption" tone="muted">
         Exercise complete. Continue when you are ready; the next exercise opens
         preparation.

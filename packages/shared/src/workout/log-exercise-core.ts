@@ -63,7 +63,7 @@ export async function logExerciseWithRepo(
     localDate, timeToCompleteSet, setTimes, restTimes,
     setStartTimes, setEndTimes, interExerciseRestSec, prepTimeSec,
     progressionStyle, plannedWeights, prescriptionBasisKg, styleName, styleId, muscleGroups, workoutStartedAt, warmupEndedAtMs,
-    rpeValues, rpeSources, intensityMode, wasOverride, exerciseDeloaded,
+    rpeValues, rpeSources, intensityMode, wasOverride, exerciseDeloaded, effort,
   } = payload;
 
 
@@ -323,6 +323,9 @@ export async function logExerciseWithRepo(
     // takes `isAnyDeload` separately and already gates on it. This changes what is STORED, not what
     // is decided, so no PR behaviour moves.
     exerciseDeloaded: deloadedForEstimate,
+    // #3745: stored only, read by nothing yet. Absent (an older build) writes nothing over a stored one.
+    effortVsPlan: effort?.vsPlan ?? null,
+    effortSource: effort?.source ?? null,
   }, setData.map((s, i) => ({ ...s, id: clientSetLogIds?.[i] })), stamp);
   const superseded = logged.superseded === true;
 
