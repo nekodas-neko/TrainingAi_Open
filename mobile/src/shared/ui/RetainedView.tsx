@@ -1,16 +1,25 @@
 import { Activity, useEffect, useState, type PropsWithChildren } from 'react';
 import { View } from 'react-native';
 
-export function RetainedView({ active, children }: PropsWithChildren<{ active: boolean }>) {
-  const [visited, setVisited] = useState(active);
+/**
+ * Keeps what it holds alive while it is not showing. `shown` keeps it drawn without making it the
+ * active one: a screen sliding out, or the one a slide moves over. It stays hidden from screen
+ * readers unless `active`.
+ */
+export function RetainedView({
+  active,
+  shown = active,
+  children,
+}: PropsWithChildren<{ active: boolean; shown?: boolean }>) {
+  const [visited, setVisited] = useState(shown);
   useEffect(() => {
-    if (active) {
+    if (shown) {
       setVisited(true);
     }
-  }, [active]);
+  }, [shown]);
   return (
-    <Activity mode={active ? 'visible' : 'hidden'}>
-      {(active || visited) && (
+    <Activity mode={shown ? 'visible' : 'hidden'}>
+      {(shown || visited) && (
         <View
           style={{ flex: 1, minHeight: 0 }}
           accessibilityElementsHidden={!active}

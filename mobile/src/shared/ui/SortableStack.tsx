@@ -11,6 +11,7 @@ import { useTheme } from '../theme/ThemeProvider';
 import { feedback } from '../../integrations/feedback/haptics';
 import { Icon } from './Icon';
 import { useReducedMotion } from './useReducedMotion';
+import { MOTION } from './motion';
 import { useDragScroll } from './ReorderScrollView';
 import { dragOrder, displacedItems, moveItem, reorderBounds, type ItemBounds } from './reorder';
 
@@ -88,7 +89,7 @@ export function SortableStack({
       else
         Animated.spring(value, {
           toValue: shift,
-          speed: 32,
+          speed: MOTION.springs.sortableStack,
           bounciness: 0,
           useNativeDriver: false,
         }).start();
@@ -149,7 +150,7 @@ export function SortableStack({
       [...destinations].map(([id, shift]) =>
         Animated.spring(offset(id), {
           toValue: shift,
-          speed: 32,
+          speed: MOTION.springs.sortableStack,
           bounciness: 0,
           useNativeDriver: false,
         }),

@@ -2,6 +2,7 @@ import { feedback } from '../../integrations/feedback/haptics';
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Platform, Pressable, View } from 'react-native';
 import { useReducedMotion } from './useReducedMotion';
+import { MOTION } from './motion';
 import { useTheme } from '../theme/ThemeProvider';
 
 export function PageDots({
@@ -52,7 +53,7 @@ export function PageDots({
     else
       Animated.spring(local, {
         toValue: selectedIndex,
-        speed: 25,
+        speed: MOTION.springs.pageDots,
         bounciness: 0,
         useNativeDriver: Platform.OS !== 'web',
       }).start();

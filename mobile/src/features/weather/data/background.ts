@@ -26,6 +26,20 @@ export function backgroundScene(
   if (detail === 'session-explain') return 'sessionExplain';
   return bucket === 'home' || bucket === 'workout' ? 'sky' : bucket;
 }
+/**
+ * What makes the backdrop a different picture: the scene, theme, weather and size. Not the clock:
+ * the sky's colours drift with the time, and the scene redraws with them without a cross-fade.
+ * (A key with the minute in it rebuilt and cross-faded the whole backdrop every minute, #3758.)
+ */
+export function backgroundKey(parts: {
+  scene: string;
+  mode: string;
+  condition: string;
+  width: number;
+  height: number;
+}) {
+  return `${parts.scene}:${parts.mode}:${parts.condition}:${parts.width}:${parts.height}`;
+}
 export function backgroundPhase(
   snapshot: WeatherSnapshot | null,
   now: number,

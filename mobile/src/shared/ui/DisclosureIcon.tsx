@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { Animated, Platform } from 'react-native';
 import { Icon } from './Icon';
 import { useReducedMotion } from './useReducedMotion';
+import { MOTION } from './motion';
 import { useTheme } from '../theme/ThemeProvider';
 
 /** `collapsed="right"` is the current app's ChevronRight that turns to point down when open. */
@@ -20,7 +21,7 @@ export function DisclosureIcon({
   useEffect(() => {
     const animation = Animated.timing(rotation, {
       toValue: expanded ? 1 : 0,
-      duration: reduced ? 0 : 180,
+      duration: reduced ? 0 : MOTION.disclosureIcon.duration,
       useNativeDriver: Platform.OS !== 'web',
     });
     animation.start();
