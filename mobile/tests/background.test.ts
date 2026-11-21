@@ -9,6 +9,7 @@ import {
   tintWeather,
 } from '../src/features/weather/data/background.ts';
 import {
+  defaults,
   settingsSchema,
   weatherNeeded,
   type WeatherSnapshot,
@@ -51,7 +52,7 @@ test('solar epochs follow the selected place rather than the phone timezone', ()
   assert.equal(backgroundPhase(abroad, rise + 16 * 3600000, PALETTES).isDay, true);
 });
 test('scene routing obeys each toggle and preserves bespoke health-detail artwork', () => {
-  const settings = settingsSchema.parse({});
+  const settings = settingsSchema.parse({ backgroundEnabled: true });
   assert.equal(backgroundScene(settings, 'home', null, null), 'sky');
   assert.equal(backgroundScene(settings, 'workout', null, null), 'sky');
   assert.equal(backgroundScene(settings, 'home', 'health-day', null), 'health');
@@ -108,8 +109,12 @@ test('background preferences migrate old weather settings, persist and allow wea
   };
   const store = new WeatherStore(storage, services, () => rise);
   await store.initialize();
-  assert.equal(store.getSnapshot().settings.backgroundEnabled, true);
-  await store.configure({ enabled: false, backgroundAnimated: false });
+  assert.equal(
+    store.getSnapshot().settings.backgroundEnabled,
+    false,
+    'settings saved before the switch existed come up with backgrounds off (#3692)',
+  );
+  await store.configure({ enabled: false, backgroundAnimated: false, backgroundEnabled: true });
   assert.equal(weatherNeeded(store.getSnapshot().settings), true);
   assert.ok(store.getSnapshot().snapshot);
   await store.configure({
@@ -127,4 +132,32 @@ test('background preferences migrate old weather settings, persist and allow wea
   assert.equal(reopened.getSnapshot().settings.backgroundAnimated, false);
   assert.equal(reopened.getSnapshot().settings.backgroundSections.home, false);
   assert.equal(reads, 0);
+});
+
+test('moving backgrounds start switched off, and a saved choice is kept either way (#3692)', async () => {
+  assert.equal(defaults.backgroundEnabled, false);
+  assert.equal(settingsSchema.parse({}).backgroundEnabled, false);
+  assert.equal(settingsSchema.parse({ backgroundEnabled: true }).backgroundEnabled, true);
+  const open = (saved: object | null) => {
+    const values = new Map<string, string>();
+    if (saved) values.set('weather.v1', JSON.stringify({ settings: saved, cache: [] }));
+    return new WeatherStore(
+      {
+        get: async (key: string) => values.get(key) ?? null,
+        set: async (key: string, value: string) => void values.set(key, value),
+        remove: async () => {},
+      },
+      { locate: async () => null, forecast: async () => snapshot },
+      () => rise,
+    );
+  };
+  const fresh = open(null);
+  await fresh.initialize();
+  assert.equal(fresh.getSnapshot().settings.backgroundEnabled, false, 'a fresh install');
+  const turnedOn = open({ enabled: true, backgroundEnabled: true });
+  await turnedOn.initialize();
+  assert.equal(turnedOn.getSnapshot().settings.backgroundEnabled, true, 'a user who turned them on');
+  const turnedOff = open({ enabled: true, backgroundEnabled: false });
+  await turnedOff.initialize();
+  assert.equal(turnedOff.getSnapshot().settings.backgroundEnabled, false);
 });

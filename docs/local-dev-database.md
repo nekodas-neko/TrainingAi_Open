@@ -301,3 +301,8 @@ migration file beats re-deriving it from the catalogue, which by then describes 
 The test user `test@local.dev` has password `testpass123` (seeded with a bcrypt
 hash) for credentials-login testing.
 
+`scripts/local-db/seed-preview-screens.sql` adds dev-only data on top for the browser preview's
+screen captures (food, older body metrics and sleep, readiness verdicts, and `is_admin` on the
+test user). `mobile/scripts/web-screens.mjs` runs it. Apart from that flag it leaves `seed.sql`'s rows alone, and it is
+safe to run again.
+

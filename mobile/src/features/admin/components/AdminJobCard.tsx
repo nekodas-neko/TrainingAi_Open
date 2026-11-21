@@ -3,12 +3,14 @@ import { View } from 'react-native';
 import { AppButton, AppText, Badge, Card, Notice, Stack, SwitchRow, TextField } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { useWorkoutResources } from '../../workouts/data/WorkoutDataProvider';
+import { useAccountContext } from '../../account/AccountProvider';
 import { failureNotice } from '../../../core/reporting/index.ts';
 import {
   WRITE_PHRASE,
   canWrite,
   jobFailure,
   jobQuery,
+  jobReport,
   rangeProblem,
   remainingOf,
   summaryRows,
@@ -20,6 +22,7 @@ import {
 /** One data job: dry run first, then a write that needs the snapshot ticked and the word typed. */
 export function AdminJobCard({ job }: { job: AdminJob }) {
   const resources = useWorkoutResources();
+  const reader = useAccountContext().dataReader;
   const { theme } = useTheme();
   const [params, setParams] = useState<JobParams>({ from: '', to: '' });
   const [dry, setDry] = useState<JobReport | null>(null);
@@ -41,17 +44,17 @@ export function AdminJobCard({ job }: { job: AdminJob }) {
   }
   async function run(write: boolean) {
     if (!resources || busy || problem) return;
+    // A count preview is a read: without a reader it cannot run, and it must never fall to the POST.
+    if (job.countPreview && !write && !reader) return;
     if (write && !canWrite({ dry, dryParams, params, snapshot, typed })) return;
     setBusy(write ? 'write' : 'dry');
     setError(null);
     try {
-      const report = (await resources.write(
-        'POST',
-        job.path,
-        undefined,
-        [],
-        jobQuery(job, params, write),
-      )) as JobReport;
+      const raw =
+        job.countPreview && !write
+          ? await reader!.get(job.path)
+          : await resources.write('POST', job.path, undefined, [], jobQuery(job, params, write));
+      const report = jobReport(job, raw, write);
       if (write) {
         setWritten(report);
         // The dry run is spent: another write needs a fresh one.
@@ -114,7 +117,7 @@ export function AdminJobCard({ job }: { job: AdminJob }) {
         </Stack>
       )}
       <AppButton
-        title="Dry run"
+        title={job.countPreview ? 'Count what it would do' : 'Dry run'}
         variant="surface"
         busy={busy === 'dry'}
         disabled={!!busy || !!problem}
@@ -123,7 +126,9 @@ export function AdminJobCard({ job }: { job: AdminJob }) {
       {error && <Notice title="Could not run" message={error} error />}
       {rows.length > 0 && (
         <Card tone={written ? 'brand' : 'neutral'}>
-          <AppText variant="label">{written ? 'Written' : 'Dry run: nothing was written'}</AppText>
+          <AppText variant="label">
+            {written ? 'Written' : job.countPreview ? 'Count: nothing was written' : 'Dry run: nothing was written'}
+          </AppText>
           {rows.map((r) => (
             <AppText key={r.label} variant="caption">
               {r.label}: {r.value}

@@ -20,3 +20,5 @@ credentials.json
 !/modules/*/android/
 /modules/*/android/.gradle/
 /modules/*/android/build/
+# Browser preview export (scripts/web-screens.mjs)
+.web-preview-dist/

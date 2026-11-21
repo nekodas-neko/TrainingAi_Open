@@ -13,7 +13,7 @@ installed app._
 | How a fix reaches the phone | A release deploys the server, and the app shows the change on its next open. No reinstall. | Server fixes still ship by release. A screen fix needs a new app build installed, since there are no over-the-air updates yet. |
 | Testing a screen | `pnpm dev` in a browser at 384 px, then the device check. | A development build on a phone, loading code from a laptop's bundler (Metro): an edit shows within a second or two. `pnpm --dir mobile web` gives a rough browser preview. The phone is the truth. |
 | Old versions | None: every phone always ran the latest screens. | A phone can run an older app build against a newer server. |
-| Cloud agents | Could run and check most screens in a browser. | Can type-check, run tests and use the browser preview, but can't reach a phone. |
+| Cloud agents | Could run and check most screens in a browser. | Can type-check, run tests and capture every screen signed in, in a browser (`mobile/scripts/web-screens.mjs`), but can't reach a phone. |
 
 The server and the app now ship separately:
 
@@ -84,7 +84,8 @@ what makes comparing them possible, and it is also why these rules exist:
      Custom Rules.
    - jsboiss checks on his test phones with a development build fed by Metro, against a local
      `pnpm dev` or a test server.
-   - Cloud agents use `pnpm --dir mobile web` for a rough preview and `pnpm dev` for the API.
+   - Cloud agents use `pnpm dev` for the API and `mobile/scripts/web-screens.mjs` to sign in and
+     capture the screens in a browser (below).
 2. **Device check (Implementer, on the owner's machine).** Install the development build on the
    owner's phone and run it against the machine's local server. Use `.preview` builds, and
    `.dev` builds only on a phone where TrainingAi Dev is not installed. Results go on the device-check issue.
@@ -125,6 +126,68 @@ what makes comparing them possible, and it is also why these rules exist:
    - Over-the-air updates, so screen fixes don't need a reinstall.
    - The minimum-version check (#2847).
    - An emulator smoke test in CI, so regressions are caught without a phone.
+
+## Checking screens in a browser (`mobile/scripts/web-screens.mjs`, #3761)
+
+A cloud session can't reach a phone, but it can sign Preview's screens in to a local server in
+Chromium and capture them. Use it for layout, text and "where does this lead" checks before
+asking for the device.
+
+**Run it** (from the repository root, with the local database up, `pnpm db:local`):
+
+```bash
+node mobile/scripts/web-screens.mjs                                  # every screen
+node mobile/scripts/web-screens.mjs --screens more,more-data,health-day
+node mobile/scripts/web-screens.mjs --list                           # the screen names
+node mobile/scripts/web-screens.mjs --no-build --screens nutrition-day   # reuse the last export
+node mobile/scripts/web-screens.mjs --click steps.json               # tap, then capture
+```
+
+- It uses the Next server on `http://localhost:3000`, or starts `pnpm dev` there with no Gemini
+  key and `AI_DEV_DAILY_CALL_LIMIT=0`, and stops it at the end. Don't run `next build` alongside
+  it: the two together run out of memory.
+- It adds dev-only data for the seeded user (`scripts/local-db/seed-preview-screens.sql`: food,
+  more weeks of body metrics and sleep, readiness verdicts, and the admin flag), builds a
+  development web export (about a minute), signs in as `test@local.dev`, then opens each screen
+  with the app's own navigation.
+- Screenshots are 384 px wide and dark (`--light`, `--height N`, `--scale 2` change that), in
+  `$TMPDIR/trainingai-web-screens` or `--out DIR`. `index.md` and `index.json` list screen → file
+  → where it landed → whether a spinner was still showing → the console errors seen on it.
+- A full run of 36 screens took 2½ to 4 minutes here, building and starting the server included.
+  Never commit the screenshots.
+- The workout logger (`workout-log`) shows only a workout in progress in this browser's own
+  journal, so it isn't in the list; `workout-day` is the day of the latest finished workout. To see
+  the logger, start a workout from `workout-session` with a click script (that writes a workout to
+  the local database).
+- A click script is a JSON array of steps: `{"open": "more"}`, `{"tap": "Data & Sync"}` (exact
+  text; add `"exact": false` for a part), `{"scroll": 600}`, `{"wait": 1000}`, `{"capture": "name"}`.
+- `--serve` signs in, then keeps the proxy running for a person's own browser at
+  `http://localhost:8099`; `--verbose` prints the app's console.
+
+**How it signs in.** The development export only (`expo export --dev` with
+`EXPO_PUBLIC_WEB_PREVIEW_AUTH=1`) swaps the web stub for a browser adapter
+(`mobile/src/integrations/auth/web-preview.ts`) and allows `http://localhost` as the server. It
+runs the real sign-in: the server's `/mobile-signin` page in a popup with the email and password,
+the consent page, then the PKCE exchange for bearer tokens, as the `android-dev` client the server
+accepts only outside production. The script serves the export and the Next server on one origin
+through a small local proxy. The proxy turns the server's last redirect, to the app's
+`com.trainingai.app.dev:` callback, into a page that posts that URL back to the app, because a
+browser can't follow it. Nothing on the server changes for this.
+
+**Why a release can't carry it.** Android and iOS never load a `.web.ts` file, the only place the
+adapter is required. On the web the require sits behind `__DEV__`, which Metro folds to false in
+a production export, so the module is dropped. `mobile/tests/web-preview-guard.test.ts` walks the
+Android and iOS module graphs, and checks that only the adapter turns the localhost allowance on.
+CI's `Mobile client` job runs `mobile/scripts/check-release-bundles.mjs` on its production export
+of all three platforms and fails if any bundle holds the adapter's strings.
+
+**What it shows:** layout and spacing at the phone's width, text and its wrapping, sizes, empty and
+loaded states with the seeded data, and where a row or button leads.
+
+**What it can't show:** Android Back, the keyboard, safe areas and the status bar, Bluetooth (the
+ring, the strap, scales), notifications and alarms, picture-in-picture, Health Connect, native
+SQLite (the web build uses a browser database), real motion and timing, and the phone's fonts
+and rendering. Those still need the device check.
 
 ## Installing TrainingAi Preview
 

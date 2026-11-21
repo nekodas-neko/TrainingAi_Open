@@ -12,7 +12,8 @@ export const settingsSchema = z.object({
   source: z.enum(['city', 'device']).default('city'),
   city: placeSchema.nullable().default(null),
   unit: z.enum(['celsius', 'fahrenheit']).default('celsius'),
-  backgroundEnabled: z.boolean().default(true),
+  // Off on a fresh install, as the current app's are (#3692). A saved value, either way, is kept.
+  backgroundEnabled: z.boolean().default(false),
   backgroundAnimated: z.boolean().default(true),
   backgroundSections: z
     .object({
