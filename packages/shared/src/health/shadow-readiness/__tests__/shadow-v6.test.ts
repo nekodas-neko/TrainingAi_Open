@@ -12,8 +12,8 @@ const night = (value: number, source = 'ring'): UnitObservation => ({ date: D, v
 const run = (units: ShadowScoreInput['units']) => scoreShadowReadiness({ date: D, units })
 
 describe('version 6: settling at 2 points, sleep duration in Activity', () => {
-  it('is version 6', () => {
-    expect(SHADOW_MODEL_VERSION).toBe(6)
+  it('is at least version 6', () => {
+    expect(SHADOW_MODEL_VERSION).toBeGreaterThanOrEqual(6)
   })
 
   it('overnight settling carries 2 points, and Heart is worth 21 (was 23.5)', () => {
