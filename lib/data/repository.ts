@@ -877,7 +877,8 @@ export interface WorkoutRepository {
   // `upsertReadinessVerdict` is idempotent per (user, date) and never touches `response_state`.
   getReadinessVerdict(userId: string, date: string): Promise<ReadinessVerdictRecord | null>
   upsertReadinessVerdict(userId: string, record: Omit<ReadinessVerdictRecord, 'responseState'>): Promise<void>
-  /** Returns false when no verdict was made for that day, so there is nothing to answer. */
+  /** False only when no verdict was made for that day. A later, weaker answer leaves the row as it is
+   *  and still returns true (#3982: rated > dismissed > none). */
   setReadinessVerdictResponse(userId: string, date: string, state: 'rated' | 'dismissed'): Promise<boolean>
   /** #3976: rewrites the day's verdict with a recomputed one ONLY while `response_state = 'none'`,
    *  in one statement. False when there is no row or it was already answered or dismissed. */

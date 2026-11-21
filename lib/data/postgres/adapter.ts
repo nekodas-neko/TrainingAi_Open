@@ -3834,17 +3834,33 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       })
   }
 
-  /** Returns false when there is no verdict for that day to respond to. */
+  /**
+   * Returns false only when there is no verdict for that day to respond to. A request that changes
+   * nothing still returns true: the day is answered. #3982: the answer an earlier request recorded is
+   * never taken back — "rated" may replace "none" or "dismissed", "dismissed" may replace only
+   * "none", and a "rated" row stays as it is — so a late retry or a second device cannot turn a
+   * rating into a dismissal. The condition is in the UPDATE itself, so two answers that race cannot
+   * both pass it; the follow-up read only tells "already answered" from "no such day".
+   */
   async setReadinessVerdictResponse(
     userId: string,
     date: string,
     state: 'rated' | 'dismissed',
   ): Promise<boolean> {
+    const replaceable = state === 'rated' ? ['none', 'dismissed'] : ['none']
     const updated = await this.db.update(s.readinessVerdicts)
       .set({ responseState: state, updatedAt: new Date() })
-      .where(and(eq(s.readinessVerdicts.userId, userId), eq(s.readinessVerdicts.date, date)))
+      .where(and(
+        eq(s.readinessVerdicts.userId, userId),
+        eq(s.readinessVerdicts.date, date),
+        inArray(s.readinessVerdicts.responseState, replaceable),
+      ))
       .returning({ id: s.readinessVerdicts.id })
-    return updated.length > 0
+    if (updated.length > 0) return true
+    const [existing] = await this.db.select({ id: s.readinessVerdicts.id }).from(s.readinessVerdicts)
+      .where(and(eq(s.readinessVerdicts.userId, userId), eq(s.readinessVerdicts.date, date)))
+      .limit(1)
+    return !!existing
   }
 
   /**
