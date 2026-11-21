@@ -227,7 +227,7 @@ describe('the missing-reps signal reads the session\'s own planned reps (#3800)'
         if (prop in t) return t[prop]
         if (/^get(Exercise|Weekly)/.test(prop)) return async () => ({})
         if (/^get(MoodLog|DayCheckin|OuraCloudSwitchDay)$/.test(prop)) return async () => null
-        if (/^list(PersonalRecords|Previous1rm)$/.test(prop)) return async () => new Map()
+        if (/^list(PersonalRecords|Recent1rm)$/.test(prop)) return async () => new Map()
         return async () => []
       },
     }) as never

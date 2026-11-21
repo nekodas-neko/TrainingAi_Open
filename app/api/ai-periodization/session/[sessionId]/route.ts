@@ -115,11 +115,11 @@ export async function GET(
   // AND every ~3s regeneration poll tick. Those signals exist for the LLM prompt; the card never
   // sees them. Three cheap reads instead, sharing the engine's own trend derivation so the two
   // can't disagree. The generator still uses the full aggregation.
-  const [allPrs, prevPrs] = await Promise.all([
+  const [allPrs, recent1rm] = await Promise.all([
     repo.listPersonalRecords(userId),
-    repo.listPrevious1rm(userId),
+    repo.listRecent1rm(userId),
   ])
-  const signals = { exercises: buildCardExerciseSignals(validSession.exercises, allPrs, prevPrs) }
+  const signals = { exercises: buildCardExerciseSignals(validSession.exercises, allPrs, recent1rm) }
 
   return NextResponse.json({ state: shown, signals }, { headers: { 'Cache-Control': 'private, no-store' } })
 }

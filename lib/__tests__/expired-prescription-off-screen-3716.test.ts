@@ -23,7 +23,7 @@ const updatePrescriptionStatus = vi.fn(async (_u: string, _s: string, _st: strin
 const wasProgramSessionTrainedSince = vi.fn(async () => false)
 const revertAutoAdoptedBaseline = vi.fn(async () => null)
 const listPersonalRecords = vi.fn(async () => new Map<string, number>())
-const listPrevious1rm = vi.fn(async () => new Map<string, number>())
+const listRecent1rm = vi.fn(async () => new Map<string, { latest: number; previous?: number }>())
 const reconcileSessionsInPhase = vi.fn(async () => undefined)
 const listSessionPeriodizationForProgram = vi.fn(async () => [state()] as Row[])
 const getRecentSessionsOfType = vi.fn(async () => [] as Row[])
@@ -40,7 +40,7 @@ vi.mock('@/lib/data', () => {
   const repo = async () => ({
     getActiveProgram, ensureSessionPeriodization, getSessionPeriodization, advancePhase,
     storePrescription, updatePrescriptionStatus, wasProgramSessionTrainedSince,
-    revertAutoAdoptedBaseline, listPersonalRecords, listPrevious1rm, reconcileSessionsInPhase,
+    revertAutoAdoptedBaseline, listPersonalRecords, listRecent1rm, reconcileSessionsInPhase,
     listSessionPeriodizationForProgram, getRecentSessionsOfType, getNextSession,
     getExerciseMuscleAssignments, listProgressionStyles, getExerciseEquipment,
       // #3766: the program's phase. A program move reaches the same spy as a per-type one; which of the
