@@ -24,6 +24,8 @@ test('the account label style wins; an unknown value falls back to a real style'
 
 test('patches use the account keys, and Home preferences now carry both', () => {
   assert.deepEqual(foodRegionPatch('GB'), { foodRegion: 'GB' });
+  assert.deepEqual(mealLabelStylePatch('band'), { mealLabelStyle: 'band' });
+  assert.deepEqual(mealLabelStylePatch('nonsense'), { mealLabelStyle: 'inlineCentred' });
   const parsed = preferencesSchema.parse({ foodRegion: 'CA', mealLabelStyle: 'inlineCentred', junk: 1 });
   assert.deepEqual(parsed, { foodRegion: 'CA', mealLabelStyle: 'inlineCentred' });
   assert.deepEqual(preferencesSchema.parse(foodRegionPatch('NZ')), { foodRegion: 'NZ' });
