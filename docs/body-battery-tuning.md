@@ -180,6 +180,25 @@ v7's; on top of it `packages/shared/src/health/body-battery-exercise.ts` adds:
   alone keeps a reserve), not fitted. The proposal's pass tests are run on a replay before release.
   Stamp: `v8:rest+9bpm:…:exw0.5:exs0.45:cap1.5:pm0.8`.
 
+## The replay harness (#3925)
+
+`scripts/tuning/body-battery-replay.cjs` replays the app's own finished-day recompute,
+`finishedBodyBatteryDay` (`lib/health/body-battery-replay.ts`), which `rederiveBodyBattery` writes
+through. It records the repository reads that function makes and replays the function on them, so
+it is on whatever model ships (v9 today: the v8 exercise drain, version-keyed baselines, the
+readiness anchor on the 75-centred scale) and holds no copy of a constant or a formula. Until
+#3925 it bundled the v7 walk alone, with the route's constants mirrored by hand.
+
+- `--capture FROM TO USER_ID` records from a database on this machine only (`LOCAL_DATABASE_URL`);
+  it refuses any other host and every repository method that is not a Body Battery read.
+- `--replay` and `--count` run the recompute on the recording. `--count` prints how many finished
+  days would change end value if finalised from the full day, by band, and how many have no row.
+- **Production, read-only:** the agent-key job `rederive-body-battery` with `dryRun: true` (no
+  approval needed) runs the same recompute on production and writes nothing. Save each 31-day
+  response and run `--count-report FILE...`: counts and bands only, safe for a public issue.
+- `lib/health/__tests__/body-battery-replay-3925.test.ts` holds the harness to the app: a fixture
+  day replays to exactly the row the re-derive writes.
+
 ## Open follow-up
 
 - **[ ] Re-run analysis #1 against v5 once ~2 weeks of v5 days exist.** It failed on v4
