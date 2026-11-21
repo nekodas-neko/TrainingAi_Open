@@ -30,6 +30,8 @@ import { LiveHrCard } from '../components/LiveHrCard';
 import { useWorkoutPip } from '../pip/usePictureInPicture';
 import { pipAccent } from '../pip/pip-accent';
 import { usePipSourceRect } from '../pip/usePipSourceRect';
+import { useOnScreen } from '../pip/useOnScreen';
+import { unseenEffortQuestions } from '../logging/effort';
 import { useWorkoutResource } from '../data/WorkoutDataProvider';
 import { hrProfileSpec } from '../../health/data/models';
 import { WorkoutSaveNotice } from '../components/WorkoutSaveNotice';
@@ -71,6 +73,13 @@ export function GuidedWorkoutScreen({
   const { theme, brand, customHue } = useTheme();
   const pip = useWorkoutPip(workout, controller, pipAccent(brand, customHue));
   const setSource = usePipSourceRect();
+  // #3745: a rest card's question counts as asked only once it is on screen, not while the app
+  // sits in the window, which asks about one exercise of a superset.
+  const onScreen = useOnScreen();
+  const unseenEffort = unseenEffortQuestions(workout).join(',');
+  useEffect(() => {
+    if (onScreen && unseenEffort) void controller.showEffort(workout.id, unseenEffort.split(','));
+  }, [controller, onScreen, unseenEffort, workout.id]);
   // Read once for the screen, not per rest, as the current app does for its Live HR card (RV-64).
   const hrProfile = useWorkoutResource(hrProfileSpec).data;
   const zoneProfile =

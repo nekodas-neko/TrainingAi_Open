@@ -73,21 +73,78 @@ export function answerEffort(
   };
 }
 
+/** The rest card's questions not yet marked seen, for the screen to mark once it is on screen. */
+export function unseenEffortQuestions(workout: WorkoutRecord): string[] {
+  if (workout.status !== 'active' || workout.flow?.stage !== 'summary') return [];
+  return effortQuestionExercises(workout, workout.flow.exerciseId)
+    .filter((x) => !x.effortShown)
+    .map((x) => x.id);
+}
+
+/** Marks the questions about these exercises as seen: on the rest card, or in the window. */
+export function showEffort(workout: WorkoutRecord, exerciseIds: readonly string[]): WorkoutRecord {
+  const ids = new Set(exerciseIds);
+  if (!workout.exercises.some((x) => ids.has(x.id) && !x.effortShown)) return workout;
+  return {
+    ...workout,
+    exercises: workout.exercises.map((x) => (ids.has(x.id) ? { ...x, effortShown: true } : x)),
+  };
+}
+
+/** Clears the open rest card's untouched defaults, except those `keep` names. */
+function openDefaults(workout: WorkoutRecord, keep: (exercise: WorkoutExercise) => boolean) {
+  if (workout.flow?.stage !== 'summary') return workout;
+  const open = new Set(effortQuestionExercises(workout, workout.flow.exerciseId).map((x) => x.id));
+  return clearDefaults(workout, (x) => open.has(x.id) && !keep(x));
+}
+
+function clearDefaults(workout: WorkoutRecord, clear: (exercise: WorkoutExercise) => boolean) {
+  if (!workout.exercises.some((x) => x.effortSource === 'default' && clear(x))) return workout;
+  return {
+    ...workout,
+    exercises: workout.exercises.map((exercise) =>
+      exercise.effortSource === 'default' && clear(exercise)
+        ? { ...exercise, effortVsPlan: null, effortSource: null }
+        : exercise,
+    ),
+  };
+}
+
 /**
  * A workout saved from stale with a rest card still open: that card's untouched answers were never
  * moved on from, so they are dropped rather than uploaded as a default. A tap is kept.
  */
 export function dropOpenDefaults(workout: WorkoutRecord): WorkoutRecord {
-  if (workout.flow?.stage !== 'summary') return workout;
-  const open = new Set(effortQuestionExercises(workout, workout.flow.exerciseId).map((x) => x.id));
-  return {
-    ...workout,
-    exercises: workout.exercises.map((exercise) =>
-      open.has(exercise.id) && exercise.effortSource === 'default'
-        ? { ...exercise, effortVsPlan: null, effortSource: null }
-        : exercise,
-    ),
-  };
+  return openDefaults(workout, () => false);
+}
+
+/**
+ * The rest card is being left (Next, another exercise, the session, finish). A default stays only
+ * where its question was on screen: a superset partner finished while the lifter was in the window,
+ * which asks about one exercise, never saw its question, so it stores nothing.
+ */
+export function dropUnseenDefaults(workout: WorkoutRecord): WorkoutRecord {
+  return openDefaults(workout, (x) => x.effortShown);
+}
+
+/** `dropUnseenDefaults` for a change that has left `before`'s rest card for `after`. */
+export function settleLeftEffort(before: WorkoutRecord, after: WorkoutRecord): WorkoutRecord {
+  if (before.flow?.stage !== 'summary') return after;
+  const stays =
+    after.status === 'active' &&
+    after.flow?.stage === 'summary' &&
+    after.flow.exerciseId === before.flow.exerciseId;
+  if (stays) return after;
+  const open = new Set(
+    effortQuestionExercises(before, before.flow.exerciseId)
+      .filter((x) => !x.effortShown)
+      .map((x) => x.id),
+  );
+  const left = clearDefaults(after, (x) => open.has(x.id));
+  // A superset's Next can land on its partner's own rest card, which asks again on the same terms.
+  return left.status === 'active' && left.flow?.stage === 'summary'
+    ? askEffort(left, left.flow.exerciseId)
+    : left;
 }
 
 /** What the upload carries: the answer of a finished exercise, else nothing. */

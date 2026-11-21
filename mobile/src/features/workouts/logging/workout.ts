@@ -11,7 +11,7 @@ import type { PendingWrite } from '../../../core/sync/pushMutation.ts';
 import { rejectionSchema } from '../../../core/sync/set-aside.ts';
 import type { CatalogIdentity, SessionPreview } from '../catalog.ts';
 import { workoutFlow } from './flow.ts';
-import { dropOpenDefaults, effortPayload } from './effort.ts';
+import { dropOpenDefaults, dropUnseenDefaults, effortPayload } from './effort.ts';
 import { measuredExerciseTiming } from './timing.ts';
 import { expectedRpe, initialWeight, prescribedWeight } from './targets.ts';
 import {
@@ -78,6 +78,9 @@ const exerciseSchema = z.object({
   // Null until the rest card asks; a workout saved before this build reads as never asked.
   effortVsPlan: EffortVsPlanSchema.nullable().default(null),
   effortSource: EffortSourceSchema.nullable().default(null),
+  // Whether the question was on screen, on the rest card or in the window. A default nobody saw
+  // is dropped when the rest card is left (dropUnseenDefaults). Kept on the phone, never uploaded.
+  effortShown: z.boolean().default(false),
   sets: z.array(setSchema).min(1).max(20),
 });
 const reference = z.object({ exerciseId: z.uuid(), setId: z.uuid() });
@@ -691,6 +694,8 @@ export function finishWorkout(workout: WorkoutRecord, now: number): WorkoutRecor
   if (!recordedSets(workout).length) {
     throw new Error('Record at least one set before finishing.');
   }
+  // #3745: finishing leaves the rest card, so a default nobody saw goes.
+  workout = dropUnseenDefaults(workout);
   const completed: WorkoutRecord = {
     ...endRest(workout, now),
     status: 'completed',
