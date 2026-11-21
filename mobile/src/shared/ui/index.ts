@@ -92,3 +92,4 @@ export { HueSlider } from './HueSlider';
 export { SortableStack } from './SortableStack';
 export { BackdropFade } from './BackdropFade';
 export { WeekdayPicker } from './WeekdayPicker';
+export { EnergyBattery, ENERGY_LEVELS } from './EnergyBattery';

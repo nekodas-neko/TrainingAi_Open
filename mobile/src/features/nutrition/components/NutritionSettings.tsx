@@ -10,6 +10,8 @@ import {
   AppText,
   Card,
   Grid,
+  Icon,
+  IconTileGrid,
   ListRow,
   NumericStepper,
   Picker,
@@ -25,6 +27,7 @@ import { useWorkoutResources } from '../../workouts/data/WorkoutDataProvider';
 import { useWorkoutDraft } from '../../workouts/data/useWorkoutDraft';
 import { useNutrition } from '../data/NutritionProvider';
 import { mealTypeBody } from '../data/models';
+import { MEAL_TYPE_ICON_CHOICES, mealTypeIconName } from './meal-type-icon-names';
 import { GoalRecommendation } from './GoalRecommendation';
 import { NutritionReminders } from '../../platform/components/NutritionReminders';
 import { ReminderPreferenceSwitch } from '../../platform/components/ReminderPreferenceSwitch';
@@ -127,7 +130,8 @@ export function NutritionSettings({ onClose }: { onClose: () => void }) {
           {n.view.mealTypes.map((mt, index) => (
             <Card key={mt.id}>
               <ListRow
-                title={mt.emoji + ' ' + mt.name}
+                title={mt.name}
+                leading={<Icon name={mealTypeIconName(mt.emoji)} tone="brand" />}
                 subtitle={`${mt.timeStartHour}:00–${mt.timeEndHour}:00 · ${mt.required ? 'Required' : 'Optional'}`}
                 onPress={() => {
                   setError(null);
@@ -191,10 +195,15 @@ export function NutritionSettings({ onClose }: { onClose: () => void }) {
             value={f.name}
             onChangeText={(name) => draft.setValue({ ...f, name })}
           />
-          <TextField
-            label="Emoji"
-            value={f.emoji}
-            onChangeText={(emoji) => draft.setValue({ ...f, emoji })}
+          <AppText variant="label">Icon</AppText>
+          <IconTileGrid
+            options={MEAL_TYPE_ICON_CHOICES.map(({ emoji, label, icon }) => ({
+              id: emoji,
+              label,
+              icon,
+            }))}
+            selectedId={f.emoji}
+            onSelect={(emoji) => draft.setValue({ ...f, emoji })}
           />
           <Grid columns={2}>
             <NumericStepper

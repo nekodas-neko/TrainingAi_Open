@@ -1,4 +1,5 @@
 import { useActivities } from '../../activities/data/ActivityProvider';
+import { leadingEmoji, mealTypeIconName } from '../../nutrition/components/meal-type-icon-names';
 import { Fragment, useRef, useState } from 'react';
 import { View } from 'react-native';
 import { formatTimeOfDay, shiftDateStr } from '@trainingai/shared/date-utils';
@@ -179,7 +180,8 @@ export function HomeTimeline({
   function appearance(event: TimelineEvent): { icon: IconName; color: string } {
     if (isSleepEvent(event))
       return { icon: event.type === 'wakeup' ? 'sunrise' : 'moon', color: hues.sleep };
-    if (event.type === 'meal') return { icon: 'nutrition', color: hues.meal };
+    if (event.type === 'meal')
+      return { icon: mealTypeIconName(leadingEmoji(event.title)), color: hues.meal };
     if (event.type === 'workout') return { icon: 'workout', color: theme.colors.brand };
     if (event.type === 'walk') return { icon: 'legs', color: hues.walk };
     if (event.type === 'cardio') return { icon: 'cardio', color: theme.tones.recovery.foreground };
