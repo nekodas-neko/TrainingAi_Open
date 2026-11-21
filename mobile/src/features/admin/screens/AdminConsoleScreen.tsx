@@ -22,7 +22,7 @@ import { AdminFeedbackPanel } from '../components/AdminFeedbackPanel';
 import { AdminInvitesPanel } from '../components/AdminInvitesPanel';
 import { AdminUsersPanel } from '../components/AdminUsersPanel';
 import { adminActivityTypesSpec, adminExercisesSpec, adminUnitFixNamesSpec } from '../data/admin-content';
-import { adminErrorsSpec } from '../data/admin-monitoring';
+import { adminErrorsSpec, isOwnerOnlyRefusal } from '../data/admin-monitoring';
 import { adminFeedbackSpec, adminInvitesSpec, adminUsersSpec } from '../data/admin-users';
 
 type Tab =
@@ -75,6 +75,9 @@ export function AdminConsoleScreen({ onBack }: { onBack: () => void }) {
   } as const;
   // AI usage reads its own windowed resource and shows its own loading and error states.
   const active = tab === 'ai' || tab === 'jobs' ? null : resourceFor[tab];
+  // Only errors and feedback are owner-only; their refusal is information, not a failed load.
+  const ownerOnly =
+    !!active && isOwnerOnlyRefusal(active, tab === 'errors' ? adminErrorsSpec : tab === 'feedback' ? adminFeedbackSpec : null);
   return (
     <PageLayout
       title="Admin Console"
@@ -107,6 +110,8 @@ export function AdminConsoleScreen({ onBack }: { onBack: () => void }) {
             <AdminAiUsagePanel />
           ) : tab === 'jobs' ? (
             <AdminJobsPanel />
+          ) : ownerOnly && active?.error ? (
+            <StateCard title="Owner only" message={active.error} />
           ) : active && active.error && !active.data ? (
             <StateCard error title="Could not load" message={active.error} action="Retry" onAction={active.refresh} />
           ) : active && !active.data ? (
@@ -126,7 +131,7 @@ export function AdminConsoleScreen({ onBack }: { onBack: () => void }) {
           ) : (
             <AdminUnitFixPanel exerciseNames={unitNames.data?.exerciseNames ?? []} />
           )}
-          {active && <AppButton title="Refresh" variant="ghost" onPress={active.refresh} />}
+          {active && !ownerOnly && <AppButton title="Refresh" variant="ghost" onPress={active.refresh} />}
         </Stack>
       </TabPanel>
     </PageLayout>

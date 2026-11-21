@@ -339,7 +339,9 @@ export class WorkoutResources {
         refreshing: false,
         saved: entry.state.data !== null,
         error: denied
-          ? (entry.spec.deniedMessage ?? 'Check your account to access this view.')
+          ? // `deniedMessage` names a 403 (e.g. "Owner only."); a 401 is an expired sign-in, never that.
+            ((error.status === 403 ? entry.spec.deniedMessage : undefined) ??
+            'Check your account to access this view.')
           : aiFailureText(
               error,
               failureNotice(

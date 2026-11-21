@@ -77,11 +77,12 @@ export default function AdminContent({ currentUserId }: { currentUserId: string 
     fetch('/api/admin/feedback')
       .then(async r => {
         if (r.status === 403) { setFeedbackFailure('owner-only'); setFeedbackSubmissions([]); return }
-        if (!r.ok) { setFeedbackFailure('failed'); return }
+        // A failed reload clears the list: rows left under "Could not load feedback" would read as current.
+        if (!r.ok) { setFeedbackFailure('failed'); setFeedbackSubmissions([]); return }
         const d = await r.json()
         setFeedbackSubmissions(Array.isArray(d) ? d : [])
       })
-      .catch(() => setFeedbackFailure('failed'))
+      .catch(() => { setFeedbackFailure('failed'); setFeedbackSubmissions([]) })
       .finally(() => setFeedbackLoading(false))
   }
 

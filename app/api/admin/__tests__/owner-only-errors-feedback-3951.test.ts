@@ -132,4 +132,36 @@ describe.skipIf(!canRun)('admin errors and feedback: an admin session must be th
     expect((await errors()).status).toBe(403)
     expect((await feedback()).status).toBe(403)
   })
+
+  // #3957 review: a database error during the owner lookup is "try again", 503, never "owner only".
+  // Only the owner lookup's `getUserById` (called from `resolveOwnerUserId`) rejects; `requireAdmin`
+  // still reads the owner's row, so each request gets past the admin check and fails on the owner.
+  describe('when the owner lookup throws', () => {
+    const failOwnerLookup = () => {
+      const real = repo.getUserById.bind(repo)
+      vi.spyOn(console, 'error').mockImplementation(() => {})
+      return vi.spyOn(repo, 'getUserById').mockImplementation(async (id: string) => {
+        if (new Error().stack?.includes('resolveOwnerUserId')) throw new Error('connection terminated unexpectedly')
+        return real(id)
+      })
+    }
+
+    it('errors, feedback, feedback/[id] and the pending badge answer 503 with no data', async () => {
+      const [first] = await seededFeedbackIds()
+      const spy = failOwnerLookup()
+      try {
+        asUser(OWNER)
+        for (const res of [await errors(), await feedback(), await deleteFeedback(first), await pending()]) {
+          expect(res.status).toBe(503)
+          expect(await res.json()).toEqual({ error: 'Service unavailable' })
+        }
+      } finally {
+        spy.mockRestore()
+      }
+      // The refused delete removed nothing, and the owner gets through once the lookup answers.
+      expect(await seededFeedbackIds()).toContain(first)
+      expect((await errors()).status).toBe(200)
+      expect((await pending()).status).toBe(200)
+    })
+  })
 })
