@@ -92,9 +92,11 @@ const getActiveProgram = vi.fn()
 const getSessionPeriodization = vi.fn()
 const storePrescription = vi.fn(async (
   _userId: string, _programSessionId: string, _prescription: AiPrescription,
-  _expiresAt: Date, _status?: string,
-) => undefined)
-const repo = { getActiveProgram, getSessionPeriodization, storePrescription } as never
+  _expiresAt: Date, _status?: string, _generatedFor?: unknown,
+) => true)
+// #3927: the re-fit reads the program with the session's structure stamp, from one snapshot.
+const getActiveProgramWithStructureStamp = vi.fn(async (u: string) => ({ program: await getActiveProgram(u), structure: 'stamp-1' }))
+const repo = { getActiveProgram, getActiveProgramWithStructureStamp, getSessionPeriodization, storePrescription } as never
 
 const periodizationState = (over: Record<string, unknown> = {}) => ({
   phase: 'accumulation',

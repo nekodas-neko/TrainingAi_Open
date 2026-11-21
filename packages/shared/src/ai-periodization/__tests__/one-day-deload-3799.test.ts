@@ -67,6 +67,11 @@ function harness() {
     prescriptionExpiresAt: null as Date | null, prescriptionGeneratedAt: null,
   }
   const known: Record<string, unknown> = {
+    // #3927: the program and the stamp from one snapshot, as the adapter reads them.
+    getActiveProgramWithStructureStamp: async (u: string, id: string) => ({
+      program: await (known.getActiveProgram as (u: string) => unknown)(u),
+      structure: await (known.getSessionStructureStamp as ((u: string, id: string) => unknown) | undefined)?.(u, id),
+    }),
     getActiveProgram: async () => ({ id: 'prog-1', sessions: [{ id: SESSION, timeBudgetMinutes: 90 }] }),
     ensureSessionPeriodization: async () => state,
     reconcileSessionsInPhase: async () => undefined,
@@ -198,6 +203,11 @@ describe('the missing-reps signal reads the session\'s own planned reps (#3800)'
       exercises: [{ sessionExerciseId: 'ex-1', name: 'Squat', sets: 5, reps: 8, pct: 70, restSec: 120 }],
     }
     const target: Record<string, unknown> = {
+      // #3927: the program and the stamp from one snapshot, as the adapter reads them.
+      getActiveProgramWithStructureStamp: async (u: string, id: string) => ({
+        program: await (target.getActiveProgram as (u: string) => unknown)(u),
+        structure: await (target.getSessionStructureStamp as ((u: string, id: string) => unknown) | undefined)?.(u, id),
+      }),
       getActiveProgram: async () => ({
         id: 'p-1', trainingGoal: 'strength', autoApplyPrescriptions: false, createdAt: new Date(Date.now() - 90 * 86_400_000),
         sessions: [{ id: SESSION, name: 'Legs', exercises: [{ id: 'ex-1', exerciseName: 'Squat', muscleGroups: ['quads'] }], timeBudgetMinutes: 60 }],

@@ -175,6 +175,11 @@ function harness() {
     prescription: null, prescriptionStatus: 'consumed', prescriptionExpiresAt: null, prescriptionGeneratedAt: null,
   }
   const known: Record<string, unknown> = {
+    // #3927: the program and the stamp from one snapshot, as the adapter reads them.
+    getActiveProgramWithStructureStamp: async (u: string, id: string) => ({
+      program: await (known.getActiveProgram as (u: string) => unknown)(u),
+      structure: await (known.getSessionStructureStamp as ((u: string, id: string) => unknown) | undefined)?.(u, id),
+    }),
     getActiveProgram: async () => ({ id: 'prog-1', sessions: [{ id: SESSION, timeBudgetMinutes: 90 }] }),
     ensureSessionPeriodization: async () => state,
     reconcileSessionsInPhase: async () => undefined,
