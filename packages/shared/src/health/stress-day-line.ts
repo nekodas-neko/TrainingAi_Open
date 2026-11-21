@@ -18,6 +18,13 @@ import { STRESS_HIGH_LEVEL } from './daytime-stress-thresholds'
  */
 export const STRESS_RUN_GAP_MS = 75 * 60_000
 
+/**
+ * The gap that splits a heart-rate (`still_hr`) day. Its buckets sit exactly on the half-hour grid and
+ * a missing one is a half hour left out (moving, asleep, not measured), never sampling jitter, so
+ * every missing half hour is bridged rather than drawn solid. Half a bucket of slack for rounding.
+ */
+export const STILL_HR_RUN_GAP_MS = 45 * 60_000
+
 /** Where "Elevated" starts: the same −0.5 the Home strip calls "High". Negative is stressed. */
 export const STRESS_ELEVATED_LEVEL = STRESS_HIGH_LEVEL
 
@@ -28,15 +35,16 @@ export interface StressLinePoint {
 }
 
 /**
- * Consecutive buckets split into runs at every gap longer than `STRESS_RUN_GAP_MS`, sorted by instant
- * first: a back-filled day has no ordering guarantee, and an out-of-order point would double back.
+ * Consecutive buckets split into runs at every gap longer than `gapMs` (`STRESS_RUN_GAP_MS` for the
+ * ring's series, `STILL_HR_RUN_GAP_MS` for heart rate), sorted by instant first: a back-filled day has
+ * no ordering guarantee, and an out-of-order point would double back.
  */
-export function stressRuns<T extends { t: number }>(buckets: readonly T[]): T[][] {
+export function stressRuns<T extends { t: number }>(buckets: readonly T[], gapMs = STRESS_RUN_GAP_MS): T[][] {
   const sorted = [...buckets].sort((a, b) => a.t - b.t)
   const runs: T[][] = []
   for (const b of sorted) {
     const run = runs[runs.length - 1]
-    if (run && b.t - run[run.length - 1].t <= STRESS_RUN_GAP_MS) run.push(b)
+    if (run && b.t - run[run.length - 1].t <= gapMs) run.push(b)
     else runs.push([b])
   }
   return runs

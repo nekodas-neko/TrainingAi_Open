@@ -4,6 +4,7 @@ import {
   elevatedAreas,
   stressBridges,
   stressRuns,
+  STILL_HR_RUN_GAP_MS,
   STRESS_ELEVATED_LEVEL,
 } from '@trainingai/shared/health/stress-day-line';
 import { AppText, Card, Legend, LineChart } from '../../../shared/ui';
@@ -25,8 +26,9 @@ export function StressDayCard({ date, enabled = true }: { date: string; enabled?
   const state = useWorkoutResource(stressSpec(date), enabled);
   const method = state.data?.method ?? null;
   const stillHr = method === 'still_hr';
-  // Plotted negated, so stress points up. x is the bucket's instant.
-  const runs = stressRuns(state.data?.series ?? []).map((run) =>
+  // Plotted negated, so stress points up. x is the bucket's instant. A heart-rate day splits at every
+  // missing half hour, so movement is always bridged.
+  const runs = stressRuns(state.data?.series ?? [], stillHr ? STILL_HR_RUN_GAP_MS : undefined).map((run) =>
     run.map((p) => ({ x: p.t, level: p.level })),
   );
   const points = runs.flatMap((run, index) => [

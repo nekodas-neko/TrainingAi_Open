@@ -72,11 +72,11 @@ export function minutesIntoDay(t: number, tz: string): number {
  * Sorted first: the series arrives in order today, but a back-filled day assembled from stored rows
  * has no such guarantee, and an out-of-order point would draw a line doubling back on itself.
  */
-export function toSegments(buckets: StressBucket[], tz: string): StressSegment[] {
+export function toSegments(buckets: StressBucket[], tz: string, gapMs?: number): StressSegment[] {
   const fmt = clockFormat(tz)
   // Split on the instant, not on wall-clock minutes (`stressRuns`): on a spring-forward day the clock
   // skips an hour, so 01:55 → 03:00 reads as 65 minutes apart when it is really five.
-  return stressRuns(buckets).map(run => run.map(b => ({ x: minutesFrom(fmt, b.t), level: b.level, t: b.t })))
+  return stressRuns(buckets, gapMs).map(run => run.map(b => ({ x: minutesFrom(fmt, b.t), level: b.level, t: b.t })))
 }
 
 /** A span on the chart's axis, `x` in minutes since local midnight, clipped to the day. */

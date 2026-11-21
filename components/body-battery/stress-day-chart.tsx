@@ -4,7 +4,7 @@ import { useMemo } from 'react'
 import { useUserTimezone } from '@/components/shell/user-timezone-provider'
 import { useStressDay } from '@/lib/hooks/use-stress-day'
 import { todayInTz, msToHHMMInTz, clockSkipOnDay, dateStrMidnightInTz } from '@trainingai/shared/date-utils'
-import { elevatedAreas, stressBridges, STRESS_ELEVATED_LEVEL } from '@trainingai/shared/health/stress-day-line'
+import { elevatedAreas, stressBridges, STILL_HR_RUN_GAP_MS, STRESS_ELEVATED_LEVEL } from '@trainingai/shared/health/stress-day-line'
 import { toSegments, coveredMinutes, placeSpans } from './stress-day'
 import { placeEvents, measuredCount, type DayEvent } from './stress-at-events'
 
@@ -86,7 +86,13 @@ export function StressDayChart(
   const { data, failed } = useStressDay(day)
 
   const series = data?.series
-  const segments = useMemo(() => toSegments(series ?? [], tz), [series, tz])
+  const method = data?.method ?? null
+  const stillHr = method === 'still_hr'
+  // A heart-rate day splits at every missing half hour, so movement is always bridged (#3939).
+  const segments = useMemo(
+    () => toSegments(series ?? [], tz, stillHr ? STILL_HR_RUN_GAP_MS : undefined),
+    [series, tz, stillHr],
+  )
   const covered = useMemo(
     () => coveredMinutes(segments, clockSkipOnDay(dateStrMidnightInTz(day.replace(/\//g, '-'), tz).getTime(), tz)),
     [segments, day, tz],
@@ -95,8 +101,6 @@ export function StressDayChart(
   // answers WHEN a stressed window happened, and this answers what was happening then.
   const placed = useMemo(() => placeEvents(events ?? [], segments, tz), [events, segments, tz])
   const withReading = measuredCount(placed)
-  const method = data?.method ?? null
-  const stillHr = method === 'still_hr'
   // #3939 (owner, 20 Nov: "a consistent line that shows areas of elevated stress rather than gaps").
   // On a heart-rate day the runs are joined by dotted bridges; a bridge is never a reading, so the
   // event list above still reads `levelAt(segments)` and says "no reading" there. A ring day keeps its

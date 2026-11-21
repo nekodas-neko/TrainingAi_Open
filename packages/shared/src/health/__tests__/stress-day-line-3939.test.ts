@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { elevatedAreas, stressBridges, stressRuns, STRESS_ELEVATED_LEVEL, STRESS_RUN_GAP_MS } from '../stress-day-line'
+import { elevatedAreas, stressBridges, stressRuns, STILL_HR_RUN_GAP_MS, STRESS_ELEVATED_LEVEL, STRESS_RUN_GAP_MS } from '../stress-day-line'
 import { STRESS_HIGH_LEVEL } from '../daytime-stress-thresholds'
 
 const MIN = 60_000
@@ -9,6 +9,12 @@ describe('stressRuns (#3939)', () => {
     const b = [0, 30, 90, 200, 230].map(m => ({ t: m * MIN, level: 0 }))
     expect(stressRuns(b).map(r => r.map(p => p.t / MIN))).toEqual([[0, 30, 90], [200, 230]])
     expect(STRESS_RUN_GAP_MS).toBe(75 * MIN)
+  })
+
+  it('on a heart-rate day every missing half hour splits the run, so a walk is bridged, never solid', () => {
+    const b = [0, 30, 90, 120].map(m => ({ t: m * MIN, level: 0 }))
+    expect(stressRuns(b, STILL_HR_RUN_GAP_MS).map(r => r.length)).toEqual([2, 2])
+    expect(stressRuns(b).map(r => r.length)).toEqual([4])
   })
 
   it('sorts first, so a back-filled day never doubles back', () => {
