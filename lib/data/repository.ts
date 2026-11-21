@@ -879,6 +879,9 @@ export interface WorkoutRepository {
   upsertReadinessVerdict(userId: string, record: Omit<ReadinessVerdictRecord, 'responseState'>): Promise<void>
   /** Returns false when no verdict was made for that day, so there is nothing to answer. */
   setReadinessVerdictResponse(userId: string, date: string, state: 'rated' | 'dismissed'): Promise<boolean>
+  /** #3976: rewrites the day's verdict with a recomputed one ONLY while `response_state = 'none'`,
+   *  in one statement. False when there is no row or it was already answered or dismissed. */
+  refreshUnansweredReadinessVerdict(userId: string, record: Omit<ReadinessVerdictRecord, 'responseState'>): Promise<boolean>
 
   // #2377 — the shadow readiness model (`shadow_readiness`), computed beside the live score and
   // shown nowhere. Keyed (user, date, modelVersion): the upsert replaces only that version's own

@@ -6,24 +6,11 @@ import { todayInTz, DEFAULT_TZ, normalizeDateParamIso, shiftDateStr } from '@tra
 import { rateLimit } from '@/lib/rate-limit'
 import { reportServerError } from '@/lib/observability'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
-import {
-  readinessVerdictForDay,
-  readinessModelVersionOf,
-  toReadinessVerdictDays,
-  READINESS_VERDICT_BASELINE_DAYS,
-} from '@trainingai/shared/health/readiness-verdict'
+import { READINESS_VERDICT_BASELINE_DAYS } from '@trainingai/shared/health/readiness-verdict'
+import { buildReadinessVerdictRecord, READINESS_VERDICT_HISTORY_DAYS } from '@/lib/health/readiness-verdict-refresh'
 
 // One date and one word.
 const MAX_BODY_BYTES = 1024
-
-/**
- * How much history to read for the band (#2105).
- *
- * The band is the last `READINESS_VERDICT_BASELINE_DAYS` days that carry a stored score, and a day
- * has one only if the readiness route ran that day, so days go missing. 120 days mirrors the sleep
- * verdict's lookback and stays one indexed range read.
- */
-const HISTORY_DAYS = 120
 
 // Matches /api/sleep-verdict: the sheet reads this once on open and writes at most one response.
 const READ_LIMIT = { max: 60, windowMs: 60 * 60 * 1000 }
@@ -41,9 +28,12 @@ const ResponseBody = z.object({
 /**
  * GET — is this day's readiness score unusual? Computed and frozen on first read.
  *
- * **A stored verdict is returned as-is and never recomputed**, as on `/api/sleep-verdict`: the row
- * pins the score, band and contributors that were judged, so a later readiness rewrite or model
- * change cannot alter what a rating was answering.
+ * **A stored verdict is returned as-is.** While it is unanswered it follows the day: when the day's
+ * readiness is rewritten (the readiness read's persist, or a night re-score), the row is recomputed
+ * from the new score (`refreshUnansweredReadinessVerdict`, #3976), because Preview words the
+ * question from the live score. **Once answered or dismissed it is never recomputed**: the row pins
+ * the score, band and contributors the answer was about, so a later rewrite or model change cannot
+ * alter it.
  *
  * **Reads stored scores only, and writes nothing but its own table.** The score comes from
  * `oura_daily_derived`, written by `/api/readiness-score`; this route never computes readiness and
@@ -77,41 +67,17 @@ export async function GET(req: Request) {
     const stored = await repo.getReadinessVerdict(userId, date)
     if (stored) return json({ verdict: stored })
 
-    const rows = await repo.getOuraDailyDerived(userId, shiftDateStr(date, -HISTORY_DAYS), date)
-    const targetRow = rows.find(r => r.day === date)
-    const contributors = targetRow?.readinessContributors
-    const readinessModelVersion = readinessModelVersionOf(targetRow?.modelVersions)
+    const rows = await repo.getOuraDailyDerived(userId, shiftDateStr(date, -READINESS_VERDICT_HISTORY_DAYS), date)
+    const built = buildReadinessVerdictRecord(date, rows)
     // No stored score for the day yet — readiness has not been computed. Say nothing and store
-    // nothing, so the snapshot is not frozen against a score nobody has seen. The same silence
-    // covers a row with no contributors or no model stamp: without them the snapshot could not say
-    // what produced the score, which is the one thing it exists to say.
-    if (
-      targetRow?.readinessScore == null ||
-      contributors == null || typeof contributors !== 'object' || Array.isArray(contributors) ||
-      readinessModelVersion === null
-    ) {
-      return json({ verdict: null })
-    }
-
-    const computed = readinessVerdictForDay(
-      { date, score: targetRow.readinessScore, modelVersion: readinessModelVersion },
-      toReadinessVerdictDays(rows),
-    )
+    // nothing, so the snapshot is not frozen against a score nobody has seen (the same silence covers
+    // a row with no contributors or no model stamp; see `buildReadinessVerdictRecord`).
+    if (built.kind === 'no-score') return json({ verdict: null })
     // Below the coverage floor there is nothing honest to say. Not an error state; the field tells
     // the surface which silence this is.
-    if (!computed) return json({ verdict: null, baselineDaysRequired: READINESS_VERDICT_BASELINE_DAYS })
+    if (built.kind === 'below-floor') return json({ verdict: null, baselineDaysRequired: READINESS_VERDICT_BASELINE_DAYS })
 
-    const record = {
-      date,
-      verdict: computed.verdict,
-      score: computed.score,
-      band: computed.band,
-      baselineDays: computed.baselineDays,
-      baselineSameVersionDays: computed.baselineSameVersionDays,
-      contributors: contributors as Record<string, unknown>,
-      readinessModelVersion,
-      modelVersion: computed.modelVersion,
-    }
+    const record = built.record
     await repo.upsertReadinessVerdict(userId, record)
     return json({ verdict: { ...record, responseState: 'none' as const } })
   } catch (err) {

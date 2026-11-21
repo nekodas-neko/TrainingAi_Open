@@ -9,9 +9,11 @@
  * back to the sleep score and showed a *provisional* anchor that later changed under the user.
  *
  * Both routes now call this. It is deliberately **not** cheap — it issues ~11 repository reads —
- * so Body Battery calls it only when today's persisted row is missing. The persist inside it means
- * that happens at most once a day; every later read on either route hits the stored row.
+ * so Body Battery calls it only when today's persisted row is missing. Every call that has today's
+ * night re-persists today's readiness (an idempotent upsert), so the stored row tracks the latest
+ * inputs; Body Battery's later reads hit that stored row rather than calling this again.
  */
+import { refreshUnansweredReadinessVerdict, readinessSnapshotChanged } from '@/lib/health/readiness-verdict-refresh'
 import { getRepository } from '@/lib/data'
 import { reportServerError } from '@/lib/observability'
 import type { OuraDailyDerivedPatch } from '@/lib/data/repository'
@@ -831,7 +833,15 @@ export async function buildReadinessPayload(
   // replacing the readiness that day had actually shown, every morning. A finished day's readiness
   // is what it said that morning; a read of today before the night lands writes no readiness, and the
   // first read after it does. Today's `nightDate` never exceeds `todayIso` (the resolver caps it).
+  // #3976: whether this read's readiness differs from what today's row held before the persist. The
+  // verdict refresh below runs only then, so an unchanged read pays nothing for it.
+  let readinessChanged = false
   if (ownComposite && night.nightDate === todayIso) {
+    readinessChanged = readinessSnapshotChanged(derivedToday, {
+      readinessScore: score,
+      readinessContributors: ownComposite.contributors,
+      readinessModelVersion: READINESS_MODEL_VERSION,
+    })
     // `model_versions` is one shared JSONB across every pillar on this row, and the upsert writes a
     // provided column wholesale — so it is MERGED with what is already stored rather than replaced.
     // Writing `{ readiness: ... }` alone would drop bodyBattery's stamp and any other pillar's.
@@ -915,10 +925,12 @@ export async function buildReadinessPayload(
   // The outer catch is what keeps the merge itself inside the best-effort contract:
   // `mergeDerivedPersists` REFUSES a key claimed by two pillars, and that refusal must be a lost
   // write and a loud log line, never a failed read.
+  let readinessPersistedFor: string | null = null
   try {
     for (const group of mergeDerivedPersists(derivedPersists)) {
       try {
         await repo.upsertOuraDailyDerived(userId, group.day, group.patch)
+        if (group.pillars.includes('readiness')) readinessPersistedFor = group.day
       } catch (err) {
         console.error(`[readiness-score] derived persist failed for ${group.day} (${group.pillars.join('+')}) — read still served:`, err)
       }
@@ -926,6 +938,14 @@ export async function buildReadinessPayload(
   } catch (err) {
     console.error('[readiness-score] derived persist merge refused (read still served):', err)
   }
+
+  // #3976: today's readiness was just rewritten with a different score, model stamp or contributors,
+  // so an unanswered verdict for the day follows it (Preview words the question from the live
+  // score). Runs only on such a change, which is rare: an unchanged re-persist does nothing here,
+  // not even the verdict read. Awaited, so this response is served after the row has followed. An
+  // answered or dismissed row is never touched, and a day with no row is left to the verdict's
+  // first read. Never throws; a fault is logged and the read is served.
+  if (readinessPersistedFor && readinessChanged) await refreshUnansweredReadinessVerdict(repo, userId, readinessPersistedFor)
 
   const availability: ScoreAvailability = scoreAvailability({
     sleep: sleepScore100 != null,
