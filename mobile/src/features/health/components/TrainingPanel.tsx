@@ -3,6 +3,7 @@ import { useState, type ReactNode } from 'react';
 import { shiftDateStr, startOfWeekInTz, weekStartForDay } from '@trainingai/shared/date-utils';
 import { plural } from '@trainingai/shared/format/plural';
 import {
+  AppButton,
   AppText,
   Card,
   Icon,
@@ -29,7 +30,10 @@ import {
   trendsSpec,
 } from '../data/models';
 import {
+  APPLY_PRIOR_DATA_LABEL,
+  APPLY_PRIOR_DATA_PATH,
   activityRow,
+  applyPriorDataBody,
   muscleVolumeCaption,
   movementRows,
   periodizationRow,
@@ -42,6 +46,8 @@ import { MuscleVolumeFigure } from './MuscleVolumeFigure';
 import { TrainingCalendarCard } from './TrainingCalendarCard';
 import { activityIcon, activityTypesSpec } from '../../activities/data/models';
 import { useActivityLogs } from '../../activities/data/ActivityProvider';
+import { useWorkoutAction } from '../../workouts/data/useWorkoutAction';
+import { useWorkoutResources } from '../../workouts/data/WorkoutDataProvider';
 
 function MovementCard() {
   const { today } = useHealthData();
@@ -170,6 +176,22 @@ export function TrainingPanel({
   const weekly = useWorkoutResource(weeklySpec);
   const muscles = useWorkoutResource(muscleSetsSpec);
   const overview = useWorkoutResource(overviewSpec);
+  const resources = useWorkoutResources();
+  const priorData = useWorkoutAction();
+  const [applyingId, setApplyingId] = useState<string | null>(null);
+  async function applyPriorData(sessionId: string) {
+    setApplyingId(sessionId);
+    await priorData.run(async () => {
+      if (!resources) {
+        throw new Error('Sign in to apply prior data.');
+      }
+      await resources.write('POST', APPLY_PRIOR_DATA_PATH, applyPriorDataBody(sessionId), [
+        '/api/ai-periodization',
+      ]);
+      await resources.load(overviewSpec, true);
+    });
+    setApplyingId(null);
+  }
   const activity = useWorkoutResource(activityHistorySpec);
   const activityTypes = useWorkoutResource(activityTypesSpec);
   const activityLogs = useActivityLogs(
@@ -220,8 +242,9 @@ export function TrainingPanel({
           {overview.data?.sessions.map((session) => {
             const row = periodizationRow(session);
             return (
+              <Stack key={session.sessionId} direction="row" align="center" gap="sm">
               <TouchSurface
-                key={session.sessionId}
+                style={{ flex: 1, minWidth: 0 }}
                 accessibilityRole="button"
                 accessibilityLabel={`${session.sessionName}, ${row.label}`}
                 onPress={openPrograms}
@@ -258,9 +281,28 @@ export function TrainingPanel({
                   ) : null}
                 </Stack>
               </TouchSurface>
+              {row.needsBaseline && (
+                <AppButton
+                  title={APPLY_PRIOR_DATA_LABEL}
+                  variant="ghost"
+                  textVariant="micro"
+                  busy={applyingId === session.sessionId && priorData.busy}
+                  disabled={priorData.busy}
+                  accessibilityLabel={`Use prior data for ${session.sessionName}`}
+                  onPress={() => {
+                    void applyPriorData(session.sessionId);
+                  }}
+                />
+              )}
+              </Stack>
             );
           })}
         </Stack>
+        {priorData.error && (
+          <AppText variant="caption" tone="danger">
+            {priorData.error}
+          </AppText>
+        )}
         {overview.data && !overview.data.sessions.length && (
           <AppText variant="caption" tone="muted">
             No AI dynamic program active

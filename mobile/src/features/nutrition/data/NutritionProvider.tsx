@@ -16,6 +16,8 @@ import { z } from 'zod';
 import { useLocalStorage } from '../../../core/storage/StorageProvider';
 import { useAccountContext } from '../../account/AccountProvider';
 import { useWorkoutDraft } from '../../workouts/data/useWorkoutDraft';
+import { useHomeState } from '../../home/data/HomeProvider';
+import { foodRegionChoice, foodRegionPatch } from './account-preferences';
 import { useWorkoutResources } from '../../workouts/data/WorkoutDataProvider';
 import { nutritionPaths } from './models';
 import { NutritionStore, emptyNutrition } from './NutritionStore';
@@ -93,15 +95,23 @@ export function NutritionStoreProvider({
     z.object({ region: z.string().max(10) }),
     { region: 'AU' },
   );
+  // The region follows the account (#3964); the local draft is the fallback until it has one.
+  const home = useHomeState();
+  const region = foodRegionChoice(home.preferences.foodRegion, preferences.region);
+  const homeStore = home.store;
   const context = useMemo(
     () => ({
       store,
       today,
       timezone,
-      region: preferences.region,
-      setRegion: (region: string) => setPreferences({ region }),
+      region,
+      setRegion: (next: string) => {
+        setPreferences({ region: next });
+        // Queued like any Home preference, so it saves offline and goes up on reconnect.
+        void homeStore?.savePreferences(foodRegionPatch(next)).catch(() => undefined);
+      },
     }),
-    [store, today, timezone, preferences.region, setPreferences],
+    [store, today, timezone, region, setPreferences, homeStore],
   );
   return <Context.Provider value={context}>{children}</Context.Provider>;
 }

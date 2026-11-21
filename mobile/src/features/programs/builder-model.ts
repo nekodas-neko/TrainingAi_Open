@@ -142,3 +142,29 @@ export function generatedDraft(
             },
   };
 }
+/** Limits of `POST /api/exercise-estimates` (its Zod schema): a positive number up to 1000, 400 entries. */
+export const MAX_STARTING_ONE_RM = 1000;
+const MAX_ESTIMATE_ENTRIES = 400;
+/** Main and secondary lifts of the reviewed program, once each: the lifts the web review step lists. */
+export function startingOneRmExercises(review: ProgramDraft): string[] {
+  const names = review.sessions.flatMap((session) =>
+    session.exercises
+      .filter((e) => e.exerciseRole === 'primary' || e.exerciseRole === 'secondary')
+      .map((e) => e.exerciseName),
+  );
+  return [...new Set(names)];
+}
+/**
+ * The body for `POST /api/exercise-estimates` from what was typed, in kg as the route stores it.
+ * Blank, zero, non-numeric and over-limit values are no estimate; null when nothing is left to send.
+ */
+export function estimateRequestBody(typed: Record<string, string>, exercises: readonly string[]) {
+  const entries = exercises.flatMap((exerciseName) => {
+    const text = (typed[exerciseName] ?? '').trim().replace(',', '.');
+    const estimated1rm = text ? Number(text) : 0;
+    return Number.isFinite(estimated1rm) && estimated1rm > 0 && estimated1rm <= MAX_STARTING_ONE_RM
+      ? [{ exerciseName: exerciseName.trim().slice(0, 200), estimated1rm }]
+      : [];
+  });
+  return entries.length ? { entries: entries.slice(0, MAX_ESTIMATE_ENTRIES) } : null;
+}

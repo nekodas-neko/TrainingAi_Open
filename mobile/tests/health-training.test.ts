@@ -60,6 +60,7 @@ test('a periodization row counts its sessions and says Yesterday', () => {
   assert.deepEqual(periodizationRow({ state, lastTrainedDaysAgo: 1 }), {
     phase: 'accumulation',
     label: 'Accum. · 1 session',
+    needsBaseline: false,
     recency: 'Yesterday',
   });
   assert.equal(periodizationRow({ state, lastTrainedDaysAgo: 4 }).recency, '4d ago');
@@ -74,6 +75,7 @@ test('a periodization row counts its sessions and says Yesterday', () => {
   assert.deepEqual(periodizationRow({ state: null, lastTrainedDaysAgo: 2 }), {
     phase: 'baseline',
     label: 'No data',
+    needsBaseline: false,
     recency: null,
   });
 });
