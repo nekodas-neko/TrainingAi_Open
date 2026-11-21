@@ -43,6 +43,29 @@ jobs:
           gh api -X POST "repos/$REPO/issues/$NUMBER/labels" -f "labels[]=needs: triage"
           echo "Marked #$NUMBER as needing triage."
 
+  # An issue from outside the repository is text a stranger wrote, and the agents that read the
+  # queue hold production keys. Mark it on arrival so the queue skips it until the owner has looked.
+  # Only `github.event` fields are read here, never the issue's title or body.
+  mark-outside:
+    name: Mark issues from outside the repository for owner review
+    if: >-
+      github.event.action == 'opened' && (
+        !contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.issue.author_association) ||
+        (github.event.issue.user.type == 'Bot' && github.event.issue.user.login != 'github-actions[bot]')
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: "Add 'needs: owner-review'"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          NUMBER: ${{ github.event.issue.number }}
+        run: |
+          set -euo pipefail
+          gh api -X POST "repos/$REPO/issues/$NUMBER/labels" -f "labels[]=needs: owner-review"
+          echo "Marked #$NUMBER for owner review."
+
   # Every title starts with its type — `bug: …`, `feature: …` — so the issue list reads at a glance
   # (owner, 2026-10-05). The `type:` label is the authority; this keeps the prefix in step with it,
   # including when someone relabels an issue. An edit made here with GITHUB_TOKEN does not trigger

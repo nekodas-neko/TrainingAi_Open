@@ -8616,6 +8616,15 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
 
   async storePrescription(userId: string, programSessionId: string, prescription: AiPrescription, expiresAt: Date, status?: PrescriptionStatus, generatedFor?: import('@trainingai/shared/types/ai-periodization').PrescriptionGeneratedFor) { return period.storePrescription(this.db, userId, programSessionId, prescription, expiresAt, status, generatedFor) }
   async getSessionStructureStamp(userId: string, programSessionId: string) { return period.getSessionStructureStamp(this.db, userId, programSessionId) }
+  // One repeatable-read snapshot: both reads see the database as of the first (#3927).
+  async getActiveProgramWithStructureStamp(userId: string, programSessionId: string) {
+    return this.db.transaction(async tx => {
+      const db = tx as unknown as typeof this.db
+      const program = await prog.getActiveProgram(db, userId)
+      const structure = await period.getSessionStructureStamp(db, userId, programSessionId)
+      return { program, structure }
+    }, { isolationLevel: 'repeatable read', accessMode: 'read only' })
+  }
   async clearProgramPrescriptions(userId: string, programId: string) { return period.clearProgramPrescriptions(this.db, userId, programId) }
   async updatePrescriptionStatus(userId: string, programSessionId: string, status: PrescriptionStatus) { return period.updatePrescriptionStatus(this.db, userId, programSessionId, status) }
   async voidSessionPrescription(userId: string, programSessionId: string) { return period.voidSessionPrescription(this.db, userId, programSessionId) }

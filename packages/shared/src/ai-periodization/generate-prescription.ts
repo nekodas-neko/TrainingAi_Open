@@ -288,10 +288,15 @@ export async function generatePrescriptionForSession(
   // then not stored (`storePrescription` re-checks this in the same statement), so the session's next
   // read regenerates against the session as it is. Read before the dedup, so a call that joins a
   // running generation shares its stamp along with its result.
-  const structure = await repo.getSessionStructureStamp(userId, programSessionId)
-  const activeProgram = await repo.getActiveProgram(userId)
+  // #3927: the stamp and the program the plan is built from come from one snapshot, and the signals
+  // reuse that program rather than reading it again. Read apart, a Coach apply landing between them and
+  // undone before the store left the stamp matching, so a plan made for the swapped session was stored.
+  const { program: activeProgram, structure } = await repo.getActiveProgramWithStructureStamp(userId, programSessionId)
   const configuredBudget = activeProgram?.sessions.find(s => s.id === programSessionId)?.timeBudgetMinutes
-  const key = `${userId}:${programSessionId}:${todayInTz(tz)}:${excludeSessionId ?? ''}:${durationPreset ?? 'standard'}:${configuredBudget}`
+  // #3927: the stamp is in the key, so a call after a Coach change or an editor save made inside the
+  // 30 s cooldown generates for the session as it is now, rather than being answered with the plan made
+  // before the change.
+  const key = `${userId}:${programSessionId}:${todayInTz(tz)}:${excludeSessionId ?? ''}:${durationPreset ?? 'standard'}:${configuredBudget}:${structure}`
   return prescriptionDedup.run(
     key,
     // An explicit preset choice is a user action asking for a different plan — it must
@@ -423,7 +428,7 @@ async function runPrescriptionGeneration(
   const budgetOverrideMin = requestedMin != null && requestedMin !== validSession.timeBudgetMinutes
     ? budgetForPreset(validSession.timeBudgetMinutes, durationPreset)
     : undefined
-  const signals = await aggregateSignals(userId, programSessionId, repo, tz, excludeSessionId, budgetOverrideMin)
+  const signals = await aggregateSignals(userId, programSessionId, repo, tz, excludeSessionId, budgetOverrideMin, { program: activeProgram })
   if (!signals) return { ok: false, error: 'Could not aggregate signals', status: 404 }
   if (programPhase.aligned && programPhase.phase != null) {
     signals.programPhase = { trainingWeeksDone: programPhase.trainingWeeksDone, capWeeks: programPhase.capWeeks }
