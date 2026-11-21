@@ -38,3 +38,9 @@ test('the card says why for each new signal, with a cause beside the two choices
     'Sleep and HRV both low',
   );
 });
+
+test('Preview keeps exactly the kinds the shared decision defines', async () => {
+  const { REST_SIGNAL_KINDS } = await import('@trainingai/shared/ai-periodization/daily-rest-decision');
+  const { recommendationRestSignals } = await import('../src/features/workouts/catalog.ts');
+  assert.deepEqual(recommendationRestSignals([...REST_SIGNAL_KINDS, 'somethingNewer']), [...REST_SIGNAL_KINDS]);
+});

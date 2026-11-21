@@ -8,6 +8,7 @@ import { FEVER_TEMP_Z } from '@trainingai/shared/health/illness-radar'
 import {
   PROMPT_REST_DAY_READINESS_BELOW, REST_DAY_SLEEP_TREND_BELOW, REST_DAY_HRV_TREND_BELOW, REST_DAY_SPO2_TREND_BELOW, cutFor,
 } from '@trainingai/shared/health/readiness-decision-thresholds'
+import { formatTrendRatio } from '@trainingai/shared/health/trend-ratio-shown'
 import { READINESS_MODEL_VERSION } from '@trainingai/shared/health/readiness-composite'
 import { goalRange } from './goal-ranges'
 import { userTextBlock, USER_TEXT_NOTE } from '../ai/untrusted-text'
@@ -300,16 +301,16 @@ export function buildUserPrompt(
     `  Active injuries in today's session: ${signals.activeInjuredMusclesInSession.length > 0 ? userTextBlock(signals.activeInjuredMusclesInSession) : 'none'}`,
     signals.activeInjuredMusclesInSession.length > 0 ? `  ${USER_TEXT_NOTE}` : '',
     signals.sleepTrend != null
-      ? `  Sleep trend (recent/baseline ratio): ${signals.sleepTrend.toFixed(2)}`
+      ? `  Sleep trend (recent/baseline ratio): ${formatTrendRatio(signals.sleepTrend)}`
       : `  Sleep trend: no data`,
     signals.sleepScoreTrend != null
-      ? `  Sleep quality trend (recent/baseline ratio, our 0-100 sleep score): ${signals.sleepScoreTrend.toFixed(2)}`
+      ? `  Sleep quality trend (recent/baseline ratio, our 0-100 sleep score): ${formatTrendRatio(signals.sleepScoreTrend)}`
       : `  Sleep quality trend: no data`,
     signals.hrvTrend != null
-      ? `  HRV trend (recent/baseline ratio): ${signals.hrvTrend.toFixed(2)}`
+      ? `  HRV trend (recent/baseline ratio): ${formatTrendRatio(signals.hrvTrend)}`
       : `  HRV trend: no data`,
     signals.spo2Trend != null
-      ? `  SpO2 trend (recent/baseline ratio): ${signals.spo2Trend.toFixed(2)}`
+      ? `  SpO2 trend (recent/baseline ratio): ${formatTrendRatio(signals.spo2Trend)}`
       : `  SpO2 trend: no data`,
     signals.tempZ != null
       ? `  Skin temp deviation (temp_z, z-score vs personal baseline; >=${FEVER_TEMP_Z} fever-consistent): ${signals.tempZ > 0 ? '+' : ''}${signals.tempZ.toFixed(1)}`

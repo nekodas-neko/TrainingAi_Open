@@ -2,7 +2,7 @@
 // past days, how often each would have suggested rest, how often the check already suggested rest
 // for another reason, and how often a workout was done anyway. Counts only: no value, date or name
 // leaves this function. `scripts/tuning/rest-signals-replay.cjs` feeds it the stored days.
-import { decideDailyRest, REST_SIGNAL_KINDS, type DailyRestInput, type RestSignalKind } from './daily-rest-decision'
+import { decideDailyRest, freshRatio, REST_SIGNAL_KINDS, type DailyRestInput, type RestSignalKind } from './daily-rest-decision'
 
 export interface ReplayDay {
   /** The morning's inputs, as the daily check would have read them that day. */
@@ -27,6 +27,8 @@ export interface RestSignalReplaySummary {
   /** Days with each signal's inputs present and fresh, so it could have fired at all. */
   evaluable: Record<RestSignalKind, number>
   bySignal: Record<RestSignalKind, SignalCount>
+  /** Days at least one signal could have fired. */
+  evaluableAny: number
   /** Days any new signal fired. */
   anySignal: SignalCount
   /** Days the suggestion is new: a signal fired and nothing else suggested rest. */
@@ -38,7 +40,7 @@ export interface RestSignalReplaySummary {
 const RANK = { none: -1, soft: 0, recommended: 1, strong: 2 } as const
 
 function evaluable(input: DailyRestInput): Record<RestSignalKind, boolean> {
-  const fresh = (t: DailyRestInput['hrvTrend']) => t != null && t.newestDate === input.today
+  const fresh = (t: DailyRestInput['hrvTrend']) => freshRatio(t, input.today) != null
   return {
     readinessVeryLow: input.readinessScore != null,
     sleepAndHrvLow: fresh(input.sleepTrend) && fresh(input.hrvTrend),
@@ -53,6 +55,7 @@ export function summariseRestSignalReplay(days: readonly ReplayDay[]): RestSigna
   const ev = Object.fromEntries(REST_SIGNAL_KINDS.map(k => [k, 0])) as Record<RestSignalKind, number>
   const anySignal = zero()
   let newlySuggested = 0
+  let evaluableAny = 0
   let gradeRaised = 0
   const tally = (c: SignalCount, before: ReturnType<typeof decideDailyRest>, trained: boolean) => {
     c.flagged++
@@ -65,6 +68,7 @@ export function summariseRestSignalReplay(days: readonly ReplayDay[]): RestSigna
     const before = decideDailyRest(day.input, { withRestSignals: false })
     const e = evaluable(day.input)
     for (const k of REST_SIGNAL_KINDS) if (e[k]) ev[k]++
+    if (REST_SIGNAL_KINDS.some(k => e[k])) evaluableAny++
     for (const k of after.restSignals) tally(bySignal[k], before, day.trained)
     if (after.restSignals.length > 0) {
       tally(anySignal, before, day.trained)
@@ -73,5 +77,5 @@ export function summariseRestSignalReplay(days: readonly ReplayDay[]): RestSigna
     const rank = (d: typeof after) => d.recommended ? RANK[d.strength] : RANK.none
     if (rank(after) > rank(before)) gradeRaised++
   }
-  return { days: days.length, evaluable: ev, bySignal, anySignal, newlySuggested, gradeRaised }
+  return { days: days.length, evaluable: ev, evaluableAny, bySignal, anySignal, newlySuggested, gradeRaised }
 }

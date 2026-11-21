@@ -28,11 +28,13 @@ export interface TrendReading {
   ratio: number
   /** Local `YYYY-MM-DD` of the newest value in the recent-3 window (a sleep row's wake date). */
   newestDate: string
+  /** Local `YYYY-MM-DD` of the oldest of the recent 3 values. A wide gap to `newestDate` means "last 3 nights" spans a stretch the ring was off. */
+  oldestDate: string
 }
 
 function ratioReading(newestFirstRows: { date: string; value: number }[]): TrendReading | null {
   const ratio = ratioTrend(newestFirstRows.map(r => r.value))
-  return ratio == null ? null : { ratio, newestDate: newestFirstRows[0].date }
+  return ratio == null ? null : { ratio, newestDate: newestFirstRows[0].date, oldestDate: newestFirstRows[2].date }
 }
 
 function newestFirst(sessions: SleepSession[]): SleepSession[] {

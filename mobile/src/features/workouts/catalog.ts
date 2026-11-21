@@ -1,6 +1,7 @@
 import { normalizeMuscle } from '@trainingai/shared/muscles';
 import { daysBetweenDateStrs, isCalendarDate, toAestDay } from '@trainingai/shared/date-utils';
 import type { DeloadReasonInput, DeloadStrength } from '@trainingai/shared/ai-periodization/deload-reasons';
+import { REST_SIGNAL_KINDS } from '@trainingai/shared/ai-periodization/daily-rest-decision';
 
 export type MuscleAssignment = { muscle: string; role: 'main' | 'secondary' };
 export type MuscleRecovery = { muscle: string; pct: number };
@@ -97,7 +98,6 @@ export type WorkoutCatalog = {
 };
 export type RecommendationSignals = NonNullable<DeloadReasonInput['signals']>;
 export type RestSignalKind = NonNullable<DeloadReasonInput['restSignals']>[number];
-const REST_SIGNAL_KINDS: readonly RestSignalKind[] = ['readinessVeryLow', 'sleepAndHrvLow', 'spo2Low'];
 
 /** The known rest signals in a response, in order. An unknown one (a newer server) is dropped. */
 export function recommendationRestSignals(value: unknown): RestSignalKind[] | undefined {

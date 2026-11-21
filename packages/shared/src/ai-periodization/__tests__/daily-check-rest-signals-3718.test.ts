@@ -9,6 +9,7 @@ import {
 } from '../../health/readiness-decision-thresholds'
 import { READINESS_MODEL_VERSION } from '../../health/readiness-composite'
 import { shiftDateStr } from '../../date-utils'
+import { formatTrendRatio, shownTrendRatio } from '../../health/trend-ratio-shown'
 import type { BodyMetrics } from '../../types/body'
 import type { ProgramSession } from '../../types/program'
 
@@ -18,8 +19,8 @@ import type { ProgramSession } from '../../types/program'
 
 const TODAY = '2026-11-04'
 const V = READINESS_MODEL_VERSION
-const fresh = (ratio: number) => ({ ratio, newestDate: TODAY })
-const stale = (ratio: number) => ({ ratio, newestDate: shiftDateStr(TODAY, -1) })
+const fresh = (ratio: number) => ({ ratio, newestDate: TODAY, oldestDate: shiftDateStr(TODAY, -2) })
+const stale = (ratio: number) => ({ ratio, newestDate: shiftDateStr(TODAY, -1), oldestDate: shiftDateStr(TODAY, -3) })
 
 const calm: DailyRestInput = {
   today: TODAY, readinessScore: 80, readinessModelVersion: V,
@@ -116,7 +117,7 @@ describe('a source without the capability never triggers it', () => {
   it('no blood-oxygen readings ⇒ no trend ⇒ no signal', () => {
     expect(spo2TrendReading(rows, [])).toBeNull()
     const hrv = hrvTrendReading(rows, [], new Map())
-    expect(hrv).toEqual({ ratio: 0.5, newestDate: TODAY })
+    expect(hrv).toEqual({ ratio: 0.5, newestDate: TODAY, oldestDate: shiftDateStr(TODAY, -2) })
     expect(restSignals({ ...calm, hrvTrend: hrv, spo2Trend: spo2TrendReading(rows, []) })).toEqual([])
   })
   it('the same nights with a falling blood oxygen do fire it', () => {
@@ -124,6 +125,46 @@ describe('a source without the capability never triggers it', () => {
     const spo2 = spo2TrendReading(withSpo2, [])
     expect(spo2?.newestDate).toBe(TODAY)
     expect(restSignals({ ...calm, spo2Trend: spo2 })).toEqual(['spo2Low'])
+  })
+})
+
+describe('the check compares the two-decimal ratio the AI is shown (#3718 F1)', () => {
+  it('blood oxygen: 0.9671 prints as 0.97 and does not fire, 0.9649 prints 0.96 and does', () => {
+    expect(restSignals({ ...calm, spo2Trend: fresh(0.9671) })).toEqual([])
+    expect(restSignals({ ...calm, spo2Trend: fresh(0.9649) })).toEqual(['spo2Low'])
+  })
+  it('sleep and HRV: 0.7451 prints as 0.75 and does not fire, 0.7449 prints 0.74 and does', () => {
+    expect(restSignals({ ...calm, sleepTrend: fresh(0.7451), hrvTrend: fresh(0.7451) })).toEqual([])
+    expect(restSignals({ ...calm, sleepTrend: fresh(0.7449), hrvTrend: fresh(0.7449) })).toEqual(['sleepAndHrvLow'])
+    expect(restSignals({ ...calm, sleepTrend: fresh(0.7449), hrvTrend: fresh(0.7451) })).toEqual([])
+  })
+  it('the prompt prints the same value the check compares', () => {
+    for (const r of [0.9671, 0.9649, 0.7451, 0.7449, 0.745, 0.965]) {
+      expect(shownTrendRatio(r)).toBe(Number(formatTrendRatio(r)))
+    }
+    expect(formatTrendRatio(0.9671)).toBe('0.97')
+  })
+})
+
+describe('a "last 3 nights" signal does not fire across a gap (#3718 F2)', () => {
+  const rowsOn = (offsets: number[], older: number, recent: number): BodyMetrics[] => [
+    ...offsets.map(o => ({ id: `r${o}`, userId: 'u', date: shiftDateStr(TODAY, -o), createdAt: new Date(0), spo2Pct: recent, spo2Source: 's' })),
+    ...[10, 11, 12, 13, 14].map(o => ({ id: `o${o}`, userId: 'u', date: shiftDateStr(TODAY, -o), createdAt: new Date(0), spo2Pct: older, spo2Source: 's' })),
+  ]
+  const fire = (offsets: number[]) => restSignals({ ...calm, spo2Trend: spo2TrendReading(rowsOn(offsets, 98, 90), []) })
+
+  it('three consecutive nights fire', () => { expect(fire([0, 1, 2])).toEqual(['spo2Low']) })
+  it('one missed night still fires', () => { expect(fire([0, 1, 3])).toEqual(['spo2Low']) })
+  it('a four-night gap does not (today, today-5, today-6)', () => { expect(fire([0, 5, 6])).toEqual([]) })
+  it('the reading carries the oldest of the recent three', () => {
+    expect(spo2TrendReading(rowsOn([0, 5, 6], 98, 90), [])).toMatchObject({ newestDate: TODAY, oldestDate: shiftDateStr(TODAY, -6) })
+  })
+  it('the AI prompt value for the same rows is unchanged by the gap rule', () => {
+    const gappy = spo2TrendReading(rowsOn([0, 5, 6], 98, 90), [])!
+    const tight = spo2TrendReading(rowsOn([0, 1, 2], 98, 90), [])!
+    // Same ratio either way: the prompt still prints it; only the daily check ignores the gappy one.
+    expect(formatTrendRatio(gappy.ratio)).toBe(formatTrendRatio(tight.ratio))
+    expect(gappy.ratio).toBeLessThan(0.97)
   })
 })
 
@@ -155,11 +196,17 @@ describe('the daily check uses the cuts the AI prompt prints', () => {
     expect(prompt).toContain(`external_readiness < ${PROMPT_REST_DAY_READINESS_BELOW}`)
     expect(prompt).toContain(`spo2_trend < ${REST_DAY_SPO2_TREND_BELOW}`)
   })
+  it('the rendered prompt still carries the literal wording (#3718 byte-identical rule)', () => {
+    expect(prompt).toContain('sleep_score_trend < 0.75 AND hrv_trend < 0.75')
+    expect(prompt).toContain('spo2_trend < 0.97')
+    expect(prompt).toContain('external_readiness < 45')
+  })
   it('and the check fires just under each of those same numbers', () => {
-    const e = 1e-6
-    expect(restSignals({ ...calm, readinessScore: PROMPT_REST_DAY_READINESS_BELOW - e })).toEqual(['readinessVeryLow'])
-    expect(restSignals({ ...calm, sleepTrend: fresh(REST_DAY_SLEEP_TREND_BELOW - e), hrvTrend: fresh(REST_DAY_HRV_TREND_BELOW - e) })).toEqual(['sleepAndHrvLow'])
-    expect(restSignals({ ...calm, spo2Trend: fresh(REST_DAY_SPO2_TREND_BELOW - e) })).toEqual(['spo2Low'])
+    // One displayed step (0.01) under the cut: the ratios are compared as the prompt prints them.
+    const step = 0.01
+    expect(restSignals({ ...calm, readinessScore: PROMPT_REST_DAY_READINESS_BELOW - 1e-6 })).toEqual(['readinessVeryLow'])
+    expect(restSignals({ ...calm, sleepTrend: fresh(REST_DAY_SLEEP_TREND_BELOW - step), hrvTrend: fresh(REST_DAY_HRV_TREND_BELOW - step) })).toEqual(['sleepAndHrvLow'])
+    expect(restSignals({ ...calm, spo2Trend: fresh(REST_DAY_SPO2_TREND_BELOW - step) })).toEqual(['spo2Low'])
   })
 })
 

@@ -32,7 +32,7 @@ function print(s) {
     console.log(`${k} | ${s.evaluable[k]} | ${c.flagged} | ${c.alreadySuggested} | ${c.alreadySuggestedNotSoft} | ${c.trained}`)
   }
   const a = s.anySignal
-  console.log(`any | - | ${a.flagged} | ${a.alreadySuggested} | ${a.alreadySuggestedNotSoft} | ${a.trained}`)
+  console.log(`any | ${s.evaluableAny} | ${a.flagged} | ${a.alreadySuggested} | ${a.alreadySuggestedNotSoft} | ${a.trained}`)
 }
 
 async function main() {

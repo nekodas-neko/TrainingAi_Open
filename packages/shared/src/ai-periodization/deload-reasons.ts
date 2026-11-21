@@ -88,6 +88,21 @@ export function deloadReasons(rec: DeloadReasonInput): DeloadReason[] {
   return out
 }
 
+/**
+ * The reasons behind the AI rule's rest signals that fired (#3718), for the "Why this?" page and its
+ * sentence. The same `deloadReasons` lines Home shows, so the three pages cannot word one differently.
+ */
+export function restSignalReasons(rec: DeloadReasonInput): Array<DeloadReason & { signal: NonNullable<DeloadReasonInput['restSignals']>[number] }> {
+  const fired = rec.restSignals ?? []
+  const signalOf: Partial<Record<DeloadReasonKind, NonNullable<DeloadReasonInput['restSignals']>[number]>> = {
+    readiness: 'readinessVeryLow', sleepAndHrv: 'sleepAndHrvLow', spo2: 'spo2Low',
+  }
+  return deloadReasons(rec).flatMap(r => {
+    const signal = signalOf[r.kind]
+    return signal && fired.includes(signal) ? [{ ...r, signal }] : []
+  })
+}
+
 export const DELOAD_STRENGTH_HEADLINE: Record<DeloadStrength, string> = {
   soft: 'A light nudge to ease off — your call.',
   recommended: 'Recovery is recommended today.',
@@ -111,7 +126,7 @@ export function deloadBannerMessage(rec: DeloadReasonInput): string {
 }
 
 /** The short cause beside the two choices, for each of the AI rule's rest signals (#3718). */
-const REST_SIGNAL_CAUSE: Record<NonNullable<DeloadReasonInput['restSignals']>[number], string> = {
+export const REST_SIGNAL_CAUSE: Record<NonNullable<DeloadReasonInput['restSignals']>[number], string> = {
   readinessVeryLow: 'Readiness very low',
   sleepAndHrvLow: 'Sleep and HRV both low',
   spo2Low: 'Blood oxygen low',

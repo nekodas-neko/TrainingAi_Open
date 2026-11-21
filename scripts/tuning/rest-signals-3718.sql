@@ -1,29 +1,6 @@
--- #3718 — how often the daily check's three new rest signals would have suggested rest over the last
--- 90 local days (yesterday back), through the owner-scoped claude_ro views. READ-ONLY, one SELECT,
--- COUNTS ONLY: no value, date or name is returned.
---
--- Columns: signal · evaluable_days (its inputs present and fresh) · flagged · already_suggested (the
--- check already suggested rest that day for another reason) · workout_done (a session with a logged
--- exercise was done that day). The last row, `any`, counts days at least one signal fired.
---
--- The cuts are the `p` row, pinned to the shared constants by
--- packages/shared/src/ai-periodization/__tests__/rest-signals-replay-3718.test.ts.
---
--- WHERE THIS DIFFERS FROM THE APP (the exact count is scripts/tuning/rest-signals-replay.cjs, which
--- runs the shipped code against a local database or a restored backup):
---  * Sleep: the app reads the trend of OUR sleep score, computed in code from each night's stages,
---    latency and timing; SQL cannot compute it, so this uses the duration trend (the prompt's
---    fallback, `sleep_trend`), one row per wake date (its longest), partial nights skipped. Naps that
---    the app's night picker drops can count here.
---  * HRV and blood oxygen: the device is the newest row's `source_map` key, as in the app, but rows
---    with no key are not inferred to a device and the algorithm-version grouping (#3601) is skipped.
---  * Readiness: exact (own-composite rows only, the cut for the row's own scale).
---  * Already suggested: fever or elevated illness radar, three training days in a row, a sick or
---    low/drained check-in. The raised-temperature arm needs the trusted temperature baseline (TN-18),
---    which SQL does not rebuild, so this column is a floor.
 WITH p AS (
   SELECT 45 AS readiness_below_v18, 40 AS readiness_below_v17, 18 AS centre_75_from_model,
-         0.75::float8 AS sleep_below, 0.75::float8 AS hrv_below, 0.97::float8 AS spo2_below, 18 AS min_wear_hours
+         0.75::float8 AS sleep_below, 0.75::float8 AS hrv_below, 0.97::float8 AS spo2_below, 18 AS min_wear_hours, 4 AS oldest_night_max_days_back
 ), tz AS (
   SELECT coalesce((SELECT timezone FROM claude_ro.users LIMIT 1), 'Australia/Brisbane') AS tz
 ), days AS (
@@ -40,7 +17,6 @@ WITH p AS (
     FROM claude_ro.sleep_sessions WHERE deleted_at IS NULL AND partial_night_at IS NULL AND duration_hours > 0
    GROUP BY date
 ), w AS (
-  -- The 14 days up to and including each day, as the app reads them.
   SELECT d.day, m.k, m.date, m.v, coalesce(m.src, '') AS src,
          (m.k = 'hrv' AND od.non_wear_time_sec IS NOT NULL
            AND (86400 - od.non_wear_time_sec) / 3600.0 < (SELECT min_wear_hours FROM p)) AS low_wear
@@ -53,17 +29,19 @@ WITH p AS (
   SELECT w.*, row_number() OVER (PARTITION BY w.day, w.k ORDER BY w.date DESC) AS rn
     FROM w JOIN dev ON dev.day = w.day AND dev.k = w.k AND dev.src = w.src
 ), o AS (
-  -- The older baseline: after the newest 3, low-wear days out (HRV only), then up to 7.
   SELECT r.*, CASE WHEN rn > 3 AND NOT low_wear
                    THEN row_number() OVER (PARTITION BY day, k, (rn > 3 AND NOT low_wear) ORDER BY date DESC) END AS orn
     FROM r
 ), t AS (
   SELECT day, k, max(date) AS newest, count(*) AS n,
+         min(date) FILTER (WHERE rn <= 3) AS oldest_recent,
          avg(v) FILTER (WHERE rn <= 3) AS recent, avg(v) FILTER (WHERE orn <= 7) AS older
     FROM o GROUP BY day, k
 ), trend AS (
-  -- Present and fresh: four nights from the device, a baseline, and the newest night is the day.
-  SELECT day, k, CASE WHEN n >= 4 AND older > 0 AND newest = day THEN recent / older END AS ratio FROM t
+  SELECT day, k,
+         CASE WHEN n >= 4 AND older > 0 AND newest = day AND oldest_recent >= day - (SELECT oldest_night_max_days_back FROM p)
+              THEN round((recent / older)::numeric, 2)::float8 END AS ratio
+    FROM t
 ), rd AS (
   SELECT x.day, x.readiness_score AS s,
          CASE WHEN coalesce(substring(x.model_versions ->> 'readiness' from '^v([0-9]+):')::int, 0) >= p.centre_75_from_model
@@ -103,11 +81,11 @@ WITH p AS (
   SELECT 1 AS ord, 'readinessVeryLow' AS signal, ev_readiness AS ev, readiness_very_low AS fired, other_reason, workout_done FROM per_day
   UNION ALL SELECT 2, 'sleepAndHrvLow', ev_sleep_hrv, sleep_and_hrv_low, other_reason, workout_done FROM per_day
   UNION ALL SELECT 3, 'spo2Low', ev_spo2, spo2_low, other_reason, workout_done FROM per_day
-  UNION ALL SELECT 4, 'any', NULL, readiness_very_low OR sleep_and_hrv_low OR spo2_low, other_reason, workout_done FROM per_day
+  UNION ALL SELECT 4, 'any', ev_readiness OR ev_sleep_hrv OR ev_spo2, readiness_very_low OR sleep_and_hrv_low OR spo2_low, other_reason, workout_done FROM per_day
 )
 SELECT signal,
        count(*) FILTER (WHERE ev) AS evaluable_days,
        count(*) FILTER (WHERE fired) AS flagged,
        count(*) FILTER (WHERE fired AND other_reason) AS already_suggested,
        count(*) FILTER (WHERE fired AND workout_done) AS workout_done
-  FROM sig GROUP BY ord, signal ORDER BY ord;
+  FROM sig GROUP BY ord, signal ORDER BY ord

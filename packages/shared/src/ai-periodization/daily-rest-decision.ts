@@ -6,7 +6,9 @@
 // pull `ai-dynamic`'s ONNX chain (Q-221).
 //
 // **The three rest signals are the AI prescription prompt's rest-day rule** (`prompt.ts`), on the
-// same inputs and the same cuts, so the two engines cannot disagree while both exist:
+// same inputs, the same cuts and the same two-decimal ratio the prompt prints, so the two engines agree
+// except on a gap (the daily check ignores a trend whose last three nights are spread over more than
+// `REST_TREND_OLDEST_NIGHT_MAX_DAYS_BACK` days; the AI is still shown it):
 //
 //   prompt: external_readiness < PROMPT_REST_DAY_READINESS_BELOW   →  'readinessVeryLow'
 //   prompt: sleep_score_trend (else sleep_trend) < 0.75 AND hrv_trend < 0.75  →  'sleepAndHrvLow'
@@ -20,6 +22,8 @@ import type { TrendReading } from '@trainingai/shared/health/sleep-trend'
 import {
   REST_DAY_SLEEP_TREND_BELOW, REST_DAY_HRV_TREND_BELOW, REST_DAY_SPO2_TREND_BELOW, cutFor, readinessCutFires,
 } from '@trainingai/shared/health/readiness-decision-thresholds'
+import { shiftDateStr } from '@trainingai/shared/date-utils'
+import { shownTrendRatio } from '@trainingai/shared/health/trend-ratio-shown'
 import { TEMP_BASELINE_MIN_DAYS, TEMP_ALERT_THRESHOLD_C } from './deload-constants'
 
 export type DeloadStrengthGrade = 'soft' | 'recommended' | 'strong'
@@ -47,9 +51,22 @@ export function restRuleSleepTrend(scoreTrend: TrendReading | null, durationTren
   return scoreTrend ?? durationTrend
 }
 
-/** A trend that is present and whose recent nights end last night. A stale or missing one is no signal. */
-function freshRatio(t: TrendReading | null, today: string): number | null {
-  return t != null && t.newestDate === today && Number.isFinite(t.ratio) ? t.ratio : null
+/**
+ * How far back the oldest of a trend's recent three nights may sit (#3718). Three consecutive nights
+ * end 2 days before today and one missed night makes it 3, so 4 is the edge of what the check still
+ * reads as "the last 3 nights". The AI's own inputs do not apply this: only the daily check does.
+ */
+export const REST_TREND_OLDEST_NIGHT_MAX_DAYS_BACK = 4
+
+/**
+ * The ratio the AI is shown (two decimals), when the trend is present, its newest night is today and
+ * its oldest recent night is within `REST_TREND_OLDEST_NIGHT_MAX_DAYS_BACK` days. A stale, gappy or
+ * missing one is no signal.
+ */
+export function freshRatio(t: TrendReading | null, today: string): number | null {
+  if (t == null || t.newestDate !== today || !Number.isFinite(t.ratio)) return null
+  if (t.oldestDate < shiftDateStr(today, -REST_TREND_OLDEST_NIGHT_MAX_DAYS_BACK)) return null
+  return shownTrendRatio(t.ratio)
 }
 
 /** Which of the three rest signals fire today. Missing or stale input never fires one. */

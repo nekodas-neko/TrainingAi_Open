@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { summariseRestSignalReplay, type ReplayDay } from '../rest-signals-replay'
-import type { DailyRestInput } from '../daily-rest-decision'
+import { REST_TREND_OLDEST_NIGHT_MAX_DAYS_BACK, type DailyRestInput } from '../daily-rest-decision'
 import {
   READINESS_CUTS, CENTRE_75_FROM_MODEL, REST_DAY_SLEEP_TREND_BELOW, REST_DAY_HRV_TREND_BELOW, REST_DAY_SPO2_TREND_BELOW,
 } from '../../health/readiness-decision-thresholds'
@@ -21,7 +21,7 @@ const day = (over: Partial<DailyRestInput>, trained = false): ReplayDay => ({
     ...over,
   },
 })
-const fresh = (ratio: number) => ({ ratio, newestDate: '2026-11-04' })
+const fresh = (ratio: number) => ({ ratio, newestDate: '2026-11-04', oldestDate: '2026-11-02' })
 
 describe('summariseRestSignalReplay', () => {
   it('counts each signal, the days already suggested for another reason, and the days trained', () => {
@@ -41,6 +41,7 @@ describe('summariseRestSignalReplay', () => {
     // Raised: the two new ones, and the low-energy day (soft → strong). The streak day was strong already.
     expect(s.gradeRaised).toBe(3)
     expect(s.evaluable).toEqual({ readinessVeryLow: 5, sleepAndHrvLow: 1, spo2Low: 2 })
+    expect(s.evaluableAny).toBe(5)
   })
 
   it('returns counts only', () => {
@@ -51,17 +52,22 @@ describe('summariseRestSignalReplay', () => {
 
 describe('the production SQL uses the shared cuts', () => {
   const sql = readFileSync(resolve(__dirname, '../../../../../scripts/tuning/rest-signals-3718.sql'), 'utf8')
-  const p = /SELECT (\d+) AS readiness_below_v18, (\d+) AS readiness_below_v17, (\d+) AS centre_75_from_model,\s*([\d.]+)::float8 AS sleep_below, ([\d.]+)::float8 AS hrv_below, ([\d.]+)::float8 AS spo2_below, (\d+) AS min_wear_hours/.exec(sql)
+  const p = /SELECT (\d+) AS readiness_below_v18, (\d+) AS readiness_below_v17, (\d+) AS centre_75_from_model,\s*([\d.]+)::float8 AS sleep_below, ([\d.]+)::float8 AS hrv_below, ([\d.]+)::float8 AS spo2_below, (\d+) AS min_wear_hours, (\d+) AS oldest_night_max_days_back/.exec(sql)
   it('its parameter row matches the constants', () => {
     expect(p).not.toBeNull()
-    const [, after, before, centre, sleep, hrv, spo2, wear] = p!.map(Number)
-    expect({ after, before, centre, sleep, hrv, spo2, wear }).toEqual({
+    const [, after, before, centre, sleep, hrv, spo2, wear, gap] = p!.map(Number)
+    expect({ after, before, centre, sleep, hrv, spo2, wear, gap }).toEqual({
       after: READINESS_CUTS.promptRestDay.after, before: READINESS_CUTS.promptRestDay.before, centre: CENTRE_75_FROM_MODEL,
-      sleep: REST_DAY_SLEEP_TREND_BELOW, hrv: REST_DAY_HRV_TREND_BELOW, spo2: REST_DAY_SPO2_TREND_BELOW, wear: MIN_WEAR_HOURS,
+      sleep: REST_DAY_SLEEP_TREND_BELOW, hrv: REST_DAY_HRV_TREND_BELOW, spo2: REST_DAY_SPO2_TREND_BELOW, wear: MIN_WEAR_HOURS, gap: REST_TREND_OLDEST_NIGHT_MAX_DAYS_BACK,
     })
   })
+  it('is one statement with no semicolon and no comment, as the claude_ro tool requires', () => {
+    expect(sql).not.toContain(';')
+    expect(sql).not.toContain('--')
+    expect(sql).not.toContain('/*')
+  })
   it('reads only claude_ro views and never writes', () => {
-    const body = sql.replace(/--.*$/gm, '')
+    const body = sql
     expect(body).not.toMatch(/\b(INSERT|UPDATE|DELETE|TRUNCATE|ALTER|DROP|CREATE|GRANT)\b/i)
     for (const [, schema] of body.matchAll(/\b(?:FROM|JOIN)\s+([a-z_]+)\./gi)) expect(schema).toBe('claude_ro')
   })

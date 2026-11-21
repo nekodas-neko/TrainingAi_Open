@@ -29,7 +29,7 @@ function trendOf(
   if (older.length === 0) return null
   const recentAvg = recent3.reduce((s, m) => s + value(m)!, 0) / recent3.length
   const olderAvg = older.reduce((s, m) => s + value(m)!, 0) / older.length
-  return olderAvg > 0 ? { ratio: recentAvg / olderAvg, newestDate: recent3[0].date } : null
+  return olderAvg > 0 ? { ratio: recentAvg / olderAvg, newestDate: recent3[0].date, oldestDate: recent3[2].date } : null
 }
 
 /**
