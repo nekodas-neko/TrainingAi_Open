@@ -1,5 +1,5 @@
 import type { Session } from 'next-auth';
-import { refreshIsActiveClaim, type ClaimUser } from './is-active-refresh';
+import { AuthCheckUnavailableError, refreshIsActiveClaim, type ClaimUser } from './is-active-refresh';
 import { sessionTokenFrom } from './session-token';
 import { sessionFromToken } from './session';
 import { getRepositoryAsync } from '@/lib/data';
@@ -29,7 +29,7 @@ export async function bearerSession(
       )
         return null;
     } catch {
-      throw new Error('Native session verification is temporarily unavailable');
+      throw new AuthCheckUnavailableError();
     }
   } else if (token.nativeSessionKey !== undefined) {
     // A seven-day token issued before #2076. Honoured until it expires so installed apps stay
@@ -50,7 +50,7 @@ export async function bearerSession(
       )
         return null;
     } catch {
-      throw new Error('Native session verification is temporarily unavailable');
+      throw new AuthCheckUnavailableError();
     }
   }
 

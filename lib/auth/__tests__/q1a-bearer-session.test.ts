@@ -143,14 +143,15 @@ describe('auth() — the bearer fallback sits behind the cookie, not beside it',
   })
 
   // #3949 review S2: during an outage the cut-offs cannot be read, so a cookie or bearer token is
-  // refused for that request whatever it claims, and nothing is persisted: the same session object
-  // and the same token pass on the next request once the database answers.
-  it.each([true, false])('refuses a cookie with isActive=%s during a database outage, and accepts it once the database is back', async isActive => {
+  // refused for that request whatever it claims, as "unavailable" (a thrown 503), never as a null
+  // session a route would answer 401, and nothing is persisted: the same session object and the same
+  // token pass on the next request once the database answers.
+  it.each([true, false])('refuses a cookie with isActive=%s as unavailable during a database outage, and accepts it once the database is back', async isActive => {
     const cookieSession = { user: { id: 'cookie-user', isAdmin: true }, isActive }
     baseAuth.mockResolvedValue(cookieSession)
     getUserById.mockRejectedValueOnce(new Error('db down'))
     const { auth } = await import('@/auth')
-    await expect(auth()).resolves.toBeNull()
+    await expect(auth()).rejects.toMatchObject({ name: 'AuthCheckUnavailableError', status: 503 })
     expect(cookieSession).toEqual({ user: { id: 'cookie-user', isAdmin: true }, isActive })
     getUserById.mockResolvedValue({ isActive: true, isAdmin: true })
     const after = await auth()
@@ -158,12 +159,12 @@ describe('auth() — the bearer fallback sits behind the cookie, not beside it',
     expect(after?.isActive).toBe(true)
   })
 
-  it.each([true, false])('refuses a bearer with isActive=%s during a database outage, and accepts it once the database is back', async isActive => {
+  it.each([true, false])('refuses a bearer with isActive=%s as unavailable during a database outage, and accepts it once the database is back', async isActive => {
     baseAuth.mockResolvedValue(null)
     requestHeaders = bearer(await mint({ userId: 'bearer-user', isActive, isAdmin: true }))
     getUserById.mockRejectedValueOnce(new Error('db down'))
     const { auth } = await import('@/auth')
-    expect(await auth()).toBeNull()
+    await expect(auth()).rejects.toMatchObject({ name: 'AuthCheckUnavailableError', status: 503 })
     getUserById.mockResolvedValue({ isActive: true, isAdmin: true })
     const session = await auth()
     expect(session?.user.id).toBe('bearer-user')

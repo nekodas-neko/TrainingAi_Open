@@ -12,7 +12,7 @@ type Row = {
   rotatedAt: Date | null; replacedBy: string | null; revokedAt: Date | null; revokedReason: string | null;
 };
 const db = vi.hoisted(() => ({
-  rows: [] as unknown[], users: new Map<string, unknown>(), fail: false, rateOk: true,
+  rows: [] as unknown[], users: new Map<string, unknown>(), fail: false, userFail: false, rateOk: true,
   session: null as null | { user: { id: string } },
 }));
 const rows = () => db.rows as Row[];
@@ -68,7 +68,7 @@ vi.mock('@/lib/data', () => ({
       for (const r of hit) { r.revokedAt = new Date(); r.revokedReason = reason; }
       return hit.length;
     },
-    async getUserById(id: string) { guard(); return db.users.get(id) ?? null },
+    async getUserById(id: string) { guard(); if (db.userFail) throw new Error('database offline: SELECT … $1'); return db.users.get(id) ?? null },
   }),
 }));
 
@@ -98,7 +98,7 @@ const lookup = async (id: string) => (db.users.get(id) as { isActive: boolean } 
 
 beforeEach(() => {
   vi.stubEnv('AUTH_SECRET', SECRET);
-  db.rows = []; db.fail = false; db.rateOk = true; db.session = null;
+  db.rows = []; db.fail = false; db.userFail = false; db.rateOk = true; db.session = null;
   db.users = new Map([[ALICE.id, ALICE], [BOB.id, BOB]]);
 });
 afterEach(() => { vi.unstubAllEnvs(); vi.useRealTimers(); vi.restoreAllMocks() });
@@ -266,6 +266,23 @@ describe('POST /api/auth/native-session/refresh', () => {
     expect(JSON.stringify(logged)).not.toContain(issued.refreshToken);
     expect(JSON.stringify(logged)).not.toContain('$1');
     expect(JSON.stringify(await res.json())).not.toContain(issued.refreshToken);
+  });
+
+  // #3949 review S2: the active check's own user lookup failing is "try again" (503), never 401,
+  // which Preview's `runRenewal` would sign out on. Nothing is written, so the same refresh token
+  // rotates once the database answers.
+  it('answers 503, not 401, when only the active check fails, writes nothing, and renews afterwards', async () => {
+    const issued = await issueNativeSession(ALICE);
+    const before = JSON.stringify(rows());
+    db.userFail = true;
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const down = await post({ refreshToken: issued.refreshToken });
+    expect(down.status).toBe(503);
+    expect(await down.json()).toEqual({ error: expect.stringMatching(/temporarily unavailable/) });
+    expect(JSON.stringify(rows())).toBe(before);
+    db.userFail = false;
+    const back = await post({ refreshToken: issued.refreshToken });
+    expect(back.status).toBe(200);
   });
 
   it('is rate-limited', async () => {

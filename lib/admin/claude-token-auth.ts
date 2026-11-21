@@ -1,5 +1,6 @@
 import type { NextRequest } from 'next/server'
 import { auth } from '@/auth'
+import { isAuthCheckUnavailable } from '@/lib/auth/is-active-refresh'
 import { requireAdmin, adminFailureOutcome } from '@/lib/admin'
 import { getRepository } from '@/lib/data'
 import { isOwnerUserId, resolveOwnerUserId } from '@/lib/admin-owner'
@@ -88,11 +89,17 @@ export async function authorizeAdminRequest(
     return { ok: true, via: 'token', userId: exportUserId }
   }
 
-  const session = await auth()
+  let session: Awaited<ReturnType<typeof auth>>
+  try {
+    session = await auth()
+  } catch (err) {
+    if (isAuthCheckUnavailable(err)) return { ok: false, status: 503, error: 'Service unavailable' }
+    throw err
+  }
   const userId = session?.user?.id
   if (!userId) return { ok: false, status: 401, error: 'Unauthorized' }
   try {
-    await requireAdmin(userId, session.user?.isAdmin)
+    await requireAdmin(userId, session?.user?.isAdmin)
   } catch (err) {
     return adminFailureOutcome(err)
   }

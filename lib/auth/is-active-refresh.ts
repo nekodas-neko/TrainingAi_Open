@@ -1,4 +1,5 @@
 import type { User } from '@trainingai/shared/types/user'
+import { UserFacingError, isUserFacingError } from '@trainingai/shared/errors'
 import { signedInBeforeCutoff, signedInBeforeSignInCutoff } from './session-cutoff'
 
 const PROFILE_FIELDS = ['timezone', 'sex', 'heightCm', 'dateOfBirth', 'activityLevel'] as const
@@ -10,6 +11,26 @@ export type IsActiveClaim = {
   isAdmin?: boolean
   isActiveCheckedAt?: number
   signedInAt?: number
+}
+
+/**
+ * The active check could not run (the user lookup threw: a database fault). The request is refused
+ * as "try again", 503, never as "signed out", 401: Preview signs out on our own JSON 401 from the
+ * profile check and from the refresh route (`mobile/src/features/account/session.ts`), so a short
+ * outage answered 401 would end the owner's sign-in. A `UserFacingError` with status 503, so the
+ * shared route mappers (`routeErrorResponse`, `refusalResponse`, `withRouteErrors`) answer it as a
+ * JSON 503; a route that lets it escape answers Next's 500. It is thrown, not returned as a refused
+ * claim, so no route's `if (!session) return 401` can turn it into a sign-out.
+ */
+export class AuthCheckUnavailableError extends UserFacingError {
+  constructor() {
+    super('Sign-in check is temporarily unavailable. Try again.', 503)
+    this.name = 'AuthCheckUnavailableError'
+  }
+}
+
+export function isAuthCheckUnavailable(err: unknown): boolean {
+  return err instanceof AuthCheckUnavailableError || (isUserFacingError(err) && err.name === 'AuthCheckUnavailableError')
 }
 
 export async function refreshIsActiveClaim<T extends IsActiveClaim>(
@@ -25,16 +46,10 @@ export async function refreshIsActiveClaim<T extends IsActiveClaim>(
   try {
     user = await lookup(token.userId)
   } catch {
-    // Fails closed for this request only. A lookup that throws (a database fault) cannot show the
-    // sign-in is still good, and the cut-offs above are only enforced through this check, so the
-    // token is refused as inactive. Nothing here outlives the request: no caller writes this claim
-    // back into a cookie or token (`auth()` builds a fresh session from it, the bearer path a
-    // decoded copy, the jwt callback never calls this), `isActiveCheckedAt` and the profile fields
-    // are left as they were, and the next call recomputes `isActive` from the row alone, never from
-    // the value set here. So once the database answers again the same cookie passes.
-    token.isActive = false
-    token.isAdmin = false
-    return token
+    // Fails closed for this request only, as "unavailable", never as "signed out"
+    // (`AuthCheckUnavailableError`). The token is not touched, and nothing is written: the next
+    // call reads the row again, so once the database answers the same cookie or token passes.
+    throw new AuthCheckUnavailableError()
   }
   // #3369: a sign-in older than the account's cut-off is treated as the account being inactive, the
   // one refusal every caller of this already honours (`auth()` answers null, the bearer path too).
