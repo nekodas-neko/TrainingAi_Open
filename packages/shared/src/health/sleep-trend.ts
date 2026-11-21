@@ -19,6 +19,22 @@ function ratioTrend(newestFirstValues: number[]): number | null {
   return olderAvg > 0 ? recentAvg / olderAvg : null
 }
 
+/**
+ * A trend ratio with the date of the newest value it read (#3718). The daily check suggests rest on
+ * a trend only when that newest value is last night's: a ratio whose recent three nights end days ago
+ * is not about this morning, the rule `nightTemp.nightDate === today` already applies to temperature.
+ */
+export interface TrendReading {
+  ratio: number
+  /** Local `YYYY-MM-DD` of the newest value in the recent-3 window (a sleep row's wake date). */
+  newestDate: string
+}
+
+function ratioReading(newestFirstRows: { date: string; value: number }[]): TrendReading | null {
+  const ratio = ratioTrend(newestFirstRows.map(r => r.value))
+  return ratio == null ? null : { ratio, newestDate: newestFirstRows[0].date }
+}
+
 function newestFirst(sessions: SleepSession[]): SleepSession[] {
   return [...sessions].sort((a, b) => b.sleepEnd.getTime() - a.sleepEnd.getTime())
 }
@@ -36,19 +52,28 @@ function newestFirst(sessions: SleepSession[]): SleepSession[] {
  * replaced, and it manufactured exactly the deficit it was supposed to detect.
  */
 export function sleepDurationTrend(sessions: SleepSession[], tz: string = DEFAULT_TZ): number | null {
+  return sleepDurationTrendReading(sessions, tz)?.ratio ?? null
+}
+
+/** {@link sleepDurationTrend} with the newest night it read. */
+export function sleepDurationTrendReading(sessions: SleepSession[], tz: string = DEFAULT_TZ): TrendReading | null {
   // #2265: a night the owner marked partial has no hours to trend, so it is skipped, not read as short.
-  return ratioTrend(newestFirst(nightsWithDuration(nightSessions(sessions, tz))).map(s => s.durationHours ?? 0))
+  return ratioReading(newestFirst(nightsWithDuration(nightSessions(sessions, tz))).map(s => ({ date: s.date, value: s.durationHours ?? 0 })))
 }
 
 /** Quality trend over our own 0–100 sleep score (efficiency/stages/latency/
  *  restfulness/timing). Unscorable nights are skipped before windowing, so one
  *  bad row never reads as a 0-quality night. */
 export function sleepScoreTrend(sessions: SleepSession[], tz: string = DEFAULT_TZ): number | null {
+  return sleepScoreTrendReading(sessions, tz)?.ratio ?? null
+}
+
+/** {@link sleepScoreTrend} with the newest scored night it read. */
+export function sleepScoreTrendReading(sessions: SleepSession[], tz: string = DEFAULT_TZ): TrendReading | null {
   // Nights only — `computeSleepScore` has no minimum-duration guard, so a 20-minute nap fed
   // straight in scores ~5 and drags the trend (the F-1 bug class, in a caller the original fix
   // missed).
-  const scores = computeSleepScoreSeries(nightSessions(sessions, tz), tz)
-    .map(r => r.result?.score)
-    .filter((v): v is number => v != null)
-  return ratioTrend(scores)
+  const rows = computeSleepScoreSeries(nightSessions(sessions, tz), tz)
+    .flatMap(r => r.result?.score != null ? [{ date: r.session.date, value: r.result.score }] : [])
+  return ratioReading(rows)
 }

@@ -44,11 +44,11 @@ import { classifyClockRegression, resolveDsToMs, resolveMsToDs, dsToMs, msToDs, 
 import { spo2PctFromR } from '@/lib/oura-ble/spo2'
 import { numericField as numArr } from '@trainingai/shared/health/night-vitals'
 import { dayStepCountsByDate } from '@trainingai/shared/health/activity-steps'
-import { rowsOfDeviceInUse, fillMissingNightSources, nightAlgorithmVersion } from '@trainingai/shared/health/per-device-normal'
+import { fillMissingNightSources } from '@trainingai/shared/health/per-device-normal'
 import { latestIllnessFromDerived } from '@trainingai/shared/health/illness-radar'
 import { liveReadinessReadingForDay } from '@trainingai/shared/health/live-readiness'
 import { extractNightlyTrainingSamples, fitDaytimeHrvModel, MIN_TRAINING_SAMPLES } from '@trainingai/shared/health/daytime-hrv-model'
-import { sleepDurationTrend } from '@trainingai/shared/health/sleep-trend'
+import { restTrendsFromRows } from '@trainingai/shared/ai-periodization/daily-rest-inputs'
 import { DayCheckinScalesSchema, DayCheckinExtrasSchema, dayCheckinHasAnswers, resolveVsAnswer } from '@trainingai/shared/validation/day-checkin'
 import { answeredMorningScales } from '@trainingai/shared/health/self-report'
 import { MoodFieldsSchema } from '@trainingai/shared/validation/mood-log'
@@ -2310,7 +2310,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         this.getExerciseMuscleAssignments(
           sessions.flatMap(s => s.exercises.map(e => e.exerciseName)),
         ),
-        this.getOuraDaily(userId, todayIso, todayIso),
+        // #3718: 14 days, for the wear filter of the HRV trend's baseline (as `signals.ts` reads it).
+        this.getOuraDaily(userId, from14dStr, todayIso),
         this.getMoodLog(userId, todayIso),
         this.getWorkoutSessionsFrom(userId, from7d),
         // #3774: only the name→muscles mapping is read here (`computeMuscleRecovery`), on every
@@ -2328,7 +2329,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         this.getOuraCloudSwitchDay(userId).catch(() => null),
       ])
 
-      const ouraToday = ouraRows[0] ?? null
+      const ouraToday = ouraRows.find(r => r.date === todayIso) ?? null
       const illnessFlag = latestIllnessFromDerived(derivedRows)?.flag ?? null
       // Daytime stress is a same-day signal, so it must read TODAY's row — not
       // derivedRows[0], which is the earliest (yesterday) since the range is
@@ -2353,24 +2354,13 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       // Sleep trend: recent-3-vs-baseline duration ratio — shared helper, same formula
       // signals.ts uses (One Formula, One Place). AI-dynamic keeps duration semantics:
       // its 0.85 low-sleep threshold was tuned on hours, not score.
-      const sleepTrend = sleepDurationTrend(sleepSessions, timezone)
-
-      // HRV trend: ratio of recent 3 days vs older baseline
-      let hrvTrend: number | null = null
-      // #3001: both stretches from the device in use, so Oura's HRV is never compared with the ring's.
-      // #3601: and from its newest algorithm version, read from the same night's sleep.
-      const versionOnNight = nightAlgorithmVersion(sleepSessions)
-      const hrvRows = rowsOfDeviceInUse(bodyMetrics.filter(m => m.hrvMs != null && m.hrvMs > 0), m => m.hrvMs, m => m.hrvSource, m => versionOnNight(m.date, m.hrvSource))
-      if (hrvRows.length >= 4) {
-        const sorted = [...hrvRows].sort((a, b) => b.date.localeCompare(a.date))
-        const recent3 = sorted.slice(0, 3)
-        const older = sorted.slice(3, 10)
-        if (older.length > 0) {
-          const recentAvg = recent3.reduce((s, m) => s + m.hrvMs!, 0) / recent3.length
-          const olderAvg = older.reduce((s, m) => s + m.hrvMs!, 0) / older.length
-          hrvTrend = olderAvg > 0 ? recentAvg / olderAvg : null
-        }
-      }
+      //
+      // #3718: with the trends the AI prescription prompt's rest-day rule reads, from the helpers
+      // `signals.ts` uses, each with its newest night so the daily check can ask whether it is last
+      // night's. HRV leaves low-wear days out of its baseline (this path's inline copy did not).
+      const restTrends = restTrendsFromRows(sleepSessions, bodyMetrics, ouraRows, timezone)
+      const sleepTrend = restTrends.sleepDuration?.ratio ?? null
+      const hrvTrend = restTrends.hrv?.ratio ?? null
 
       const muscleRecovery = computeMuscleRecovery(recentWorkouts, muscleMap)
 
@@ -2420,6 +2410,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         hrvTrend,
         illnessFlag,
         stressHighMinutes,
+        restTrends,
         timezone,
         ...reminders,
       })

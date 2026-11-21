@@ -5,6 +5,8 @@ import type { ProgramSession, MuscleAssignment, NextSessionRecommendation } from
 import type { IllnessFlag } from '@trainingai/shared/health/illness-radar'
 import { loggedAsSession, programSessionFor } from '@trainingai/shared/workout/session-identity'
 import { cutFor } from '@trainingai/shared/health/readiness-decision-thresholds'
+import type { TrendReading } from '@trainingai/shared/health/sleep-trend'
+import { decideDailyRest, restRuleSleepTrend } from './daily-rest-decision'
 
 export interface MuscleRecovery {
   muscle: string
@@ -67,6 +69,17 @@ export interface AiDynamicInput {
    * the real value; one that does not should not be firing this alert.
    */
   temperatureTrusted?: boolean
+  /**
+   * #3718: the trends the AI prescription prompt's rest-day rule reads, each with its newest night,
+   * from the same helpers `signals.ts` uses (`sleep-trend.ts`, `recovery-trends.ts`). Absent ⇒ none
+   * of the trend rest signals can fire; a stale one (newest night not today) never fires either.
+   */
+  restTrends?: {
+    sleepScore: TrendReading | null
+    sleepDuration: TrendReading | null
+    hrv: TrendReading | null
+    spo2: TrendReading | null
+  }
 }
 
 // ── Muscle recovery helpers ───────────────────────────────────────────────────
@@ -231,71 +244,9 @@ export function countConsecutiveRestDays(history: SessionHistory[], now: Date, t
 import { TEMP_BASELINE_MIN_DAYS, TEMP_ALERT_THRESHOLD_C } from './deload-constants'
 export { TEMP_BASELINE_MIN_DAYS, TEMP_ALERT_THRESHOLD_C }
 
-function computeDeloadStrength(
-  consecutiveTrainingDays: number,
-  readinessScore: number | null,
-  readinessModelVersion: string | null,
-  temperatureDeviation: number | null,
-  temperatureBaselineDays: number,
-  illnessFlag: IllnessFlag | null,
-  stressHighMinutes: number | null,
-  temperatureTrusted: boolean,
-): { recommended: boolean; strength: 'soft' | 'recommended' | 'strong'; temperatureAlert: boolean } {
-  // Fever overrides everything — the strongest "don't train hard" signal we have.
-  // temperatureAlert stays tied to the Cloud temp-deviation field (its own UI copy).
-  if (illnessFlag === 'fever') {
-    return { recommended: true, strength: 'strong', temperatureAlert: false }
-  }
-
-  // Only trust an elevated temperature once the baseline is mature enough to define "normal" AND
-  // centred enough for the deviation to mean anything (TN-18).
-  //
-  // The maturity count alone was never sufficient and the owner's screenshot showed why: on
-  // 2026-08-31 the stored deviation was 0.519 °C — over the 0.5 threshold, so this banner said
-  // "Body temp elevated — rest or deload recommended" — while readiness scored temperature
-  // **80/100** on the same night, because its baseline sd is 12x too wide. Two paths, one broken
-  // baseline, opposite verdicts, same frame.
-  //
-  // TN-6a shipped the suspension and said it "must cover all three consumers"; it covered one, and
-  // it was the readiness ladder — the path the owner does not read. This is the path behind the
-  // report that started it: *"its often triggering deload days. its not trustable yet."*
-  //
-  // **Do NOT fix this by raising TEMP_ALERT_THRESHOLD_C.** That is the Q-504 mistake and would be
-  // the fourth "the threshold is right, the input is wrong" in this pillar. The condition is
-  // computed, not a TODO, so it lifts on its own once a re-derivation centres the deviations.
-  const tempAlert = temperatureTrusted
-    && temperatureDeviation != null && temperatureDeviation > TEMP_ALERT_THRESHOLD_C
-    && temperatureBaselineDays >= TEMP_BASELINE_MIN_DAYS
-  // TN-34: the derived arm is UNWIRED (owner-approved 2026-09-10, *"yes lets do all that"*).
-  // `stressHighMinutes >= STRESS_HIGH_DAY_THRESHOLD_MIN` recommended a deload on **83% of the
-  // owner's days** (15 of 18 recomputed; 7 of 10 on stored values since the 2026-08-31 fix). A flag
-  // that fires four days in five carries no information, and the input is the number TN-33 measured
-  // as carrying none: the daily scalar is 57% NIGHT buckets, night runs systematically positive
-  // (+0.266 against the day's −0.405), and its correlation with readiness is +0.072 over 18 days
-  // with the two halves pointing opposite ways.
-  //
-  // **Do NOT restore this by raising STRESS_HIGH_DAY_THRESHOLD_MIN.** That is the mistake the
-  // TEMP_ALERT_THRESHOLD_C comment above warns about — it would be the fifth "the threshold is
-  // right, the input is wrong" in this pillar. The threshold is a documented ~2 h judgement; the
-  // input is a sleep-weighted average wearing a daytime label. Re-wire it when TN-33's level-2 test
-  // passes, ideally against this user's own distribution (a percentile, not a constant).
-  //
-  // A `day_summary === 'very_stressful'` arm used to sit here. Oura's enum has no such value and
-  // nothing writes the column it read, so it could never fire; it was removed with #3000.
-  // Temperature and illness still override.
-  if (tempAlert || illnessFlag === 'elevated') {
-    return { recommended: true, strength: 'recommended', temperatureAlert: tempAlert }
-  }
-
-  if (consecutiveTrainingDays < 3) {   // was < 4
-    return { recommended: false, strength: 'soft', temperatureAlert: false }
-  }
-
-  // #3824: both grades are chosen for the score's own scale (70/50 before #3778, 76/56 after).
-  if (readinessScore == null || readinessScore >= cutFor('deloadSoft', readinessModelVersion)) return { recommended: true, strength: 'soft', temperatureAlert: false }
-  if (readinessScore >= cutFor('deloadRecommended', readinessModelVersion)) return { recommended: true, strength: 'recommended', temperatureAlert: false }
-  return { recommended: true, strength: 'strong', temperatureAlert: false }
-}
+// The grade itself (fever, temperature, illness, the training streak, the AI rule's three rest
+// signals, sick and energy) is `decideDailyRest` in `daily-rest-decision.ts` (#3718), a pure function
+// a replay over past days can call.
 
 // ── Main entry point ──────────────────────────────────────────────────────────
 
@@ -303,8 +254,8 @@ export function computeAiDynamicNextSession(input: AiDynamicInput): NextSessionR
   const {
     sessions, muscleAssignments, muscleRecovery, history, soreMuscles, suggestedSoreMuscles,
     readinessScore, readinessModelVersion, temperatureDeviation, temperatureBaselineDays, timezone,
-    reminderEnabled, reminderTime, sleepTrend, energyLevel, selfReportedSick, hrvTrend, illnessFlag, stressHighMinutes,
-    temperatureTrusted,
+    reminderEnabled, reminderTime, sleepTrend, energyLevel, selfReportedSick, hrvTrend, illnessFlag,
+    temperatureTrusted, restTrends,
   } = input
 
   const now = new Date()
@@ -351,35 +302,23 @@ export function computeAiDynamicNextSession(input: AiDynamicInput): NextSessionR
   const consecutiveTrainingDays = countConsecutiveTrainingDays(history, now, timezone)
   const consecutiveRestDays = countConsecutiveRestDays(history, now, timezone)
 
-  const deload = computeDeloadStrength(
-    consecutiveTrainingDays, readinessScore, readinessModelVersion, temperatureDeviation, temperatureBaselineDays ?? 0,
-    illnessFlag, stressHighMinutes, temperatureTrusted ?? false,
-  )
-  let recommended = deload.recommended
-  let strength = deload.strength
-
-  // Self-reported illness is the strongest subjective signal there is — the lifter knows they
-  // have a fever before any of our biometrics do (owner call 2026-07-29). It forces the strongest
-  // recommendation, which the home surfaces render as "rest today"; it never blocks training.
-  if (selfReportedSick) {
-    recommended = true
-    strength = 'strong'
-  }
-
-  // Energy level can push deload strength up one level or force 'strong'
-  if (energyLevel === 'drained') {
-    recommended = true
-    strength = 'strong'
-  } else if (energyLevel === 'low') {
-    if (!recommended) {
-      recommended = true
-      strength = 'soft'
-    } else if (strength === 'soft') {
-      strength = 'recommended'
-    } else if (strength === 'recommended') {
-      strength = 'strong'
-    }
-  }
+  const deload = decideDailyRest({
+    today: todayStr,
+    consecutiveTrainingDays,
+    readinessScore,
+    readinessModelVersion,
+    temperatureDeviation,
+    temperatureBaselineDays: temperatureBaselineDays ?? 0,
+    temperatureTrusted: temperatureTrusted ?? false,
+    illnessFlag,
+    selfReportedSick: selfReportedSick ?? false,
+    energyLevel,
+    sleepTrend: restRuleSleepTrend(restTrends?.sleepScore ?? null, restTrends?.sleepDuration ?? null),
+    hrvTrend: restTrends?.hrv ?? null,
+    spo2Trend: restTrends?.spo2 ?? null,
+  })
+  const recommended = deload.recommended
+  const strength = deload.strength
 
   const hrvWarning = hrvTrend != null && hrvTrend < 0.85
 
@@ -410,6 +349,7 @@ export function computeAiDynamicNextSession(input: AiDynamicInput): NextSessionR
     streakWarning: consecutiveRestDays === 2,
     streakBroken: consecutiveRestDays >= 3,
     temperatureAlert: deload.temperatureAlert,
+    ...(deload.restSignals.length > 0 ? { restSignals: deload.restSignals } : {}),
     weightedComponents,
     scoredSessions,
     hrvWarning,

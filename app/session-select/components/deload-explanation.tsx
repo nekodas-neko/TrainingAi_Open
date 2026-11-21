@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDownIcon, ThermometerIcon, BatteryLowIcon, CalendarClockIcon, ActivityIcon } from "lucide-react";
+import { ChevronDownIcon, ThermometerIcon, BatteryLowIcon, CalendarClockIcon, ActivityIcon, MoonIcon, DropletIcon } from "lucide-react";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import { cn } from "@trainingai/shared/utils";
 import type { NextSessionRecommendation } from "@trainingai/shared/types/program";
@@ -19,6 +19,8 @@ const REASON_ICON: Record<DeloadReasonKind, React.ReactNode> = {
   readiness: <ActivityIcon className="h-3.5 w-3.5" />,
   streak: <CalendarClockIcon className="h-3.5 w-3.5" />,
   energy: <BatteryLowIcon className="h-3.5 w-3.5" />,
+  sleepAndHrv: <MoonIcon className="h-3.5 w-3.5" />,
+  spo2: <DropletIcon className="h-3.5 w-3.5" />,
 };
 
 // Turn the recommendation's raw signal fields into a plain-English list of *why* recovery is

@@ -90,10 +90,21 @@ export type WorkoutCatalog = {
     deloadStrength?: DeloadStrength;
     /** The inputs the reasons for a suggested rest are worded from (`deloadReasons`). */
     signals?: RecommendationSignals;
+    /** #3718: the AI rule's rest signals the daily check saw today, each with its own reason line. */
+    restSignals?: RestSignalKind[];
   };
   recovery?: MuscleRecovery[] | null;
 };
 export type RecommendationSignals = NonNullable<DeloadReasonInput['signals']>;
+export type RestSignalKind = NonNullable<DeloadReasonInput['restSignals']>[number];
+const REST_SIGNAL_KINDS: readonly RestSignalKind[] = ['readinessVeryLow', 'sleepAndHrvLow', 'spo2Low'];
+
+/** The known rest signals in a response, in order. An unknown one (a newer server) is dropped. */
+export function recommendationRestSignals(value: unknown): RestSignalKind[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const known = value.filter((v): v is RestSignalKind => REST_SIGNAL_KINDS.includes(v as RestSignalKind));
+  return known.length > 0 ? known : undefined;
+}
 const DELOAD_STRENGTHS: readonly DeloadStrength[] = ['soft', 'recommended', 'strong'];
 
 /** The few `signals` fields the reasons read. A field that is missing or the wrong shape is left
@@ -330,6 +341,9 @@ export function buildCatalog(
       ? { deloadStrength: next.deloadStrength as DeloadStrength }
       : {}),
     ...(recommendationSignals(next.signals) ? { signals: recommendationSignals(next.signals) } : {}),
+    ...(recommendationRestSignals(next.restSignals)
+      ? { restSignals: recommendationRestSignals(next.restSignals) }
+      : {}),
   };
   const base = {
     version: 2 as const,
@@ -496,6 +510,9 @@ export function readSavedCatalog(
     }
     if (recommendation.signals !== undefined) {
       recommendation.signals = recommendationSignals(recommendation.signals);
+    }
+    if (recommendation.restSignals !== undefined) {
+      recommendation.restSignals = recommendationRestSignals(recommendation.restSignals);
     }
     if (saved.program !== null) {
       const program = object(saved.program);
