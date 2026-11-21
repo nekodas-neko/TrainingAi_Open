@@ -134,11 +134,14 @@ export function completedAsForActivity(activityType: string | null): 'run' | 'wa
   return activityType === 'run' ? 'run' : 'walk'
 }
 
+/** How far a rolled-over end may sit from the log's stored duration before the duration wins. */
+const ROLLED_SPAN_TOLERANCE_MS = 60 * 60_000
+
 /**
  * The instant window an activity log covers, from its local date and "HH:MM[:SS]" clock times.
  * Null without a start time: a log with only a duration cannot be placed against the heart-rate
  * series, so its minutes are unknown rather than guessed. An end before the start crossed
- * midnight.
+ * midnight; an end equal to the start is a zero-length log and gives no window.
  */
 export function activityLogWindow(
   log: { date: string; startTime?: string | null; endTime?: string | null; durationMin?: number | null },
@@ -151,8 +154,19 @@ export function activityLogWindow(
   if (log.endTime) {
     const hhmm = log.endTime.slice(0, 5)
     let end = fromZonedTime(`${log.date}T${hhmm}:00`, tz)
-    // The next local day's clock time, not +24 h: a DST night is not 24 hours long.
-    if (end.getTime() <= from.getTime()) end = fromZonedTime(`${shiftDateStr(log.date, 1)}T${hhmm}:00`, tz)
+    // Only an end strictly before the start crossed midnight. An end equal to the start is a
+    // zero-length log (a 12-second treadmill entry), not a 24-hour one: reading it as the next day
+    // credited a whole day's heart-rate readings to it.
+    if (end.getTime() < from.getTime()) {
+      // The next local day's clock time, not +24 h: a DST night is not 24 hours long.
+      end = fromZonedTime(`${shiftDateStr(log.date, 1)}T${hhmm}:00`, tz)
+      // A rolled span that is more than an hour off the stored duration was a mistyped end time,
+      // not an overnight activity: the duration is the better witness.
+      if (log.durationMin != null && log.durationMin > 0
+        && Math.abs(end.getTime() - from.getTime() - log.durationMin * 60_000) > ROLLED_SPAN_TOLERANCE_MS) {
+        end = new Date(from.getTime() + log.durationMin * 60_000)
+      }
+    }
     if (Number.isFinite(end.getTime())) to = end
   }
   if (to == null && log.durationMin != null && log.durationMin > 0) {

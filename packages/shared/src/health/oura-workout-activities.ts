@@ -23,7 +23,8 @@
  *
  * Each workout lands on the user's local day of its start, the same day key everything else uses.
  */
-import { localClockTimeToDate, shiftDateStr, toAestDay } from '../date-utils'
+import { toAestDay } from '../date-utils'
+import { activityLogWindow } from '../running/heart-health'
 import type { SourceActivitySession } from './activity-sessions'
 
 export interface SourceBudgetActivity {
@@ -47,20 +48,11 @@ const overlaps = (aStart: number, aEnd: number, bStart: number, bEnd: number) =>
 export function movementWindows(counted: CountedMovement, tz: string): [number, number][] {
   const windows: [number, number][] = []
   for (const a of counted.activityLogs) {
-    // Stored as HH:MM:SS (Postgres time); the parser takes HH:MM.
-    const start = localClockTimeToDate(a.date, a.startTime?.slice(0, 5), tz)
-    if (!start) continue
-    let end = localClockTimeToDate(a.date, a.endTime?.slice(0, 5), tz)
-      ?? (a.durationMin != null ? new Date(start.getTime() + a.durationMin * 60_000) : null)
-    // A log that crosses midnight (23:30–00:30) stores an end clock time before its start: it ended
-    // the next day. Dropping it from the check would let the Oura copy of that walk count twice.
-    if (end && end <= start) {
-      end = a.durationMin != null && a.durationMin > 0
-        ? new Date(start.getTime() + a.durationMin * 60_000)
-        // The same clock time on the next calendar day, not 24 h on: a daylight-saving day is 23 or 25 h.
-        : localClockTimeToDate(shiftDateStr(a.date, 1), a.endTime?.slice(0, 5), tz)
-    }
-    if (end && end > start) windows.push([start.getTime(), end.getTime()])
+    // The one rule for placing a log (`activityLogWindow`): an end before the start crossed midnight
+    // (23:30–00:30), so the Oura copy of that walk is still matched; an end equal to the start is
+    // no window, not a 24-hour one.
+    const w = activityLogWindow(a, tz)
+    if (w) windows.push([w.from.getTime(), w.to.getTime()])
   }
   for (const s of counted.sessions) {
     if (s.completedAt) windows.push([s.startedAt.getTime(), s.completedAt.getTime()])

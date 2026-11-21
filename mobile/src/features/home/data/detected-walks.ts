@@ -6,6 +6,7 @@ import {
   shiftDateStr,
   toAestDay,
 } from '@trainingai/shared/date-utils';
+import { activityLogWindow } from '@trainingai/shared/running/heart-health';
 import { activityPayload, type ActivityPayload } from '../../activities/data/models.ts';
 
 /**
@@ -50,13 +51,9 @@ export function recordedSpans(
   timezone: string,
 ): Span[] {
   return rows.flatMap(({ payload }) => {
-    const date = payload.date.replace(/\//g, '-');
-    const start = localClockTimeToDate(date, payload.startTime, timezone);
-    if (!start) return [];
-    const end =
-      localClockTimeToDate(date, payload.endTime, timezone) ??
-      (payload.durationMin != null ? new Date(start.getTime() + payload.durationMin * 60_000) : null);
-    return end && end > start ? [{ startMs: start.getTime(), endMs: end.getTime() }] : [];
+    // The one rule for placing a log (`activityLogWindow`), so an overnight log is held as a span too.
+    const w = activityLogWindow({ ...payload, date: payload.date.replace(/\//g, '-') }, timezone);
+    return w ? [{ startMs: w.from.getTime(), endMs: w.to.getTime() }] : [];
   });
 }
 const overlaps = (a: Span, b: Span) => a.startMs < b.endMs && a.endMs > b.startMs;
