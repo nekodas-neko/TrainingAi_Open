@@ -6,6 +6,7 @@ import {
   type ClockSkip,
 } from '@trainingai/shared/date-utils';
 import { bucketAverage } from '@trainingai/shared/health/hr-smoothing';
+import { bridgeHrGaps } from '@trainingai/shared/health/hr-gap-bridge';
 
 /** Gaps wider than this, in elapsed minutes, are drawn as "Not recorded". */
 const GAP_MIN = 30;
@@ -68,18 +69,37 @@ export function activityHrPoints(
 }
 
 /**
+ * The "Estimated" line (the current app's Home chart, `showBackfill`): straight bridges across the
+ * gaps of 20 to 120 minutes between buckets, as a series of its own beside the real trace.
+ */
+export function hrEstimatedPoints(buckets: { x: number; y: number }[], skip: ClockSkip | null) {
+  return bridgeHrGaps(buckets, 20, 120, skip).map((p) => ({
+    x: p.x,
+    value: Number.isFinite(p.y) ? p.y : null,
+  }));
+}
+
+/**
  * Logged workouts as wall-clock minute windows for the day's heart-rate chart, by the current app's
  * rule (hr-day-chart.tsx workoutWindows): a finished session only, from its start to its completion,
- * and only when it ends after it starts. `minuteOf` places an instant on the day's clock face.
+ * and only when it ends after it starts. `minuteOf` places an instant on the day's clock face. Each
+ * window carries its session's name, for the legend's "Workout: Pull".
  */
 export function hrWorkoutWindows(
-  sessions: readonly { startedAt: string; completedAt: string | null }[],
+  sessions: readonly { sessionName?: string; startedAt: string; completedAt: string | null }[],
   minuteOf: (ms: number) => number,
 ) {
   return sessions.flatMap((session) => {
     if (session.completedAt == null) return [];
     const start = minuteOf(Date.parse(session.startedAt));
     const end = minuteOf(Date.parse(session.completedAt));
-    return Number.isFinite(start) && Number.isFinite(end) && end > start ? [{ from: start, to: end }] : [];
+    return Number.isFinite(start) && Number.isFinite(end) && end > start
+      ? [{ from: start, to: end, name: session.sessionName?.trim() || null }]
+      : [];
   });
+}
+
+/** The legend's workout entry: the current app's "Workout: Pull", or "Workout" for an unnamed session. */
+export function hrWorkoutLabel(name: string | null) {
+  return name ? `Workout: ${name}` : 'Workout';
 }

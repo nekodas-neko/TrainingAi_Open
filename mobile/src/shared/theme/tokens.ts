@@ -89,6 +89,9 @@ export const sizes = {
   zonePeriodToggle: 160,
   // calendar-widget.tsx: the month between the arrows is w-24.
   calendarMonthLabel: 96,
+  // calendar-widget.tsx: each month arrow is a 14 px chevron in p-1, so about 22 px wide. Drawn at
+  // 28 here; the control carries hitSlop up to touchTarget (#2948).
+  calendarArrow: 28,
   // muscle-heatmap.tsx KeyItem: a w-2.5 h-2.5 rounded-[2px] swatch.
   legendSwatch: 10,
   // collection chain (#2088): a 34 px cat on a 38 px rung, so six rungs and five links fit at 384 dp.
@@ -399,6 +402,12 @@ export const macroColorsLight = {
 };
 // Heart-rate zones 1 to 5 in light, a darker step of each. Dark is the shared HR_ZONE_META.
 export const hrZoneColorsLight = ['#1d4ed8', '#177a3c', '#8a5a00', '#c2410c', '#b91c1c'];
+// hr-day-chart.tsx windowDefs: the workout window is orange-500 (249,115,22), the sleep window
+// indigo-500 (99,102,241). The estimated bridge is teal at 60%: 400 on dark, 600 on light.
+export const hrDayChartColors = {
+  workoutBand: '#f97316',
+  estimated: { dark: '#2dd4bf', light: '#0d9488' },
+};
 export const homeCardColors = {
   weightSparkline: '#00d4ff',
   nutritionDonut: '#bf5fff',

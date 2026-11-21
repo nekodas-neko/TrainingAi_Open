@@ -41,7 +41,7 @@ export function MonthCalendar({
   const { theme } = useTheme();
   const [year, number] = month.split('-').map(Number);
   // Measured widths decide whether the title fits beside the controls; until all three land it
-  // stacks, which is where a phone ends up anyway.
+  // shares the row, which is where a phone at normal text size ends up.
   const [rowWidth, setRowWidth] = useState<number | null>(null);
   const [controlsWidth, setControlsWidth] = useState<number | null>(null);
   const [titleWidth, setTitleWidth] = useState<number | null>(null);
@@ -58,6 +58,7 @@ export function MonthCalendar({
   const back = (
     <IconButton
       icon="back"
+      drawnWidth={title ? theme.sizes.calendarArrow : undefined}
       label="Previous month"
       onPress={year > 2000 || number > 1 ? () => move(-1) : undefined}
     />
@@ -65,35 +66,39 @@ export function MonthCalendar({
   const forward = (
     <IconButton
       icon="forward"
+      drawnWidth={title ? theme.sizes.calendarArrow : undefined}
       label="Next month"
       onPress={year < 2100 || number < 12 ? () => move(1) : undefined}
     />
   );
-  // The current app's w-24 month label between the arrows, 4 px apart.
+  // The current app's w-24 month label between the arrows, 4 px apart. The status sits outside the
+  // measured group: it is there only while loading or failed, and must not decide the layout.
   const controls = (
-    <Stack
-      direction="row"
-      align="center"
-      gap="xs"
-      // flex-start keeps the measured width natural once stacked, where a column would stretch it
-      // to the block and pin the title above for good.
-      style={{ flexShrink: 0, alignSelf: 'flex-start' }}
-      onLayout={(event) => setControlsWidth(event.nativeEvent.layout.width)}
-    >
-      {back}
-      <AppText
-        variant="calendarDay"
-        numberOfLines={2}
-        style={{
-          width: theme.sizes.calendarMonthLabel,
-          textAlign: 'center',
-          fontVariant: ['tabular-nums'],
-        }}
-      >
-        {monthLabel}
-      </AppText>
+    <Stack direction="row" align="center" gap="xs" style={{ flexShrink: 0, alignSelf: 'flex-start' }}>
       {status}
-      {forward}
+      <Stack
+        direction="row"
+        align="center"
+        gap="xs"
+        // flex-start keeps the measured width natural once stacked, where a column would stretch it
+        // to the block and pin the title above for good.
+        style={{ flexShrink: 0, alignSelf: 'flex-start' }}
+        onLayout={(event) => setControlsWidth(event.nativeEvent.layout.width)}
+      >
+        {back}
+        <AppText
+          variant="calendarDay"
+          numberOfLines={2}
+          style={{
+            width: theme.sizes.calendarMonthLabel,
+            textAlign: 'center',
+            fontVariant: ['tabular-nums'],
+          }}
+        >
+          {monthLabel}
+        </AppText>
+        {forward}
+      </Stack>
     </Stack>
   );
   // The gap is the shared row's own (Stack's default, sm).
@@ -120,7 +125,12 @@ export function MonthCalendar({
           >
             {title}
           </AppText>
-          <Stack direction="row" align="center" justify="space-between">
+          <Stack
+            direction="row"
+            align="center"
+            justify="space-between"
+            style={{ minHeight: theme.sizes.touchTarget }}
+          >
             <AppText
               variant="groupTitle"
               tone="muted"

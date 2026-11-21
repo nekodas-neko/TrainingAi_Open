@@ -56,8 +56,10 @@ test('a gain reads up, down or flat from the shared rule, and colours from the s
   assert.equal(gainColor(null, status), null);
 });
 
-test('the calendar title starts above its controls until the row is measured (#2900, #3501)', () => {
-  assert.equal(calendarTitleStacked(null), true);
+// #2900 and #3501 started it stacked. The 20 Nov look (#2948) fails that: the current app has one
+// row at normal text size and stacks only at 1.3, so the unmeasured first paint is the row.
+test('the calendar title shares the row with its controls until the row is measured (#2948)', () => {
+  assert.equal(calendarTitleStacked(null), false);
 });
 
 test('More words its rows and actions as the current app does (#2902)', () => {

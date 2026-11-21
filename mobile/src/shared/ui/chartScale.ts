@@ -233,3 +233,34 @@ export function lastReadingIndex(values: readonly (number | null)[]): number {
   for (let i = values.length - 1; i >= 0; i--) if (values[i] !== null) return i;
   return -1;
 }
+
+/**
+ * Gridline values for an axis fixed to [min, max], as chart.js draws them when `min` and `max` are
+ * set (`generateTicks` with bounds 'ticks' and includeBounds): the two ends are always labelled,
+ * with round values between them, at most `maxTicks` in all. The current app's heart-rate chart
+ * fits its range to the day, so it reads "50 · 60 · 80 · 91", not the round values alone. A
+ * round value too close to an end to be read beside it is left out.
+ */
+export function boundedTicks(min: number, max: number, maxTicks = 4): number[] {
+  if (max - min < 1e-6) return [min];
+  const niceNum = (range: number) => {
+    const base = 10 ** Math.floor(Math.log10(range));
+    const fraction = range / base;
+    return (fraction <= 1 ? 1 : fraction <= 2 ? 2 : fraction <= 5 ? 5 : 10) * base;
+  };
+  const maxSpaces = Math.max(1, maxTicks - 1);
+  let spacing = niceNum((max - min) / maxSpaces);
+  const spaces = Math.ceil(max / spacing - 1e-9) - Math.floor(min / spacing + 1e-9);
+  if (spaces > maxSpaces) spacing = niceNum((spaces * spacing) / maxSpaces);
+  const round = (v: number) => Math.round(v * 1e6) / 1e6;
+  const niceMin = round(Math.floor(min / spacing + 1e-9) * spacing);
+  const niceMax = round(Math.ceil(max / spacing - 1e-9) * spacing);
+  // A round value within 8% of an end would draw its label over the end's, so the end keeps it.
+  const apart = (max - min) * 0.08;
+  const out = [min];
+  for (let v = niceMin; v <= niceMax + 1e-9; v = round(v + spacing)) {
+    if (v > min + apart && v < max - apart) out.push(v);
+  }
+  out.push(max);
+  return out;
+}
