@@ -18,8 +18,19 @@ export function createReducedMotionStore(source: ReducedMotionSource) {
     reduced = value;
     listeners.forEach((listener) => listener());
   }
-  source.watch(set);
-  void source.read().then(set, () => undefined);
+  // Either call can throw at once if the accessibility service is missing. The store is made when
+  // the app's code loads, so a throw here would crash every importer at start-up: on failure
+  // motion stays "not reduced", the default until the phone answers.
+  try {
+    source.watch(set);
+  } catch {
+    // keep the default
+  }
+  try {
+    source.read().then(set, () => undefined);
+  } catch {
+    // keep the default
+  }
   return {
     get: () => reduced,
     subscribe(listener: () => void) {

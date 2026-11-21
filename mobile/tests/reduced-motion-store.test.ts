@@ -60,3 +60,35 @@ test('a phone that cannot answer leaves motion allowed', async () => {
   await Promise.resolve();
   assert.equal(store.get(), false);
 });
+
+test('a setting that throws when asked leaves motion allowed, and the app still starts', () => {
+  const watchThrows = createReducedMotionStore({
+    read: () => Promise.resolve(true),
+    watch: () => {
+      throw new Error('no accessibility service');
+    },
+  });
+  assert.equal(watchThrows.get(), false);
+  const readThrows = createReducedMotionStore({
+    read: () => {
+      throw new Error('no accessibility service');
+    },
+    watch: () => () => undefined,
+  });
+  assert.equal(readThrows.get(), false);
+});
+
+test('a read that fails still lets a later change through', () => {
+  let change: (reduced: boolean) => void = () => undefined;
+  const store = createReducedMotionStore({
+    read: () => {
+      throw new Error('boom');
+    },
+    watch: (onChange) => {
+      change = onChange;
+      return () => undefined;
+    },
+  });
+  change(true);
+  assert.equal(store.get(), true);
+});

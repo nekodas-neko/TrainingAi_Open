@@ -62,3 +62,20 @@ test('the values that moved here are the ones they had', () => {
     assert.equal(MOTION.sheet.open.easing(t), 1 - Math.pow(1 - t, 3));
   }
 });
+
+test('the guard that releases a lost animation callback is in the motion file, and outlasts every motion', async () => {
+  assert.ok(MOTION.navGuard.duration > MOTION.screen.duration * 2);
+  assert.ok(MOTION.navGuard.duration > MOTION.tabFade.duration * 2);
+  const offenders: string[] = [];
+  for (const dir of ['app', 'shared']) {
+    for (const path of await files(join(src, dir))) {
+      if (path === HOME) continue;
+      (await readFile(path, 'utf8')).split('\n').forEach((line, index) => {
+        if (/\b[A-Za-z_]*_MS\s*=\s*\d/.test(line)) {
+          offenders.push(`${relative(src, path)}:${index + 1}: ${line.trim()}`);
+        }
+      });
+    }
+  }
+  assert.deepEqual(offenders, []);
+});

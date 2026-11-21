@@ -12,6 +12,8 @@ export const MOTION = {
   screen: { duration: 220, easing: easeOutCubic },
   /** Switching tabs: a short cross-fade, no slide. */
   tabFade: { duration: 120 },
+  /** A moving screen or tab that nothing reported finished (a lost callback) is released after this. */
+  navGuard: { duration: 800 },
   sheet: {
     open: { duration: 240, easing: easeOutCubic },
     close: { duration: 180 },

@@ -16,8 +16,12 @@ import {
   drawn,
   finish,
   idle,
+  layerLook,
   layerOfEntry,
   layerOfTab,
+  layerOrder,
+  startValues,
+  touchable,
   type Motion,
 } from '../src/app/navigation/transition.ts';
 
@@ -180,9 +184,9 @@ test('opening a second screen during an open leaves the first one finishing its 
   );
   assert.equal(next.parts[entryLayer(second)].role, 'slide-in');
   assert.equal(next.parts[layerOfTab('Workout')].role, 'under');
-  // Nothing is released until both have landed.
+  // The first, landed, is held under the second; the tab it covers is no longer drawn.
   const afterFirst = finish(next, entryLayer(first));
-  assert.equal(afterFirst.parts[layerOfTab('Workout')].role, 'under');
+  assert.equal(afterFirst.parts[entryLayer(first)].role, 'under');
   const afterBoth = finish(afterFirst, entryLayer(second));
   assert.deepEqual(afterBoth.parts, {});
 });
@@ -227,4 +231,140 @@ test('the Coach is one layer per scope, however many times it is opened', () => 
   assert.equal(layerOfEntry(top(a)!), 'coach:general');
   assert.equal(layerOfEntry(top(c)!), 'coach:general');
   assert.equal(roles(advance(idle, b, c, false))['coach:general'], 'slide-in');
+});
+
+// Review of #3995.
+
+const session = { screen: 'workout-session', sessionId: 's', fullOverride: false } as const;
+const coach = { screen: 'coach', scope: 'general' } as const;
+const z = (nav: Navigation, motion: Motion) =>
+  new Proxy(layerOrder(nav, motion), { get: (order, id: string) => order[id] ?? 0 });
+
+test('the Coach is drawn above the session it opens over, and keeps that place sliding out', () => {
+  const home = on('Home');
+  const withSession = walk(home, session);
+  const withCoach = push(withSession, coach);
+  const opening = advance(idle, withSession, withCoach, false);
+  const order = z(withCoach, opening);
+  assert.ok(order['coach:general'] > order[entryLayer(withSession)]);
+  assert.ok(order[entryLayer(withSession)] > order[layerOfTab('Home')]);
+  const closing = advance(idle, withCoach, withSession, false);
+  const back = z(withSession, closing);
+  assert.ok(back['coach:general'] > back[entryLayer(withSession)], 'still above while it leaves');
+});
+
+test('a screen opened over the Coach is above it, and Back from it keeps it above', () => {
+  const nav = walk(on('Home'), coach, { screen: 'programs' });
+  const order = z(nav, advance(idle, pop(nav), nav, false));
+  assert.ok(order[entryLayer(nav)] > order['coach:general']);
+  const back = z(pop(nav), advance(idle, nav, pop(nav), false));
+  assert.ok(back[layerOfEntry(top(nav)!)] > back['coach:general']);
+});
+
+test('two screens leaving at once are drawn in stack order, over the tab', () => {
+  const from = walk(on('Workout'), { screen: 'cardio' }, { screen: 'running' });
+  const one = pop(from);
+  const two = pop(one);
+  const motion = advance(advance(idle, from, one, false), one, two, false);
+  const order = z(two, motion);
+  const [cardio, running] = from.stack;
+  assert.ok(order[layerOfEntry(running)] > order[layerOfEntry(cardio)]);
+  assert.ok(order[layerOfEntry(cardio)] > order[layerOfTab('Workout')]);
+});
+
+test('a layer that finishes while a screen still slides over it stays drawn under that screen', () => {
+  const base = on('Workout');
+  const first = push(base, { screen: 'cardio' });
+  const second = push(first, { screen: 'running' });
+  const next = advance(advance(idle, base, first, false), first, second, false);
+  const landed = finish(next, entryLayer(first));
+  assert.deepEqual(roles(landed), {
+    [entryLayer(second)]: 'slide-in',
+    [entryLayer(first)]: 'under',
+  });
+  assert.equal(
+    landed.parts[layerOfTab('Workout')],
+    undefined,
+    'the tab is covered by the screen now, so it is not drawn through it',
+  );
+  assert.deepEqual(finish(landed, entryLayer(second)).parts, {});
+});
+
+test('an entering layer starts at its first position, so its first frame is not at rest', () => {
+  assert.deepEqual(startValues('slide-in', true), { slide: 0, fade: 1 });
+  assert.deepEqual(startValues('fade-in', true), { slide: 1, fade: 0 });
+  assert.deepEqual(startValues('slide-out', true), { slide: 1, fade: 1 });
+  assert.deepEqual(startValues('fade-out', true), { slide: 1, fade: 1 });
+  // Already moving: carry on from where it is.
+  for (const role of ['slide-in', 'slide-out', 'fade-in', 'fade-out'] as const) {
+    assert.deepEqual(startValues(role, false), {});
+  }
+  assert.deepEqual(startValues('under', true), {});
+});
+
+test('a layer fading out keeps the slide it had, instead of snapping to rest', () => {
+  assert.equal(layerLook('fade-out', false).slide, true);
+  assert.equal(layerLook('fade-in', false).slide, true);
+  assert.equal(layerLook('fade-out', false).fade, true);
+  assert.deepEqual(layerLook('slide-in', false), { slide: true, fade: false, clip: false });
+  assert.deepEqual(layerLook(undefined, false), { slide: false, fade: false, clip: false });
+  assert.equal(layerLook('under', true).clip, true);
+});
+
+test('a tab chosen during an open fades the half-slid screen out from where it is', () => {
+  const base = on('Workout');
+  const opened = push(base, { screen: 'cardio' });
+  const opening = advance(idle, base, opened, false);
+  const switched = advance(opening, opened, selectTab(opened, 'Health'), false);
+  assert.equal(switched.parts[entryLayer(opened)].role, 'fade-out');
+  assert.equal(layerLook('fade-out', false).slide, true);
+});
+
+test('the newly active screen is not touchable while the screen above it slides out', () => {
+  const from = walk(on('Workout'), { screen: 'cardio' });
+  const to = pop(from);
+  const motion = advance(idle, from, to, false);
+  assert.equal(touchable(true, motion.parts[layerOfTab('Workout')]), false);
+  const landed = finish(motion, entryLayer(from));
+  assert.equal(touchable(true, landed.parts[layerOfTab('Workout')]), true);
+  // Never touchable when it is not the active layer.
+  assert.equal(touchable(false, undefined), false);
+  // Remove animations: no part at all, so no delay.
+  assert.equal(touchable(true, advance(idle, from, to, true).parts[layerOfTab('Workout')]), true);
+});
+
+test('whatever was opened and closed, once every motion has ended the top layer is touchable', () => {
+  let seed = 7;
+  const rand = (n: number) => {
+    seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+    return seed % n;
+  };
+  const routes: Route[] = [{ screen: 'cardio' }, { screen: 'running' }, { screen: 'programs' }, coach];
+  const tabs = ['Home', 'Health', 'Workout', 'Nutrition', 'More'] as const;
+  for (let run = 0; run < 200; run += 1) {
+    let nav = on('Home');
+    let motion = idle;
+    for (let step = 0; step < 8; step += 1) {
+      const next = [
+        () => push(nav, routes[rand(routes.length)]),
+        () => pop(nav),
+        () => selectTab(nav, tabs[rand(tabs.length)]),
+        () => replaceTop(nav, routes[rand(routes.length)]),
+      ][rand(4)]();
+      motion = advance(motion, nav, next, false);
+      nav = next;
+      if (rand(3) === 0) {
+        for (const id of Object.keys(motion.parts)) {
+          if (motion.parts[id]) motion = finish(motion, id);
+        }
+      }
+    }
+    for (const id of [...Object.keys(motion.parts), ...motion.leaving.map(layerOfEntry)]) {
+      motion = finish(motion, id);
+    }
+    const entry = top(nav);
+    const id = entry ? layerOfEntry(entry) : layerOfTab(nav.tab);
+    assert.deepEqual(motion.parts, {}, 'nothing is held when nothing moves');
+    assert.equal(touchable(true, motion.parts[id]), true);
+  }
 });
