@@ -21,6 +21,8 @@ export type ReadinessPrompt =
       kind: 'ask';
       eyebrow: string;
       title: string;
+      /** The score stated without the question, for the card that no longer asks (#3953). */
+      line: string;
       /** The user already answered or skipped today: the card goes back to stating the score. */
       answered: boolean;
     };
@@ -69,10 +71,31 @@ export function readinessPrompt(
   }
   return {
     kind: 'ask',
+    line: `Readiness ${score} is ${low ? 'under' : 'over'} your usual ${range(verdict)}.`,
     eyebrow: low ? 'Readiness is low today' : 'Readiness is high today',
     title: `${score} is ${low ? 'under' : 'over'} your usual ${range(verdict)}. How do you feel?`,
     answered: false,
   };
+}
+
+/** Local marker for "Not now" on a day: a dismissal is never an answer and never reaches the server. */
+export const readinessQuestionDismissKey = (today: string) => `readiness-question:${today}`;
+
+/**
+ * Whether Home's own unusual-day card (#3953) is drawn. It looks only at today's prompt and today's
+ * local dismissal, never at which Home cards are switched on, so a user with Exercise Readiness off
+ * is still asked. Answered days (and a skip already queued) come back as `usual` and so hide it.
+ */
+export function unusualDayCard(
+  prompt: ReadinessPrompt,
+  dismissedToday: boolean,
+): Extract<ReadinessPrompt, { kind: 'ask' }> | null {
+  return prompt.kind === 'ask' && !dismissedToday ? prompt : null;
+}
+
+/** What the Exercise Readiness card says about the score: a statement, never the question (#3953). */
+export function readinessCardLine(prompt: ReadinessPrompt): string | null {
+  return prompt.kind === 'silent' ? null : prompt.line;
 }
 
 type SavedCheckin = {

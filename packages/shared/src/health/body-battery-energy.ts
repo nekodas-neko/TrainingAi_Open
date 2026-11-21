@@ -31,7 +31,23 @@ export type EnergyHero =
       /** Where the morning figure came from, for the line beside the title. */
       origin: string
       limited: boolean
+      /**
+       * True only when `waitingForRing` was asked for and no heart-rate reading has arrived since
+       * waking: `level` is then the morning level itself (#3502). Callers that did not ask never see it.
+       */
+      waiting: boolean
     }
+
+/** The caption under the morning level while the ring's first upload is awaited (#3502). */
+export const ENERGY_WAITING_CAPTION = "Waiting for the ring's heart rate"
+
+export type EnergyHeroOptions = {
+  /**
+   * Draw the morning level before the first reading arrives. Off by default, so every reader keeps
+   * the old "no data" result until it opts in; only Preview's Home Energy hero does.
+   */
+  waitingForRing?: boolean
+}
 
 const clamp = (value: number) => Math.max(0, Math.min(100, value))
 
@@ -43,7 +59,29 @@ function figureShown(data: BodyBatteryEnergyInput): number {
   return data.current
 }
 
-export function energyHero(data: BodyBatteryEnergyInput | null | undefined): EnergyHero {
+/** The morning level is known when the anchor came from readiness or sleep, not the fallback guess. */
+function morningKnown(data: BodyBatteryEnergyInput): boolean {
+  return data.anchorSource !== 'default' && Number.isFinite(data.anchor)
+}
+
+export function energyHero(
+  data: BodyBatteryEnergyInput | null | undefined,
+  options: EnergyHeroOptions = {},
+): EnergyHero {
+  if (data && !data.hasData && options.waitingForRing && morningKnown(data)) {
+    const morning = Math.round(clamp(data.anchor))
+    return {
+      hasData: true,
+      level: morning,
+      morning,
+      drained: 0,
+      label: bodyBatteryLabelFor(morning),
+      sub: `woke at ${morning}`,
+      origin: originLine(data),
+      limited: false,
+      waiting: true,
+    }
+  }
   if (!data?.hasData) {
     return { hasData: false }
   }
@@ -59,9 +97,15 @@ export function energyHero(data: BodyBatteryEnergyInput | null | undefined): Ene
     // Looked up from the number on screen, so the label always agrees with it.
     label: bodyBatteryLabelFor(level),
     sub: drained > 0 ? `woke at ${morning} · drained ${drained}` : `woke at ${morning}`,
-    origin:
-      `set${bodyBatteryAnchorSuffix(data.anchorSource)}` +
-      (data.anchorProvisional ? BODY_BATTERY_PROVISIONAL_SUFFIX : ''),
+    origin: originLine(data),
     limited: !!data.confidence && !data.confidence.sufficient,
+    waiting: false,
   }
+}
+
+function originLine(data: BodyBatteryEnergyInput): string {
+  return (
+    `set${bodyBatteryAnchorSuffix(data.anchorSource)}` +
+    (data.anchorProvisional ? BODY_BATTERY_PROVISIONAL_SUFFIX : '')
+  )
 }

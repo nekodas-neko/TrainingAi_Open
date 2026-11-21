@@ -14,7 +14,7 @@ import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { useWeather } from '../../weather/WeatherProvider';
 import { backgroundScene } from '../../weather/data/background';
 import { useHome } from '../data/HomeProvider';
-import { energyHero } from '@trainingai/shared/health/body-battery-energy';
+import { ENERGY_WAITING_CAPTION, energyHero } from '@trainingai/shared/health/body-battery-energy';
 import { energyHeroSize, type EnergyHeroSize } from '../data/energy-hero';
 import { chipFigure, homePillars } from '../data/score-chips';
 import { EnergyGauge } from './EnergyGauge';
@@ -44,7 +44,7 @@ export function HomeEnergy({ onOpen }: { onOpen: (detail: HealthDetail) => void 
   const size = energyHeroSize(home.preferences.energyHeroSize);
   // The dial sits over the wallpaper; with it off, the tide sits on the plain page.
   const onWallpaper = backgroundScene(weather.settings, 'home', null, null) !== null;
-  const hero = energyHero(state.data);
+  const hero = energyHero(state.data, { waitingForRing: true });
   const geometry = GAUGE[size];
   // Behind the band and sub-text in Full: the wallpaper's glass over the dial; over the tide's water
   // the page colour at 90%, which keeps the muted text above 4.5:1 on every accent in light.
@@ -97,10 +97,19 @@ export function HomeEnergy({ onOpen }: { onOpen: (detail: HealthDetail) => void 
       </AppText>
     </View>
   ) : null;
+  const waiting = hero.hasData && hero.waiting;
+  // One quiet line under "woke at N" until the ring's first reading arrives (#3502).
   const subText = (
-    <AppText variant="micro" tone="muted">
-      {sub}
-    </AppText>
+    <>
+      <AppText variant="micro" tone="muted">
+        {sub}
+      </AppText>
+      {waiting && (
+        <AppText variant="micro" tone="muted" style={{ textAlign: 'center' }}>
+          {ENERGY_WAITING_CAPTION}
+        </AppText>
+      )}
+    </>
   );
   const bigNumber = (
     <AppText
@@ -150,7 +159,9 @@ export function HomeEnergy({ onOpen }: { onOpen: (detail: HealthDetail) => void 
     accessibilityRole: 'button' as const,
     accessibilityLabel: 'Energy',
     accessibilityValue: {
-      text: hero.hasData ? `${hero.level}, ${hero.label}, ${hero.sub}` : sub,
+      text: hero.hasData
+        ? `${hero.level}, ${hero.label}, ${hero.sub}${waiting ? `, ${ENERGY_WAITING_CAPTION}` : ''}`
+        : sub,
     },
     accessibilityHint: expanded ? 'Collapse details' : 'Expand details',
     accessibilityState: { expanded },
