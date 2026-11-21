@@ -96,19 +96,46 @@ const toToken = (r: Record<keyof typeof COLUMNS, unknown>): NativeRefreshToken =
 })
 
 /** A sign-in on a device: a new token in a new family. A family is never continued from here — only
- *  `rotateNativeRefreshToken` adds to one, so a caller cannot attach a token to someone else's. */
+ *  `rotateNativeRefreshToken` adds to one, so a caller cannot attach a token to someone else's.
+ *
+ *  #3429 item 2: an install that signs in again ends its older sign-in. When the app names its
+ *  install (`deviceId`), every family this account already has for that install is revoked
+ *  (`sign_out`: the old sign-in is over) in the same transaction as the insert, so a sign-in after
+ *  an offline sign-out does not leave the old one valid on the server and listed twice. Scoped to
+ *  the caller's user, so an install id sent from another account revokes nothing of this one's.
+ *  The families are locked first (in a fixed order), so a rotation of one running at the same
+ *  moment either commits before the revoke, whose UPDATE then sees its successor, or waits and finds
+ *  its row revoked. No `deviceId` (an app from before #3280) revokes nothing. */
 export async function createNativeRefreshToken(db: Db, input: CreateNativeRefreshTokenInput): Promise<NativeRefreshToken> {
-  const [row] = await db.insert(t)
-    .values({
-      userId: input.userId,
-      tokenHash: input.tokenHash,
-      familyId: randomUUID(),
-      deviceLabel: input.deviceLabel,
-      deviceId: input.deviceId ?? null,
-      expiresAt: input.expiresAt,
-    })
-    .returning(COLUMNS)
-  return toToken(row)
+  const deviceId = input.deviceId ?? null
+  return db.transaction(async tx => {
+    if (deviceId !== null) {
+      const older = await tx.selectDistinct({ familyId: t.familyId }).from(t)
+        .where(and(eq(t.userId, input.userId), eq(t.deviceId, deviceId), isNull(t.revokedAt)))
+        .orderBy(t.familyId)
+      for (const f of older) await lockFamily(tx, f.familyId)
+      if (older.length) {
+        await tx.update(t)
+          .set({ revokedAt: sql`now()`, revokedReason: 'sign_out' })
+          .where(and(
+            eq(t.userId, input.userId),
+            inArray(t.familyId, older.map(f => f.familyId)),
+            isNull(t.revokedAt),
+          ))
+      }
+    }
+    const [row] = await tx.insert(t)
+      .values({
+        userId: input.userId,
+        tokenHash: input.tokenHash,
+        familyId: randomUUID(),
+        deviceLabel: input.deviceLabel,
+        deviceId,
+        expiresAt: input.expiresAt,
+      })
+      .returning(COLUMNS)
+    return toToken(row)
+  })
 }
 
 /** The row a presented token's hash names, whatever its state — rotated, revoked and expired rows
