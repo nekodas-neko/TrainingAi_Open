@@ -68,6 +68,7 @@
  * released the way an arriving night releases it, because the anchor was built from that night.
  * Best-effort throughout: a failure here is logged and never fails the ingest that triggered it.
  */
+import { refreshUnansweredReadinessVerdict } from '@/lib/health/readiness-verdict-refresh'
 import type { WorkoutRepository } from '@/lib/data/repository'
 import type { SleepSession } from '@trainingai/shared/types/body'
 import { DEFAULT_TZ, shiftDateStr, todayInTz } from '@trainingai/shared/date-utils'
@@ -363,6 +364,10 @@ export async function scoreReadinessForDays(
       }, null)
       if (after == null) continue
       out.scored.push(day)
+      // #3976: the day's readiness was cleared and scored again, so an unanswered verdict follows it.
+      // The read's own persist refreshes it too; this keeps the re-score correct whatever the
+      // injected scorer does. A second refresh finds the row already current and writes nothing.
+      await refreshUnansweredReadinessVerdict(repo, userId, day)
       if (opts.releaseAnchorOnChange?.has(day) && before != null && after !== before &&
         await bestEffort(day, () => repo.releaseBodyBatteryAnchor(userId, day), false)) out.batteryReleased.push(day)
       continue
@@ -377,7 +382,11 @@ export async function scoreReadinessForDays(
     }
     // A finished day that never got a score, its night late, or one this path filled before the
     // rest of its inputs landed. Neither moves a value the owner saw.
-    if (await bestEffort(day, () => scoreFinishedDayReadiness(repo, userId, day, tz, now), false)) out.scored.push(day)
+    if (await bestEffort(day, () => scoreFinishedDayReadiness(repo, userId, day, tz, now), false)) {
+      out.scored.push(day)
+      // #3976: an unanswered verdict on a day scored here follows the new score; answered rows stay.
+      await refreshUnansweredReadinessVerdict(repo, userId, day)
+    }
   }
   return out
 }

@@ -3848,6 +3848,38 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   }
 
   /**
+   * #3976: an unanswered verdict follows the day's re-scored readiness. The `response_state = 'none'`
+   * condition is in the statement, so an answer that lands between the caller's read and this write
+   * keeps its row exactly as answered. `response_state` itself is never written here.
+   */
+  async refreshUnansweredReadinessVerdict(
+    userId: string,
+    record: Omit<ReadinessVerdictRecord, 'responseState'>,
+  ): Promise<boolean> {
+    const updated = await this.db.update(s.readinessVerdicts)
+      .set({
+        verdict: record.verdict,
+        score: record.score,
+        bandMedian: record.band.median,
+        bandLow: record.band.low,
+        bandHigh: record.band.high,
+        baselineDays: record.baselineDays,
+        baselineSameVersionDays: record.baselineSameVersionDays,
+        contributors: record.contributors,
+        readinessModelVersion: record.readinessModelVersion,
+        modelVersion: record.modelVersion,
+        updatedAt: new Date(),
+      })
+      .where(and(
+        eq(s.readinessVerdicts.userId, userId),
+        eq(s.readinessVerdicts.date, record.date),
+        eq(s.readinessVerdicts.responseState, 'none'),
+      ))
+      .returning({ id: s.readinessVerdicts.id })
+    return updated.length > 0
+  }
+
+  /**
    * Every night in [from, to] by wake date, newest date first — **with a typed-in night dropped
    * wherever a device recorded the same night** (#2338, `preferDeviceNights`). Applied here, at the
    * one read every server consumer shares, so no scorer, list or chart has to know manual nights
