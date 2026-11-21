@@ -105,15 +105,17 @@ export async function PATCH(req: NextRequest) {
 
   if (action === 'grant-admin' || action === 'revoke-admin') {
     // An admin can't remove their own admin, so there is always at least one. Granting yourself is a no-op.
+    const verb = action === 'grant-admin' ? 'make admin' : 'remove admin'
     if (action === 'revoke-admin') {
       const self = refuseSelf(userId, session.user.id, 'remove admin from')
       if (self) return self
-      // Only the owner removes admin. Checked again on the locked rows inside the transaction.
-      const refused = judgeRevokeAdmin(session.user.id, ownerId)
-      if (refused) {
-        console.warn(`[admin/users] remove admin refused (${refused}): admin ${session.user.id} -> ${userId}`)
-        return NextResponse.json({ error: ownerRefusalMessage(refused, 'remove admin') }, { status: 403 })
-      }
+    }
+    // Only the owner grants or removes admin (#3657 made granting owner-only too). Checked again on
+    // the locked rows inside the transaction.
+    const refused = judgeRevokeAdmin(session.user.id, ownerId)
+    if (refused) {
+      console.warn(`[admin/users] ${verb} refused (${refused}): admin ${session.user.id} -> ${userId}`)
+      return NextResponse.json({ error: ownerRefusalMessage(refused, verb) }, { status: 403 })
     }
     const outcome = await repo.setUserAdmin({
       actingAdminId: session.user.id, targetUserId: userId, makeAdmin: action === 'grant-admin', ownerId,
@@ -123,7 +125,7 @@ export async function PATCH(req: NextRequest) {
       case 'not-found': return NextResponse.json({ error: 'User not found' }, { status: 404 })
       case 'inactive-target': return NextResponse.json({ error: 'Only an active user can be made admin' }, { status: 400 })
       case 'actor-not-admin': return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-      default: return NextResponse.json({ error: ownerRefusalMessage(outcome.reason, 'remove admin') }, { status: 403 })
+      default: return NextResponse.json({ error: ownerRefusalMessage(outcome.reason, verb) }, { status: 403 })
     }
   }
 

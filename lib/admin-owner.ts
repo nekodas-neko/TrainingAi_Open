@@ -61,11 +61,11 @@ export function sameUserId(a: string, b: string): boolean {
  * owner": the person reading it cannot fix it by being someone else, and needs to know to look at
  * the setting.
  */
-export function ownerRefusalMessage(refused: OwnerRefusal, action: 'remove admin' | 'deactivate this account'): string {
+export function ownerRefusalMessage(refused: OwnerRefusal, action: 'make admin' | 'remove admin' | 'deactivate this account'): string {
   if (refused === 'owner-unresolved') {
-    return action === 'remove admin'
-      ? 'The owner account is not configured, so no one can remove admin.'
-      : 'The owner account is not configured, so no admin account can be deactivated.'
+    return action === 'deactivate this account'
+      ? 'The owner account is not configured, so no admin account can be deactivated.'
+      : `The owner account is not configured, so no one can ${action}.`
   }
   return `Only the owner can ${action}`
 }
@@ -74,8 +74,9 @@ export function ownerRefusalMessage(refused: OwnerRefusal, action: 'remove admin
 export type OwnerRefusal = 'owner-only' | 'owner-protected' | 'owner-unresolved'
 
 /**
- * Removing admin: the owner only. `ownerId` null means the owner cannot be resolved, so it is refused.
- * The caller handles "yourself" first (nobody removes their own admin, the owner included).
+ * Granting or removing admin: the owner only (#3657 added granting). `ownerId` null means the owner
+ * cannot be resolved, so it is refused. The caller handles "yourself" first for a removal (nobody
+ * removes their own admin, the owner included).
  */
 export function judgeRevokeAdmin(actingId: string, ownerId: string | null): OwnerRefusal | null {
   if (ownerId === null) return 'owner-unresolved'

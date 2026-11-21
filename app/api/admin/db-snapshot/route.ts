@@ -3,6 +3,7 @@ import { auth } from '@/auth'
 import { getPool } from '@/lib/data/postgres/client'
 import { getReadonlyPool, isReadonlyDbConfigured, describeReadonlyConnection, runScoped } from '@/lib/data/postgres/readonly-client'
 import { requireAdmin, adminFailureOutcome } from '@/lib/admin'
+import { requireOwnerSession } from '@/lib/admin/claude-token-auth'
 import { rateLimit } from '@/lib/rate-limit'
 import { safeCompare } from '@/lib/security/constant-time'
 import { reportServerError } from '@/lib/observability'
@@ -75,6 +76,10 @@ async function authorize(req: NextRequest): Promise<AuthOutcome> {
   } catch (err) {
     return adminFailureOutcome(err)
   }
+  // #3657: the snapshot is the owner's rows whoever asks, so a session must be the owner's; any
+  // other admin gets the same 403 as a non-admin.
+  const owner = await requireOwnerSession(userId)
+  if (!owner.ok) return owner
   return { ok: true, via: 'session' }
 }
 

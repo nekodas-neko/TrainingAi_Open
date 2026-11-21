@@ -59,7 +59,11 @@ const getActiveProgram = vi.fn(async (_u: string) => null as Row | null)
 const listProgressionStyles = vi.fn(async (_u: string) => [] as Row[])
 const getExerciseEquipment = vi.fn(async (_n: string[]) => ({}) as Record<string, string>)
 
-let sessionUser: { id: string; isAdmin?: boolean } | null = { id: 'u-1', isAdmin: true }
+// #3657: db-snapshot's session path serves only the owner, so the signed-in admin here is the
+// configured owner (`CLAUDE_RO_OWNER_USER_ID`). A second admin's refusal is tested against real rows
+// in `app/api/admin/__tests__/owner-only-db-tools-3657.test.ts`.
+const SESSION_OWNER = '00000000-0000-4000-8000-0000000003a1'
+let sessionUser: { id: string; isAdmin?: boolean } | null = { id: SESSION_OWNER, isAdmin: true }
 vi.mock('@/auth', () => ({ auth: async () => (sessionUser ? { user: sessionUser } : null) }))
 vi.mock('@/lib/rate-limit', () => ({ rateLimit: (...a: unknown[]) => rateLimit(...a) }))
 vi.mock('@/lib/observability', () => ({ reportServerError: (...a: unknown[]) => reportServerError(...a) }))
@@ -139,15 +143,17 @@ beforeEach(() => {
   getExerciseEquipment.mockResolvedValue({})
   streamedRows = [{ id: 1 }, { id: 2 }]
   streamThrows = null
-  sessionUser = { id: 'u-1', isAdmin: true }
+  sessionUser = { id: SESSION_OWNER, isAdmin: true }
   process.env.ADMIN_SNAPSHOT_SECRET = 'snapshot-secret'
   process.env.ADMIN_EXPORT_USER_ID = 'owner-1'
+  process.env.CLAUDE_RO_OWNER_USER_ID = SESSION_OWNER
 })
 
 afterEach(() => {
   delete process.env.ADMIN_SNAPSHOT_SECRET
   delete process.env.ADMIN_EXPORT_USER_ID
   delete process.env.WEBHOOK_USER_ID
+  delete process.env.CLAUDE_RO_OWNER_USER_ID
 })
 
 describe('the admin gate on all three', () => {
@@ -159,7 +165,7 @@ describe('the admin gate on all three', () => {
   ]
 
   it('refuses a non-admin, whatever the token claims', async () => {
-    sessionUser = { id: 'u-1', isAdmin: true }
+    sessionUser = { id: SESSION_OWNER, isAdmin: true }
     getUserById.mockResolvedValue({ isActive: true, isAdmin: false })
     for (const [name, call] of ALL) expect((await call()).status, name).toBe(403)
     expect(vacuumTableFull).not.toHaveBeenCalled()
@@ -254,7 +260,7 @@ describe('GET /api/admin/db-snapshot — the two ways in', () => {
   it('ignores a malformed authorization header and falls through to the session', async () => {
     // `Basic ...` is not a bearer, so the route must not treat it as a failed token attempt and
     // 401 a legitimately signed-in admin.
-    sessionUser = { id: 'u-1', isAdmin: true }
+    sessionUser = { id: SESSION_OWNER, isAdmin: true }
     const res = await snapshotReq('', { authorization: 'Basic abc' })
     expect(res.status).toBe(200)
   })

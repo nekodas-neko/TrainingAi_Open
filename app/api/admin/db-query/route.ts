@@ -53,7 +53,9 @@ const MAX_BYTES = 5_000_000
 
 /** The shared admin authorisation (session, or the Claude token resolving to an admin). The rate
  *  key prefix is this route's own, unchanged from before the helper existed. */
-const authorize = (req: NextRequest) => authorizeAdminRequest(req, 'db-query-token')
+// #3657: a session must be the owner's. The query runs as `claude_ro` scoped to the owner (or to a
+// user who filed feedback), so any other admin's session would read the owner's data.
+const authorize = (req: NextRequest) => authorizeAdminRequest(req, 'db-query-token', { sessionOwnerOnly: true })
 
 /** Best-effort audit row. A logging failure must never change the response. */
 async function logQuery(entry: {
