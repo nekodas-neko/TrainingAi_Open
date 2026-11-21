@@ -2,7 +2,9 @@ import { z } from 'zod'
 
 export const PrescriptionSchema = z.object({
   phase: z.enum(['accumulation', 'intensification', 'realisation', 'deload']),
-  phase_action: z.enum(['stay', 'transition_recommended', 'deload_recommended', 'session_swap_recommended', 'rest_day_recommended']),
+  // No rest-day answer (#3718): whether to rest today is the app's own daily check
+  // (`computeAiDynamicNextSession`), worked out on every open. A stored plan only ever describes training.
+  phase_action: z.enum(['stay', 'transition_recommended', 'deload_recommended', 'session_swap_recommended']),
   exercises: z.array(z.object({
     session_exercise_id: z.string(),
     name: z.string(),

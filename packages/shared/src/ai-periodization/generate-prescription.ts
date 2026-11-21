@@ -449,7 +449,7 @@ async function runPrescriptionGeneration(
 
   // Emergency deload check — only for severe systemic overtraining.
   // Muscle-specific soreness and mild recovery issues are handled by the AI's
-  // session_swap_recommended / rest_day_recommended phase_action in the normal path.
+  // session_swap_recommended phase_action in the normal path; rest today is the daily check's (#3718).
   const isEmergencyDeload = shouldTriggerEmergencyDeload(signals, state)
 
   if (isEmergencyDeload) {

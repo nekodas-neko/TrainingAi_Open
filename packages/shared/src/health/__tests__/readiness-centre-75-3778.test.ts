@@ -129,7 +129,6 @@ describe('every decision cut moved with the centre', () => {
       ['session pick: low readiness', 60, 67],
       ['deload grade: soft', 70, 76],
       ['deload grade: recommended', 50, 56],
-      ['AI prompt: rest day', 40, 45],
       ['early-deload card', 45, 51],
       ['running gate: rest', 50, 57],
       ['running gate: soften', 65, 72],
@@ -170,10 +169,10 @@ describe('every decision cut moved with the centre', () => {
     expect(gate(72)).toBe('proceed')
   })
 
-  it('the AI prompt states the moved rest-day cut', () => {
+  // #3718: the prompt's rest-day rule, and with it its cut, is gone. Rest today is the daily check's.
+  it('the AI prompt states no rest-day cut', () => {
     const prompt = buildSystemPrompt('strength')
-    expect(prompt).toContain('OR external_readiness < 45,')
-    expect(prompt).not.toContain('external_readiness < 40')
+    expect(prompt).not.toMatch(/external_readiness < \d/)
   })
 })
 

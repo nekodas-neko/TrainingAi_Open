@@ -12,7 +12,8 @@ import type { AiPrescription } from '@trainingai/shared/types/ai-periodization'
 import type { PrescriptionSignals } from '../signals'
 import type { WorkoutRepository } from '@/lib/data/repository'
 
-const restDay = { phaseAction: 'rest_day_recommended' } as const
+// A one-day plan. This was a rest-day answer until #3718 took that answer away from the model.
+const oneDay = { phaseAction: 'session_swap_recommended' } as const
 const stay = { phaseAction: 'stay' } as const
 const deload = { phaseAction: 'deload_recommended' } as const
 
@@ -30,14 +31,14 @@ describe('nextMidnightInTz', () => {
 })
 
 describe('the expiry written for a prescription', () => {
-  it('a rest-day prescription written in the evening expires at the next local midnight', () => {
+  it('a one-day prescription written in the evening expires at the next local midnight', () => {
     const at = new Date('2026-11-03T09:30:00Z') // 19:30 Brisbane
-    expect(prescriptionExpiresAt(restDay, 'Australia/Brisbane', at).toISOString()).toBe('2026-11-03T14:00:00.000Z')
+    expect(prescriptionExpiresAt(oneDay, 'Australia/Brisbane', at).toISOString()).toBe('2026-11-03T14:00:00.000Z')
   })
 
-  it('a rest-day prescription written in the morning also ends that night, not a day later', () => {
+  it('a one-day prescription written in the morning also ends that night, not a day later', () => {
     const at = new Date('2026-11-02T21:00:00Z') // 07:00 Brisbane on 3 Nov
-    expect(prescriptionExpiresAt(restDay, 'Australia/Brisbane', at).toISOString()).toBe('2026-11-03T14:00:00.000Z')
+    expect(prescriptionExpiresAt(oneDay, 'Australia/Brisbane', at).toISOString()).toBe('2026-11-03T14:00:00.000Z')
   })
 
   it('a normal "stay" keeps its 7 days', () => {
@@ -50,21 +51,21 @@ describe('the expiry written for a prescription', () => {
     // 21:00 in New York (EST, UTC−5) on 10 Nov is 02:00 UTC on 11 Nov, already "tomorrow" in UTC and
     // midday in Brisbane. The plan must still live until New York's own midnight.
     const at = new Date('2026-11-11T02:00:00Z')
-    expect(prescriptionExpiresAt(restDay, 'America/New_York', at).toISOString()).toBe('2026-11-11T05:00:00.000Z')
-    expect(prescriptionExpiresAt(restDay, 'Australia/Brisbane', at).toISOString()).toBe('2026-11-11T14:00:00.000Z')
+    expect(prescriptionExpiresAt(oneDay, 'America/New_York', at).toISOString()).toBe('2026-11-11T05:00:00.000Z')
+    expect(prescriptionExpiresAt(oneDay, 'Australia/Brisbane', at).toISOString()).toBe('2026-11-11T14:00:00.000Z')
   })
 
   it('a 25-hour day (London, clocks back on 25 Oct) still ends at local midnight', () => {
     // 00:30 BST on 25 Oct = 23:30 UTC on 24 Oct. The day is 25 h long, so `+24h` would land on
     // 23:30 the same evening; the next local midnight is 00:00 GMT on 26 Oct.
     const at = new Date('2026-10-24T23:30:00Z')
-    expect(prescriptionExpiresAt(restDay, 'Europe/London', at).toISOString()).toBe('2026-10-26T00:00:00.000Z')
+    expect(prescriptionExpiresAt(oneDay, 'Europe/London', at).toISOString()).toBe('2026-10-26T00:00:00.000Z')
   })
 
   it('a 23-hour day (Sydney, clocks forward on 4 Oct) still ends at local midnight', () => {
     // 00:30 AEST (UTC+10) on 4 Oct; 00:00 on 5 Oct is AEDT (UTC+11). Only 22.5 h later.
     const at = new Date('2026-10-03T14:30:00Z')
-    expect(prescriptionExpiresAt(restDay, 'Australia/Sydney', at).toISOString()).toBe('2026-10-04T13:00:00.000Z')
+    expect(prescriptionExpiresAt(oneDay, 'Australia/Sydney', at).toISOString()).toBe('2026-10-04T13:00:00.000Z')
   })
 
   it('an emergency deload fired by the lifter\'s own sick report ends at the next local midnight', () => {
@@ -87,13 +88,13 @@ describe('an expired prescription is no longer the plan', () => {
   const live = new Date(now.getTime() + 1)
   const p = (phaseAction: AiPrescription['phaseAction']) => ({ phaseAction } as AiPrescription)
 
-  it('a pending rest-day offer ages out at its expiry', () => {
-    expect(prescriptionAgedOut({ prescription: p('rest_day_recommended'), prescriptionStatus: 'pending', prescriptionExpiresAt: expired }, now)).toBe(true)
-    expect(prescriptionAgedOut({ prescription: p('rest_day_recommended'), prescriptionStatus: 'pending', prescriptionExpiresAt: live }, now)).toBe(false)
+  it('a pending one-day offer ages out at its expiry', () => {
+    expect(prescriptionAgedOut({ prescription: p('session_swap_recommended'), prescriptionStatus: 'pending', prescriptionExpiresAt: expired }, now)).toBe(true)
+    expect(prescriptionAgedOut({ prescription: p('session_swap_recommended'), prescriptionStatus: 'pending', prescriptionExpiresAt: live }, now)).toBe(false)
   })
 
-  it('an accepted rest day ages out too', () => {
-    expect(prescriptionAgedOut({ prescription: p('rest_day_recommended'), prescriptionStatus: 'accepted', prescriptionExpiresAt: expired }, now)).toBe(true)
+  it('an accepted one-day plan ages out too', () => {
+    expect(prescriptionAgedOut({ prescription: p('session_swap_recommended'), prescriptionStatus: 'accepted', prescriptionExpiresAt: expired }, now)).toBe(true)
   })
 
   // #3714: a pending stay drives load, and every stay is pending while auto-apply is off, so an
@@ -116,7 +117,7 @@ describe('an expired prescription is no longer the plan', () => {
 
   it('an aged-out prescription reads as pending regeneration, so the next open regenerates it', () => {
     const opts = { isAiDynamic: true, isBaselinePhase: false }
-    const state = { prescription: p('rest_day_recommended'), prescriptionStatus: 'pending' as const, prescriptionExpiresAt: expired }
+    const state = { prescription: p('session_swap_recommended'), prescriptionStatus: 'pending' as const, prescriptionExpiresAt: expired }
     expect(isAiPrescriptionPending(state, opts, now)).toBe(true)
     expect(isAiPrescriptionPending({ ...state, prescriptionExpiresAt: live }, opts, now)).toBe(false)
     expect(isAiPrescriptionPending(state, { ...opts, isBaselinePhase: true }, now)).toBe(false)
@@ -217,15 +218,15 @@ describe('generation stores the short expiry (#3700)', () => {
   })
   afterEach(() => { vi.useRealTimers() })
 
-  // #3716: the expiry was read from the moment the plan was stored, so a rest day asked for at
+  // #3716: the expiry was read from the moment the plan was stored, so a one-day plan asked for at
   // 23:59 and stored at 00:00 lived all of the next day.
   it('a generation that straddles midnight ends at the midnight that closed the day it was asked on', async () => {
     vi.setSystemTime(new Date('2026-11-03T13:59:30Z')) // 23:59:30 Brisbane on 3 Nov
     mocks.duringModel = () => { vi.setSystemTime(new Date('2026-11-03T14:00:30Z')) } // 00:00:30 on 4 Nov
-    mocks.modelAnswer = answer('rest_day_recommended')
+    mocks.modelAnswer = answer('session_swap_recommended')
     const h = harness()
     await h.run('Australia/Brisbane')
-    expect(h.stored[0].prescription.phaseAction).toBe('rest_day_recommended')
+    expect(h.stored[0].prescription.phaseAction).toBe('session_swap_recommended')
     expect(h.stored[0].expiresAt.toISOString()).toBe('2026-11-03T14:00:00.000Z')
   })
 
@@ -234,16 +235,6 @@ describe('generation stores the short expiry (#3700)', () => {
     const h = harness()
     await h.run('Australia/Brisbane')
     expect(h.stored[0].prescription.phaseAction).toBe('session_swap_recommended')
-    expect(h.stored[0].expiresAt.toISOString()).toBe('2026-11-03T14:00:00.000Z')
-  })
-
-  it('a model rest-day recommendation ends at the next local midnight', async () => {
-    mocks.modelAnswer = answer('rest_day_recommended')
-    const h = harness()
-    const r = await h.run('Australia/Brisbane')
-    expect(r.ok).toBe(true)
-    expect(h.stored).toHaveLength(1)
-    expect(h.stored[0].prescription.phaseAction).toBe('rest_day_recommended')
     expect(h.stored[0].expiresAt.toISOString()).toBe('2026-11-03T14:00:00.000Z')
   })
 

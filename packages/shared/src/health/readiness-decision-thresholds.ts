@@ -47,8 +47,6 @@ export const SESSION_LOW_READINESS_BELOW = 67
 export const DELOAD_READINESS_SOFT_MIN = 76
 /** …is "recommended" at or above this, "strong" below it. */
 export const DELOAD_READINESS_RECOMMENDED_MIN = 56
-/** The AI prescription prompt's rest-day rule: readiness under this. */
-export const PROMPT_REST_DAY_READINESS_BELOW = 45
 /** Home early-deload card: readiness under this with ACWR over its bound (`readiness-payload.ts`). */
 export const EARLY_DELOAD_READINESS_BELOW = 51
 /** Running recovery gate: rest below this. */
@@ -72,7 +70,6 @@ export const READINESS_CUTS = {
   sessionLowReadiness: { name: 'session pick: low readiness', where: 'packages/shared/src/ai-periodization/ai-dynamic.ts', side: 'below', before: 60, after: SESSION_LOW_READINESS_BELOW },
   deloadSoft: { name: 'deload grade: soft', where: 'packages/shared/src/ai-periodization/ai-dynamic.ts', side: 'atLeast', before: 70, after: DELOAD_READINESS_SOFT_MIN },
   deloadRecommended: { name: 'deload grade: recommended', where: 'packages/shared/src/ai-periodization/ai-dynamic.ts', side: 'atLeast', before: 50, after: DELOAD_READINESS_RECOMMENDED_MIN },
-  promptRestDay: { name: 'AI prompt: rest day', where: 'packages/shared/src/ai-periodization/prompt.ts', side: 'below', before: 40, after: PROMPT_REST_DAY_READINESS_BELOW },
   earlyDeload: { name: 'early-deload card', where: 'lib/health/readiness-payload.ts', side: 'below', before: 45, after: EARLY_DELOAD_READINESS_BELOW },
   runningRest: { name: 'running gate: rest', where: 'packages/shared/src/running/recovery-gate.ts', side: 'below', before: 50, after: RUNNING_REST_READINESS_BELOW },
   runningSoften: { name: 'running gate: soften', where: 'packages/shared/src/running/recovery-gate.ts', side: 'below', before: 65, after: RUNNING_SOFTEN_READINESS_BELOW },

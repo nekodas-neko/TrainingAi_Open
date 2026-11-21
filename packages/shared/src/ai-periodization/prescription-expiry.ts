@@ -23,8 +23,6 @@ export interface ExpiryContext {
  * True when the prescription answers today's readiness rather than the training block, so it must
  * not outlive the local day it was written on.
  *
- * - `rest_day_recommended`: the model's answer to how the lifter is today. Its exercise list is
- *   offered "for reference", never as next week's plan.
  * - `session_swap_recommended`: "train a different session today" (`prompt.ts`), on today's
  *   soreness and the hours since the last session. Tomorrow it answers nothing (#3716).
  * - A deload whose emergency trigger was the lifter's own illness report. That trigger is named at
@@ -38,7 +36,6 @@ export function isOneDayPrescription(
   prescription: Pick<AiPrescription, 'phaseAction'>,
   ctx: ExpiryContext = {},
 ): boolean {
-  if (prescription.phaseAction === 'rest_day_recommended') return true
   if (prescription.phaseAction === 'session_swap_recommended') return true
   return prescription.phaseAction === 'deload_recommended' && ctx.illnessTriggered === true
 }
@@ -72,15 +69,24 @@ export function prescriptionExpiresAt(
  *  Q-229 / BF-179 class through the one status those fixes exempted. Past its expiry, an offer of
  *  any kind is pending regeneration.
  *
- *  `prescription` is accepted so callers can pass the stored state as it is; the action no longer
- *  changes the answer. */
+ *  A stored rest-day answer is aged out whatever its expiry (#3718). The model no longer gives one:
+ *  rest today is the app's own daily check, worked out on every open. A row written before that
+ *  change is a one-morning answer, so it is never served as the plan; opening the session
+ *  regenerates a training plan in its place. */
 export function prescriptionAgedOut(
   state: Pick<SessionPeriodization, 'prescriptionStatus' | 'prescriptionExpiresAt'>
     & Partial<Pick<SessionPeriodization, 'prescription'>>,
   now = new Date(),
 ): boolean {
+  if (state.prescriptionStatus === 'none') return false
+  if (isStoredRestDayAnswer(state.prescription)) return true
   if (state.prescriptionExpiresAt == null || state.prescriptionExpiresAt > now) return false
-  return state.prescriptionStatus !== 'none'
+  return true
+}
+
+/** A prescription stored before #3718 whose answer was "rest today" rather than a session. */
+export function isStoredRestDayAnswer(prescription: { phaseAction?: string } | null | undefined): boolean {
+  return prescription?.phaseAction === 'rest_day_recommended'
 }
 
 /** The stored prescription state as a route returns it to a screen (#3716): an aged-out
@@ -139,6 +145,7 @@ export interface WirePrescriptionState {
 export function prescriptionAgedOutOnScreen(state: WirePrescriptionState | null | undefined, now = new Date()): boolean {
   if (state == null) return false
   if (state.prescriptionAgedOut === true) return true
+  if (state.prescriptionStatus !== 'none' && isStoredRestDayAnswer(state.prescription)) return true
   const raw = state.prescriptionExpiresAt
   const expiresAt = raw == null ? null : raw instanceof Date ? raw : new Date(raw)
   if (expiresAt == null || Number.isNaN(expiresAt.getTime()) || state.prescriptionStatus == null) return false

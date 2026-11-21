@@ -5,8 +5,6 @@ import { SECONDS_PER_REP, SET_SETUP_SEC, fitBudgetMin, fitBudgetWholeMin } from 
 import { PCT_BANDS } from '@trainingai/shared/workout/time-profile'
 import { displayOneRm, displayOneRmDelta } from '@trainingai/shared/1rm'
 import { FEVER_TEMP_Z } from '@trainingai/shared/health/illness-radar'
-import { PROMPT_REST_DAY_READINESS_BELOW, cutFor } from '@trainingai/shared/health/readiness-decision-thresholds'
-import { READINESS_MODEL_VERSION } from '@trainingai/shared/health/readiness-composite'
 import { goalRange } from './goal-ranges'
 import { userTextBlock, USER_TEXT_NOTE } from '../ai/untrusted-text'
 // The units, superlative and no-diagnosis rules: `reasoning` is shown to the lifter (#3803).
@@ -186,18 +184,13 @@ phase_action rules:
   (used if they choose to train anyway), but reduce load/volume on any exercise whose
   muscles overlap an active injury — never prescribe an increase there.
   EXCEPTION: if the input states per-exercise deloads were already applied for this
-  soreness, it is handled — do not use this action (or rest_day_recommended) for that
-  soreness alone.
-- "rest_day_recommended": multiple systemic stress indicators simultaneously poor
-  (sleep_score_trend < 0.75 AND hrv_trend < 0.75 — use sleep_trend in place of
-  sleep_score_trend when the quality trend is not given; OR external_readiness < ${PROMPT_REST_DAY_READINESS_BELOW},
-  OR spo2_trend < 0.97, OR temp_z >= ${FEVER_TEMP_Z} [skin temperature fever-consistent
-  vs personal baseline]),
-  OR the illness radar is elevated or fever (temperature/RHR/HRV moving together against the
-  user's own baseline — training hard while fighting something makes both worse);
-  recommend skipping training entirely today.
-  An illness radar of "watch" is context only — never recommend a rest day from watch alone.
-  If no sleep/HRV/SpO2/illness/temperature data, do NOT output rest_day_recommended from those signals alone.
+  soreness, it is handled — do not use this action for that soreness alone.
+
+Whether to rest today is not yours to decide: the app works that out from the same signals each
+time the session is opened, and your prescription is used on the days the lifter trains. Always
+prescribe a session to train. Poor recovery signals size it (lighter load or fewer sets, or
+deload_recommended when fatigue has accumulated); they never remove it.
+An illness radar of "watch" is context only.
 
 Null values in recovery signals mean "no data recorded" — omit those signals from your
 reasoning entirely. Do not infer or guess from absent data.
@@ -212,17 +205,6 @@ ${PROSE_FIELD_GUARDS}`
 }
 
 
-/**
- * #3824. The system prompt's rest-day rule names the cut for the current readiness scale. A score
- * stored before #3778 (today's row on release day, until it is recomputed) is on the old scale, so
- * its line says which cut applies to it. On the current scale the line is unchanged.
- */
-function externalReadinessScaleNote(modelVersion: string | null | undefined): string {
-  const cut = cutFor('promptRestDay', modelVersion === undefined ? READINESS_MODEL_VERSION : modelVersion)
-  return cut === PROMPT_REST_DAY_READINESS_BELOW
-    ? ''
-    : `; scored on the earlier scale, so its rest-day cut is ${cut}, not ${PROMPT_REST_DAY_READINESS_BELOW}`
-}
 /** #3766: the program's phase and its training weeks, beside this type's own sessions in it. */
 function phaseLine(signals: PrescriptionSignals): string {
   const own = `${signals.sessionsInPhase} session${signals.sessionsInPhase === 1 ? '' : 's'} of this type in it`
@@ -316,7 +298,7 @@ export function buildUserPrompt(
       ? `  Illness radar (vs personal baseline): ${signals.illness.flag} (score ${signals.illness.score}/100)`
       : `  Illness radar: no data`,
     signals.externalReadiness != null
-      ? `  External readiness score: ${signals.externalReadiness}/100 (one signal among many${externalReadinessScaleNote(signals.externalReadinessModelVersion)})`
+      ? `  External readiness score: ${signals.externalReadiness}/100 (one signal among many)`
       : `  External readiness: no data`,
     signals.trainingLoadOts != null
       ? `  Training stress (own OTS model): ${signals.trainingLoadOts.toFixed(1)}${signals.trainingLoadHigh ? ' — HIGH today' : ''}`
@@ -336,7 +318,7 @@ export function buildUserPrompt(
   if (perExerciseDeloadedNames && perExerciseDeloadedNames.length > 0) {
     recoveryLines.push(
       `  Per-exercise deloads already applied to: ${perExerciseDeloadedNames.join(', ')} — ` +
-      `this soreness is handled; prescribe the session normally and do NOT recommend a rest day or session swap for this soreness alone.`,
+      `this soreness is handled; prescribe the session normally and do NOT recommend a session swap for this soreness alone.`,
     )
   }
 
