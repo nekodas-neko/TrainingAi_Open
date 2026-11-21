@@ -1,6 +1,7 @@
 import { AI_PAUSED_CODE, AI_PAUSED_MESSAGE, aiPausedMessage } from '@trainingai/shared/ai-paused-notice';
 import { reportError } from '../../../core/reporting/index.ts';
 import { connectivity } from '../../../core/sync/Connectivity.ts';
+import { isAllowedLocalHttp } from '../../../core/network/local-backend.ts';
 import { REFRESH_TOKEN_RE } from '@trainingai/shared/auth/refresh-token';
 import { APP_BUILD_HEADER, APP_VERSION_HEADER } from '@trainingai/shared/native-min-build';
 import { nativeAppVersion, nativeBuildCode } from '../../../integrations/app-info/platform';
@@ -119,7 +120,7 @@ export function appIdentityHeaders(
 export function backendOrigin(baseUrl: string): string {
   const base = new URL(baseUrl);
   if (
-    base.protocol !== 'https:' ||
+    (base.protocol !== 'https:' && !isAllowedLocalHttp(base)) ||
     base.username ||
     base.password ||
     base.search ||
@@ -388,7 +389,8 @@ export function createApiClient(
     },
     async media(source: string): Promise<string> {
       const url = new URL(source, base);
-      if (url.protocol !== 'https:' || url.username || url.password) {
+      const localOwn = url.origin === base && isAllowedLocalHttp(url);
+      if ((url.protocol !== 'https:' && !localOwn) || url.username || url.password) {
         throw new Error('Invalid exercise media URL.');
       }
       const own = url.origin === base;

@@ -17,7 +17,8 @@ export function useAccount() {
         reason: 'Account sign-in is waiting for the backend connection.',
       };
     }
-    if (Platform.OS !== 'ios' && Platform.OS !== 'android') {
+    // The web build signs in only as the browser preview's development export (#3761).
+    if (Platform.OS !== 'ios' && Platform.OS !== 'android' && !nativeAuthAvailable()) {
       return { controller: null, reason: 'Account sign-in is available in the native app.' };
     }
     if (!nativeAuthAvailable()) {
