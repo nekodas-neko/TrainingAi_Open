@@ -10,6 +10,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { fromZonedTime } from 'date-fns-tz'
 import { shiftDateStr, todayInTz, weekStartForDay } from '@trainingai/shared/date-utils'
+import { walkingWeekStatus } from '@trainingai/shared/running/walking-plan'
 import { firstJudgedWeek, MINUTES_CEILING_PLUS, parseWalkingState, setMinutesCeiling } from '@trainingai/shared/running/walking-plan'
 
 vi.mock('@trainingai/shared/health/hr-profile', async (orig) => ({
@@ -167,6 +168,19 @@ describe.each(['Australia/Brisbane', 'America/Los_Angeles'])('the walking plan o
     const day = view!.week.days.find((d) => d.date === today)!
     expect(day).toMatchObject({ activeMinutes: 30, basis: 'heart_rate', done: true })
     expect(view!.week.activeMinutesBasis).toBe('heart_rate')
+  })
+
+  it('the week carries its status (rule B), computed from the same measured days', async () => {
+    const f = fakeRepo(tz, { planStart: today })
+    const view = await settleWalkingPlan(f.repo, USER, tz)
+    const expected = walkingWeekStatus({
+      weekStart: view!.week.from, today, startDate: view!.start.date,
+      minutesTarget: view!.targets.activeMinutesPerWeek, days: view!.week.days,
+    })
+    expect(expected).not.toBeNull()
+    expect(view!.week.status).toEqual(expected)
+    // And an older client reading the block still finds every field it had.
+    expect(view!.week).toMatchObject({ from: expect.any(String), daysDone: expect.any(Number) })
   })
 
   it('a day done by steps alone is completed without an activity link', async () => {

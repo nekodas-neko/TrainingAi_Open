@@ -393,3 +393,69 @@ export function parseWalkingState(raw: unknown): WalkingPlanState | null {
   if (!s.startLevels || !isNum(s.stepsStreak) || !isNum(s.stepsMissStreak) || !isNum(s.minutesMissStreak)) return null
   return s as WalkingPlanState
 }
+
+/**
+ * Issue 3779, rule B (picked 21 Nov). Where the current week stands, in a fixed vocabulary plus the
+ * wording a screen shows. Pure: counts only what is passed in; nothing is stored.
+ *
+ * - `met`: both weekly targets met (the minutes, and `min(5, countedDays)` step days, as `measureWeek`).
+ * - `on_track`: the minutes still to go fit in the counted days left (today included) at the daily
+ *   share, and the step days met so far plus the days that can still add one reach `min(5, countedDays)`.
+ * - `behind`: otherwise.
+ * - null: no counted day in the plan's part of the week (no plan week, or all of it left out).
+ *
+ * Readings taken where the rule is silent (stated in the PR):
+ * - A plan that began mid-week counts only the days from its start; earlier days are out of every count.
+ * - A day left out (rest or sick) is out of the counted days, the days left and every sum; a future
+ *   day is assumed counted, since nothing is known of it.
+ * - Today is a day left, but when today's steps already met the target it is among the step days
+ *   met, so it is not added a second time to the days that can still add one.
+ */
+export type WalkingWeekStatusKey = 'met' | 'on_track' | 'behind'
+
+export const WALKING_WEEK_STATUS_LABELS: Record<WalkingWeekStatusKey, string> = {
+  met: 'Week met',
+  on_track: 'On track',
+  behind: 'Behind',
+}
+
+export interface WalkingWeekStatus {
+  key: WalkingWeekStatusKey
+  label: string
+}
+
+export function walkingWeekStatus(input: {
+  /** The Monday of the week being shown, and the user's local today inside it. */
+  weekStart: string
+  today: string
+  /** The plan's first local day; days before it are not part of the plan. */
+  startDate: string
+  minutesTarget: number
+  /** The days the server measured (through today). A date with no row is counted, with nothing done. */
+  days: readonly { date: string; stepsMet: boolean; activeMinutes: number; excluded: DayExclusion | null }[]
+}): WalkingWeekStatus | null {
+  const byDate = new Map(input.days.map((d) => [d.date, d]))
+  const counted: string[] = []
+  for (let i = 0; i < 7; i++) {
+    const date = shiftDateStr(input.weekStart, i)
+    if (date < input.startDate || byDate.get(date)?.excluded != null) continue
+    counted.push(date)
+  }
+  if (counted.length === 0 || input.today < input.weekStart || input.today > shiftDateStr(input.weekStart, 6)) return null
+
+  const minutes = counted.reduce((s, date) => s + (byDate.get(date)?.activeMinutes ?? 0), 0)
+  const stepDaysMet = counted.filter((date) => byDate.get(date)?.stepsMet).length
+  const stepDaysNeeded = Math.min(STEPS_DAYS_TO_MEET_WEEK, counted.length)
+
+  const stepsWeekMet = stepDaysMet >= stepDaysNeeded
+  const minutesWeekMet = minutes >= input.minutesTarget
+  const key = ((): WalkingWeekStatusKey => {
+    if (stepsWeekMet && minutesWeekMet) return 'met'
+    const daysLeft = counted.filter((date) => date >= input.today)
+    const stepChancesLeft = daysLeft.filter((date) => date > input.today || !byDate.get(date)?.stepsMet).length
+    const minutesFit = input.minutesTarget - minutes <= daysLeft.length * dailyMinutesShare(input.minutesTarget)
+    const stepsFit = stepDaysMet + stepChancesLeft >= stepDaysNeeded
+    return minutesFit && stepsFit ? 'on_track' : 'behind'
+  })()
+  return { key, label: WALKING_WEEK_STATUS_LABELS[key] }
+}

@@ -13,8 +13,8 @@ import {
 } from '@trainingai/shared/running/walking-minutes'
 import {
   dailyMinutesShare, initialWalkingState, MINUTES_BASELINE_WEEKS, MINUTES_CEILING_PLUS, parseWalkingState,
-  settleWeeks, stepBackOffers, stepsCeiling, STEPS_BASELINE_DAYS, walkingDayRationale, walkingDayVerdict, weeksInGrace, weeksToJudge,
-  type DayExclusion, type StepBackOffer, type WalkingDayMeasure, type WalkingPlanState, type WalkingWeekRecord,
+  settleWeeks, stepBackOffers, stepsCeiling, STEPS_BASELINE_DAYS, walkingDayRationale, walkingDayVerdict, walkingWeekStatus, weeksInGrace, weeksToJudge,
+  type DayExclusion, type StepBackOffer, type WalkingDayMeasure, type WalkingPlanState, type WalkingWeekRecord, type WalkingWeekStatus,
 } from '@trainingai/shared/running/walking-plan'
 import { readEveningBefore } from '@/lib/health/oura-budget-activities'
 
@@ -94,6 +94,8 @@ export interface WalkingPlanView {
     stepDaysMet: number
     daysDone: number
     days: WalkingDayView[]
+    /** Rule B (#3779): where the week stands. Null when the plan has no counted day this week. */
+    status: WalkingWeekStatus | null
   }
   /** Judged weeks, oldest first (the last twelve). */
   history: WalkingWeekRecord[]
@@ -451,6 +453,10 @@ async function settle(repo: Repo, userId: string, tz: string): Promise<WalkingPl
       stepDaysMet: counted.filter((v) => v.stepsMet).length,
       daysDone: views.filter((v) => v.done).length,
       days: views,
+      status: walkingWeekStatus({
+        weekStart: currentWeek, today, startDate: finalState.startDate,
+        minutesTarget: finalState.minutesTarget, days: views,
+      }),
     },
     history: finalState.weeks,
     // Offered from the frozen state: a step back follows two settled weeks, never a provisional one,

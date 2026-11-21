@@ -1,5 +1,5 @@
 import { View } from 'react-native';
-import { AppButton, AppText, Card, Icon, ProgressBar, Stack } from '../../../shared/ui';
+import { AppButton, AppText, Badge, Card, Icon, ProgressBar, Stack } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import {
   walkingTodayModel,
@@ -60,9 +60,12 @@ export function WalkingWeekCard({ walking }: { walking: WalkingBlock }) {
   const model = walkingWeekModel(walking);
   return (
     <Card>
-      <AppText variant="eyebrow" tone="muted">
-        Walking and heart health · this week
-      </AppText>
+      <Stack direction="row" align="center" justify="space-between" gap="sm">
+        <AppText variant="eyebrow" tone="muted" style={{ flex: 1 }}>
+          Walking and heart health · this week
+        </AppText>
+        {model.status && <Badge label={model.status.label} tone={model.status.tone} />}
+      </Stack>
       <BarBlock bar={model.steps} />
       <BarBlock bar={model.minutes} />
       <Stack direction="row" justify="space-between">
