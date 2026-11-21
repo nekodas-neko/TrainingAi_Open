@@ -11,6 +11,8 @@ import {
   Stack,
   StatusIndicator,
   SwipeReveal,
+  EnergyBattery,
+  ENERGY_LEVELS,
 } from '../../../shared/ui';
 import { readinessSpec } from '../../health/data/models';
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
@@ -200,13 +202,12 @@ export function HomeRecommendation({
             gap: theme.spacing.xs,
           }}
         >
-          <AppText variant="heading">
-            {
-              { drained: '😴', low: '😑', ok: '😐', good: '😊', pumped: '⚡' }[
-                home.mood.energyLevel
-              ]
-            }
-          </AppText>
+          <View accessible accessibilityLabel={`Energy: ${home.mood.energyLevel}`}>
+            <EnergyBattery
+              level={ENERGY_LEVELS[home.mood.energyLevel]}
+              color={theme.colors.brandText}
+            />
+          </View>
           {home.mood.soreMuscles.length > 0 && (
             <View
               style={{

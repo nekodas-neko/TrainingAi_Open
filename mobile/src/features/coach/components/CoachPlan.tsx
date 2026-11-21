@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { AppButton, AppText, Card, ListRow, Skeleton, Stack } from '../../../shared/ui';
+import { View } from 'react-native';
+import { AppButton, AppText, Card, Icon, ListRow, Skeleton, Stack } from '../../../shared/ui';
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { useNutrition } from '../../nutrition/data/NutritionProvider';
 import { planSpec } from '../../nutrition/data/models';
@@ -83,7 +84,9 @@ export function PlanCard({
               subtitle={`${Math.round(m.targetCalories)} kcal · ${m.ingredients.length} ${m.ingredients.length === 1 ? 'ingredient' : 'ingredients'}`}
               trailing={
                 m.savedMealId || (m.id && n.view.planLinks[m.id]) ? (
-                  <AppText>✓</AppText>
+                  <View accessible accessibilityLabel="Saved">
+                    <Icon name="check" />
+                  </View>
                 ) : undefined
               }
             />

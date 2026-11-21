@@ -1,6 +1,6 @@
 import { Linking, View } from 'react-native';
 import type { UIMessage } from 'ai';
-import { AppButton, AppText, Card, MarkdownText, Stack } from '../../../shared/ui';
+import { AppButton, AppText, Card, Icon, MarkdownText, Stack } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import {
   isWidgetToolName,
@@ -84,7 +84,8 @@ export function CoachMessage({
             return (
               <View key={i} style={{ alignSelf: 'flex-end', maxWidth: '86%' }}>
                 <AppButton
-                  title={`${output.label} ↶`}
+                  title={output.label}
+                  icon="undo"
                   variant="surface"
                   onPress={() => onReopen(p.toolCallId!)}
                 />
@@ -93,7 +94,10 @@ export function CoachMessage({
           if (output.status === 'applied')
             return (
               <Card key={i} tone="recovery">
-                <AppText>✓ {output.summary}</AppText>
+                <Stack direction="row" align="center" gap="xs">
+                  <Icon name="check" />
+                  <AppText style={{ flexShrink: 1 }}>{output.summary}</AppText>
+                </Stack>
               </Card>
             );
           return (
