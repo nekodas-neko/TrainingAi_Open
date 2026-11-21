@@ -84,9 +84,11 @@ const paths = ['/api/running-plan', '/api/cardio-week'];
 export function RunningScreen({
   onBack,
   openActivity,
+  startInSetup = false,
 }: {
   onBack: () => void;
   openActivity: () => void;
+  startInSetup?: boolean;
 }) {
   const { today } = useHealthData(),
     { theme } = useTheme();
@@ -97,7 +99,7 @@ export function RunningScreen({
   const draft = useWorkoutDraft('running-setup', form, initial),
     action = useWorkoutAction(),
     activity = useActivities();
-  const [setup, setSetup] = useState(false);
+  const [setup, setSetup] = useState(startInSetup);
   const data = state.data,
     prescription = data?.prescription;
   useMeasuredRunCompletion(data?.heartHealth?.days);

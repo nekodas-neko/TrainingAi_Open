@@ -220,6 +220,7 @@ function screenList(ids) {
     ['workout-session', ids.sessionId ? route('Workout', { screen: 'workout-session', sessionId: ids.sessionId, fullOverride: false }) : { kind: 'missing', why: 'no active program session in the local database' }],
     ['exercise-library', route('Workout', { screen: 'exercise-library' })],
     ['cardio', route('Workout', { screen: 'cardio' })],
+    ['cardio-plan', route('Workout', { screen: 'cardio-plan' })],
     ['running', route('Workout', { screen: 'running' })],
     ['guided-walk', route('Workout', { screen: 'guided-walk' })],
     ['fitness-baselines', route('Workout', { screen: 'fitness-baselines' })],

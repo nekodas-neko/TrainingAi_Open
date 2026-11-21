@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   zoneLabel,
   ANY_ACTIVITY,
@@ -48,12 +48,15 @@ import {
 } from '../components/CardioCards';
 import { latestBaselines } from '../data/cardio-view';
 import { CardioTrends } from '../components/CardioTrends';
+import { WalkingTodayCard, WalkingWeekCard } from '../components/WalkingWeekCards';
+import { cardioPlanMode } from '../data/cardio-plan-view';
 
 export function CardioScreen({
   onBack,
   openActivity,
   openSettings,
   openRunning,
+  openPlanChoice,
   openWalk,
   openBaselines,
 }: {
@@ -61,6 +64,7 @@ export function CardioScreen({
   openActivity: () => void;
   openSettings: () => void;
   openRunning: () => void;
+  openPlanChoice: () => void;
   openWalk: () => void;
   openBaselines: () => void;
 }) {
@@ -79,6 +83,16 @@ export function CardioScreen({
   const data = week.data,
     plan = running.data;
   useMeasuredRunCompletion(plan?.heartHealth?.days);
+  // #3779: no plan asks "walk or run" first (once per visit); a walking plan swaps the run cards for its week.
+  const mode = running.data ? cardioPlanMode(plan?.plan) : null;
+  const walking = mode === 'walking' ? plan?.walking : null;
+  const askedChoice = useRef(false);
+  useEffect(() => {
+    if (mode === 'choice' && week.connected && !askedChoice.current) {
+      askedChoice.current = true;
+      openPlanChoice();
+    }
+  }, [mode, week.connected, openPlanChoice]);
   const day = plan?.heartHealth?.days.find((day) => day.date.replace(/\//g, '-') === today);
   const runMin = plan?.run?.durationMin;
   const target = day?.targetMin ?? (runMin != null && runMin > 0 ? Math.round(runMin) : undefined);
@@ -167,6 +181,38 @@ export function CardioScreen({
           <StableContent minHeight={540} loading={!data && week.loading}>
             {data ? (
               <>
+                {walking && (
+                  <>
+                    <WalkingWeekCard walking={walking} />
+                    <WalkingTodayCard
+                      walking={walking}
+                      busy={busy || !!activity.session}
+                      onGuidedWalk={openWalk}
+                      onOther={() => setPicker(true)}
+                      onTreadmill={() => {
+                        if (!activity.store) return;
+                        setBusy(true);
+                        void activity.store
+                          .recordCompleted(
+                            {
+                              id: 'treadmill',
+                              label: 'Treadmill walk',
+                              icon: 'PersonSimpleWalk',
+                              isDistanceBased: false,
+                            },
+                            walking.targets.activeMinutesPerDay,
+                          )
+                          .then(openActivity)
+                          .catch((cause) =>
+                            setError(
+                              cause instanceof Error ? cause.message : 'Could not open the activity.',
+                            ),
+                          )
+                          .finally(() => setBusy(false));
+                      }}
+                    />
+                  </>
+                )}
                 <HeartProfileCard heart={data.heart} hasSource={data.quota.hasHrSource} />
                 <TouchSurface
                   accessibilityRole="button"
@@ -353,7 +399,7 @@ export function CardioScreen({
           <AppText variant="eyebrow" tone="muted">
             What do you want to do?
           </AppText>
-          {!data?.hasRunningPlan && (
+          {!data?.hasRunningPlan && mode !== 'walking' && (
             <AppButton
               title="How much time do you have?"
               variant="surface"
@@ -361,14 +407,16 @@ export function CardioScreen({
               onPress={() => setTimePicker(true)}
             />
           )}
-          <HubCard
-            title="Run"
-            subtitle={data?.hasRunningPlan ? 'Your running plan' : 'Set up a running plan'}
-            badge={data?.hasRunningPlan ? 'Program' : undefined}
-            icon="legs"
-            tone="recovery"
-            onPress={openRunning}
-          />
+          {mode !== 'walking' && (
+            <HubCard
+              title="Run"
+              subtitle={data?.hasRunningPlan ? 'Your running plan' : 'Set up a running plan'}
+              badge={data?.hasRunningPlan ? 'Program' : undefined}
+              icon="legs"
+              tone="recovery"
+              onPress={openRunning}
+            />
+          )}
           <HubCard
             title="Guided walk"
             subtitle="Interval walk with fast and easy blocks"
@@ -389,6 +437,15 @@ export function CardioScreen({
                   : undefined
             }
           />
+          {mode && (
+            <HubCard
+              title="Change plan"
+              subtitle="Walking and heart health, or running"
+              icon="swap"
+              tone="neutral"
+              onPress={openPlanChoice}
+            />
+          )}
           <CardioTrends />
         </>
       )}

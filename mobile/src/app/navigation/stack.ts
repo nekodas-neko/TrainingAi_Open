@@ -26,6 +26,8 @@ export type Route =
   | { screen: 'health-day'; date: string }
   | { screen: 'health-week'; week: string }
   | { screen: 'friend-profile'; friendId: string }
+  /** The running screen with its goal picker already open (from the Cardio plan choice). */
+  | { screen: 'running'; setup: true }
   | { screen: 'health-detail'; detail: HealthDetail }
   /** `ouraReturn` is the link that cold-started the app, for the Oura screen to finish. */
   | { screen: 'more-devices'; ouraReturn?: string };

@@ -115,6 +115,7 @@ export const runningPlanSpec = (today: string) => ({
       .object({
         id: z.string(),
         frameworkKey: z.string(),
+        goalKind: z.string().optional(),
         // A running plan stores its fitness here; a walking plan (#3779) stores only its own state
         // under `walkingPlan`, which the screens read from the payload's `walking` block instead.
         // So a walking snapshot parses to null rather than failing the whole payload, and a running
@@ -168,6 +169,43 @@ export const runningPlanSpec = (today: string) => ({
       })
       .optional(),
     goal: z.object({ label: z.string(), blurb: z.string() }).nullish(),
+    // #3779: the walking plan's week, as the server settled it (`WalkingPlanView`). Only what the
+    // screens draw is checked; a running plan has none.
+    walking: z
+      .object({
+        targets: z
+          .object({
+            stepsPerDay: number,
+            activeMinutesPerWeek: number,
+            activeMinutesPerDay: number,
+          })
+          .passthrough(),
+        week: z
+          .object({
+            from: z.string(),
+            to: z.string(),
+            stepsToday: number.nullable(),
+            activeMinutes: number,
+            activeMinutesBasis: z.enum(['heart_rate', 'cadence', 'speed', 'estimated']).nullable(),
+            days: z.array(
+              z
+                .object({
+                  date: z.string(),
+                  steps: number.nullable(),
+                  stepsMet: z.boolean(),
+                  activeMinutes: number,
+                  minutesMet: z.boolean(),
+                  done: z.boolean(),
+                  excluded: z.enum(['rest', 'sick']).nullable(),
+                  isToday: z.boolean(),
+                })
+                .passthrough(),
+            ),
+          })
+          .passthrough(),
+      })
+      .passthrough()
+      .nullish(),
     isPushSession: z.boolean().optional(),
     heartHealth: z
       .object({

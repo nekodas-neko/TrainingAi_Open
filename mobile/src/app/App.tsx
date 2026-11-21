@@ -63,6 +63,7 @@ import { RunningScreen } from '../features/activities/screens/RunningScreen';
 import { WalkScreen } from '../features/activities/screens/WalkScreen';
 import { BaselinesScreen } from '../features/activities/screens/BaselinesScreen';
 import { CardioScreen } from '../features/activities/screens/CardioScreen';
+import { CardioPlanScreen } from '../features/activities/screens/CardioPlanScreen';
 import { ActivityScreen } from '../features/activities/screens/ActivityScreen';
 import { WeighInBanner } from '../features/devices/components/WeighInBanner';
 import { AlertNavigation } from '../features/platform/components/AlertNavigation';
@@ -225,7 +226,22 @@ function AppShell() {
           />
         );
       case 'running':
-        return <RunningScreen key={accountKey} onBack={back} openActivity={openActivity} />;
+        return (
+          <RunningScreen
+            key={accountKey}
+            onBack={back}
+            openActivity={openActivity}
+            startInSetup={'setup' in entry && entry.setup === true}
+          />
+        );
+      case 'cardio-plan':
+        return (
+          <CardioPlanScreen
+            key={accountKey}
+            onBack={back}
+            openRunningGoals={() => open({ screen: 'running', setup: true })}
+          />
+        );
       case 'guided-walk':
         return <WalkScreen key={accountKey} onBack={back} openActivity={openActivity} />;
       case 'fitness-baselines':
@@ -236,6 +252,7 @@ function AppShell() {
             key={accountKey}
             onBack={back}
             openRunning={() => open({ screen: 'running' })}
+            openPlanChoice={() => open({ screen: 'cardio-plan' })}
             openWalk={() => open({ screen: 'guided-walk' })}
             openBaselines={() => open({ screen: 'fitness-baselines' })}
             openActivity={openActivity}
