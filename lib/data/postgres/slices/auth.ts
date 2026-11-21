@@ -11,20 +11,53 @@ type Db = ReturnType<typeof getDb>
 type Tx = Parameters<Parameters<Db['transaction']>[0]>[0]
 
 /**
- * #3829: end every sign-in of the account made before `at`, web cookies included, without touching
- * the data epoch (`sessions_valid_from`), so no device wipes its store. Compared with each token's
- * `signedInAt` in `refreshIsActiveClaim`. `at` is the app server's clock, not the database's: the
- * sign-in making the link is stamped by this server right after, and must land at or after it.
- * The cut-off only moves forward (GREATEST ignores the NULL of an account that has none), so a later
- * caller (a "sign out everywhere") can share the column. Throws unless exactly one row was set, so
- * the caller's transaction rolls back rather than link with the old sign-ins still valid.
+ * #3829 / #3854: end every sign-in of the account made up to now, web cookies included, without
+ * touching the data epoch (`sessions_valid_from`), so no device wipes its store. Compared with each
+ * token's `signedInAt` by `signedInBeforeSignInCutoff`, and with a native refresh row's `created_at`.
+ *
+ * **One clock, the database's (#3949 review N1).** The cut-off is the next whole second after the
+ * database's `clock_timestamp()` at this write, and after any earlier cut-off: strictly later than
+ * every stamp taken before it (`signInStampFor`, and the `created_at` a native row is given), and a
+ * whole second, so the comparison has no rounding. It always moves forward, by at least a second
+ * past an earlier one, so a sign-in stamped at an earlier cut-off (the one a link just made) is
+ * ended by the next. `clock_timestamp()`, not `now()`: `now()` is when the transaction began, which
+ * is before any lock it waited for (`endSignInsOnSignOut` waits for a rotation in flight).
+ *
+ * Returns the new cut-off. Throws unless exactly one row was set, so the caller's transaction rolls
+ * back rather than leave the old sign-ins valid.
  */
-export async function endSignInsBefore(tx: Tx | Db, userId: string, at: Date = new Date()): Promise<void> {
+export async function endSignInsBefore(tx: Tx | Db, userId: string): Promise<Date> {
   const rows = await tx.update(users)
-    .set({ signInsValidFrom: sql`GREATEST(${users.signInsValidFrom}, ${at.toISOString()}::timestamptz)` })
+    .set({
+      signInsValidFrom: sql`GREATEST(
+        to_timestamp(floor(extract(epoch FROM clock_timestamp())) + 1),
+        to_timestamp(ceil(extract(epoch FROM ${users.signInsValidFrom})) + 1)
+      )`,
+    })
     .where(eq(users.id, userId))
-    .returning({ id: users.id })
-  if (rows.length !== 1) throw new Error('sign-in cut-off was not recorded')
+    .returning({ at: users.signInsValidFrom })
+  if (rows.length !== 1 || !rows[0].at) throw new Error('sign-in cut-off was not recorded')
+  return new Date(rows[0].at)
+}
+
+/**
+ * The `signedInAt` a new web sign-in (or a re-issued cookie) is stamped with: the database clock in
+ * whole seconds, raised to the account's sign-in cut-off when that is later. Read after any link or
+ * password change this sign-in made has committed, so it is at or after the cut-off they set and the
+ * sign-in keeps its session; a sign-in that read the row before a sign-out committed is below the
+ * cut-off that sign-out writes (`endSignInsBefore`), and is ended by it. Throws when the account has
+ * no row: the caller's sign-in then fails, rather than be stamped from another clock.
+ */
+export async function signInStampFor(db: Tx | Db, userId: string): Promise<number> {
+  const rows = await db.select({
+    stamp: sql<string>`GREATEST(
+      floor(extract(epoch FROM clock_timestamp())),
+      ceil(extract(epoch FROM ${users.signInsValidFrom}))
+    )::bigint`,
+  }).from(users).where(eq(users.id, userId)).limit(1)
+  const stamp = Number(rows[0]?.stamp)
+  if (!rows.length || !Number.isSafeInteger(stamp)) throw new Error('sign-in stamp could not be read')
+  return stamp
 }
 
 export async function getUserByProvider(db: Db, provider: AuthProvider, subject: string) {

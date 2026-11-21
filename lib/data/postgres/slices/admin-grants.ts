@@ -16,8 +16,10 @@ export type SetAdminOutcome =
  *   same moment waits for this outcome instead of interleaving with it.
  * - **The acting admin is re-checked on the locked row** (still active, still admin). A request
  *   that passed `requireAdmin` a moment ago is not trusted.
- * - **Only the owner removes admin** (`judgeRevokeAdmin`), judged here and not only in the route.
- *   `ownerId` is passed in by the caller so tests can pin it; null refuses every removal.
+ * - **Only the owner grants or removes admin** (`judgeRevokeAdmin`), judged here and not only in the
+ *   route. `ownerId` is passed in by the caller so tests can pin it; null refuses every change.
+ *   #3657: granting was open to any admin, so a second admin could make a third; now it is the
+ *   owner's alone, like removing.
  * - **A grant needs an active target.** A deactivated or pending account is not made an admin.
  * - **A no-op writes nothing**: granting someone who is already admin (yourself included) returns ok
  *   without an update or an audit row.
@@ -42,12 +44,11 @@ export async function setUserAdmin(
     if (!actor || !actor.is_admin || !actor.is_active) return { ok: false, reason: 'actor-not-admin' } as const
     if (!target) return { ok: false, reason: 'not-found' } as const
 
-    if (!makeAdmin) {
-      const refused = judgeRevokeAdmin(actingAdminId, ownerId)
-      if (refused) return { ok: false, reason: refused } as const
-    } else if (!target.is_active) {
-      return { ok: false, reason: 'inactive-target' } as const
-    }
+    // Granting and removing both need the owner (#3657), checked before the no-op below so a
+    // non-owner cannot tell a grant that would change something from one that would not.
+    const refused = judgeRevokeAdmin(actingAdminId, ownerId)
+    if (refused) return { ok: false, reason: refused } as const
+    if (makeAdmin && !target.is_active) return { ok: false, reason: 'inactive-target' } as const
 
     // Nothing to change (already in that state, or granting yourself): no write and no audit row, so
     // the log records changes only. A refused call returned above, so this is a success.

@@ -127,7 +127,7 @@ export const SCOPED_STATEMENT_TIMEOUT_MS = 10_000
 export async function runScoped<R extends QueryResultRow = QueryResultRow>(
   pool: Pool,
   sql: string,
-  opts: { ownerId?: string; timeoutMs?: number } = {},
+  opts: { ownerId?: string; timeoutMs?: number; values?: unknown[] } = {},
 ): Promise<QueryResult<R>> {
   const client = await pool.connect()
   try {
@@ -150,7 +150,7 @@ export async function runScoped<R extends QueryResultRow = QueryResultRow>(
         }
         await client.query(`SET LOCAL app.claude_ro_owner = '${opts.ownerId}'`)
       }
-      return await client.query<R>(sql)
+      return opts.values ? await client.query<R>(sql, opts.values) : await client.query<R>(sql)
     } finally {
       // Always, including after a failed query: an aborted transaction still holds its connection's
       // state until something ends it.

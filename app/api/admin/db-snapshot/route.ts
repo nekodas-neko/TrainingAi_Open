@@ -3,6 +3,7 @@ import { auth } from '@/auth'
 import { getPool } from '@/lib/data/postgres/client'
 import { getReadonlyPool, isReadonlyDbConfigured, describeReadonlyConnection, runScoped } from '@/lib/data/postgres/readonly-client'
 import { requireAdmin, adminFailureOutcome } from '@/lib/admin'
+import { requireOwnerSession, scopeOwnerFor } from '@/lib/admin/claude-token-auth'
 import { rateLimit } from '@/lib/rate-limit'
 import { safeCompare } from '@/lib/security/constant-time'
 import { reportServerError } from '@/lib/observability'
@@ -43,7 +44,7 @@ const CHUNK_SIZE = 5_000
 const HIGH_WATER_BYTES = 256 * 1024
 
 type AuthOutcome =
-  | { ok: true; via: 'session' | 'token' }
+  | { ok: true; via: 'session' | 'token'; ownerId?: string }
   | { ok: false; status: number; error: string }
 
 async function authorize(req: NextRequest): Promise<AuthOutcome> {
@@ -75,7 +76,11 @@ async function authorize(req: NextRequest): Promise<AuthOutcome> {
   } catch (err) {
     return adminFailureOutcome(err)
   }
-  return { ok: true, via: 'session' }
+  // #3657: the snapshot is the owner's rows whoever asks, so a session must be the owner's; any
+  // other admin gets the same 403 as a non-admin.
+  const owner = await requireOwnerSession(userId)
+  if (!owner.ok) return owner
+  return { ok: true, via: 'session', ownerId: owner.ownerId }
 }
 
 /** Best-effort audit row. A logging failure must never change the response — same pattern as
@@ -102,6 +107,13 @@ export async function GET(req: NextRequest) {
   }
 
   const ip = clientIp(req)
+  // #3949 review N7: every row read is scoped explicitly to the owner this request's check resolved
+  // (`scopeOwnerFor`), never to the read-only role's default. Unresolvable: nothing is read.
+  const resolvedOwner = await scopeOwnerFor(authed)
+  if (!resolvedOwner.ok) {
+    return NextResponse.json({ error: `${resolvedOwner.error}; nothing was read` }, { status: resolvedOwner.status })
+  }
+  const ownerId: string = resolvedOwner.ownerId
   const q = req.nextUrl.searchParams
   const bulk = q.get('bulk')
   const tablesParam = q.get('tables')
@@ -137,7 +149,7 @@ export async function GET(req: NextRequest) {
     for (const table of toExport) {
       try {
         // RV-190: same wrapper as db-query — the protections are per-query, not per-session.
-        const { rows } = await runScoped(pool, `SELECT count(*)::int AS n FROM claude_ro.${quoteIdent(table)}`)
+        const { rows } = await runScoped(pool, `SELECT count(*)::int AS n FROM claude_ro.${quoteIdent(table)}`, { ownerId })
         rowCounts[table] = rows[0]?.n ?? null
       } catch {
         rowCounts[table] = null
@@ -157,7 +169,7 @@ export async function GET(req: NextRequest) {
       const pk = await getPrimaryKeyColumns(pool, table)
       const since = bulkWindowFor(table, bulk)
       let n = 0
-      for await (const row of streamTableRows(pool, table, pk, CHUNK_SIZE, since ?? undefined)) {
+      for await (const row of streamTableRows(pool, table, pk, CHUNK_SIZE, since ?? undefined, ownerId)) {
         yield { table, row }
         n++
       }

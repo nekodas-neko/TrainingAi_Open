@@ -4,6 +4,7 @@ import { getRepository } from '@/lib/data'
 import { rateLimit } from '@/lib/rate-limit'
 import { reportServerError } from '@/lib/observability'
 import { dataEpochOf } from '@/lib/auth/session-cutoff'
+import { withRouteErrors } from '@/lib/api/route-errors'
 
 /**
  * #3369 — the moment an admin last reset this account's data, in whole seconds (0 when never).
@@ -13,7 +14,12 @@ import { dataEpochOf } from '@/lib/auth/session-cutoff'
  * cut-off already refuses a stale sign-in; this covers the phone that signs in again afterwards
  * with the old rows still in its local store.
  */
+// `withRouteErrors`: a database fault in `auth()` (`AuthCheckUnavailableError`) is a JSON 503.
 export async function GET(req: Request) {
+  return withRouteErrors(() => readEpoch(req))
+}
+
+async function readEpoch(req: Request) {
   const session = await auth()
   const userId = session?.user?.id
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

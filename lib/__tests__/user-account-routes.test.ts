@@ -7,6 +7,7 @@ const sessionTokenFrom = vi.fn(async () => ({ userId: 'u-1', exp: Math.floor(Dat
 
 const getUserCredentials = vi.fn(async (_e: string) => userRow() as Row | null)
 const updateUserPassword = vi.fn(async (_u: string, _h: string) => undefined)
+const signInStampFor = vi.fn(async (_u: string) => 1_800_000_000)
 const updateUserProfile = vi.fn(async (_u: string, _p: Row) => ({ id: 'u-1', displayName: 'Sam' }) as Row)
 const updateUserAvatar = vi.fn(async (_u: string, _a: string) => ({ avatar: 'stored.png' }) as Row)
 const countWorkoutSessions = vi.fn(async (_u: string) => 42)
@@ -24,7 +25,7 @@ const getLatestIdentityLinkedAt = vi.fn(async (_u: string) => null as Date | nul
 vi.mock('@/auth', () => ({ auth: async () => (sessionUser ? { user: sessionUser, signedInAt } : null) }))
 vi.mock('@/lib/data', () => {
   const repo = async () => ({
-    getUserCredentials, getUserById, updateUserPassword, updateUserProfile, updateUserAvatar,
+    getUserCredentials, getUserById, updateUserPassword, signInStampFor, updateUserProfile, updateUserAvatar,
     countWorkoutSessions, getUserPreferences, updateUserPreferences, getUserProviders: async () => ['google'],
     getLatestIdentityLinkedAt,
   })

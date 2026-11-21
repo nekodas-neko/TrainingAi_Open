@@ -34,6 +34,8 @@ export const authConfig = {
     jwt({ token, user, account }) {
       if (user?.id) token.userId = user.id
       // #3369: `user` is only present at sign-in, so this is stamped once and survives every re-issue.
+      // The Node instance (`auth.ts`) replaces it with the database-clock stamp (#3949 review N1);
+      // this copy only stands where no database is reachable (the edge never sees a sign-in).
       if (user) token.signedInAt = nowSeconds()
       if (user && typeof user.dataEpoch === "number") token.dataEpoch = user.dataEpoch
       if (typeof user?.isActive === "boolean") token.isActive = user.isActive

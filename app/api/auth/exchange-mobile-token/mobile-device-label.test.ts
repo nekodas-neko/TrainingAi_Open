@@ -34,7 +34,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.stubEnv('AUTH_SECRET', 'device-label-test-secret-long-enough-for-hs');
   mocks.consume.mockReturnValue({ sessionCookieValue: 'c', challenge: 'x' });
-  mocks.create.mockResolvedValue({ id: '5e551011-0000-4000-8000-000000003280', expiresAt: new Date(Date.now() + 60000) });
+  mocks.create.mockResolvedValue({ id: '5e551011-0000-4000-8000-000000003280', createdAt: new Date(), expiresAt: new Date(Date.now() + 60000) });
 });
 
 describe('exchange-mobile-token device info', () => {

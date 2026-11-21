@@ -44,8 +44,11 @@ on:
         type: boolean
         default: false
 
+# #3673 item 2: read-only by default. Only `tag` writes (the tag and the release notes), and `apk`
+# uploads onto the release; each says so itself. `verify` and `deploy`, which holds the production
+# token, have no write access to the repository.
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: release
@@ -159,7 +162,23 @@ jobs:
           ref: ${{ needs.verify.outputs.sha }}
 
       - name: Install the Railway CLI
-        run: npm i -g @railway/cli
+        # #3673 item 2: an exact release, checked against a pinned checksum, with no install script.
+        # `npm i -g @railway/cli` installed whatever version npm served that minute and ran its
+        # postinstall right before this job hands the CLI the production token. The binary is the
+        # same file that postinstall downloads (railwayapp/cli's release asset for this version), so
+        # nothing about the deploy changes. To move the version: change both lines, with the new
+        # asset's sha256 (`sha256sum` of the downloaded .tar.gz), in a reviewed PR.
+        env:
+          RAILWAY_CLI_VERSION: 5.71.0
+          RAILWAY_CLI_SHA256: 2e682fd2ddf8d6fdf9e46d9d99d99646ff0022a6abb0c2bca93011348a269fb9
+        run: |
+          set -euo pipefail
+          url="https://github.com/railwayapp/cli/releases/download/v${RAILWAY_CLI_VERSION}/railway-v${RAILWAY_CLI_VERSION}-x86_64-unknown-linux-musl.tar.gz"
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/railway.tar.gz" "$url"
+          echo "${RAILWAY_CLI_SHA256}  $RUNNER_TEMP/railway.tar.gz" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/railway-cli"
+          tar -xzf "$RUNNER_TEMP/railway.tar.gz" -C "$RUNNER_TEMP/railway-cli" railway
+          "$RUNNER_TEMP/railway-cli/railway" --version
 
       - name: Deploy the released commit
         env:
@@ -182,7 +201,8 @@ jobs:
           # Without this file the app reports no commit and the next job can never see the deploy
           # land (lib/build-sha.ts). Not committed and not gitignored — the upload must include it.
           git rev-parse HEAD > BUILD_SHA
-          railway up --ci --detach --service "$RAILWAY_SERVICE"
+          # By its full path: the checked binary from the step above, not whatever PATH finds.
+          "$RUNNER_TEMP/railway-cli/railway" up --ci --detach --service "$RAILWAY_SERVICE"
 
   confirm:
     name: Production serves this commit
@@ -201,6 +221,9 @@ jobs:
     if: needs.verify.outputs.mode != 'rollback'
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # The one job that writes: it pushes the tag and creates the release.
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v5
         with:

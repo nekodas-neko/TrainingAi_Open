@@ -22,6 +22,7 @@ import { UserTimezoneProvider } from "@/components/shell/user-timezone-provider"
 import { LocalDayProvider } from "@/components/shell/local-day-provider";
 import { WorkoutDayRollover } from "@/components/shell/workout-day-rollover";
 import { auth } from "@/auth";
+import { isAuthCheckUnavailable } from "@/lib/auth/is-active-refresh";
 import "./globals.css";
 
 const brandThemeScript = `(function(){
@@ -141,7 +142,13 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const session = await auth();
+  // A database fault during the active check (`AuthCheckUnavailableError`) renders the shell with no
+  // session rather than failing the root layout, which has no error boundary above it: the page's
+  // own `auth()` then throws into `app/error.tsx`, a retry screen, not the sign-in page.
+  const session = await auth().catch((err: unknown) => {
+    if (isAuthCheckUnavailable(err)) return null;
+    throw err;
+  });
   const userId = session?.user?.id;
   // Read here rather than per-screen: this is the one place that already has the session on the
   // server, so the value is in the first render and cannot flash a wrong zone (Q-148).
