@@ -18,7 +18,7 @@ import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { usePlatformIntegrations } from '../PlatformProvider';
 import { useWorkoutJournal } from '../../workouts/logging/WorkoutJournalProvider';
 import { calendars } from '../../../integrations/calendar/platform';
-import { notificationsBlocked, restAlarmRow } from '../data/alert-plan';
+import { notificationsBlocked, notificationsRow, restAlarmRow } from '../data/alert-plan';
 import { reminderKinds, reminderLabels, reminderSchema, type Reminder } from '../data/models';
 
 const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -33,6 +33,8 @@ export function IntegrationSettings() {
     alertError,
     refresh,
     dailyRemindersOn,
+    mealRemindersOn,
+    ringBatteryAlertOn,
   } = usePlatformIntegrations();
   const { theme } = useTheme();
   const journal = useWorkoutJournal();
@@ -62,7 +64,11 @@ export function IntegrationSettings() {
   const restCueOn =
     journal.data.preferences.timers.restCues ||
     journal.data.workouts.some((x) => x.status === 'active' && x.timers.restCues);
-  const blocked = !!settings && notificationsBlocked(settings, restCueOn, permission, dailyRemindersOn);
+  const blocked = !!settings && notificationsBlocked(settings, restCueOn, permission, {
+      dailyRemindersOn,
+      mealRemindersOn,
+      ringBatteryAlertOn,
+    });
   return (
     <Card>
       <AppText variant="heading">Alerts & calendar</AppText>
@@ -93,13 +99,18 @@ export function IntegrationSettings() {
                 {restAlarmRow.caption}
               </AppText>
             </View>
-            {blocked && <Badge label={restAlarmRow.blockedLabel} tone="checkin" />}
           </Stack>
           {blocked && (
             <>
-              <AppText variant="caption" tone="muted">
-                {restAlarmRow.blockedCaption}
-              </AppText>
+              <Stack direction="row" align="flex-start">
+                <View style={{ flex: 1 }}>
+                  <AppText>{notificationsRow.title}</AppText>
+                  <AppText variant="caption" tone="muted">
+                    {notificationsRow.blockedCaption}
+                  </AppText>
+                </View>
+                <Badge label={notificationsRow.blockedLabel} tone="checkin" />
+              </Stack>
               <AppButton
                 title="Enable notification permission"
                 variant="secondary"

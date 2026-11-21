@@ -20,9 +20,11 @@ import { useActivities } from '../activities/data/ActivityProvider';
 import { PlatformStore } from './data/PlatformStore';
 import { CalendarStore } from './data/CalendarStore';
 import { AlertScheduler } from './data/AlertScheduler';
-import { planAlerts } from './data/alert-plan';
+import { anyMealReminderOn, planAlerts } from './data/alert-plan';
 import { useMealEstimateReminders } from '../meal-plans/useMealEstimateReminders';
 import { useDailyReminders } from './useDailyReminders';
+import { useNutrition } from '../nutrition/data/NutritionProvider';
+import { useRingBatteryAlertOn } from '../devices/useRingBatteryAlertOn';
 import {
   nativeAlerts,
   alertPermission,
@@ -40,6 +42,10 @@ const Context = createContext<{
   opened: Record<string, unknown> | null;
   /** True when a supplement, meal-group or day-review reminder is on (#3653). */
   dailyRemindersOn: boolean;
+  /** True when any meal group has meal reminders on (#3434). */
+  mealRemindersOn: boolean;
+  /** True when the ring battery alert is on and the ring has a reading (#3434). */
+  ringBatteryAlertOn: boolean;
 } | null>(null);
 export function PlatformProvider({ children }: PropsWithChildren) {
   const { dataReader } = useAccountContext(),
@@ -57,6 +63,8 @@ export function PlatformProvider({ children }: PropsWithChildren) {
   const lastMealReminders = useRef<NonNullable<typeof mealReminders>>([]);
   if (mealReminders) lastMealReminders.current = mealReminders;
   const daily = useDailyReminders(lastMealReminders.current);
+  const mealRemindersOn = anyMealReminderOn(useNutrition().view.mealTypes);
+  const ringBatteryAlertOn = useRingBatteryAlertOn();
   const requestedRestPermission = useRef<string | null>(null);
   const requestedCuePermission = useRef<string | null>(null);
   const mounted = useRef(false);
@@ -250,8 +258,10 @@ export function PlatformProvider({ children }: PropsWithChildren) {
       refresh: () => setTick((value) => value + 1),
       opened,
       dailyRemindersOn: daily.on,
+      mealRemindersOn,
+      ringBatteryAlertOn,
     }),
-    [stores, alertError, permission, opened, enableAlerts, daily.on],
+    [stores, alertError, permission, opened, enableAlerts, daily.on, mealRemindersOn, ringBatteryAlertOn],
   );
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }

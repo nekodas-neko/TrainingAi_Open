@@ -6,8 +6,8 @@ import { isDateInput } from './admin-content';
  * #2760, the #2601 pair), the two re-scores that were left to a dry run first, and the derived-score
  * backfill (#2860 needs it). Not here, on purpose: the Body Battery re-derive (#2409), the stress
  * backfill (#2236), baseline phase tagging (#2460) and the temperature-baseline re-derive, which the
- * owner dropped; the ring archive and Pack; and the HR snapshot backfills, which have no dry run to
- * show (asked on #3368).
+ * owner dropped; and the ring archive and Pack. The two HR snapshot backfills came in with a count
+ * preview (#3882): they have no dry run, so their route answers a read-only GET count instead.
  */
 export type JobRange = 'none' | 'required' | 'optional';
 export type AdminJob = {
@@ -22,6 +22,11 @@ export type AdminJob = {
   expect: string;
   /** Moves scores already shown to the user: tuning territory, so the owner decides. */
   movesPastScores?: boolean;
+  /**
+   * The route has no dry run: its preview is a read-only `GET` that counts what a run would take on
+   * (#3882), and a run is one pass of the route's `POST`.
+   */
+  countPreview?: boolean;
 };
 
 export const adminJobs: readonly AdminJob[] = [
@@ -94,6 +99,26 @@ export const adminJobs: readonly AdminJob[] = [
     expect: 'Per pillar: written, unchanged, noScore. Each call can run about 370 queries, so keep to one page at a time.',
     movesPastScores: true,
   },
+  {
+    id: 'backfill-workout-hr-stats',
+    title: 'Backfill workout heart-rate snapshots',
+    issue: '#3882',
+    path: '/api/oura-ble/backfill-hr-stats',
+    range: 'none',
+    countPreview: true,
+    what: 'Saves each finished workout’s average and peak heart rate, HRR1 and HRV, for workouts inside the 180-day window that have no snapshot yet, so they outlive the prune. Adds rows only; no source data changes. Oldest first, up to 200 per run.',
+    expect: 'sessionsToProcess is how many workouts a run would take on (atLeast: true means more than that). After a run, processed is what it did; moreToProcess true means run it again.',
+  },
+  {
+    id: 'backfill-set-hr-stats',
+    title: 'Backfill set heart-rate snapshots',
+    issue: '#3882',
+    path: '/api/workout/backfill-set-hr-stats',
+    range: 'none',
+    countPreview: true,
+    what: 'Saves per-set heart-rate figures for workouts inside the 180-day window that have logged sets but no per-set snapshot yet. Adds rows only; no source data changes. Oldest first, up to 100 per run.',
+    expect: 'sessionsToProcess is how many workouts a run would take on (atLeast: true means more than that). After a run, processed is what it did; moreToProcess true means run it again.',
+  },
 ];
 
 export const MAX_RANGE_DAYS = 31;
@@ -143,6 +168,23 @@ export function summaryRows(report: JobReport | null): { label: string; value: s
     else add(k, v);
   }
   return rows;
+}
+/**
+ * A count-preview job's answer as the card reads every job's: its write answers
+ * `{ processed, withData, remaining: boolean }` with no summary, so it is given one. A preview is
+ * already in that shape. Anything else is passed on as it came.
+ */
+export function jobReport(job: Pick<AdminJob, 'countPreview'>, raw: unknown, write: boolean): JobReport {
+  const report = (isRecord(raw) ? raw : {}) as JobReport;
+  if (!job.countPreview || !write) return report;
+  return {
+    dryRun: false,
+    summary: {
+      processed: report.processed ?? null,
+      withData: report.withData ?? null,
+      moreToProcess: report.remaining === true,
+    },
+  };
 }
 /** `summary.remaining`, when the job pages its writes. */
 export function remainingOf(report: JobReport | null): number {

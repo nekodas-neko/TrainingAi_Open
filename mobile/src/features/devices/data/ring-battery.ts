@@ -32,6 +32,11 @@ const alertSchema = z.object({
 export type RingAlertSettings = z.infer<typeof alertSchema>;
 export const DEFAULT_RING_ALERT: RingAlertSettings = { enabled: true, level: 20, fired: false };
 
+/** Whether the alert would fire for this ring: it is switched on and the server has a reading. */
+export function ringAlertWanted(settings: RingAlertSettings, hasReading: boolean) {
+  return settings.enabled && hasReading;
+}
+
 export function parseRingAlert(raw: string | null): RingAlertSettings {
   try {
     const parsed = alertSchema.safeParse(raw ? JSON.parse(raw) : null);
@@ -101,3 +106,11 @@ export function drainChart(series: readonly { day: string; drainPct: number }[])
     }),
   };
 }
+
+// The card saves the alert; the platform settings row listens, so a switch shows at once (#3434).
+const alertListeners = new Set<() => void>();
+export const onRingAlertSaved = (listener: () => void) => {
+  alertListeners.add(listener);
+  return () => void alertListeners.delete(listener);
+};
+export const notifyRingAlertSaved = () => alertListeners.forEach((listener) => listener());
