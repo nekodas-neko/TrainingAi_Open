@@ -1,6 +1,16 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { View } from 'react-native';
-import Svg, { Circle, Path, Polygon, Polyline, Rect, Line } from 'react-native-svg';
+import Svg, {
+  Circle,
+  Defs,
+  LinearGradient,
+  Path,
+  Polygon,
+  Polyline,
+  Rect,
+  Line,
+  Stop,
+} from 'react-native-svg';
 import { AppText } from './AppText';
 import { Stack } from './Stack';
 import { ChartGuides, YAxisLabels, yAxisColumnWidth } from './ChartGuides';
@@ -23,6 +33,7 @@ import {
   boundedTicks,
   smoothPath,
   DENSE_AXIS_POINTS,
+  FADE_FILL_OPACITY,
   tickLabels,
   type ChartTarget,
 } from './chartScale';
@@ -61,6 +72,7 @@ export function LineChart({
   axisLabels,
   color: accent,
   fillColor,
+  fadeFill = false,
   readable = false,
   gridlines = false,
   yAxis = false,
@@ -106,6 +118,8 @@ export function LineChart({
   axisLabels?: readonly string[];
   color?: string;
   fillColor?: string;
+  /** The area under the line fades from the line's colour to transparent (the web Sparkline's `fill`). */
+  fadeFill?: boolean;
   readable?: boolean;
   gridlines?: boolean;
   yAxis?: boolean;
@@ -132,6 +146,7 @@ export function LineChart({
   strip?: readonly { from: number; to: number; color: string }[];
 }) {
   const { theme } = useTheme();
+  const gradientId = useId().replace(/:/g, '');
   const [selection, setSelection] = useState<number | null>(null);
   const [width, setWidth] = useState(1);
   const labelVariant = readable ? 'caption' : 'micro';
@@ -229,6 +244,7 @@ export function LineChart({
   // its ticks, else the edge of the box.
   const floorY = scale ? yy(min) : vbHeight;
   const color = accent ?? theme.tones[tone].foreground;
+  const areaFill = fadeFill ? `url(#${gradientId})` : (fillColor ?? theme.tones[tone].background);
   const readings = coords.map((point) => (point ? 1 : null));
   const showDot = dotMask(readings, dots);
   // A connected line has no gaps to explain, so its newest reading is the one dot made larger.
@@ -340,6 +356,14 @@ export function LineChart({
                 />
               ));
           })}
+          {fill && fadeFill && (
+            <Defs>
+              <LinearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+                <Stop offset="0" stopColor={fillColor ?? color} stopOpacity={FADE_FILL_OPACITY[0]} />
+                <Stop offset="1" stopColor={fillColor ?? color} stopOpacity={FADE_FILL_OPACITY[1]} />
+              </LinearGradient>
+            </Defs>
+          )}
           {segments
             .filter((segment) => segment.length > 1)
             .map((segment, index) =>
@@ -348,13 +372,13 @@ export function LineChart({
                   <Path
                     key={'fill' + index}
                     d={`M${segment[0].x},${floorY} L${smoothPath(segment, curve).slice(1)} L${segment.at(-1)!.x},${floorY} Z`}
-                    fill={fillColor ?? theme.tones[tone].background}
+                    fill={areaFill}
                   />
                 ) : (
                   <Polygon
                     key={'fill' + index}
                     points={`${segment[0].x},${floorY} ${segment.map((point) => `${point.x},${point.y}`).join(' ')} ${segment.at(-1)!.x},${floorY}`}
-                    fill={fillColor ?? theme.tones[tone].background}
+                    fill={areaFill}
                   />
                 )
               ) : null,

@@ -66,7 +66,7 @@ export function ScoreRing({
       <AppText variant="display" style={{ color }}>
         {value === null ? '—' : Math.round(value)}
       </AppText>
-      {caption && (
+      {!!caption && (
         <AppText variant="caption" tone="muted">
           {caption}
         </AppText>

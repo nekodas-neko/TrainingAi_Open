@@ -87,11 +87,11 @@ export function MetricTile({
         >
           {value ?? '—'}
         </AppText>
-        {unit && (
+        {unit ? (
           <AppText variant="statUnit" tone="muted">
             {unit}
           </AppText>
-        )}
+        ) : null}
       </View>
     );
   }
@@ -129,7 +129,7 @@ export function MetricTile({
           {label}
           {unit ? ` · ${unit}` : ''}
         </AppText>
-        {caption && (
+        {caption ? (
           <AppText
             variant="micro"
             tone="muted"
@@ -137,7 +137,7 @@ export function MetricTile({
           >
             {caption}
           </AppText>
-        )}
+        ) : null}
       </Card>
     );
   }
@@ -154,16 +154,16 @@ export function MetricTile({
       >
         {value ?? '—'}
       </AppText>
-      {unit && (
+      {unit ? (
         <AppText variant="micro" tone="muted">
           {unit}
         </AppText>
-      )}
-      {caption && (
+      ) : null}
+      {caption ? (
         <AppText variant="caption" tone="muted">
           {caption}
         </AppText>
-      )}
+      ) : null}
     </Card>
   );
 }

@@ -7,7 +7,7 @@ import {
 } from '@trainingai/shared/health/long-term-goal-progress';
 import { AppText, Badge, Disclosure, ProgressBar, Stack } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
-import { bodyCardColors } from '../../../shared/theme/tokens';
+import { bodyCardColors, bodyHeadingColors } from '../../../shared/theme/tokens';
 import { displayFat, metricValue, type BodyRow } from '../data/models';
 import { readingCount, signedRate, weightPaceLine } from '../data/body-view';
 import { HealthMetricCard } from './HealthMetricCard';
@@ -51,6 +51,7 @@ export function BodyWeightCard({
   onLog: () => void;
   onOpen: () => void;
 }) {
+  const { theme } = useTheme();
   const cueColor = useCueColor();
   const points = trendPoints(rows, (row) => row.weightKg);
   const gap =
@@ -63,6 +64,7 @@ export function BodyWeightCard({
       unit="kg"
       decimals={1}
       accent={bodyCardColors.weight}
+      headingColor={bodyHeadingColors[theme.mode].weight}
       caption={weightDate && weightDate !== today ? `Last logged ${weightDate}` : 'Last 7 days'}
       onLog={onLog}
       onOpen={onOpen}

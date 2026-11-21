@@ -56,7 +56,7 @@ export function Disclosure({
               })}
             >
               <AppText variant="label" numberOfLines={2}>{title}</AppText>
-              {subtitle && (
+              {!!subtitle && (
                 <AppText variant="caption" tone="muted" numberOfLines={2}>
                   {subtitle}
                 </AppText>

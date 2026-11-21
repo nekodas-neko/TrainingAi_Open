@@ -306,3 +306,12 @@ screen captures (food, older body metrics and sleep, readiness verdicts, and `is
 test user). `mobile/scripts/web-screens.mjs` runs it. Apart from that flag it leaves `seed.sql`'s rows alone, and it is
 safe to run again.
 
+Its second block (#3969) adds the states a capture could not otherwise reach, all dated from the
+local day it runs (Monday-start weeks, nothing ahead of now): workouts in this week and last
+(skipping a day that already has one) with sets for muscle volume, an Overhead Press personal
+record, a weight goal (`target_weight_kg`), one active shoulder injury, two supplements, the test
+user's friend code `PREVIEW1` and one accepted friend (`friend@local.dev`, a made-up account),
+six cardio activities with heart rate, today's Body Battery morning level with no readings (it
+replaces only the `default` fallback a first read stores, and leaves `oura_heartrate` empty), and
+today's readiness verdict set to the unusual `good` while it is unanswered.
+

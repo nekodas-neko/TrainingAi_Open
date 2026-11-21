@@ -433,6 +433,13 @@ export const bodyCardColors = {
   leanMass: '#22c55e',
   sleep: '#2dd4bf',
 };
+// The card headings on those washes. Dark keeps the accent. In Light the accent sat at 1.4:1 on its
+// own wash, so Body Weight and Sleep take darker steps that reach 4.5:1 on the strongest end of it
+// (tests/light-contrast.test.ts).
+export const bodyHeadingColors = {
+  light: { weight: '#02608d', sleep: '#0b665e' },
+  dark: { weight: bodyCardColors.weight, sleep: bodyCardColors.sleep },
+};
 export const domainTones = {
   light: {
     checkin: { foreground: '#a16207', background: '#fffbeb', border: '#fcd34d' },

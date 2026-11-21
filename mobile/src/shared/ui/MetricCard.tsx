@@ -21,6 +21,7 @@ export function MetricCard({
   icon,
   tone = 'neutral',
   accent,
+  headingColor,
   dense = false,
   centered = false,
   onOpen,
@@ -38,6 +39,8 @@ export function MetricCard({
   icon?: IconName;
   tone?: Tone;
   accent?: string;
+  /** The heading's colour when the accent is too faint to read on its own wash (Light). */
+  headingColor?: string;
   dense?: boolean;
   centered?: boolean;
   onOpen?: () => void;
@@ -54,7 +57,8 @@ export function MetricCard({
     feedback('impact');
     setMenu(true);
   }
-  const color = accent && accent !== 'transparent' ? accent : theme.tones[tone].foreground;
+  const color =
+    headingColor ?? (accent && accent !== 'transparent' ? accent : theme.tones[tone].foreground);
   const header = (
     <Stack
       direction="row"
