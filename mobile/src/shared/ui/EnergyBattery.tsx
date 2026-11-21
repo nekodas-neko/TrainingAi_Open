@@ -33,7 +33,9 @@ export function EnergyBattery({
       <Rect x={2} y={7} width={18} height={10} rx={2.5} />
       <Path d="M22 11v2" />
       {Array.from({ length: level }, (_, i) => (
-        <Rect key={i} x={4 + i * 3.4} y={9} width={2.4} height={6} rx={0.8} fill={ink} stroke="none" />
+        // Five bars inside the 18-wide body (x 2 to 20): 2 wide, 2.8 apart, so the fifth ends at 17.2
+        // and clears the right wall as the first clears the left.
+        <Rect key={i} x={4 + i * 2.8} y={9} width={2} height={6} rx={0.8} fill={ink} stroke="none" />
       ))}
     </Svg>
   );
