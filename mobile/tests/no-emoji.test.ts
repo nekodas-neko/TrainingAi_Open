@@ -32,6 +32,7 @@ const ALLOWED: Record<string, string> = {
 
 function sourceFiles(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {
+    if (name === 'node_modules' || name === '__check_fixture__') return [];
     const path = join(dir, name);
     if (statSync(path).isDirectory()) return sourceFiles(path);
     return /\.(ts|tsx)$/.test(name) ? [path] : [];
