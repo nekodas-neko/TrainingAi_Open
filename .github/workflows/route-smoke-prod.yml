@@ -15,6 +15,12 @@ name: Route smoke (production build)
 #   (`lib/oura-models/constants-delivery.ts`). `scripts/ci/route-smoke-prod.sh` copies them into
 #   `.oura-constants/`, the directory a deploy downloads its set into.
 #
+# - Model assets: production refuses to boot unless object storage lists every ONNX model
+#   (`instrumentation-node.ts`). `scripts/ci/start-local-s3.sh` runs MinIO in the job with
+#   placeholder files at those keys and throwaway credentials made up there (not secrets), so no
+#   real bucket credential is in the repo's Actions (owner decision on #3933, option 2). The guard
+#   is untouched; the job never exercises the real bucket listing, which the release workflow does.
+#
 # 0 Gemini calls: the key is blank and the dev call budget is 0 (`lib/ai/dev-call-budget.ts`).
 
 on:
@@ -56,6 +62,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Start Postgres with SSL
         run: echo "DATABASE_URL=$(scripts/ci/start-ssl-postgres.sh)" >> "$GITHUB_ENV"
+      - name: Start a local S3 stand-in with placeholder model files
+        run: scripts/ci/start-local-s3.sh | sed "s/^export //" >> "$GITHUB_ENV"
       - name: Apply all migrations
         run: node scripts/local-db/migrate.js
       - name: Seed the test user and program

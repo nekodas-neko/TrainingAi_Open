@@ -9,6 +9,8 @@
 #   DATABASE_URL  a Postgres that accepts SSL, with every migration applied and the seed loaded
 #                 (`scripts/ci/start-ssl-postgres.sh`, `node scripts/local-db/migrate.js`,
 #                 `psql "$DATABASE_URL" -f scripts/local-db/seed.sql`). NEVER production.
+#   STORAGE_*     a local S3 stand-in holding placeholder model files
+#                 (`eval "$(scripts/ci/start-local-s3.sh)"`). NEVER the real bucket.
 # Optional:
 #   PORT          default 3200
 #   AUTH_SECRET   default a throwaway: it signs cookies for a server that lives for this run only
@@ -28,6 +30,12 @@ case "$DATABASE_URL" in
   *localhost*|*127.0.0.1*|*host=/*) ;;
   *) echo "route-smoke-prod: DATABASE_URL is not a local database; refusing" >&2; exit 1 ;;
 esac
+case "${STORAGE_ENDPOINT:-}" in
+  http://localhost*|http://127.0.0.1*) ;;
+  *) echo "route-smoke-prod: STORAGE_ENDPOINT must be the local S3 stand-in (scripts/ci/start-local-s3.sh); refusing" >&2; exit 1 ;;
+esac
+# The AWS_* names win over STORAGE_* in lib/exercise-storage.ts; a stray real set must not.
+unset AWS_ENDPOINT_URL AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_S3_BUCKET_NAME
 PORT="${PORT:-3200}"
 export AUTH_SECRET="${AUTH_SECRET:-route-smoke-prod-throwaway-secret}"
 # 0 Gemini calls: no key, and the dev call budget at 0 (`lib/ai/dev-call-budget.ts`).
