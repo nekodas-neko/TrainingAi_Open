@@ -11,16 +11,33 @@ import { HealthResourceHeader } from './HealthResourceHeader';
 import { AppText, Card, Legend, LineChart } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { scaleAlpha } from '../../../shared/theme/alpha';
+import { hrDayChartColors } from '../../../shared/theme/tokens';
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { daySessionsSpec } from '../../workouts/data/models';
 import { useHealthData } from '../data/HealthDataProvider';
-import { hrDayBuckets, hrTracePoints, hrWorkoutWindows } from '../data/hr-trace';
+import {
+  hrDayBuckets,
+  hrEstimatedPoints,
+  hrTracePoints,
+  hrWorkoutLabel,
+  hrWorkoutWindows,
+} from '../data/hr-trace';
 import { hrSpec, stressSpec } from '../data/models';
+// hr-day-chart.tsx windowDefs: the sleep window is drawn at 14%, the workout window at 22%.
+const HR_SLEEP_BAND_OPACITY = 0.14;
+const HR_WORKOUT_BAND_OPACITY = 0.22;
 export function HrDayCard({
   embedded = false,
   color,
   title = 'Heart Rate · Today',
-}: { embedded?: boolean; color?: string; title?: string } = {}) {
+  showEstimated = false,
+}: {
+  embedded?: boolean;
+  color?: string;
+  title?: string;
+  /** Bridge gaps of 20 to 120 minutes with a dashed "Estimated" line: Home's card only, as in the current app. */
+  showEstimated?: boolean;
+} = {}) {
   const { today, timezone, sleep } = useHealthData();
   const { theme } = useTheme();
   const state = useWorkoutResource(hrSpec(today));
@@ -53,13 +70,15 @@ export function HrDayCard({
             to: sleepWindow.endMin,
             label: 'Sleep',
             color: theme.tones.sleep.foreground,
+            opacity: HR_SLEEP_BAND_OPACITY,
           },
         ]
       : []),
     ...hrWorkoutWindows(workouts.data?.sessions ?? [], wallMinute).map((window) => ({
       ...window,
-      label: 'Workout',
-      color: theme.tones.activity.foreground,
+      label: hrWorkoutLabel(window.name),
+      color: hrDayChartColors.workoutBand,
+      opacity: HR_WORKOUT_BAND_OPACITY,
     })),
   ];
   // Negated, so stress points up as on "When the day ran stressed" (#3935).
@@ -96,15 +115,24 @@ export function HrDayCard({
   // hr-day-chart.tsx: with no card colour the line is neutral, white at 75% on dark, slate at 70% on light.
   const hrColor =
     lineColor ?? scaleAlpha(theme.colors.text, theme.mode === 'dark' ? 0.75 : 0.7);
-  const hasWorkout = bands.some((b) => b.label === 'Workout');
+  const workoutBands = bands.filter((b) => b.label !== 'Sleep');
+  const estimated = showEstimated ? hrEstimatedPoints(buckets, skip) : [];
+  const estimatedColor = scaleAlpha(
+    theme.mode === 'dark' ? hrDayChartColors.estimated.dark : hrDayChartColors.estimated.light,
+    0.6,
+  );
   // The legend names what the chart draws, as the current app's does; it carries no source chips.
   const legend = [
     ...(sleepWindow ? [{ label: 'Sleep', color: theme.tones.sleep.foreground }] : []),
-    ...(hasWorkout ? [{ label: 'Workout', color: theme.tones.activity.foreground }] : []),
+    ...[...new Set(workoutBands.map((b) => b.label))].map((label) => ({
+      label,
+      color: hrDayChartColors.workoutBand,
+    })),
     { label: 'Heart rate', color: hrColor },
     ...(stressPoints.length
       ? [{ label: 'Stress (−1 to +1)', color: theme.tones.recovery.foreground }]
       : []),
+    ...(estimated.length ? [{ label: 'Estimated', color: estimatedColor }] : []),
   ];
   // Fitted to the day with 10 bpm of headroom either side, as the current app's chart is.
   const domain = hrChartDomain(buckets.map((p) => p.y));
@@ -132,22 +160,26 @@ export function HrDayCard({
         dots="none"
         height={theme.sizes.hrChartHeight}
         tickCount={4}
+        boundedAxis
         label="24h heart rate in bpm"
         tone="heart"
         bands={bands}
         interactive={!embedded}
-        series={
-          stressPoints.length
+        series={[
+          ...(estimated.length
+            ? [{ label: 'Estimated', color: estimatedColor, dashed: true, points: estimated }]
+            : []),
+          ...(stressPoints.length
             ? [
                 {
                   label: 'Estimated stress',
                   color: theme.tones.recovery.foreground,
-                  domain: [-1, 1],
+                  domain: [-1, 1] as const,
                   points: stressPoints,
                 },
               ]
-            : []
-        }
+            : []),
+        ]}
       />
       <Legend items={legend} />
       {!embedded && (

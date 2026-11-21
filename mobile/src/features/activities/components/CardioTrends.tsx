@@ -1,5 +1,6 @@
 import { deviceHealthName } from '../../../integrations/device-health/platform';
 import { useState } from 'react';
+import { View } from 'react-native';
 import { HR_ZONE_META } from '@trainingai/shared/health/hr-zones';
 import { zoneStacksUnmeasured } from '@trainingai/shared/health/cardio-trends';
 import {
@@ -11,6 +12,7 @@ import {
   StackedBarChart,
   StatusIndicator,
 } from '../../../shared/ui';
+import { centredOverlayTop } from '../../../shared/ui/touchSlop';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { cardioTrendsSpec } from '../data/models';
@@ -30,9 +32,32 @@ export function CardioTrends() {
   }));
   return (
     <Card>
-      <AppText variant="eyebrow" tone="muted">
-        Trends
-      </AppText>
+      {/* The status is drawn over the heading line, not as a row of its own: an idle 48 px slot
+          under the chart was the empty band at the bottom of the card (#2934). */}
+      <View>
+        <AppText variant="eyebrow" tone="muted">
+          Trends
+        </AppText>
+        {(state.refreshing || state.error) && (
+          <View
+            style={{
+              position: 'absolute',
+              right: 0,
+              top: centredOverlayTop(
+                theme.typography.eyebrow.lineHeight ?? theme.sizes.touchTarget,
+                theme.sizes.touchTarget,
+              ),
+            }}
+          >
+            <StatusIndicator
+              label="Cardio trends"
+              error={state.error}
+              busy={state.refreshing}
+              onRetry={state.refresh}
+            />
+          </View>
+        )}
+      </View>
       <SegmentedControl
         label="Cardio trend"
         value={view}
@@ -136,12 +161,6 @@ export function CardioTrends() {
           <AppText tone="muted">No cadence readings yet.</AppText>
         )}
       </StableContent>
-      <StatusIndicator
-        label="Cardio trends"
-        error={state.error}
-        busy={state.refreshing}
-        onRetry={state.refresh}
-      />
     </Card>
   );
 }

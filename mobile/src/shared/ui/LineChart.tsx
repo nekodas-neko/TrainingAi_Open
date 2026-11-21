@@ -20,6 +20,7 @@ import {
   meetBox,
   pointCentreX,
   niceTicks,
+  boundedTicks,
   smoothPath,
   DENSE_AXIS_POINTS,
   tickLabels,
@@ -51,6 +52,7 @@ export function LineChart({
   domain,
   xDomain,
   bands = [],
+  boundedAxis = false,
   series = [],
   markers = [],
   interactive = false,
@@ -84,7 +86,9 @@ export function LineChart({
   tone?: Tone;
   domain?: readonly [number, number];
   xDomain?: readonly [number, number];
-  bands?: readonly { from: number; to: number; label: string; color: string }[];
+  bands?: readonly { from: number; to: number; label: string; color: string; opacity?: number }[];
+  /** With a fixed `domain`: label both ends of it, as chart.js does with `min` and `max` set. */
+  boundedAxis?: boolean;
   series?: readonly {
     label: string;
     color: string;
@@ -190,7 +194,11 @@ export function LineChart({
   const xs = points.map((point, index) => point.x ?? index);
   const xMin = xDomain?.[0] ?? Math.min(...xs);
   const xMax = xDomain?.[1] ?? Math.max(...xs);
-  const ticks = gridlines || yAxis ? (scale ? scale.ticks : niceTicks(min, max, tickCount)) : [];
+  const ticks = gridlines || yAxis ? (scale
+      ? scale.ticks
+      : boundedAxis && domain
+        ? boundedTicks(min, max, tickCount)
+        : niceTicks(min, max, tickCount)) : [];
   const tickTexts = tickLabels(ticks);
   // The plot sits right of the y-axis column; overlays are absolute so the Svg and the touch
   // responder below keep their existing layout (locationX is relative to the root View).
@@ -289,7 +297,7 @@ export function LineChart({
               width={Math.max(0, xx(Math.min(xMax, band.to)) - xx(Math.max(xMin, band.from)))}
               height={vbHeight}
               fill={band.color}
-              opacity={0.15}
+              opacity={band.opacity ?? 0.15}
             />
           ))}
           {markers.map((marker, index) => (

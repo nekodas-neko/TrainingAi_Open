@@ -45,7 +45,7 @@ test('logged workouts become chart windows by the current app’s rule (#2903 it
     ],
     minuteOf,
   );
-  assert.deepEqual(windows, [{ from: 7 * 60 + 51, to: 9 * 60 + 11 }]);
+  assert.deepEqual(windows, [{ from: 7 * 60 + 51, to: 9 * 60 + 11, name: null }]);
 });
 
 test('the Heart rate card reads workout instants, not the day log’s display strings (#2903 item 1)', async () => {

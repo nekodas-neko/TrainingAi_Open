@@ -2,6 +2,7 @@ import { ActivityIndicator } from 'react-native';
 import { Pressable } from './Pressable';
 import { Icon, type IconName } from './Icon';
 import { useTheme } from '../theme/ThemeProvider';
+import { slopTo } from './touchSlop';
 import type { ReactNode } from 'react';
 
 export function IconButton({
@@ -14,6 +15,7 @@ export function IconButton({
   tone = 'muted',
   selected,
   expanded,
+  drawnWidth,
   children,
 }: {
   icon: IconName;
@@ -25,6 +27,8 @@ export function IconButton({
   tone?: 'muted' | 'brand' | 'danger';
   selected?: boolean;
   expanded?: boolean;
+  /** Draw the button narrower than the touch target; hitSlop keeps the full-width hit area. */
+  drawnWidth?: number;
   children?: ReactNode;
 }) {
   const { theme } = useTheme();
@@ -36,8 +40,13 @@ export function IconButton({
       accessibilityState={{ disabled: disabled || !onPress || busy, busy, selected, expanded }}
       disabled={disabled || !onPress || busy}
       onPress={onPress}
+      hitSlop={
+        drawnWidth === undefined
+          ? undefined
+          : { left: slopTo(theme.sizes.touchTarget, drawnWidth), right: slopTo(theme.sizes.touchTarget, drawnWidth) }
+      }
       style={({ pressed }) => ({
-        width: theme.sizes.touchTarget,
+        width: drawnWidth ?? theme.sizes.touchTarget,
         height: theme.sizes.touchTarget,
         borderRadius: theme.radii.control,
         alignItems: 'center',

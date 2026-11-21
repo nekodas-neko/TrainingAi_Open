@@ -29,9 +29,10 @@ export function stackCalendarTitleToFit(fit: CalendarTitleFit): boolean {
 
 /**
  * Whether the title sits above the controls. Until the block, the controls and the title are all
- * measured it stacks: on a phone the controls leave the title too little room at every text scale,
- * so the first paint is already the final layout and nothing jumps.
+ * measured it shares the row, which is where a phone at normal text size ends up (#2948): the
+ * controls are 160 px, leaving a 384 px phone's title 152 px. A larger text size stacks it once
+ * measured.
  */
 export function calendarTitleStacked(fit: CalendarTitleFit | null): boolean {
-  return fit === null || stackCalendarTitleToFit(fit);
+  return fit !== null && stackCalendarTitleToFit(fit);
 }

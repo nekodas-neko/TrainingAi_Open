@@ -1,5 +1,6 @@
 import { balanceProvenance, budgetLine } from '../../nutrition/data/budget-line';
 import { useRecordedIntake } from '../../nutrition/data/useRecordedIntake';
+import { sleepStageLegend, SLEEP_LEGEND_MIN_FONT_SCALE } from '../data/sleep-legend';
 import { HrDayCard } from '../../health/components/HrDayCard';
 import { verdictSpec } from '../../health/data/checkin';
 import { verdictCopy } from '@trainingai/shared/health/sleep-verdict-copy';
@@ -450,14 +451,7 @@ function HomeWidgetBody({
     // The current app starts at 8 h until a goal is saved, so the goal text and bar are always there.
     const savedGoal = goals?.data?.sleepGoalHours;
     const goal = savedGoal != null && savedGoal > 0 ? savedGoal : DEFAULT_SLEEP_GOAL_HOURS;
-    const stages = night
-      ? [
-          { label: 'Deep', hours: night.deepSleepHours, color: theme.sleepStages.deep },
-          { label: 'REM', hours: night.remSleepHours, color: theme.sleepStages.rem },
-          { label: 'Light', hours: night.lightSleepHours, color: theme.sleepStages.light },
-          { label: 'Awake', hours: night.awakHours, color: theme.sleepStages.awake },
-        ]
-      : [];
+    const stages = night ? sleepStageLegend(night, theme.sleepStages) : [];
     const known = stages.reduce((sum, row) => sum + (row.hours ?? 0), 0);
     const waiting =
       handoff.status !== 'idle' && !hasLastNight(health.sleep, health.today)
@@ -521,9 +515,16 @@ function HomeWidgetBody({
                       />
                     ))}
                 </View>
-                <Stack direction="row" wrap gap="md">
+                {/* One row, as the current app's is: the items shrink instead of wrapping. */}
+                <Stack direction="row" gap="md">
                   {stages.map((row) => (
-                    <Stack key={row.label} direction="row" align="center" gap="xs">
+                    <Stack
+                      key={row.label}
+                      direction="row"
+                      align="center"
+                      gap="xs"
+                      style={{ flexShrink: 1, minWidth: 0 }}
+                    >
                       <View
                         style={{
                           width: theme.sizes.legendDot,
@@ -532,11 +533,24 @@ function HomeWidgetBody({
                           borderRadius: theme.radii.pill,
                         }}
                       />
-                      <AppText variant="caption" tone="muted">
+                      <AppText
+                        variant="caption"
+                        tone="muted"
+                        numberOfLines={1}
+                        adjustsFontSizeToFit
+                        minimumFontScale={SLEEP_LEGEND_MIN_FONT_SCALE}
+                        style={{ flexShrink: 1 }}
+                      >
                         {row.label}
                       </AppText>
-                      <AppText variant="caption" style={{ fontWeight: '700' }}>
-                        {row.hours == null ? '—' : formatHoursMinutes(row.hours * 60)}
+                      <AppText
+                        variant="caption"
+                        numberOfLines={1}
+                        adjustsFontSizeToFit
+                        minimumFontScale={SLEEP_LEGEND_MIN_FONT_SCALE}
+                        style={{ fontWeight: '700', flexShrink: 1 }}
+                      >
+                        {row.text}
                       </AppText>
                     </Stack>
                   ))}
@@ -782,7 +796,7 @@ function HomeWidgetBody({
       >
         <Card accent={accent}>
           {title('Heart Rate · Today')}
-          <HrDayCard embedded color={accent} />
+          <HrDayCard embedded showEstimated color={accent} />
         </Card>
       </TouchSurface>
     );
