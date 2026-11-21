@@ -149,3 +149,25 @@ describe('buildRecapFacts', () => {
     expect(withoutRpe.sessionRpe).toBeNull()
   })
 })
+
+describe('the effort climb counts only efforts the lifter gave (#3893)', () => {
+  const climb = (sources: Array<SetLog['rpeSource']>) => buildRecapFacts({
+    session: makeSession({
+      exercises: [makeExercise({
+        sets: [makeSet({ setNumber: 1, rpe: 7, rpeSource: sources[0] }), makeSet({ setNumber: 2, rpe: 9, rpeSource: sources[1] })],
+      })],
+    }),
+    recentDurationsMin: [], restSecByStyleSet: new Map(), prCount: 0,
+  }).rpeDrift
+
+  it('two rated sets climb', () => {
+    expect(climb(['rated', 'rated'])).toBe(2)
+  })
+  it('a pre-filled effort is not an answer: one rated set is too few to show a climb', () => {
+    expect(climb(['expected', 'rated'])).toBeNull()
+    expect(climb(['expected', 'expected'])).toBeNull()
+  })
+  it('a set logged before the source existed is read as reported', () => {
+    expect(climb([undefined, 'rated'])).toBe(2)
+  })
+})

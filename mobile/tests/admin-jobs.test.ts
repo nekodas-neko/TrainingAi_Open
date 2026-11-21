@@ -133,3 +133,15 @@ test('a count preview keeps its server answer, and a run is given a summary the 
   assert.deepEqual(jobReport({}, other, false), other, 'other jobs pass through untouched');
   assert.equal(canWrite({ dry: jobReport(job, { processed: 1 }, false), dryParams: none, params: none, snapshot: true, typed: 'WRITE' }), false, 'an answer that is not a count never unlocks a write');
 });
+
+test('the session read replay is dry-run only: the card never offers or sends a write (#3893)', () => {
+  const only = adminJobs.filter((job) => job.dryRunOnly);
+  assert.deepEqual(only.map((job) => job.path), ['/api/admin/session-read-replay']);
+  assert.equal(only[0].movesPastScores, undefined, 'it writes nothing');
+  const route = readFileSync(new URL('../../app/api/admin/session-read-replay/route.ts', import.meta.url), 'utf8');
+  assert.match(route, /dryRun: z\.literal\('true'\)\.optional\(\)/, 'the server refuses dryRun=false');
+  const card = readFileSync(new URL('../src/features/admin/components/AdminJobCard.tsx', import.meta.url), 'utf8');
+  assert.match(card, /if \(write && \(job\.dryRunOnly \|\| !canWrite/);
+  assert.match(card, /const unlocked = !job\.dryRunOnly && canWrite/);
+  assert.match(card, /dry\?\.dryRun === true && !job\.dryRunOnly &&/);
+});

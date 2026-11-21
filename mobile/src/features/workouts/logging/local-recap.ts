@@ -45,6 +45,7 @@ export function localRecap(workout: WorkoutRecord, journal: readonly WorkoutReco
           restTimeSec: set.restAfterSec ?? undefined,
           plannedRestSec: set.planned?.restSeconds,
           rpe: set.rpe ?? undefined,
+          rpeSource: set.rpeSource ?? undefined,
         })),
       },
     ];

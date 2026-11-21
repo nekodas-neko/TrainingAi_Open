@@ -41,6 +41,7 @@ import { z } from 'zod'
 import { PrescriptionSchema } from '@trainingai/shared/ai-periodization/prescription-schema'
 import { reconcilePrescription } from '@trainingai/shared/ai-periodization/reconcile-prescription'
 import { buildPrescriptionShadow } from '@trainingai/shared/ai-periodization/prescription-shadow'
+import { loadSessionReads } from '@trainingai/shared/ai-periodization/session-read-plan'
 import type { AiPrescription, AiPrescriptionExercise, PeriodizationPhase, PrescriptionGeneratedFor } from '@trainingai/shared/types/ai-periodization'
 import type { PrescriptionSignals } from '@trainingai/shared/ai-periodization/signals'
 import type { WorkoutRepository } from '@/lib/data/repository'
@@ -372,9 +373,13 @@ async function runPrescriptionGeneration(
   // The deload count this plan was made at, stored on it: `workout-data` regenerates a plan in a
   // finished deload only when it was made before the count got there (`deloadEndDue`), so a plan made
   // after this exit check does not ask for another generation on every read.
+  // #3893: the session read of each exercise's last session, in shadow. It is stored beside the plan
+  // and read by nothing that builds it; a failed read stores no read and the plan is unchanged.
+  const sessionReads = await loadSessionReads(repo, userId, activeProgram, validSession, tz).catch(() => null)
   const storePrescription = (p: AiPrescription, expiresAt: Date, status: 'pending' | 'auto_applied', storeFor: PrescriptionGeneratedFor) =>
     repo.storePrescription(userId, programSessionId, {
       ...p,
+      ...(sessionReads && sessionReads.length > 0 ? { sessionReads } : {}),
       sessionsInPhaseAtPlan: state.sessionsInPhase,
       // An aligned program's deload ends at its cap, not the type's count: the same once-only stamp,
       // in the program's weeks.

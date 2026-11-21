@@ -46,7 +46,7 @@ export function AdminJobCard({ job }: { job: AdminJob }) {
     if (!resources || busy || problem) return;
     // A count preview is a read: without a reader it cannot run, and it must never fall to the POST.
     if (job.countPreview && !write && !reader) return;
-    if (write && !canWrite({ dry, dryParams, params, snapshot, typed })) return;
+    if (write && (job.dryRunOnly || !canWrite({ dry, dryParams, params, snapshot, typed }))) return;
     setBusy(write ? 'write' : 'dry');
     setError(null);
     try {
@@ -75,7 +75,7 @@ export function AdminJobCard({ job }: { job: AdminJob }) {
 
   const rows = summaryRows(written ?? dry);
   const remaining = remainingOf(written);
-  const unlocked = canWrite({ dry, dryParams, params, snapshot, typed });
+  const unlocked = !job.dryRunOnly && canWrite({ dry, dryParams, params, snapshot, typed });
   return (
     <Card>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm, flexWrap: 'wrap' }}>
@@ -141,7 +141,7 @@ export function AdminJobCard({ job }: { job: AdminJob }) {
           )}
         </Card>
       )}
-      {dry?.dryRun === true && (
+      {dry?.dryRun === true && !job.dryRunOnly && (
         <Stack gap="sm">
           <AppText variant="label">To write for real</AppText>
           <SwitchRow

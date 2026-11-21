@@ -2,6 +2,7 @@ import type { WorkoutSession } from '@trainingai/shared/types/log'
 import { restAdherencePct, restAdherenceSets } from './rest-adherence'
 import { median } from './time-audit'
 import { sessionActiveMin } from './active-duration'
+import { isReportedRpe } from './rpe-source'
 
 export interface RecapFacts {
   durationMin: number | null
@@ -46,7 +47,8 @@ export function buildRecapFacts({ session, recentDurationsMin, restSecByStyleSet
 
   const rpeDeltas: number[] = []
   for (const ex of session.exercises) {
-    const rated = ex.sets.filter(s => s.rpe != null).sort((a, b) => a.setNumber - b.setNumber)
+    // #3893: a pre-filled effort is not an answer, so an untouched picker cannot read as "no climb".
+    const rated = ex.sets.filter(s => s.rpe != null && isReportedRpe(s.rpeSource)).sort((a, b) => a.setNumber - b.setNumber)
     if (rated.length >= 2) {
       rpeDeltas.push(rated[rated.length - 1].rpe! - rated[0].rpe!)
     }

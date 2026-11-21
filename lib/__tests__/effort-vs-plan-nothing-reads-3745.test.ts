@@ -81,6 +81,15 @@ const CARRIERS: Record<string, Carrier> = {
       'effortSource:         s.exerciseLogs.effortSource,',
     ],
   },
+  'lib/data/postgres/slices/session-read.ts': {
+    why: 'selects it for the session read (#3893), read only',
+    lines: [
+      'effortVsPlan: s.exerciseLogs.effortVsPlan,',
+      'effortSource: s.exerciseLogs.effortSource,',
+      'effortVsPlan: l.effortVsPlan,',
+      'effortSource: l.effortSource,',
+    ],
+  },
   'mobile/src/features/workouts/logging/effort.ts': { why: 'asks, records a tap, marks it seen, builds the upload field', lines: 30 },
   'mobile/src/features/workouts/logging/workout.ts': { why: 'journal schema and the upload payload', lines: 5 },
   'mobile/src/features/workouts/logging/WorkoutJournalStore.ts': { why: 'the tap and seen actions; resets on re-log and swap', lines: 16 },
@@ -94,6 +103,34 @@ const CARRIERS: Record<string, Carrier> = {
   'mobile/modules/picture-in-picture/android/src/main/java/expo/modules/pictureinpicture/PipState.kt': { why: 'which buttons the window shows, and the answer selected', lines: 7 },
   'mobile/modules/picture-in-picture/android/src/main/java/expo/modules/pictureinpicture/PictureInPictureModule.kt': { why: 'when the buttons go back', lines: 1 },
 }
+
+/**
+ * The one reader #3889 decided on (20 Nov: "this issue's session read applies them"): the session
+ * read, IN SHADOW (#3893). It is stored beside a plan and counted by an admin replay; nothing that
+ * builds or shows a prescription reads its result, which the import pin below holds.
+ */
+const SHADOW_READERS: Record<string, Carrier> = {
+  'packages/shared/src/ai-periodization/session-read.ts': {
+    why: 'the session read: a tapped answer moves its band (#3889, 20 Nov)',
+    lines: [
+      'effort: { vsPlan: number | null; source: string | null } | null',
+      'return effort.vsPlan === -1 || effort.vsPlan === 0 || effort.vsPlan === 1 ? effort.vsPlan : null',
+      "// Effort per set counts only when the lifter gave it (`'asked'` never reached `set_logs`: #3889 step 2 stored `effort_vs_plan`).",
+      'effortVsPlan: number | null',
+      'effortSource: string | null',
+      'effort: { vsPlan: log.effortVsPlan, source: log.effortSource },',
+    ],
+  },
+}
+
+/** Every non-test file allowed to import the session read while it is in shadow. */
+const SESSION_READ_IMPORTERS = [
+  'app/api/admin/session-read-replay/route.ts',
+  'lib/data/postgres/slices/session-read.ts',
+  'lib/data/repository.ts',
+  'packages/shared/src/ai-periodization/session-read-plan.ts',
+  'packages/shared/src/types/ai-periodization.ts',
+]
 
 const isTest = (path: string) =>
   /(^|\/)(__tests__|tests|test)\//.test(path) || /\.test\.tsx?$/.test(path) || /Test\.kt$/.test(path)
@@ -112,11 +149,12 @@ describe('nothing reads the effort answer yet (#3745, until #3889)', () => {
     files.map(path => [path, naming(readFileSync(path, 'utf8'))] as const).filter(([, lines]) => lines.length),
   )
 
-  it('only the carriers above name it, each exactly as pinned', () => {
-    expect([...named.keys()].filter(path => !(path in CARRIERS))).toEqual([])
+  it('only the carriers and the shadow reader name it, each exactly as pinned', () => {
+    const allowed = { ...CARRIERS, ...SHADOW_READERS }
+    expect([...named.keys()].filter(path => !(path in allowed))).toEqual([])
     // And the list is not stale: each carrier still names it.
-    expect(Object.keys(CARRIERS).filter(path => !named.has(path))).toEqual([])
-    for (const [path, { lines }] of Object.entries(CARRIERS)) {
+    expect(Object.keys(allowed).filter(path => !named.has(path))).toEqual([])
+    for (const [path, { lines }] of Object.entries(allowed)) {
       const found = named.get(path) ?? []
       if (typeof lines === 'number') expect({ path, lines: found.length }).toEqual({ path, lines })
       else expect({ path, lines: found }).toEqual({ path, lines })
@@ -130,7 +168,15 @@ describe('nothing reads the effort answer yet (#3745, until #3889)', () => {
     // There are such files to check, and none of them names the answer.
     const readers = files.filter(path => READERS.test(path))
     expect(readers.length).toBeGreaterThan(20)
-    expect(readers.filter(path => named.has(path))).toEqual([])
+    expect(readers.filter(path => named.has(path))).toEqual(Object.keys(SHADOW_READERS))
     expect(Object.keys(CARRIERS).filter(path => READERS.test(path))).toEqual([])
+  })
+
+  it('the shadow reader feeds no prescription: only the plan store, the replay and their types import it (#3893)', () => {
+    const importers = files.filter(path => /from '[^']*ai-periodization\/session-read'|import\('[^']*ai-periodization\/session-read'\)|from '\.\/session-read'/.test(readFileSync(path, 'utf8')))
+    expect(importers.sort()).toEqual([...SESSION_READ_IMPORTERS].sort())
+    // Generation only stores the reads it loads; it never imports the rules themselves.
+    const gen = readFileSync('packages/shared/src/ai-periodization/generate-prescription.ts', 'utf8')
+    expect(gen.match(/sessionReads/g)?.length).toBe(4)
   })
 })

@@ -124,6 +124,7 @@ import * as mp from './slices/meal-plans'
 import * as social from './slices/social'
 import * as prog from './slices/programs'
 import * as period from './slices/periodization'
+import { getSessionReadLogs } from './slices/session-read'
 import * as userStatsSlice from './slices/user-stats'
 import * as oura from './slices/oura'
 import { readRawFrames, readRecentRawFrames, DS_BUCKET_SPAN } from './slices/oura-raw-frames'
@@ -8693,6 +8694,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async wasProgramSessionTrainedSince(userId: string, programSessionId: string, since: Date) { return period.wasProgramSessionTrainedSince(this.db, userId, programSessionId, since) }
   async getRecentSessionsOfType(userId: string, programSessionId: string, limit: number) { return period.getRecentSessionsOfType(this.db, userId, programSessionId, limit) }
   async getSetLogsForSessions(workoutSessionIds: string[]) { return period.getSetLogsForSessions(this.db, workoutSessionIds) }
+  async getSessionReadLogs(userId: string, from: Date, to: Date) { return getSessionReadLogs(this.db, userId, from, to) }
   async getSetTimingRows(userId: string, exerciseNames: string[]) { return period.getSetTimingRows(this.db, userId, exerciseNames) }
   async getExercise1rmHistory(userId: string, exerciseNames: string[], tz: string, windowDays?: number) { return period.getExercise1rmHistory(this.db, userId, exerciseNames, tz, windowDays) }
   async getWeeklySetsByMuscleGroup(userId: string, programId: string, weekStart: string, weekEnd: string, tz: string) { return period.getWeeklySetsByMuscleGroup(this.db, userId, programId, weekStart, weekEnd, tz) }
