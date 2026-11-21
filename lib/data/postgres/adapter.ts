@@ -1049,8 +1049,32 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     return this.rowToUser(r)
   }
 
-  async updateUserPassword(userId: string, passwordHash: string): Promise<void> {
-    await this.db.update(s.users).set({ passwordHash }).where(eq(s.users.id, userId))
+  /**
+   * #3673 item 5: a new password ends every other sign-in of the account, in one transaction with
+   * the write, so a password someone else learned stops working everywhere it was used:
+   * - every native sign-in is revoked (`revokeEveryNativeSignIn`, reason `password_change`);
+   * - every web session signed in before `at` is refused from here on (`endSignInsBefore`,
+   *   `users.sign_ins_valid_from`, #3829's column). Not `sessions_valid_from`: that is the data
+   *   epoch, and moving it would make every device wipe its store and read everything again.
+   * The route gives the caller's own browser a fresh cookie stamped after `at`
+   * (`reissueSessionCookie`). Families are locked before the user row, the order
+   * `linkOAuthAccount` uses against a rotation. Throws unless exactly one row was set.
+   */
+  async updateUserPassword(userId: string, passwordHash: string, at: Date = new Date()): Promise<void> {
+    await this.db.transaction(async x => {
+      await nativeRefreshTokens.lockEveryNativeFamily(x, userId)
+      const rows = await x.update(s.users).set({ passwordHash }).where(eq(s.users.id, userId)).returning({ id: s.users.id })
+      if (rows.length !== 1) throw new Error('password was not updated')
+      await nativeRefreshTokens.revokeEveryNativeSignIn(x, userId)
+      await authData.endSignInsBefore(x, userId, at)
+    })
+  }
+
+  /** #3854 item 1: a web sign-out ends every sign-in of the account made before `at`
+   *  (`endSignInsBefore`), so a session cookie a late response sets again after the sign-out
+   *  cleared it is refused, whatever its timing. */
+  async endSignInsBefore(userId: string, at: Date = new Date()): Promise<void> {
+    await authData.endSignInsBefore(this.db, userId, at)
   }
 
   async getTimingBaselineDate(userId: string): Promise<string | null> {

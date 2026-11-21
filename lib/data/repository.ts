@@ -692,7 +692,10 @@ export interface WorkoutRepository {
   updateUserProfile(userId: string, profile: Partial<Pick<User, 'displayName' | 'heightCm' | 'dateOfBirth' | 'weightGoalKg' | 'timezone' | 'sex' | 'activityLevel' | 'fitnessGoal'>>): Promise<User>
   touchLastGoalReviewAt(userId: string): Promise<void>
   updateUserAvatar(userId: string, avatar: string): Promise<User>
-  updateUserPassword(userId: string, passwordHash: string): Promise<void>
+  /** #3673 item 5: also ends every other sign-in (native families revoked, web sessions before `at` refused). */
+  updateUserPassword(userId: string, passwordHash: string, at?: Date): Promise<void>
+  /** #3854 item 1: refuse every sign-in of the account made before `at` (`users.sign_ins_valid_from`). */
+  endSignInsBefore(userId: string, at?: Date): Promise<void>
   /** #3797: a password it clears ends that password's native sign-ins; `activate` for a verified, invited address. */
   linkOAuthAccount(userId: string, oauthSub: string, opts?: { activate?: boolean }): Promise<boolean>
   getTimingBaselineDate(userId: string): Promise<string | null>
