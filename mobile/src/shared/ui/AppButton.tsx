@@ -1,4 +1,6 @@
+import { useContext } from 'react';
 import { ActivityIndicator, type PressableProps } from 'react-native';
+import { RowGestureContext } from './RowGestureContext';
 import { Pressable } from './Pressable';
 import { AppText } from './AppText';
 import { Stack } from './Stack';
@@ -29,6 +31,16 @@ export function AppButton({
   textVariant?: TextVariant;
 }) {
   const { theme } = useTheme();
+  // Inside a swipe row (`SwipeReveal`) a drag, or the tap that closes an open row, is not a press.
+  // A plain tap still is (#2204).
+  const gesture = useContext(RowGestureContext);
+  const onPress = props.onPress;
+  const guardedPress: PressableProps['onPress'] =
+    gesture && onPress
+      ? (event) => {
+          if (!gesture.suppressPress()) onPress(event);
+        }
+      : onPress;
   const blocked = disabled || busy || !props.onPress;
   const foreground = blocked
     ? theme.colors.disabled
@@ -57,6 +69,7 @@ export function AppButton({
   return (
     <Pressable
       {...props}
+      onPress={guardedPress}
       accessibilityRole="button"
       accessibilityState={{ ...props.accessibilityState, disabled: blocked, busy }}
       disabled={blocked}

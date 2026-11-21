@@ -2,6 +2,7 @@
 
 import { memo } from 'react'
 import { ThermometerIcon, TriangleAlertIcon, MoonIcon } from 'lucide-react'
+import { deloadBannerMessage } from '@trainingai/shared/ai-periodization/deload-reasons'
 
 interface DeloadBannerProps {
   consecutiveTrainingDays: number
@@ -31,15 +32,7 @@ export const DeloadBanner = memo(function DeloadBanner({
     : deloadStrength === 'recommended' ? '#f9731640'
     : 'color-mix(in oklch, var(--accent-amber) 25%, transparent)'
 
-  let message: string
-  if (temperatureAlert) {
-    message = 'Body temp elevated — rest or deload recommended'
-  } else if (streakBroken) {
-    message = `${consecutiveRestDays} rest days — resting today breaks your streak`
-  } else {
-    const suffix = deloadStrength === 'soft' ? ' — consider a rest soon' : ' — rest or deload recommended today'
-    message = `${consecutiveTrainingDays} sessions in a row${suffix}`
-  }
+  const message = deloadBannerMessage({ consecutiveTrainingDays, deloadStrength, temperatureAlert, consecutiveRestDays, streakBroken })
 
   return (
     <div className="px-4 pt-2 pb-1">

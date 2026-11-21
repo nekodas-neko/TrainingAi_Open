@@ -72,6 +72,7 @@ export { MarkdownText } from './MarkdownText';
 export { ZoneGauge } from './ZoneGauge';
 
 export { SwipeDelete } from './SwipeDelete';
+export { SwipeReveal, type SwipeRevealAction } from './SwipeReveal';
 export { MultiChoice } from './MultiChoice';
 export { SegmentRing } from './SegmentRing';
 export { QrCode } from './QrCode';

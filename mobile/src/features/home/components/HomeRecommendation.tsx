@@ -10,7 +10,17 @@ import {
   Skeleton,
   Stack,
   StatusIndicator,
+  SwipeReveal,
 } from '../../../shared/ui';
+import { readinessSpec } from '../../health/data/models';
+import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
+import {
+  deloadWhy,
+  recommendationControls,
+  recommendationStrip,
+  restDayCardModel,
+} from '../data/recommendation-reasons';
+import { DeloadStrip } from './DeloadStrip';
 import { useHome } from '../data/HomeProvider';
 import { useWorkoutContext } from '../../workouts/WorkoutProvider';
 import { useWorkoutJournal } from '../../workouts/logging/WorkoutJournalProvider';
@@ -43,6 +53,8 @@ export function HomeRecommendation({
   const journal = useWorkoutJournal();
   const { theme } = useTheme();
   const [error, setError] = useState<string | null>(null);
+  const [whyOpen, setWhyOpen] = useState(false);
+  const readiness = useWorkoutResource(readinessSpec(today));
   const rec = catalog?.recommendation;
   const model = homeRecommendationModel({
     catalog,
@@ -54,6 +66,16 @@ export function HomeRecommendation({
     moodFailed: !!home.errors[`mood:${today}`],
     today,
   });
+  const strip = recommendationStrip(rec, model);
+  const withStrip = (card: React.ReactElement) =>
+    strip ? (
+      <Stack gap="sm">
+        <DeloadStrip strip={strip} />
+        {card}
+      </Stack>
+    ) : (
+      card
+    );
   async function rest(value: boolean) {
     try {
       await home.store?.chooseRestDay(today, value);
@@ -72,7 +94,7 @@ export function HomeRecommendation({
   }
   if (model.kind === 'checkin' || !home.mood) {
     const session = model.kind === 'checkin' ? model.session : undefined;
-    return (
+    return withStrip(
       <Card tone="checkin">
         <AppText variant="eyebrow" style={{ color: theme.tones.checkin.foreground }}>
           Exercise Readiness
@@ -88,19 +110,53 @@ export function HomeRecommendation({
           </Stack>
         </Stack>
         <AppButton title="Log Readiness · ~15 sec" onPress={() => onReadiness(session)} />
-      </Card>
+      </Card>,
     );
   }
   if (model.kind === 'rest') {
+    // #3644: the current app's rest-day guidance, from the same shared `restDayGuidance`.
+    const guidance = restDayCardModel({
+      readiness: readiness.data,
+      soreMuscles: home.mood.soreMuscles,
+      consecutiveRestDays: rec?.consecutiveRestDays,
+      today,
+    });
     return (
       <Card tone="sleep">
         <Stack direction="row" align="center">
           <Icon name="moon" color={theme.tones.sleep.foreground} />
           <AppText variant="heading">Rest Day</AppText>
         </Stack>
-        <AppText variant="caption" tone="muted">
-          {model.reason}
+        <AppText variant="eyebrow" style={{ color: theme.tones.sleep.foreground }}>
+          {guidance.title}
         </AppText>
+        <AppText variant="caption" tone="muted">
+          {guidance.body}
+        </AppText>
+        {guidance.suggestions.length > 0 && (
+          <Stack gap="xs">
+            {guidance.suggestions.map((suggestion) => (
+              <Stack key={suggestion} direction="row" align="flex-start" gap="xs">
+                <AppText variant="caption" tone="muted">
+                  •
+                </AppText>
+                <AppText variant="caption" tone="muted" style={{ flex: 1 }}>
+                  {suggestion}
+                </AppText>
+              </Stack>
+            ))}
+          </Stack>
+        )}
+        {guidance.bedtime && (
+          <AppText variant="caption" style={{ fontWeight: '600' }}>
+            Recommended bedtime: {guidance.bedtime}
+          </AppText>
+        )}
+        {guidance.lowConfidence && (
+          <AppText variant="micro" tone="muted">
+            Based on limited data today.
+          </AppText>
+        )}
         <AppButton title="Train instead" variant="ghost" onPress={() => void rest(false)} />
         <StatusIndicator label="Rest day" error={error} />
       </Card>
@@ -122,7 +178,9 @@ export function HomeRecommendation({
   const accent = home.preferences.cardColors?.recommendedToday ?? theme.homeCards.recommendedToday;
   const soreColor = soreChipColor(theme.mode, theme.status.warning);
   const eyebrowColor = done ? theme.status.success : accent;
-  return (
+  const controls = recommendationControls(model.action);
+  const why = rec && controls === 'rest-and-full' ? deloadWhy(rec) : null;
+  return withStrip(
     <Card tone="neutral" accent={done ? theme.status.success : accent} faint={!!done}>
       <Stack direction="row" align="center" justify="space-between">
         <AppText variant="eyebrow" style={{ color: eyebrowColor, fontWeight: '700' }}>
@@ -244,11 +302,42 @@ export function HomeRecommendation({
             Completed Today
           </AppText>
         </Stack>
-      ) : model.action === 'deload' && rec ? (
+      ) : controls === 'rest-and-full' && why ? (
         <>
           <AppText variant="caption" tone="muted">
-            {rec.reason}
+            {why.cause ?? rec?.reason}
           </AppText>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Why this recommendation?"
+            accessibilityState={{ expanded: whyOpen }}
+            onPress={() => setWhyOpen(!whyOpen)}
+            style={{ minHeight: theme.sizes.touchTarget, justifyContent: 'center' }}
+          >
+            <Stack direction="row" align="center" gap="xs">
+              <AppText variant="caption" tone="brand" style={{ fontWeight: '600' }}>
+                Why this recommendation?
+              </AppText>
+              <Icon
+                name="expand"
+                size={theme.sizes.iconSmall}
+                tone="brand"
+                style={whyOpen ? { transform: [{ rotate: '180deg' }] } : undefined}
+              />
+            </Stack>
+          </Pressable>
+          {whyOpen && (
+            <Stack gap="xs">
+              <AppText variant="caption" style={{ fontWeight: '600' }}>
+                {why.headline}
+              </AppText>
+              {why.reasons.map((reason) => (
+                <AppText key={reason.kind} variant="caption" tone="muted">
+                  {reason.text}
+                </AppText>
+              ))}
+            </Stack>
+          )}
           <Stack direction="row">
             <AppButton
               title="Rest Day"
@@ -264,8 +353,31 @@ export function HomeRecommendation({
           </Stack>
         </>
       ) : (
-        <AppButton title="Start Workout" onPress={() => onStart(session.id)} />
+        // #2204: Start is the one control; a swipe left reveals Rest, which a second tap takes.
+        <SwipeReveal
+          radius={theme.radii.control}
+          rowBackground={theme.colors.brand}
+          actionWidth={theme.sizes.touchTarget * 2.5}
+          actions={[
+            {
+              key: 'rest',
+              label: 'Rest Day',
+              accessibilityLabel: 'Rest today instead',
+              icon: 'moon',
+              foreground: theme.tones.sleep.foreground,
+              background: theme.tones.sleep.background,
+              onPress: () => void rest(true),
+            },
+          ]}
+        >
+          <AppButton
+            title="Start Workout"
+            icon="swipeLeft"
+            accessibilityHint="Swipe left to rest today instead"
+            onPress={() => onStart(session.id)}
+          />
+        </SwipeReveal>
       )}
-    </Card>
+    </Card>,
   );
 }

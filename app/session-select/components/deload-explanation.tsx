@@ -6,8 +6,7 @@ import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/component
 import { cn } from "@trainingai/shared/utils";
 import type { NextSessionRecommendation } from "@trainingai/shared/types/program";
 import { TEMP_BASELINE_MIN_DAYS } from "@trainingai/shared/ai-periodization/deload-constants";
-import { cutFor } from "@trainingai/shared/health/readiness-decision-thresholds";
-import { READINESS_MODEL_VERSION } from "@trainingai/shared/health/readiness-composite";
+import { deloadReasons, DELOAD_STRENGTH_HEADLINE, type DeloadReasonKind } from "@trainingai/shared/ai-periodization/deload-reasons";
 import { temperatureBaselineProgress } from "./temperature-baseline-progress";
 
 interface Signal {
@@ -15,57 +14,19 @@ interface Signal {
   text: string;
 }
 
+const REASON_ICON: Record<DeloadReasonKind, React.ReactNode> = {
+  temperature: <ThermometerIcon className="h-3.5 w-3.5" />,
+  readiness: <ActivityIcon className="h-3.5 w-3.5" />,
+  streak: <CalendarClockIcon className="h-3.5 w-3.5" />,
+  energy: <BatteryLowIcon className="h-3.5 w-3.5" />,
+};
+
 // Turn the recommendation's raw signal fields into a plain-English list of *why* recovery is
 // being suggested — the home card only shows a one-line summary, which the owner found too thin.
+// The words are shared with Preview (`deloadReasons`, #3644).
 export function buildSignals(rec: NextSessionRecommendation): Signal[] {
-  const out: Signal[] = [];
-  const s = rec.signals;
-
-  if (rec.temperatureAlert) {
-    const dev = s?.temperatureDeviation;
-    const threshold = s?.temperatureAlertThresholdC;
-    const nights = s?.temperatureBaselineDays;
-    const text = dev != null && threshold != null
-      ? `+${dev.toFixed(1)}°C above your baseline (threshold ${threshold.toFixed(1)}°C)${nights != null ? ` — based on ${nights} nights of history.` : "."} Often an early sign of illness, incomplete recovery, or heat/alcohol stress.`
-      : "Body temperature is above your baseline — often an early sign of illness, incomplete recovery, or heat/alcohol stress.";
-    out.push({ icon: <ThermometerIcon className="h-3.5 w-3.5" />, text });
-  }
-  // #3824: graded on the score's own scale, the same cut the deload decision used. A response from
-  // before the version rode along is from the current server, so it is on the current scale.
-  const softMin = cutFor("deloadSoft", s?.ouraReadinessModelVersion === undefined ? READINESS_MODEL_VERSION : s.ouraReadinessModelVersion);
-  if (s?.ouraReadiness != null && s.ouraReadiness < softMin) {
-    out.push({
-      icon: <ActivityIcon className="h-3.5 w-3.5" />,
-      text: `Readiness ${Math.round(s.ouraReadiness)} — below the ${softMin}+ range where hard training is well tolerated.`,
-    });
-  }
-  if (rec.consecutiveTrainingDays != null && rec.consecutiveTrainingDays >= 3) {
-    out.push({
-      icon: <CalendarClockIcon className="h-3.5 w-3.5" />,
-      text: `${rec.consecutiveTrainingDays} training days in a row without a rest day — fatigue accumulates faster than it clears.`,
-    });
-  }
-  if (s?.energyLevel === "drained" || s?.energyLevel === "low") {
-    out.push({
-      icon: <BatteryLowIcon className="h-3.5 w-3.5" />,
-      text: `You checked in feeling ${s.energyLevel === "drained" ? "drained" : "low on energy"} this morning.`,
-    });
-  }
-  // No soreness line (#3804). Sore ticks change which session is picked, not whether to ease off:
-  // computeDeloadStrength and the sick/energy checks in ai-dynamic.ts never read them. And the
-  // check-in pre-ticks recently trained muscles, so the line mostly read the app's own guess back
-  // as a reason.
-  // No HRV or sleep-trend line either (#3837). hrvWarning is computed after the deload decision and
-  // only returned, and sleepTrend only shifts the session-scoring weights, so neither is a reason
-  // to ease off.
-  return out;
+  return deloadReasons(rec).map((reason) => ({ icon: REASON_ICON[reason.kind], text: reason.text }));
 }
-
-const STRENGTH_HEADLINE: Record<NonNullable<NextSessionRecommendation["deloadStrength"]>, string> = {
-  soft: "A light nudge to ease off — your call.",
-  recommended: "Recovery is recommended today.",
-  strong: "Strong signal to back off today.",
-};
 
 export function DeloadExplanation({ recommendation }: { recommendation: NextSessionRecommendation }) {
   const [open, setOpen] = useState(false);
@@ -81,7 +42,7 @@ export function DeloadExplanation({ recommendation }: { recommendation: NextSess
       </CollapsibleTrigger>
       <CollapsibleContent>
         <div className="space-y-3 px-3 pb-3">
-          <p className="text-xs font-semibold text-foreground">{STRENGTH_HEADLINE[strength]}</p>
+          <p className="text-xs font-semibold text-foreground">{DELOAD_STRENGTH_HEADLINE[strength]}</p>
 
           {signals.length > 0 && (
             <ul className="space-y-2">

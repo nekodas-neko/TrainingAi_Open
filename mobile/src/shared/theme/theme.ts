@@ -14,6 +14,7 @@ import {
   domainTones,
   anatomyColors,
   statusColors,
+  deloadStrengthColors,
   macroColorsLight,
   hrZoneColorsLight,
   sessionTones,
@@ -83,6 +84,7 @@ export type Theme = {
   tones: Record<Tone, TonePalette>;
   anatomy: typeof anatomyColors.dark & { high: string };
   status: typeof statusColors.dark;
+  deload: typeof deloadStrengthColors.dark;
   coachFab: { background: string; foreground: string };
   sessions: TonePalette[];
   effort: Record<number, string>;
@@ -192,6 +194,7 @@ export function createTheme(
       ...overrides.anatomy,
     },
     status: statusColors[mode],
+    deload: deloadStrengthColors[mode],
     coachFab:
       mode === 'dark'
         ? { background: colors.text, foreground: colors.background }
