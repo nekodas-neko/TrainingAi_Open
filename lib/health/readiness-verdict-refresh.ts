@@ -8,6 +8,7 @@
  * from the new score with the same builder the first read uses ({@link buildReadinessVerdictRecord},
  * which calls `readinessVerdictForDay`), and updates it only while `response_state = 'none'`. An
  * answered or dismissed row keeps what it answered; a day with no row is left to the first read.
+ * By design, an answer given after a refresh is stored against the refreshed score and direction.
  *
  * Reached from the data layer's re-score path (`rescore-nights.ts`), so it imports types only from
  * `@/lib/data` (`data-layer-readiness-cycle.test.ts`). Not a scoring change: it reads stored scores
@@ -80,6 +81,37 @@ export function buildReadinessVerdictRecord(
       modelVersion: computed.modelVersion,
     },
   }
+}
+
+/** JSON with object keys sorted, so a JSONB round trip (which reorders keys) compares equal. */
+function canonicalJson(v: unknown): string {
+  if (v === null || typeof v !== 'object') return JSON.stringify(v) ?? 'null'
+  if (Array.isArray(v)) return `[${v.map(canonicalJson).join(',')}]`
+  const obj = v as Record<string, unknown>
+  return `{${Object.keys(obj).filter(k => obj[k] !== undefined).sort().map(k => `${JSON.stringify(k)}:${canonicalJson(obj[k])}`).join(',')}}`
+}
+
+/** The readiness fields a verdict snapshot is built from. */
+export interface ReadinessSnapshotFields {
+  readinessScore: number | null
+  readinessContributors?: unknown
+  modelVersions: unknown
+}
+
+/**
+ * Whether a readiness persist changed anything a verdict row stores: the score, the readiness model
+ * stamp or the contributors. `prior` is the day's derived row as read before the persist (null when
+ * there was none). False means a refresh could only recompute the row it already holds, so the
+ * caller skips it and issues no verdict read at all.
+ */
+export function readinessSnapshotChanged(
+  prior: ReadinessSnapshotFields | null,
+  next: { readinessScore: number; readinessContributors: unknown; readinessModelVersion: string },
+): boolean {
+  if (!prior) return true
+  return prior.readinessScore !== next.readinessScore ||
+    readinessModelVersionOf(prior.modelVersions) !== next.readinessModelVersion ||
+    canonicalJson(prior.readinessContributors ?? null) !== canonicalJson(JSON.parse(JSON.stringify(next.readinessContributors ?? null)))
 }
 
 type RefreshRepo = Pick<WorkoutRepository, 'getReadinessVerdict' | 'getOuraDailyDerived' | 'refreshUnansweredReadinessVerdict'>
