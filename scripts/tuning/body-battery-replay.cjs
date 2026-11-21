@@ -187,7 +187,7 @@ async function countReportCommand(files) {
     if (report.dryRun === false) console.log(`warning: ${f} is a real run, not a dry run`)
     return report.days
   })
-  printCount(m.endValueChangeBandsFromReport({ days }), 'Production (rederive dry run): finished days whose stored end value would change:')
+  printCount(m.endValueChangeBandsFromReport({ days }), 'Re-derive dry run: finished days whose stored end value would change:')
 }
 
 /**
