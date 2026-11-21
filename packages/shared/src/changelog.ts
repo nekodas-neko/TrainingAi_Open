@@ -6,6 +6,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.527.0",
+    date: "2026-11-21",
+    changes: [
+      "Both apps: the \"When the day ran stressed\" chart is back for days since the ring moved to Oura Cloud, estimated from your heart rate while you were still. It is one continuous line: dotted where you were moving, with stretches of elevated stress filled amber and a strip marking when you were moving or asleep. A note under the title says how the day was worked out.",
+      "Both apps: the stress band on the heart-rate day chart now points up for more stress, the same way as the stress chart.",
+      "TrainingAi Preview: after an exercise's last set the rest card asks how it felt: easier than expected, as expected or harder than expected. It starts on As expected, so you only tap when it differs. Nothing uses the answer yet.",
+      "TrainingAi Preview: the picture-in-picture window is one card in every state, with the exercise, where you are in the session, the set and load, and a labelled clock that always counts. Before the first set it says Ready instead of a rest clock stuck at 0:00.",
+      "TrainingAi Preview: a walk you didn't record stays on offer in Home's updates until you save or dismiss it, as in the current app.",
+      "TrainingAi Preview: text follows your phone's font size setting down as well as up; Progress shows when each lift was last trained; a past day's resting heart rate, HRV and steps move into their own Daily vitals card; and Week in review no longer repeats a record's exercise name.",
+    ],
+  },
+  {
     version: "1.526.0",
     date: "2026-11-20",
     changes: [
