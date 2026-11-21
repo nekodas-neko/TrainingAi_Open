@@ -3,7 +3,10 @@ import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
 import {
   feelCheckin,
+  readinessCardLine,
   readinessPrompt,
+  readinessQuestionDismissKey,
+  unusualDayCard,
   respondedToday,
   type ReadinessVerdictData,
 } from '../src/features/home/data/readiness-prompt.ts';
@@ -170,11 +173,69 @@ test('until the live score loads, the verdict’s own score stands', () => {
   }
 });
 
-test('Home’s readiness card passes the live score the chips show', async () => {
+test('Home’s readiness question passes the live score the chips show', async () => {
   const card = await readFile(
-    new URL('../src/features/home/components/ReadinessPromptCard.tsx', import.meta.url),
+    new URL('../src/features/home/data/useReadinessQuestion.ts', import.meta.url),
     'utf8',
   );
   assert.match(card, /useWorkoutResource\(readinessSpec\(health\.today\)\)/);
   assert.match(card, /readiness\.data\?\.readinessDisplayScore,\s*\);/);
+});
+
+// #3953: the question has its own card, whatever Home cards are switched on.
+const unusual = (feelAnswered = false, responseState: ReadinessVerdictData['responseState'] = 'none') =>
+  readinessPrompt(verdict({ verdict: 'poor', score: 47, responseState }), feelAnswered);
+
+test('the unusual-day card shows on an unusual day, with no card preference involved', () => {
+  const card = unusualDayCard(unusual(), false);
+  assert.equal(card?.title, '47 is under your usual 61–80. How do you feel?');
+  assert.equal(unusualDayCard.length, 2, 'it takes the prompt and the dismissal, nothing else');
+});
+
+test('the unusual-day card is hidden on a usual or unscored day', () => {
+  assert.equal(unusualDayCard(readinessPrompt(verdict({ verdict: 'normal', score: 72 })), false), null);
+  assert.equal(unusualDayCard(readinessPrompt(null), false), null);
+});
+
+test('the unusual-day card is hidden once answered, here or on a queued/stored response', () => {
+  assert.equal(unusualDayCard(unusual(true), false), null);
+  assert.equal(unusualDayCard(unusual(false, 'rated'), false), null);
+  assert.equal(unusualDayCard(unusual(false, 'dismissed'), false), null);
+});
+
+test('a dismissal hides the card for that local day only, and is back tomorrow', () => {
+  const markers: Record<string, boolean> = { [readinessQuestionDismissKey('2026-11-21')]: true };
+  const dismissed = (day: string) => !!markers[readinessQuestionDismissKey(day)];
+  assert.equal(unusualDayCard(unusual(), dismissed('2026-11-21')), null);
+  assert.ok(unusualDayCard(unusual(), dismissed('2026-11-22')));
+});
+
+test('the question is never asked twice: the Exercise Readiness card only states the score', async () => {
+  assert.equal(readinessCardLine(unusual()), 'Readiness 47 is under your usual 61–80.');
+  assert.equal(readinessCardLine(readinessPrompt(null)), null);
+  const card = await readFile(
+    new URL('../src/features/home/components/ReadinessPromptCard.tsx', import.meta.url),
+    'utf8',
+  );
+  assert.doesNotMatch(card, /FEEL_OPTIONS|How do you feel|respondToReadiness/);
+});
+
+test('the unusual-day card is mounted once, outside the switchable Home sections', async () => {
+  const screen = await readFile(
+    new URL('../src/features/home/screens/HomeScreen.tsx', import.meta.url),
+    'utf8',
+  );
+  assert.equal(screen.match(/<UnusualDayCard \/>/g)?.length, 1);
+  assert.ok(screen.indexOf('<UnusualDayCard />') < screen.indexOf('<SortableStack'));
+});
+
+test('a dismissal writes a local marker and nothing to the server; an answer uses the existing path', async () => {
+  const hook = await readFile(
+    new URL('../src/features/home/data/useReadinessQuestion.ts', import.meta.url),
+    'utf8',
+  );
+  const dismiss = hook.slice(hook.indexOf('async function dismiss'));
+  assert.match(dismiss, /home\.store\.mark\(readinessQuestionDismissKey/);
+  assert.doesNotMatch(dismiss, /respondToReadiness|saveCheckin/);
+  assert.match(hook, /respondToReadiness\(health\.today, 'rated'\)/);
 });

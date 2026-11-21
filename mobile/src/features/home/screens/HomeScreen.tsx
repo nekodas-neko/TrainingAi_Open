@@ -4,6 +4,7 @@ import { useActivities } from '../../activities/data/ActivityProvider';
 import { HomeSection, HiddenHomeSections } from '../components/HomeSection';
 import { HomeHeader } from '../components/HomeHeader';
 import { HomeEnergy } from '../components/HomeEnergy';
+import { UnusualDayCard } from '../components/UnusualDayCard';
 import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { getScheduledSessionsPerWeek } from '@trainingai/shared/schedule-utils';
@@ -205,6 +206,7 @@ export function HomeScreen(navigation: HomeNavigation) {
               onDetailsSeen={acknowledgeSetAside}
               badge={adminSignups}
             />
+            <UnusualDayCard />
             <HomeEnergy onOpen={navigation.openHealthDetail} />
             {scores?.illnessAdvisory && scores.illnessFlag === 'watch' && (
               <AppText variant="micro" tone="muted">

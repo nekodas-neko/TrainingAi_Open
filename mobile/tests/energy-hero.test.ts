@@ -84,3 +84,12 @@ test('Full and Compact chips take their unit from chipFigure, and a dash never c
   assert.match(chip, /shownUnit = unit && \(display != null \|\| value !== null\) \? unit : undefined/);
   assert.doesNotMatch(chip, /\{unit\}/);
 });
+
+test('only Home’s Energy hero asks for the waiting state (#3502); the widget keeps its old rule', async () => {
+  const read = (path: string) => readFile(new URL(path, import.meta.url), 'utf8');
+  assert.match(
+    await read('../src/features/home/components/HomeEnergy.tsx'),
+    /energyHero\(state\.data, \{ waitingForRing: true \}\)/,
+  );
+  assert.match(await read('../src/features/widgets/snapshot.ts'), /energyHero\(data\);/);
+});
