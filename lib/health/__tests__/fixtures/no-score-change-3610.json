@@ -8644,7 +8644,7 @@
    "excluded": "c240346515ca9da73eada03dbe359c9055d6255a1def4a0c501f525408e5864e",
    "scored": [
     {
-     "all": "5e3217a85752597fc1cabffe5f96eeeb327b22329f4439b00750e00365f5754d",
+     "all": "00afd4bc1b9b4de64b4e7e0e52f81ba6de63f93f162ba4b4d39efc64adfb19ea",
      "temperature": {
       "value": 0.07,
       "source": "oura_daily_summary",
@@ -8668,7 +8668,7 @@
      }
     },
     {
-     "all": "4864855a6a3f560510c39217c37c01a59b47863a7150479ea36b73fdb66eccfe",
+     "all": "e7eba06ed2e08764d7ba3be280540cd878725217e9c6645baf5955a71e958e8d",
      "temperature": {
       "value": 0.213,
       "source": "oura_daily_summary",
@@ -8718,7 +8718,7 @@
    "excluded": "3e0ec1421e8c528ae772a79b017ebeda04cf3e12c6a63b7f2082531315374fb2",
    "scored": [
     {
-     "all": "10bf5ce15441967cfd33c7132cc89b4a65077a89d09d9491a7b3fb6eaf4d0540",
+     "all": "051b761664ed1524dc89921063b3693361be73e769a1da61c728757fa8000d73",
      "temperature": {
       "value": 0.257,
       "source": "oura_daily_summary",
@@ -8742,7 +8742,7 @@
      }
     },
     {
-     "all": "e9bbdc491773346376b4ecefc3f23911f2d0993316a3c73fb34790f21fe041c7",
+     "all": "04782f5036d13a598a2c7c0127418a766ff5c528563e6b73aef6a7ea27c065fc",
      "temperature": {
       "value": 0.184,
       "source": "oura_daily_summary",
@@ -8792,7 +8792,7 @@
    "excluded": "de38eeb13ec15a9bfe93f67e42606efb41157f5df086fb013101d2deb960ba2b",
    "scored": [
     {
-     "all": "887c39bba897e5bad2a6ed759c615dc1f7ff9f84bc5e1114f83e7d7c195bf048",
+     "all": "9ddedbb23694248929b1e119793a389fde343815a73364b2e27338f3112f3e98",
      "temperature": {
       "value": -0.287,
       "source": "oura_daily_summary",
@@ -8816,7 +8816,7 @@
      }
     },
     {
-     "all": "cdc74a1fffe7237c266f591f07348cecde9fb02ada750f0dba1087c36c05f3f3",
+     "all": "ee0680f1b8b0373635a6edc876fe4bd162cc3b2a0c5de636150751e4279b8cc0",
      "temperature": {
       "value": 0.32,
       "source": "oura_cloud",
@@ -8866,7 +8866,7 @@
    "excluded": "95de71c5605bda4b94d8e708beda0b2751af09dd46861dab3ef7a3749bb1c8b4",
    "scored": [
     {
-     "all": "674657ddc208aff96c6f7a383e7fb5bc9b510be0850f0582b7312a1f91ac2129",
+     "all": "bca9e9b5ca22fef831c3c666f3d75206bc3228ccf68949ad1a448dfafaa60d4a",
      "temperature": {
       "value": -0.221,
       "source": "oura_daily_summary",
@@ -8890,7 +8890,7 @@
      }
     },
     {
-     "all": "e72193ae0849dcd313f74dc89f7166e55b32012c42ac1f1988f594ca374d56b6",
+     "all": "099e11b4b447a6f56eb163229d20aa480b389d1f2686f12172f574ecf8984d99",
      "temperature": {
       "value": -0.2,
       "source": "oura_cloud",
@@ -8940,7 +8940,7 @@
    "excluded": "6425f69212b54f9d5b3c0ebf245ea010598cbb5dbd50320cec3148c0c8c79c40",
    "scored": [
     {
-     "all": "4c6c7f206687332e261836dc8666fe75981af09eade2965b7986241d51906370",
+     "all": "507b68c7541f90356c7775d5383eb053952ce9ec6a2923b4170c1aa102b41fb9",
      "temperature": {
       "value": -0.08,
       "source": "oura_daily_summary",
@@ -8964,7 +8964,7 @@
      }
     },
     {
-     "all": "53b31b8cbafc304a4848b3fe5c724f60a9aa0090fdf0b626baf9c019cdacf870",
+     "all": "d8c0c6421890b3c22be0a79fb74b1c0c980bc354fc15558abffc07f91f4e21c7",
      "temperature": {
       "value": -0.27,
       "source": "oura_cloud",
@@ -9014,7 +9014,7 @@
    "excluded": "13e8456b09324b33bf9c0e658e57c59701f5f1ba4625ae38089aa7fd88dc40ff",
    "scored": [
     {
-     "all": "5e2f9ec9f11a9100ef1542f6ad16361433e015fa672958a48bded24f105b2e0f",
+     "all": "a9c03ea722b86c80bd51824d5536eedd7b37164dbf92e70f8c837e16f37037a9",
      "temperature": {
       "value": -0.119,
       "source": "oura_daily_summary",
@@ -9038,7 +9038,7 @@
      }
     },
     {
-     "all": "7f81806bcdad6ccacce5a71a79476705ad980471992afa377a02dac4ba5abe98",
+     "all": "7b52f86ac0c6c15336ec0c49d02aeb31118448fde1b1d7cab3240d1cd63cdd17",
      "temperature": {
       "value": -0.16,
       "source": "oura_cloud",
@@ -9087,7 +9087,7 @@
    "excluded": "1583503f24669d2e8df9686ea916fda57872249b32f691452adac4b5b1004522",
    "scored": [
     {
-     "all": "7dd93151d0e23046cded0d9480933d0aaf65517e7bc863d610e180d2f3016fa2",
+     "all": "42485094ec342d4692cc1b0a9f67034a0e1c221fa25b3ba137c19847470cb585",
      "temperature": {
       "value": -0.222,
       "source": "oura_daily_summary",
@@ -9111,7 +9111,7 @@
      }
     },
     {
-     "all": "fc8d86d82cbf4c8653698f3255f66a8c29e078e35ea58f8a5fb021a18c5f2212",
+     "all": "ef767649ddee35ac3b688516d57f572eb133735af48c7cdb2c4a0a2414953fb7",
      "temperature": {
       "value": -0.31,
       "source": "oura_cloud",
@@ -9161,7 +9161,7 @@
    "excluded": "aee59f350b282b1e17b7301e4188059cbcbce1d9888ed3e8de239506225046a5",
    "scored": [
     {
-     "all": "74f58a446249485f1c020b362a60c1ffc44c43db18044e1d672f902a968e0f23",
+     "all": "fc445ea3d8a3d4e08b0fadf37117a00ac3e3a55a3f0aebd12cbf64485fcecdaa",
      "temperature": {
       "value": -0.198,
       "source": "oura_daily_summary",
@@ -9185,7 +9185,7 @@
      }
     },
     {
-     "all": "a0ae5a61c229706250da1dbae9954f42ff77233657710fa167c35b34aee03512",
+     "all": "c385fa3244d5feedcd9e45fffaf5d42446f3cc74634ad4dae3282a66e93e6d39",
      "temperature": {
       "value": 0.37,
       "source": "oura_cloud",
@@ -9235,7 +9235,7 @@
    "excluded": "9a6d86aa08e84890750794a56b09227fd6ce573e15804f11b2d78e8b8784fc71",
    "scored": [
     {
-     "all": "0fe1a1ed2c392033e932660f137fb4f598a0b853a62ac91a045f2c7ec3123575",
+     "all": "0083f5d8c58cb9fee756f6db0e75cc230d1ad903206f2ef941bfb48f0f3479a0",
      "temperature": {
       "value": 0.183,
       "source": "oura_daily_summary",
@@ -9259,7 +9259,7 @@
      }
     },
     {
-     "all": "1572ddc223f89e4998c3d718b02988a8ab2797cc3ccaf20beaf0269dcca2afad",
+     "all": "6f6c3f29080cc853d1c0d079fbf50f80f9acf4320e254e8de7d0e83ea7c6e355",
      "temperature": {
       "value": null,
       "source": null,
@@ -9308,7 +9308,7 @@
    "excluded": "46ac864f573b6c5a0966bf0350475ac4c1b76f3ac6b1deccfbbad021c4164c69",
    "scored": [
     {
-     "all": "72a77ce4120ff7c9a6974e9c6d6578ef0ed542dd50aa97cc96c3f442bb78801c",
+     "all": "c0c72fb6b73a2e5812664f88a9c79c187f6ab45985e5a691572dfa8f2fc4e360",
      "temperature": {
       "value": 0.191,
       "source": "oura_daily_summary",
@@ -9332,7 +9332,7 @@
      }
     },
     {
-     "all": "a3810fa29f29aedf57d088b53f19e3948027999ab11c97cab90129af70aced06",
+     "all": "216a18ac6ab75433b18c55e2b32a320f78d2d07208ffc0dd975503ab6d83303e",
      "temperature": {
       "value": null,
       "source": null,
@@ -9382,7 +9382,7 @@
    "excluded": "92ba63fa59c35a87c937111096cee76ba3ce475b55775b295f85f5438d7f985a",
    "scored": [
     {
-     "all": "2483c92b3f55ac05ab811a2798cc257d47308158329bfa5874332a897afb564c",
+     "all": "5338d46dac44fd0a6355ad4b9362f141fe2e20635d63938061e213fc9853bee0",
      "temperature": {
       "value": 0.039,
       "source": "oura_daily_summary",
@@ -9406,7 +9406,7 @@
      }
     },
     {
-     "all": "f94a3c5b30495f1a78221aca2a761a7d0febd20f7ebfe9cc4dee146328970845",
+     "all": "509d8b3199a69b808342635c0e04ff91a44cdad7c05f8cfb515220c8fd1f714d",
      "temperature": {
       "value": 0.014,
       "source": "oura_daily_summary",
@@ -9456,7 +9456,7 @@
    "excluded": "4752033d750d053556408e48f8faf69de6bcab30df3550ccefdb729746a4231c",
    "scored": [
     {
-     "all": "922a6a538f8d3fe530245c18783a3e87c7491ee2ee7db6d21a2d5f19dbfa331d",
+     "all": "9f1cb552b2eea7e8607788e0823b9d953ed820da21ed4c1d940172f02d453294",
      "temperature": {
       "value": -0.225,
       "source": "oura_daily_summary",
@@ -9480,7 +9480,7 @@
      }
     },
     {
-     "all": "642c828fcc2e3966f56e45de1a4dfca9b552fa4f57f590f8e6a136421e265c88",
+     "all": "1887c7e39ce884fcc899ee68e313c9f97a212941e10a880173f880054102213d",
      "temperature": {
       "value": 0.106,
       "source": "oura_daily_summary",
@@ -9530,7 +9530,7 @@
    "excluded": "25b191a72c0145f9f8d2bd9cb2539367034a0a9747059de861eb08973100e44d",
    "scored": [
     {
-     "all": "97013e43a3a901876e1af1fab506dd12a61057569ce8d4257c123bd7e4d0050f",
+     "all": "15851746c1a257c02ea2c35d7d7ec75c7fe18b97956573c2273ce4c4e3da4ad6",
      "temperature": {
       "value": -0.251,
       "source": "oura_daily_summary",
@@ -9554,7 +9554,7 @@
      }
     },
     {
-     "all": "a5eef1683309d588656a7df87a48da7286de41152c7ccec883c420063954a019",
+     "all": "f3bd10c1f6e71551f26e769d0ad5c816eab72da2cbb4847a1857970181b09f68",
      "temperature": {
       "value": -0.132,
       "source": "oura_daily_summary",
@@ -9604,7 +9604,7 @@
    "excluded": "c341ad1934720a7a611142d3110113360a3e35903111de4b037a727227cb6c1a",
    "scored": [
     {
-     "all": "bf264c24e850b801f85f2d7bedfe099c9290748c0da0809d17cdb0b52a631964",
+     "all": "747684103adbc2bd3dca4fa8d34df06ab0018fbf53243fe115947d80915aca8f",
      "temperature": {
       "value": 0.295,
       "source": "oura_daily_summary",
@@ -9628,7 +9628,7 @@
      }
     },
     {
-     "all": "2e34f0e13ca8798b276ed847045f2912e717f8473bfedf1f55c84b49838c5a8a",
+     "all": "362fb03feea758e461fbc7ef54357c7319d2a42cc3ce2a1230b3b32eec164fb5",
      "temperature": {
       "value": 0.087,
       "source": "oura_daily_summary",
@@ -9678,7 +9678,7 @@
    "excluded": "a32d338fa9ddf9ddf99b9cd48f10992fd87ca2c3e3b4bd94e3dd7c4ea65402cf",
    "scored": [
     {
-     "all": "8ae7f252d6297470939cab0c051782523a9d1bd12826d3e314892523c03aa4d1",
+     "all": "5b5e9e604bcf8113a296ddb2c647e42627ecb8d3cad15c4d744b286a53c14b0a",
      "temperature": {
       "value": 0.159,
       "source": "oura_daily_summary",
@@ -9702,7 +9702,7 @@
      }
     },
     {
-     "all": "d1d3c6da28ab9175f91cb8d0db7fcaacb725ce8340992a9f35f77a9981110198",
+     "all": "971aea308ee24fd4627572873dd10b384306699062c42a3c0250ffcb5531088b",
      "temperature": {
       "value": -0.19,
       "source": "oura_cloud",
@@ -9752,7 +9752,7 @@
    "excluded": "b818ae9132b9c4b99a871a012bb06d480b280a5382fd1dc4eead4b963b4b161d",
    "scored": [
     {
-     "all": "7b61df860c00e4cea8168f4469b01e5b4c4699e8285c7ea638697f3bca5291a7",
+     "all": "d827a09be7fb7ec0508f5db65f74b04002828f8867db14bbeec56f4dece11c53",
      "temperature": {
       "value": -0.065,
       "source": "oura_daily_summary",
@@ -9776,7 +9776,7 @@
      }
     },
     {
-     "all": "22340b856ab5656c410833c9ac67cb592fc15a1155797c7a076b2da107341c42",
+     "all": "55a552e27273ba36b6d45abffe91f65cbd3f043c1313d59c4991ac6cb7177de0",
      "temperature": {
       "value": 0.25,
       "source": "oura_cloud",
@@ -9826,7 +9826,7 @@
    "excluded": "78f11517c56dc86c52d10eeab73c4bfaac919251e3bcf2e984d57c308cd40118",
    "scored": [
     {
-     "all": "79fea269c7395341f138672781275d9db9136e3ead12882a3876b61e2883d4ff",
+     "all": "5d577331ad09e89b80541684e1eed8b6edf765222585fa5df470a857dff07280",
      "temperature": {
       "value": -0.015,
       "source": "oura_daily_summary",
@@ -9850,7 +9850,7 @@
      }
     },
     {
-     "all": "f9f150e81f9843ea178fbffde7b93ef252b05d769853c6dde264683781992aa2",
+     "all": "65421c8bafa9ffab34ab43c22a0ff5fde354980abd9a934fd584fd91ba31f34d",
      "temperature": {
       "value": 0.22,
       "source": "oura_cloud",
@@ -9900,7 +9900,7 @@
    "excluded": "7dabe7f560e8d6e6c9833aa869981349bd638b09413f62c728d601c164e4a6d5",
    "scored": [
     {
-     "all": "1aeafb17a514c46706f29d7027e0fe653a5c1b31e78f0c250fa7011bb91649c2",
+     "all": "39611d9e740cb74746008d6da896ddb00c94503e9f4b2505c29140de3c5dcfca",
      "temperature": {
       "value": -0.068,
       "source": "oura_daily_summary",
@@ -9924,7 +9924,7 @@
      }
     },
     {
-     "all": "2ee7aa8274fc58d0f9da2b2b84583a5ddbe362b9125513b801f4c430d19bb813",
+     "all": "c4952cabdbf266939fc3327f45e39bca8f545e0a143a69c0ba60dc9774ba1468",
      "temperature": {
       "value": 0,
       "source": "oura_cloud",
@@ -9974,7 +9974,7 @@
    "excluded": "7b5af0ff37a0d26be6eeac716ccddc34d71d78da219a394fa3791c8107c132b9",
    "scored": [
     {
-     "all": "b54655e7f64e052d520aa783de989987e0ca22c7a55dc361385a066dafc5fce3",
+     "all": "184370753c59d8f5a1fa8adb09ddea7899e89b070dd64cd8ba6bc674e072308b",
      "temperature": {
       "value": -0.3,
       "source": "oura_cloud",
@@ -9998,7 +9998,7 @@
      }
     },
     {
-     "all": "7d4717e7115520bcf7cab367e3c15954b450f29c88b2af5fae64454d2f8c16db",
+     "all": "4f84dbc62dd7a7f49def2b2c6859fc77f5fefa7d523b755ba8211b7ae7c806f6",
      "temperature": {
       "value": 0.05,
       "source": "oura_cloud",
@@ -10047,7 +10047,7 @@
    "excluded": "dcd773082bc2a5a6afd6007e1dc18d8277839fd3688ec7a8f8300050956de18e",
    "scored": [
     {
-     "all": "0a95159558946d1c80a8482aa71b451fa00518d3220ee45542a4d4b33155299f",
+     "all": "916e095eefcb0aa6dc58c98bb3717f22f565bd070523a0c3aae304fda9d20883",
      "temperature": {
       "value": -0.216,
       "source": "oura_daily_summary",
@@ -10071,7 +10071,7 @@
      }
     },
     {
-     "all": "d97e4c432c31e675319f439f6619fe27ee9803fc629267c53504b272a578335c",
+     "all": "df4e7fabbb44e463285344267994a2f016584bf4642d3ab6ef7f7a72eb4ca842",
      "temperature": {
       "value": 0.36,
       "source": "oura_cloud",
@@ -10121,7 +10121,7 @@
    "excluded": "2a3ded691a94f620d08a8f6d0fe5da78dbb5878ab27bb2cc0e32bfe4a54e398a",
    "scored": [
     {
-     "all": "c56b68ef9b13adec1ed2f08ba38a6f817e3064785f480931673f762d785c9f91",
+     "all": "c360b52c52bc0b25cfd68e9db7109692678b768774e178063861ad3604283a52",
      "temperature": {
       "value": -0.292,
       "source": "oura_daily_summary",
@@ -10145,7 +10145,7 @@
      }
     },
     {
-     "all": "2c7755aba31406d286bcb2b42f658167103e0e51c3efb668ac1ee37f6f9c515f",
+     "all": "aaee9be358756167db05766f19c582db8089bc05364e96c4be66c10807e61577",
      "temperature": {
       "value": null,
       "source": null,
@@ -10194,7 +10194,7 @@
    "excluded": "577b6f116aa852d7ab081f33e310ba446050fdda50545b389c1ecc4bb5175690",
    "scored": [
     {
-     "all": "47cda5904b5f3aa938cd561d4bbd04819ec346a23b05bc3b1df37aa8da4ed14e",
+     "all": "3323a5cad23c1d7174eeaed5e57f1a70ec70a2d00b1c697399205050ca806c37",
      "temperature": {
       "value": 0.279,
       "source": "oura_daily_summary",
@@ -10218,7 +10218,7 @@
      }
     },
     {
-     "all": "3aa40fd2652698aca27c848b0a65c17f25607a57d11e858fa56d03dc2ffa9f7b",
+     "all": "f73e634fa10c2d14fb34f32444e10d8f05febe1c14e638855ba0f914a39aaab2",
      "temperature": {
       "value": null,
       "source": null,
@@ -10268,7 +10268,7 @@
    "excluded": "39e44139dc39d7cf440b0f63b89b63336f217c9aa7a53e1171d09a458a6aa056",
    "scored": [
     {
-     "all": "72795ed6a0fe75c4fd19bfa00d78454682a57d0c3b514682f9dfc3f9718ae215",
+     "all": "27f009ad865256a6209d9ef1c0a040648061766a1f431d3a4b18cfa8611a51c1",
      "temperature": {
       "value": 0.196,
       "source": "oura_daily_summary",
@@ -10292,7 +10292,7 @@
      }
     },
     {
-     "all": "97b635f950033e3a1e86809109b28d504e07dea0ad0fc3654aa777a10f959728",
+     "all": "3b51eaab2513baedddd94d9b71234a424fb5099820e76e01e8a32f7f05262473",
      "temperature": {
       "value": 0.152,
       "source": "oura_daily_summary",
@@ -10341,7 +10341,7 @@
    "excluded": "25a2d0f53804af9cdceebb76103c329ca5192b6861dc61baec19ede231e0bcab",
    "scored": [
     {
-     "all": "1071b7e2bdcd9a600b31bfe8cf6db0431c586c8ef33bb2c898c313821221bdff",
+     "all": "42808efcdbc32f978955aaca4c8144330bc3f59dde351f00f4d5e52b61c1b290",
      "temperature": {
       "value": 0.124,
       "source": "oura_daily_summary",
@@ -10365,7 +10365,7 @@
      }
     },
     {
-     "all": "3351a227901952353a7f804edac548bcf04d9390580edb826aa9ecf9ab495e55",
+     "all": "ceac17e6fb2e363cd446a76c88e335775ed60d5a26c4d4abbed709d45d5dbe68",
      "temperature": {
       "value": 0.211,
       "source": "oura_daily_summary",
@@ -10416,7 +10416,7 @@
    "excluded": "7e17b3c673823c03074b61c030cfefbe954d1d1b63f091dca1bbb27fc6ff667d",
    "scored": [
     {
-     "all": "714a5d1b9d54ade72d0093fd913c571014bacea8963b863927dba249423c557c",
+     "all": "61a0d840a6d46ac78e53ef023e78d2a47bb55371f15ba22f080db028198791de",
      "temperature": {
       "value": 0.196,
       "source": "oura_daily_summary",
@@ -10440,7 +10440,7 @@
      }
     },
     {
-     "all": "e9a7c22d074114eacee462b303ae095226e76436a0c5755d7a8893afa6b29e82",
+     "all": "9a6ad2e8bd3ae053211b18cd8d27177f34178d00ee489e456cc53b5c62d972d5",
      "temperature": {
       "value": -0.26,
       "source": "oura_cloud",
@@ -10489,7 +10489,7 @@
    "excluded": "4cb39317a3afce52c8f8aabb0468fc9cc641bd4321b96217c94b1a7dd4a1ecbc",
    "scored": [
     {
-     "all": "ba5f89935dab133c4268af51ee38e4d96e969bdabea0af5e083dc601f8c02b5c",
+     "all": "ca753d7067017faa4270491ff5f003d7fe1902fc2c38945cfb64ab7c0db3ae8d",
      "temperature": {
       "value": -0.284,
       "source": "oura_daily_summary",
@@ -10513,7 +10513,7 @@
      }
     },
     {
-     "all": "39d89aa27d942c5f66972e9f07aed1b959dc3f8378c8933ee83a9f98ca11395c",
+     "all": "fc3d0d2f2db88a3cb1877fed31595e8df43eba108d3d377894c415b843f5fd3f",
      "temperature": {
       "value": 0.211,
       "source": "oura_daily_summary",
@@ -10564,7 +10564,7 @@
    "excluded": "6e942d6109f4b0eefc51021371ca17afdc4c12cd3eff0b31129e9eb9ea7b9982",
    "scored": [
     {
-     "all": "9ac78af91124828ec3d6408bc3e81b3c8680fc73b536c5a8954b093e6bd1d80d",
+     "all": "82b85cd23feed57f8dbf9768e9438452179c1e1e27760b299a6d98b07ed582cd",
      "temperature": {
       "value": 0.257,
       "source": "oura_daily_summary",
@@ -10588,7 +10588,7 @@
      }
     },
     {
-     "all": "5fa814a02e568bac58ccc06c8674ad9c0eba957c4441aeeb53e794bcac350708",
+     "all": "ab93d87adc0680b8ac223734f37dced8fbb6a556afe029f2c3326da17492d81a",
      "temperature": {
       "value": -0.16,
       "source": "oura_cloud",
@@ -10638,7 +10638,7 @@
    "excluded": "aaac93995d37e660c1fffaa40a6143741fa2c51e40a1c532f88cc07813088b1e",
    "scored": [
     {
-     "all": "88d502ca4f081d91dd5a1308c9eca08c07536d6d1c4dbddfdce0f1330f10752e",
+     "all": "f21806a2f36bba40149a271a0bb2d82521ebb4ff0c72acae25054d246fb31cde",
      "temperature": {
       "value": -0.237,
       "source": "oura_daily_summary",
@@ -10662,7 +10662,7 @@
      }
     },
     {
-     "all": "85766ac8875274ca10942fab56be6a4ba482a0c3c55e2b5554b8596ad69cb302",
+     "all": "3963c74acbab39dda95c4fce1dc7fd483b340736eca1d09bfaba377cb8706251",
      "temperature": {
       "value": -0.16,
       "source": "oura_cloud",
@@ -10713,7 +10713,7 @@
    "excluded": "dea3ec85f1ab89c8d44416edd1f9ee01e2d03c282985e47c64f2fade95f04479",
    "scored": [
     {
-     "all": "98da81bd0939d17dbb011373756cf00dc3edae3060fc955b6525b74edb1017d7",
+     "all": "a7339e654ce2dd0c083e5bee44cd9cb86075c16180200ac55ffef28fc1cf4e2c",
      "temperature": {
       "value": -0.194,
       "source": "oura_daily_summary",
@@ -10737,7 +10737,7 @@
      }
     },
     {
-     "all": "a676ea7c31e173ca47415b1e4d21b9b5b55ccd444080566780117179bc3fc6fd",
+     "all": "0f0d3b0ac6558da4a2db722e74c224d8112441cbe149f3849be9c9567a1362c0",
      "temperature": {
       "value": 0,
       "source": "oura_cloud",
@@ -10787,7 +10787,7 @@
    "excluded": "8e50c06c4c24f89bf49d3256db4b97985c2d9ace371a9ada1e5bc0a64c96d071",
    "scored": [
     {
-     "all": "b75bf8eda8e1c4011ec5b760efdd39c10986ba8a076ad4ebb37c970160fef90a",
+     "all": "d54ae568477ce3d5eeb655fe3c5412fd8ae067effc0582828f22aaa0b23acab7",
      "temperature": {
       "value": -0.174,
       "source": "oura_daily_summary",
@@ -10811,7 +10811,7 @@
      }
     },
     {
-     "all": "16b611cf767d21818fd3f9fd5e140ca0a6adc25c9a8b53ca737a07cd0a160fbc",
+     "all": "496be52e1f524c12691cf8728ec7c576ac52b32c64671458beff37be0122d86a",
      "temperature": {
       "value": 0.05,
       "source": "oura_cloud",
@@ -10862,7 +10862,7 @@
    "excluded": "ebead52a6db6890c18115bfd9d8c936222190100f6a6e13a3b1e369be7f1a153",
    "scored": [
     {
-     "all": "d4c945872b05a4a4cd7bb451b1ca5c20a23794932c195cae771aab00582f835f",
+     "all": "10de07af61cd0dd8722faf43d129b12cc959bd7b562e838466b74816868522f3",
      "temperature": {
       "value": -0.235,
       "source": "oura_daily_summary",
@@ -10886,7 +10886,7 @@
      }
     },
     {
-     "all": "07fc46cb410300a975f638af9d9e1d03dc048d58a34c719073c94f47a7e8d770",
+     "all": "ba2e2880748a83de238de8b51df7b367d3ed73e5a5521f265cfd39fd28130af7",
      "temperature": {
       "value": -0.26,
       "source": "oura_cloud",
@@ -10936,7 +10936,7 @@
    "excluded": "c0df9ff0929a6c8ec46fd2eadf3577fa1c904c2741abe9b5dc85c020fd1f38bc",
    "scored": [
     {
-     "all": "241c729c9c4a778fc74f2fa1f7b30a75988b09e9de183b4f86c5a361f8c1d137",
+     "all": "1e44688e67fb3255c10409c89a13f37f6b696f8a76c46aed65df4ffba0c26638",
      "temperature": {
       "value": 0.057,
       "source": "oura_daily_summary",
@@ -10960,7 +10960,7 @@
      }
     },
     {
-     "all": "038c11392d449b0f78ee55e1ee2f3f7676fe372affa331e37655146e0168a89c",
+     "all": "70e3cbfae9146d7722876c12be97f826e73b6a42b428e92499c25bde7391ef9a",
      "temperature": {
       "value": -0.28,
       "source": "oura_cloud",
@@ -11011,7 +11011,7 @@
    "excluded": "f875d51b05fa46dc170ffba35effb0728ed77edd19212d3be49721cee0939aff",
    "scored": [
     {
-     "all": "b3b7e6fc6a1bd058d0cebaecc8ebca12adee7f2754343b8152599453349c1f3c",
+     "all": "d5a0aba991c4e96bc02fb2f958e7d1715083f3991b487281786eeda0bcb50e02",
      "temperature": {
       "value": -0.059,
       "source": "oura_daily_summary",
@@ -11035,7 +11035,7 @@
      }
     },
     {
-     "all": "a3048247b4e4cc839d919208c218fd8fdf912f9c06981f85b20a402dd4844205",
+     "all": "b2b19194378ad09cc92df34c3535ec52f40ec75dcfc7141bad194d51f0ff20a7",
      "temperature": {
       "value": null,
       "source": null,
@@ -11085,7 +11085,7 @@
    "excluded": "5457e09e6e5d97840d57d6f7f89dcb9089529ecf28b235e1e71daef0fb757170",
    "scored": [
     {
-     "all": "a4053cd4de5ab31748fd11a79d8fed22d2d5a911ac7377bc8b1383931f6bd108",
+     "all": "bfd3f31b3df7b43230197941fcb8269149abd09de5a26b10a584a35409130020",
      "temperature": {
       "value": -0.15,
       "source": "oura_daily_summary",
@@ -11109,7 +11109,7 @@
      }
     },
     {
-     "all": "b4196becd1d3194ee9134380a7dfe99c08fc1a7d4fae7d0c8237991dc7eb8d41",
+     "all": "2b352767de3da420696d475e35f9d8c0d22c869474d1fd1efee4a38ebadecfc6",
      "temperature": {
       "value": null,
       "source": null,
@@ -11159,7 +11159,7 @@
    "excluded": "96579ed7c6ee26a05b4559e7ae6f52821487fb25cfc8ec9a1f69c841a8b1b373",
    "scored": [
     {
-     "all": "99b097a49fddf1d358663d17effcc232bcb8a1b759e01a9b5d6e38f9ef5b1228",
+     "all": "0d14975600d54c549c9c1a11f855b7a338a186a1e575082fba3509ecbf0de5ff",
      "temperature": {
       "value": -0.212,
       "source": "oura_daily_summary",
@@ -11183,7 +11183,7 @@
      }
     },
     {
-     "all": "d3a936e28050b249dcc7c35a496b3267a3dc87fc9b92c6bb8a2f5172106553f3",
+     "all": "faadc9504ae6d6b60527737c6ca51a29aaee37f727adf2aa1e41d74095a87b32",
      "temperature": {
       "value": 0.192,
       "source": "oura_daily_summary",
@@ -11233,7 +11233,7 @@
    "excluded": "cd2009ab6fd8418898cba035ca6b7118b1e16b45adf938d68a36bbc3bf972b0f",
    "scored": [
     {
-     "all": "1e433b50a78700c1f4d61ed11585fd2a3808fa8e908c3e81912d76e1ee7ca609",
+     "all": "249101429cdcdea2c8bee218ca87bd7f5e94975319396dd3e919b053a402bbea",
      "temperature": {
       "value": -0.196,
       "source": "oura_daily_summary",
@@ -11257,7 +11257,7 @@
      }
     },
     {
-     "all": "66baef15dac6ec84345557c56dad208b8693b5ade12b5969752fdaf5b8a1edaf",
+     "all": "064b779ddc645c466ccf2485ccb6e3339ca35352da8e93261059cb271c7991fd",
      "temperature": {
       "value": -0.218,
       "source": "oura_daily_summary",
@@ -11308,7 +11308,7 @@
    "excluded": "d396cd9bbdd195d93f01948b90cc61044527814c64619d088963c750a1898197",
    "scored": [
     {
-     "all": "5e2a3ccee4ef94ea62ff6e91b00b315edf1a1f331e0b410e357b2639cd126bc5",
+     "all": "e579cb0274e4ad55cc1299d8215e77e17b8a15140e897deee25b1e8583298c98",
      "temperature": {
       "value": -0.128,
       "source": "oura_daily_summary",
@@ -11332,7 +11332,7 @@
      }
     },
     {
-     "all": "64c0ee9f3e70eea2f05e112a6ec1570c60248c60a2b48a2033745bf0256f2b22",
+     "all": "5855fb7cd019dcf110fa67f4f8b9538394279e918881aa96462718fb4503bdb3",
      "temperature": {
       "value": 0.15,
       "source": "oura_cloud",
@@ -11381,7 +11381,7 @@
    "excluded": "089ebaee5d22e0b3100729f48223b89da3947a176fa9cc3bdb8c65cd6f6f029e",
    "scored": [
     {
-     "all": "cc689959557e4bbeaafdbe999163b2e06e7a168f069acac201b532019605f76f",
+     "all": "3f9d95730bc27ed952613847d6e3ecfef5e8e8349b24967102433277ec86fa3d",
      "temperature": {
       "value": 0.028,
       "source": "oura_daily_summary",
@@ -11405,7 +11405,7 @@
      }
     },
     {
-     "all": "cee0defe50b51aa2d37416aaa7eea820301a74ed699edf90c0e02fe6581730c5",
+     "all": "c09475345778186f8908af963a42e439713c540a254283111f8b52bdeaa87dc6",
      "temperature": {
       "value": -0.19,
       "source": "oura_daily_summary",
@@ -11456,7 +11456,7 @@
    "excluded": "b05bea1c905adaf20bf7aba2365ad07746915c1506ed534a713d45e3b008d315",
    "scored": [
     {
-     "all": "9b49ee4c58db61bf678e06a0c99e4ff849f4756dcd3d1de7587d567bcd88a0d3",
+     "all": "d75ee6f7fc98ac395840c1a7026c79a59d3a432e428267a6f649ed176f01c477",
      "temperature": {
       "value": 0.064,
       "source": "oura_daily_summary",
@@ -11480,7 +11480,7 @@
      }
     },
     {
-     "all": "c3b04a7e542d3bd4025a3d57f3bd919bcbce36de1519997d51297602341dc6ab",
+     "all": "aaefee5f8056f8630384da2284578aff5219a34aba7eb5b75cdf475f551e750d",
      "temperature": {
       "value": 0.31,
       "source": "oura_cloud",
@@ -11530,7 +11530,7 @@
    "excluded": "f2c2ac5c56de29a46c46000f724e47e46a194f6270d11016ad73ab36ec274104",
    "scored": [
     {
-     "all": "1743b098c67a695cef9b613bc0e5fe6f81f84b35916b648c97ef41a4ae8dbc5b",
+     "all": "a462317736b0a863d12f6b747c7acd3f83c7056c6fba6c96f142b7535f931ee2",
      "temperature": {
       "value": -0.015,
       "source": "oura_daily_summary",
@@ -11554,7 +11554,7 @@
      }
     },
     {
-     "all": "fd2ed2d8141a1c56b69a5362412e37d1ac23834e0613c0fa6643a2bc7f00540b",
+     "all": "b3ba672cfd429ba69e98013c7e4d0b7276c05d44229fe7d4d28918143b9f6d14",
      "temperature": {
       "value": -0.11,
       "source": "oura_cloud",
@@ -11605,7 +11605,7 @@
    "excluded": "0eee911beb9087b51bb281b01e447abfe0c763fc9cc3b2baf9aca1f341b6c88d",
    "scored": [
     {
-     "all": "c005db90464ce12948ea15935fd547d6c119dddbbd75e3f64c0da1ca728075ce",
+     "all": "27e21e23cb87cd5f9645bbf1c48ca33bc6b768a298336325f2d4969d86276af3",
      "temperature": {
       "value": -0.073,
       "source": "oura_daily_summary",
@@ -11629,7 +11629,7 @@
      }
     },
     {
-     "all": "8c8a58861c0402345f327b61df8830cd38265d91747c94c05f0241f1db82fb4b",
+     "all": "e2233c2e7844de51e244c36122a1ea72b521aa615935e82dc15699163a8f8e0e",
      "temperature": {
       "value": 0.32,
       "source": "oura_cloud",
@@ -11679,7 +11679,7 @@
    "excluded": "f238a3f4a69e976227e07171e768e9e239f3f7100621274c9ff95be749d931cf",
    "scored": [
     {
-     "all": "e0ca665f41ed8d0e517a7672c5a64b504a426c075db8c1083ef86763a1b70bf0",
+     "all": "5bbc49ac408e347bdfa92756543b3eb730cd441c0c3c006e85ecd8bce905aa42",
      "temperature": {
       "value": -0.186,
       "source": "oura_daily_summary",
@@ -11703,7 +11703,7 @@
      }
     },
     {
-     "all": "a2e72ef2aa2403f0650bab5148cc720d310a8682d57366b048c532c5d0b927b0",
+     "all": "856957099932d9fa60291383f249e97481f79acc35bd54215a051cb3cffcb565",
      "temperature": {
       "value": 0.3,
       "source": "oura_cloud",
@@ -11754,7 +11754,7 @@
    "excluded": "934be4698e4fcf3a70f39b57f91f7f246d542ffe74d7dbd4f668d22c5ba65a39",
    "scored": [
     {
-     "all": "e146491f9b7c4531426c66960dfdff5c1a72d5242e4629986eafc3df29365df0",
+     "all": "d9248004369fdcb52b6fbaf0a260cac23e892d397f5415828c32870f7ec6fef4",
      "temperature": {
       "value": 0.06,
       "source": "oura_cloud",
@@ -11778,7 +11778,7 @@
      }
     },
     {
-     "all": "f9515fa2d69126f6413940f254378b4476b8990addc89f90890a65c56190efd4",
+     "all": "f605f198baf90019b5a5fce022acac0a16a1243e1989c72e0e5cdf2182dbeefb",
      "temperature": {
       "value": -0.38,
       "source": "oura_cloud",
@@ -11828,7 +11828,7 @@
    "excluded": "fe282648263bc31656ddd51cfb3431e1f0f1e651d4d156a794de1c3d24874af5",
    "scored": [
     {
-     "all": "b84a8e0ea8ddcf4f3ee34c8833292a06e79eb2a089660d0b0b5b6ba3ff2eac05",
+     "all": "9f57d76555a7a2245d026731e7f3d7bdc05ccfa79fbbd0e68bfd37c6e2899124",
      "temperature": {
       "value": 0.125,
       "source": "oura_daily_summary",
@@ -11852,7 +11852,7 @@
      }
     },
     {
-     "all": "bf7e6cc4b67352ff6a5e684dde86f49f640aad890404f55aa95a04b76cd1a97f",
+     "all": "4d3f95ffbaa43adfcf00c6b8fda04c7b1808310d1402dbaefdf483b20ff647c6",
      "temperature": {
       "value": 0.17,
       "source": "oura_cloud",
@@ -11903,7 +11903,7 @@
    "excluded": "2b4a01242d280a187b8763c25e5648ad68a039ce176dcb50a6f483a107ac7d1e",
    "scored": [
     {
-     "all": "e0aae9c92c2777e18f0059b9281648c7276ac0a7133a5d25debbbb0d7f19abef",
+     "all": "9bab76969f6edb0ea7446abc31277e2b3360cabcf56c3d45c7b2d9b10ea98669",
      "temperature": {
       "value": -0.201,
       "source": "oura_daily_summary",
@@ -11927,7 +11927,7 @@
      }
     },
     {
-     "all": "565816dcd7178a399d53999fd0812069fb31abafc11ed49cf101de926bbb38e2",
+     "all": "6109332c02e76c999179dccc4d9950d12c3c3e4f43c09353e76144ceb926301d",
      "temperature": {
       "value": null,
       "source": null,
@@ -11977,7 +11977,7 @@
    "excluded": "eddc7aa66b98b1b415f73ed3603a5d641a8d88aad1dac4fa3bc4e904fa4cd77c",
    "scored": [
     {
-     "all": "deae15cf56de46745aa03001fa64d64ebfcf8b5009e0165cbe2db3eee38d5fb9",
+     "all": "5b69f7a513916adef56b462efe59e6717172b37779afefb7bbacae5d5213ef96",
      "temperature": {
       "value": -0.26,
       "source": "oura_cloud",
@@ -12001,7 +12001,7 @@
      }
     },
     {
-     "all": "2d3ad70d290fffe26dd025ba5f3880757ffb29af1a5233c88dbbad6cd4fffd87",
+     "all": "09632cfe0b6fb70b759885d0569c80a02a48ac2598b18f54ca39a66b32aa56cf",
      "temperature": {
       "value": null,
       "source": null,
@@ -12052,7 +12052,7 @@
    "excluded": "6b95a01150ba1fec60e1d0e7a9015e376fb451693d7e701137932b472d1b5b57",
    "scored": [
     {
-     "all": "5d6a82f82977853e33169f93a90f11ec557b50ecce7ec1db1ee2ab2009b72a11",
+     "all": "16c1de0ef09e7112be9387cc8525938c3cff62cf59aa61f9b60b17fcbde2e3ff",
      "temperature": {
       "value": 0.18,
       "source": "oura_cloud",
@@ -12076,7 +12076,7 @@
      }
     },
     {
-     "all": "649f13b91233bef0e0383fbfc9cf618a52d9717f4eca9c79beaf62bba67d85fc",
+     "all": "3cb70e7f3b598fd99d96e17952a7c9fd17e2bf01bada4c285f5d077fffd66048",
      "temperature": {
       "value": 0.259,
       "source": "oura_daily_summary",
@@ -12125,7 +12125,7 @@
    "excluded": "52305e71b528413e5dcce687649cc62ca496df979b47be759714022d958be6cc",
    "scored": [
     {
-     "all": "e13dcd76db99d98f98974434420e5699eb1e344f9a1d4544613b99b24ddeff4c",
+     "all": "618d9672cbd6ccbd99fb5decbeef708af496f452eb9d11c6882a3c7bcb0e0650",
      "temperature": {
       "value": 0.07,
       "source": "oura_cloud",
@@ -12149,7 +12149,7 @@
      }
     },
     {
-     "all": "e74a4e486c6b1fbd3d2601d17e2a82663a18e7e06b9c5d33072f46b621180387",
+     "all": "2884d7e208afd1249cb4795a6922b79edd93cdcfaeefff0f080456115cac059b",
      "temperature": {
       "value": -0.247,
       "source": "oura_daily_summary",
@@ -12200,7 +12200,7 @@
    "excluded": "efe400c2097af46add57716cc1705784cbc78fa72921ddd1bdb8d1ef17406809",
    "scored": [
     {
-     "all": "9b77ebdedd00bd00f03a8dcc1ef61dc8bc2d1612f047ec96e037d3a4cbca2f95",
+     "all": "e44eea041642f994c00654ec325e5cf62c75b69113f7d83d8a0d82b7902d8bc8",
      "temperature": {
       "value": 0.22,
       "source": "oura_cloud",
@@ -12224,7 +12224,7 @@
      }
     },
     {
-     "all": "8ba83b59f75dab7e353ebf97320484772c41a7c95dfce86e06f19c5700d03d28",
+     "all": "ae016786098a7852d3f9c7ddf38475041275191c80925fe1eed3996d5bff2528",
      "temperature": {
       "value": -0.23,
       "source": "oura_cloud",
@@ -12274,7 +12274,7 @@
    "excluded": "4f8648a564c52ce868be6a03c00267a38dd86256df4cb4198fecc41e38b40dc8",
    "scored": [
     {
-     "all": "8502774d810f90c61ff5e246fdc0b2c8b40c3e0b8e009a5b3b97e226f869b5df",
+     "all": "bc55a372bb81fb64f6e47f62e1c00b921fc87d4cf28f59581fcd8ff056bf373e",
      "temperature": {
       "value": -0.25,
       "source": "oura_cloud",
@@ -12298,7 +12298,7 @@
      }
     },
     {
-     "all": "48bafbb7f7b2ebba478656b77cb0af021409885156e7198292ab8549850ab7e5",
+     "all": "3c21f095ecae70e64a1cf3811604032c540e97e4038ec927455a892d3463dfbd",
      "temperature": {
       "value": -0.223,
       "source": "oura_daily_summary",
@@ -12349,7 +12349,7 @@
    "excluded": "71bbab261a9c491b474c6a269b78704e8baf3e18b9d2a212054e74dcc12a394f",
    "scored": [
     {
-     "all": "cacac622a13096267060574d9da5222e10ac3cf7dc56916804da174c5fcc182e",
+     "all": "9deb9d7e3891a6e77e0d3764d8019d50da7de43ca1237f9feef87ab2515ee63f",
      "temperature": {
       "value": null,
       "source": null,
@@ -12373,7 +12373,7 @@
      }
     },
     {
-     "all": "5ef59b1826348341b8358e49454460920672ec8d405e838446786baf361f9d9a",
+     "all": "88c63f6554e28a4bbeed2636e144d2646fbbd923f384285da45ada9689ab8ea6",
      "temperature": {
       "value": -0.23,
       "source": "oura_cloud",
@@ -12423,7 +12423,7 @@
    "excluded": "576f2e451be51870733753b9d1ee5ff00bcdbdf1f1eafcd0e70d9e0ff5d5024e",
    "scored": [
     {
-     "all": "8dfe999c84e033f64f028359b1d61169b2965aa4b66f6bf204a0e37c0b847588",
+     "all": "8e5e61b6c7e38622ee002c2adb54f9ee839bc55bec995261f19dec0a95869c7d",
      "temperature": {
       "value": -0.222,
       "source": "oura_daily_summary",
@@ -12447,7 +12447,7 @@
      }
     },
     {
-     "all": "4eb5f7b755fbfa3da0c833bf2b625689a536234c80519a0bbfaf4d1554ac296a",
+     "all": "69a01dc4c3d508ec5cf223b958e1a7749c022047cc222682bf5e91293fb2ef69",
      "temperature": {
       "value": 0.05,
       "source": "oura_cloud",
@@ -12498,7 +12498,7 @@
    "excluded": "8e5029662872704608403270377a86fc073f8dfe970f16dffef9425694ccea72",
    "scored": [
     {
-     "all": "32b86e62100e4bb6a3b77718c8492bfd175d0b86db16a40ede9de6b7c53a0936",
+     "all": "3ae04e8587f5ab7cf4c3a5261fc820d51dbaab835d3738be19cc18cdcd8226a7",
      "temperature": {
       "value": -0.25,
       "source": "oura_cloud",
@@ -12522,7 +12522,7 @@
      }
     },
     {
-     "all": "ac4f6ea9d98cac8914b2115599291554fbffafec1fc1d98535d686a7473c7055",
+     "all": "9870b4ba17fb7dd35c6006e4114135bccc6e5e2541c72956a2bbf244a0f7a2c6",
      "temperature": {
       "value": -0.09,
       "source": "oura_cloud",
@@ -12572,7 +12572,7 @@
    "excluded": "119c850255d2b0b0217c9b13d408b443b935feaedb911ed4d97863e67b7c488b",
    "scored": [
     {
-     "all": "5696c4e2041342b15141c1bd045fbe44ac329655485bc33c2c2c1d18af2e7ef8",
+     "all": "98c0acdde0e3830ce1302e31517238fe78a6d93405f06250d8a7ef40baa10483",
      "temperature": {
       "value": 0.105,
       "source": "oura_daily_summary",
@@ -12596,7 +12596,7 @@
      }
     },
     {
-     "all": "c0faf6aac8ba605452e21b2a53d2152e2253189ed98cb1ee41adff3307908ff8",
+     "all": "a7b84a75e6f7a9e7a5a3aea7c9da39c6c04dd669eb18fe80c66b6284516d7414",
      "temperature": {
       "value": -0.08,
       "source": "oura_cloud",
@@ -12647,7 +12647,7 @@
    "excluded": "e5c41f7ab0a3aa789e86ac8aeec1bea18eeb319d7bdf93d3ff84b8bb25d05465",
    "scored": [
     {
-     "all": "d26482e38441f8b0a977cc774eb7424c5cd44d14a3acd494514ff61a828cdd30",
+     "all": "3f2d015b8cfe6fb7802fc5d70f9d8d7863ad4134ed64d5bf5ec06b2f535cdc3d",
      "temperature": {
       "value": -0.32,
       "source": "oura_cloud",
@@ -12671,7 +12671,7 @@
      }
     },
     {
-     "all": "b15a4233d2c57e926a629cefa505113c5ba7c622f8b6eca03be829a4ad39f34b",
+     "all": "7953f36c3422f7efbe9d8b40550a6debaa69361ba22c909637718fc754e66271",
      "temperature": {
       "value": 0.22,
       "source": "oura_cloud",
@@ -12721,7 +12721,7 @@
    "excluded": "d9f61313c1da397cc648222e63274f76e04c82a1b1e9a644a8b67ce8bba8ca0b",
    "scored": [
     {
-     "all": "736c749b1cf0e12656863285715c6361ad231d3144d3a7cc17e0693c3ba2d2ee",
+     "all": "2e588bdfee1dbde5207aaf5abb7062eeb1dfa2f31c4f1d6e4cefd1ebf6ee314f",
      "temperature": {
       "value": -0.241,
       "source": "oura_daily_summary",
@@ -12745,7 +12745,7 @@
      }
     },
     {
-     "all": "4af814ef0320024c6dd538c612efe36129e076a0ecefdd15dd4ca8c96a839a1f",
+     "all": "5916633146bae0d822b353ac4725c05fd0d7972da50b1dc86d795460c059eb97",
      "temperature": {
       "value": 0.32,
       "source": "oura_cloud",
@@ -12796,7 +12796,7 @@
    "excluded": "b5eeaf4c72bc638410c5d7a1517be6e0843fd1554f3b89892c01a9be9ad93602",
    "scored": [
     {
-     "all": "aa1484a8fcd656b2f0353bb9c9a569745e21e2f9193d43e0de05a1fb3978071b",
+     "all": "71b6725baad1fa39d351ce70ab37a1a678510055811a351bc6c95378e7e75e1d",
      "temperature": {
       "value": 0.2,
       "source": "oura_cloud",
@@ -12820,7 +12820,7 @@
      }
     },
     {
-     "all": "5082eaaeed39d7bece92449546ca51989456dedad51efad206dec884468757e4",
+     "all": "2b70d5f0ab0470f1c384c135d6c8f5cdbe3946c29415b2ecea13e2f46bc2b6cb",
      "temperature": {
       "value": null,
       "source": null,
@@ -12870,7 +12870,7 @@
    "excluded": "c3d1de239c3da30667295c37f43f0704aa9d3083cf5c8908540c0affed64be9e",
    "scored": [
     {
-     "all": "704c6a167e0a418ee58f4950fcaa763197a686a8ce31ce0b264273df527df4ce",
+     "all": "d7dd0ce0e5fc87b9c5bd0afd0143a75c40c983feb693cc24f567fbc48eaebb22",
      "temperature": {
       "value": 0.045,
       "source": "oura_daily_summary",
@@ -12894,7 +12894,7 @@
      }
     },
     {
-     "all": "be144f3746ee2fb236c6be39c11196cf956cea0b1da5f2f0040f1b1ba7c6d51d",
+     "all": "cf263ae532ff8b4dd68b0dd6213880a8d6c86a90f1eabf4d3e68f0413840bda7",
      "temperature": {
       "value": null,
       "source": null,
@@ -12945,7 +12945,7 @@
    "excluded": "33b7b8a3e29e6fff21df4b98be68eeb6a5272bad0468b67b173523631100e417",
    "scored": [
     {
-     "all": "ab47cc6416d2c85cb8729ec6f85c9ee43a9b9ce0ebcd80eb03232376fe0aa755",
+     "all": "c500538a576a8952f417b18a1dab6daf6ec57697c0ec53ba418555c9edfb3e3d",
      "temperature": {
       "value": 0.31,
       "source": "oura_cloud",
@@ -12969,7 +12969,7 @@
      }
     },
     {
-     "all": "7daa64bcbb7702fb19ef25a8635c4a23c124ee27eced34ed9063805ad771a38a",
+     "all": "9ebdaa88dafd1381702caf1a59c82a2c81f81e828311850548bccf26c265d4d3",
      "temperature": {
       "value": 0.054,
       "source": "oura_daily_summary",
@@ -13018,7 +13018,7 @@
    "excluded": "a811d68febb6fdff953342a1d25d3d326008e999634748ce0dcff36b5769873c",
    "scored": [
     {
-     "all": "e142f881f929416c21e5b78956436c7bbb3992582b34225687963336043878d9",
+     "all": "c421538140760bbc108a9506a8e494830a93518df32ac7c86345e8f6c945f644",
      "temperature": {
       "value": 0.051,
       "source": "oura_daily_summary",
@@ -13042,7 +13042,7 @@
      }
     },
     {
-     "all": "7b491324eb0f566bde08ba902ed9fd4c93334169000ad9f65c26bced2e37ef8f",
+     "all": "32aa6cc6b5eb732f7a745fda412cc3221f395eb9cd53e4c216aa01a83b00a5bf",
      "temperature": {
       "value": -0.146,
       "source": "oura_daily_summary",
@@ -13069,10 +13069,9 @@
   },
   "2026-07-05 v0 switch=2026-10-17": {
    "temperature": {
-    "digest": "adbf45c300f12dc584e705cc214ffeccfb9826b9abf63b85da619ca7cd49add0",
+    "digest": "592c15985ee638e199203f2faac1a441d7aa27cfe9c7cef1e60714823fb58ee2",
     "bySource": {
-     "oura_daily_summary": 36,
-     "oura_cloud": 4
+     "oura_daily_summary": 36
     }
    },
    "settling": {
@@ -13092,13 +13091,13 @@
    "excluded": "e06475a75173b634d98cf59aec18cbbd2344703305ed699f7efcf4743a21e7fb",
    "scored": [
     {
-     "all": "a8c68661371d578279cb5950fb264956a820ad307d43e7fefc72282ac1899f5b",
+     "all": "6a1e5c02a621cbfe5f90137e8be7431d8cac6767fe9ce10fa7100632f707707a",
      "temperature": {
-      "value": 0.11,
-      "source": "oura_cloud",
+      "value": null,
+      "source": null,
       "score": null,
-      "validDays": 1,
-      "gap": "learning"
+      "validDays": 0,
+      "gap": "missing"
      },
      "settling": {
       "value": 5.824,
@@ -13116,7 +13115,7 @@
      }
     },
     {
-     "all": "cb9924e7da75d50bcdbb01788e8fa207a16257ce08c8e778e29c4d26cb6abc09",
+     "all": "cef45ef35254858bee6f59153632f393a0276453ce158adc72cb67b568d390c5",
      "temperature": {
       "value": -0.24,
       "source": "oura_daily_summary",
@@ -13143,10 +13142,9 @@
   },
   "2026-07-05 v0 switch=null": {
    "temperature": {
-    "digest": "06ccc29b09b40ec7c60f4a98ce2e7de4901ff8f4a01fc4a9bd8082a162a0889e",
+    "digest": "43ad0b9ab7449d6fb0778fc0a51695c56983553a9c8a889a86e486b2d3812fbf",
     "bySource": {
-     "oura_daily_summary": 33,
-     "oura_cloud": 7
+     "oura_daily_summary": 33
     }
    },
    "settling": {
@@ -13166,7 +13164,7 @@
    "excluded": "220dbf2c4d5ad138ba1f1c427d39bbfc2a2f4f988067f45f0a7b1b8ec4d9c09a",
    "scored": [
     {
-     "all": "ae94547d416d7088677378e83f707e3021fc69b1c1e46f04a3aa621768f54dcc",
+     "all": "1d6d19de1079a5044c271d36805088a5f51e65b446cdd98530a6cea32a742453",
      "temperature": {
       "value": 0.288,
       "source": "oura_daily_summary",
@@ -13190,13 +13188,13 @@
      }
     },
     {
-     "all": "10fe436c2ddc1aceef10cf53e099fa5cbdf0149e6132abad39abfbce771091cb",
+     "all": "86234be54e384c4a62b70a7813c190920bfb64d50b9fa40f1b60fb1847192aa8",
      "temperature": {
-      "value": -0.04,
-      "source": "oura_cloud",
+      "value": null,
+      "source": null,
       "score": null,
-      "validDays": 6,
-      "gap": "learning"
+      "validDays": 0,
+      "gap": "missing"
      },
      "settling": {
       "value": 3.214,
@@ -13217,10 +13215,9 @@
   },
   "2026-07-05 v1 switch=2026-10-17": {
    "temperature": {
-    "digest": "a5aba76a469c59355502a143759b0215cd9da698079d3348b4909f256c9b63d1",
+    "digest": "3f8219cb5aab6cacbb653cfafe67b90c94c5283908f8925e0103233786ba01eb",
     "bySource": {
-     "oura_daily_summary": 35,
-     "oura_cloud": 3
+     "oura_daily_summary": 35
     }
    },
    "settling": {
@@ -13240,7 +13237,7 @@
    "excluded": "722bd5c5cfab549d3bee9006a779de9a473087b17a2793038632bc28dd0e9640",
    "scored": [
     {
-     "all": "b31e9d128446e1edcc00f8b6e2c213c46fa03c586a3f6923555999b739594160",
+     "all": "7e8a49c11226e16850043dcf526935e4a037b8fb3448d655f142dc4b19d3c92e",
      "temperature": {
       "value": 0.05,
       "source": "oura_daily_summary",
@@ -13264,13 +13261,13 @@
      }
     },
     {
-     "all": "49111559f493d621ab1f2035e1e30ac79c3231fa3b9138ac0dae90d7c4adefaf",
+     "all": "cbb1a4c49a154ca42fa216a18f8be5abb308c52785cd536d0785f1ebb7976fd4",
      "temperature": {
-      "value": 0.08,
-      "source": "oura_cloud",
+      "value": null,
+      "source": null,
       "score": null,
-      "validDays": 1,
-      "gap": "learning"
+      "validDays": 0,
+      "gap": "missing"
      },
      "settling": {
       "value": 2.17,
@@ -13291,10 +13288,9 @@
   },
   "2026-07-05 v1 switch=null": {
    "temperature": {
-    "digest": "3daa13061d2d90a8586e5589af104e2d723a2b6e779df5972555f31ce15ee63c",
+    "digest": "ac6ac4f2c19237f6f23d69546bbc0dfe66b897f31441d046a6fd1fc41d213349",
     "bySource": {
-     "oura_daily_summary": 36,
-     "oura_cloud": 4
+     "oura_daily_summary": 36
     }
    },
    "settling": {
@@ -13314,7 +13310,7 @@
    "excluded": "8ba28d8dbd5c08616dc157311416d4b59d1fe202eb81321f3d9084ba71906073",
    "scored": [
     {
-     "all": "b5fb6f75df10590738e0be43ba171be385d02e09e154286001534d72d4950d01",
+     "all": "78357bafb2331e10690a999da1a0b922fbccf56f94d40aef2c049f8233897e16",
      "temperature": {
       "value": 0.159,
       "source": "oura_daily_summary",
@@ -13338,13 +13334,13 @@
      }
     },
     {
-     "all": "7fdb048e5a2f84e33429a14b65d86dff8070756f22d2c92f37bab677cca42e5a",
+     "all": "2e159869dcb72d5bf9903a1910044dc730fa12bf9071906a0384cd43b0ebd860",
      "temperature": {
-      "value": -0.4,
-      "source": "oura_cloud",
+      "value": null,
+      "source": null,
       "score": null,
-      "validDays": 3,
-      "gap": "learning"
+      "validDays": 0,
+      "gap": "missing"
      },
      "settling": {
       "value": 2.61,
@@ -13365,10 +13361,9 @@
   },
   "2026-07-05 v2 switch=2026-10-17": {
    "temperature": {
-    "digest": "90cd61a53a3cbf8d16255a903099379eed2259604e087e74c9f2032ae0571735",
+    "digest": "fbfe15e8d1d4b8753ac7590b297fd42ebc29e7ff9675447993f1493deaf63450",
     "bySource": {
-     "oura_daily_summary": 37,
-     "oura_cloud": 2
+     "oura_daily_summary": 37
     }
    },
    "settling": {
@@ -13388,7 +13383,7 @@
    "excluded": "fdba8aac5c4898c3198cf8601f07b735cc43496ec38600271fff75fd21e62e66",
    "scored": [
     {
-     "all": "4b8bebef5af5aa339237bee6645668ca4e531c1398a9cf44523f13b3101eeb52",
+     "all": "35c803d6a82e03c3c2cae7d16cc61ef432fc2d29917963198b388949dff1b805",
      "temperature": {
       "value": -0.143,
       "source": "oura_daily_summary",
@@ -13412,13 +13407,13 @@
      }
     },
     {
-     "all": "63364d4770165cfcc08e8a6e02698a0d7cd555843bc31d0062a5c0bf87f748b1",
+     "all": "af3252d16688b8477d45dcf6b9668efaa22841954ab484837928c98f21ee30d8",
      "temperature": {
-      "value": 0.25,
-      "source": "oura_cloud",
+      "value": null,
+      "source": null,
       "score": null,
-      "validDays": 1,
-      "gap": "learning"
+      "validDays": 0,
+      "gap": "missing"
      },
      "settling": {
       "value": 40,
@@ -13439,10 +13434,9 @@
   },
   "2026-07-05 v2 switch=null": {
    "temperature": {
-    "digest": "910272e767129a317f592c35956bed38e115380211931da3434a6ca65589c1d3",
+    "digest": "017c8e3ca123738cb39380a9dcba73c45c6aee4a5568ebda983302230a657fbe",
     "bySource": {
-     "oura_daily_summary": 30,
-     "oura_cloud": 9
+     "oura_daily_summary": 30
     }
    },
    "settling": {
@@ -13462,7 +13456,7 @@
    "excluded": "e8191dcacde8dbfb367d87f8372a8112831c96e73f12d3c6cf074f4a849150f9",
    "scored": [
     {
-     "all": "633ccabff47ef7fd0a5949a685c018ac9458ee725dfe55e09a6907476dc1b54c",
+     "all": "325de7e8818cbe2ab1c82fc46801c086184f4a1566d6241aba9367f12c4adcee",
      "temperature": {
       "value": -0.135,
       "source": "oura_daily_summary",
@@ -13486,13 +13480,13 @@
      }
     },
     {
-     "all": "9c3cfafc5448f563bca723291218e5ca9e662afdf6305b62942c13f1ea8c182f",
+     "all": "463e9cac048e64f81fb805dd07cb9b19d0031260197ee3ecb76bcebb92d2cbdc",
      "temperature": {
-      "value": -0.36,
-      "source": "oura_cloud",
+      "value": null,
+      "source": null,
       "score": null,
-      "validDays": 7,
-      "gap": "learning"
+      "validDays": 0,
+      "gap": "missing"
      },
      "settling": {
       "value": 67,
@@ -13513,10 +13507,9 @@
   },
   "2026-07-05 v3 switch=2026-10-17": {
    "temperature": {
-    "digest": "a022ac41c0c2b1ecc348f1a9c57391f42730130ec5009667d0c10ca4a9a02760",
+    "digest": "62014054fb6530dac552f526bcf9efecf443cc52b9c4afa8afb5c023a175925b",
     "bySource": {
-     "oura_daily_summary": 36,
-     "oura_cloud": 3
+     "oura_daily_summary": 36
     }
    },
    "settling": {
@@ -13536,7 +13529,7 @@
    "excluded": "4716ff03570be628b4c61651f81865387263eb00d98f91d62bcfa2a6a1bebfc1",
    "scored": [
     {
-     "all": "336eee486c0b62b1e24a5c685ec3af6d1e9b3f509d58ecf1c55b8032278d19ce",
+     "all": "53902057e742ef8a5fcc3865769f39d72be143cf22d39af3e4e13ae6d6ca5815",
      "temperature": {
       "value": -0.132,
       "source": "oura_daily_summary",
@@ -13560,13 +13553,13 @@
      }
     },
     {
-     "all": "291f4c550d9960ccfe8cdfaf812f51f58ffe539748eb973aeb2d7a3a37d52a8b",
+     "all": "780bd4c7008742b494b36f09e34b36407c1b3b358cdde7f626695af464d3c8a4",
      "temperature": {
-      "value": -0.22,
-      "source": "oura_cloud",
+      "value": null,
+      "source": null,
       "score": null,
-      "validDays": 2,
-      "gap": "learning"
+      "validDays": 0,
+      "gap": "missing"
      },
      "settling": {
       "value": null,
@@ -13587,10 +13580,9 @@
   },
   "2026-07-05 v3 switch=null": {
    "temperature": {
-    "digest": "66611b96df8f2503aa7a2555b5cce08f3007a7aa19c45b4a9fbaa870c9a16371",
+    "digest": "1ab5d72ca39369d62d0d80fccc1bd034094292383a5a16e7314395f672f5b6ee",
     "bySource": {
-     "oura_daily_summary": 33,
-     "oura_cloud": 7
+     "oura_daily_summary": 33
     }
    },
    "settling": {
@@ -13609,7 +13601,7 @@
    "excluded": "ada8f3e5ce157c1bfb0359422178ab0c5cb5b5b4d90ee1e65f17a5336c9c59a6",
    "scored": [
     {
-     "all": "d8ae7b9bf23d67ec6abaa82a6ab667b5a587aea7e219dd3b08bfd3ab3d0a9b9c",
+     "all": "4f043741e48bd58182f4f4f6f0520186a83a85440e1a29b5e6f7577f21004ca2",
      "temperature": {
       "value": 0.014,
       "source": "oura_daily_summary",
@@ -13633,13 +13625,13 @@
      }
     },
     {
-     "all": "d6435565991ab796b39936bf2dc650446c399dbbbeccbd65ea7b1518fa706656",
+     "all": "41ec6a4dd6bdedb96f179c534e9dcdb58ea7475524531c3ac47ee8a3ba36b44d",
      "temperature": {
-      "value": 0.12,
-      "source": "oura_cloud",
+      "value": null,
+      "source": null,
       "score": null,
-      "validDays": 5,
-      "gap": "learning"
+      "validDays": 0,
+      "gap": "missing"
      },
      "settling": {
       "value": null,
@@ -13660,10 +13652,9 @@
   },
   "2026-07-05 v4 switch=2026-10-17": {
    "temperature": {
-    "digest": "571c32599c19fb84ce8dd9b0d126d4ce73b1ee6a38808a8fdb6f6a2ff1a1551c",
+    "digest": "f4b801dc2980179d4e5158da64e6fbe05294a3fa57bee9e6fb8bd68302678458",
     "bySource": {
-     "oura_daily_summary": 35,
-     "oura_cloud": 3
+     "oura_daily_summary": 35
     }
    },
    "settling": {
@@ -13681,7 +13672,7 @@
    "excluded": "770996c9c251e84212ff949c466f02ce36ea0e76067262e7926b4637a89137a2",
    "scored": [
     {
-     "all": "01e7f65c2d36eb2ca93da25c68db5e6214655002dbd630ecd49badd3de5bb35c",
+     "all": "339b1526f9fa7c6450b7aa28951c8a22dad0e359c2e4503ce5e09ac2db477056",
      "temperature": {
       "value": -0.067,
       "source": "oura_daily_summary",
@@ -13705,7 +13696,7 @@
      }
     },
     {
-     "all": "29c25b795474c3443c8ec44c406bbd4884f50f13a4c7814b36340ab5ec20beef",
+     "all": "3b0faf0fa40ffd597e97084de07159a0e6629706691db083f804d86b91535e84",
      "temperature": {
       "value": null,
       "source": null,
@@ -13732,10 +13723,9 @@
   },
   "2026-07-05 v4 switch=null": {
    "temperature": {
-    "digest": "69fa1a0a025d05bfa70d7b80e82fae3df338fd53c7a7af3da87391d148d28e48",
+    "digest": "fcaca3b4e84c4d957c9e98290f61811aa2255d931df5440d40323bb7c6845a77",
     "bySource": {
-     "oura_daily_summary": 37,
-     "oura_cloud": 1
+     "oura_daily_summary": 37
     }
    },
    "settling": {
@@ -13755,7 +13745,7 @@
    "excluded": "6613f612b50080ed86d2c1a902aad638b56abeb54f815404567d2683faf37ee7",
    "scored": [
     {
-     "all": "076c915e813b6c80b7bc99bc998f827ddfe47a27a8333e80ae9b7214beeed235",
+     "all": "7ef04da631a9cabd6ca95374d66974486597925e7a8247250a19b49278f7895b",
      "temperature": {
       "value": 0.229,
       "source": "oura_daily_summary",
@@ -13779,7 +13769,7 @@
      }
     },
     {
-     "all": "66fb0c8243d470f76c24d048f4e57fb46879ff59a11e7a2276394e166dbdb2c0",
+     "all": "f8e5e8b78e695d76b3ab0e46434ad16d5429ca914d302e4a563758a01a15a52f",
      "temperature": {
       "value": null,
       "source": null,
@@ -13806,10 +13796,9 @@
   },
   "2026-07-05 v5 switch=2026-10-17": {
    "temperature": {
-    "digest": "6e5140e543c755b05cfc0e9da4fb51bd7e795d1039f9d5f030d8c80d10c841e3",
+    "digest": "af8f47039a4396640c6846bd29314d5d564c2b777a596e864235ac32851a82ad",
     "bySource": {
-     "oura_daily_summary": 36,
-     "oura_cloud": 2
+     "oura_daily_summary": 36
     }
    },
    "settling": {
@@ -13829,7 +13818,7 @@
    "excluded": "c2ba8e187e796821058a00ed85f08b20144bf17a0fc7222c4ac86b7c71d43a7e",
    "scored": [
     {
-     "all": "5819932f7df74aecdc3f1e2d14342a1cadadfc5f39e6cd32f29127ba318cc1f0",
+     "all": "2d53b819922940d36b3ce91568f2c0bb1a0222c809e91eeaa5892e322442895f",
      "temperature": {
       "value": 0.11,
       "source": "oura_daily_summary",
@@ -13853,13 +13842,13 @@
      }
     },
     {
-     "all": "215b5a4700e80ea702d9ea8cb57d622bca7a4301eca27ce1cd097d446c5b8226",
+     "all": "7dcada09393ba7963045a94e5495129a45683cf78fe2a80bb0e8827996410d4d",
      "temperature": {
-      "value": 0.28,
-      "source": "oura_cloud",
+      "value": null,
+      "source": null,
       "score": null,
-      "validDays": 1,
-      "gap": "learning"
+      "validDays": 0,
+      "gap": "missing"
      },
      "settling": {
       "value": 5.51,
@@ -13880,10 +13869,9 @@
   },
   "2026-07-05 v5 switch=null": {
    "temperature": {
-    "digest": "05c1401a06d74933f2c57b07b43cf0ab1f7537417e293595cb86e21ff44dad16",
+    "digest": "ae2ff7c25ebf752d46fb16646e407f3dd9f6793c1aec9edd6dffb168da5dd960",
     "bySource": {
-     "oura_daily_summary": 36,
-     "oura_cloud": 4
+     "oura_daily_summary": 36
     }
    },
    "settling": {
@@ -13902,7 +13890,7 @@
    "excluded": "fbc9d5f55b82c98e75e57309f7fed16e0a1b565ff09f53fc0c1433acb639b32c",
    "scored": [
     {
-     "all": "6b89065790c7b93ef2e623bc4dc19fd2daab949475532e12c2dd536a101af623",
+     "all": "418cf865b3448ed0279f960cc9493134323d386cce126a021c16841eceda3f1a",
      "temperature": {
       "value": -0.067,
       "source": "oura_daily_summary",
@@ -13926,7 +13914,7 @@
      }
     },
     {
-     "all": "36ce0d0d36a5244ab76850a9fcc766c2df679f85eb98db8ff58f4c0738959609",
+     "all": "361a1a7fd7969fcb2f859b28caf231d9e13b122d8059c58a3e8eb25db8638da6",
      "temperature": {
       "value": 0.07,
       "source": "oura_daily_summary",
@@ -13953,10 +13941,9 @@
   },
   "2026-07-07 v0 switch=2026-10-17": {
    "temperature": {
-    "digest": "b62cff4ff49a9b471ecbc64f58ce4520ee4dca55083958d7ccdcbd2c2f45a217",
+    "digest": "2040a4f77d0df59aacbe221ebb57934aec86a76245c4a43f2e18eb5f2059862f",
     "bySource": {
-     "oura_daily_summary": 36,
-     "oura_cloud": 3
+     "oura_daily_summary": 36
     }
    },
    "settling": {
@@ -13975,7 +13962,7 @@
    "excluded": "2c67160643b5f6adf49f0161658e75cc919175448cb467b97adbd3081f094324",
    "scored": [
     {
-     "all": "5b856ea8dd64b2cfa1c85f559050408a1370156ea922e7ff465ddba16219e608",
+     "all": "2eef79e3a8054f2ef40598370e72320c7563250c37c6384c85bab023f0031f13",
      "temperature": {
       "value": -0.283,
       "source": "oura_daily_summary",
@@ -13999,7 +13986,7 @@
      }
     },
     {
-     "all": "1d5b1892476ec4ff889998c417490c9f617b88753776aae57a6479dc88ace115",
+     "all": "8927e1f7746c6b49b266945392219fbfd30d4c9706053ef959e1d6aee880b49e",
      "temperature": {
       "value": -0.042,
       "source": "oura_daily_summary",
@@ -14026,10 +14013,9 @@
   },
   "2026-07-07 v0 switch=null": {
    "temperature": {
-    "digest": "828263685b7d585c3719cdfb307dd08f3e33424332ae2ac89d24bee1f53245f4",
+    "digest": "0277543d20198183b7ee3f64bede07dd0561cea1a8222a77091bc345385e17e6",
     "bySource": {
-     "oura_daily_summary": 38,
-     "oura_cloud": 2
+     "oura_daily_summary": 38
     }
    },
    "settling": {
@@ -14049,7 +14035,7 @@
    "excluded": "e06c90a02a2b332e6178b3de38bb7bafe16ac5fcb99dd08bb6b5ac42a6d82c7e",
    "scored": [
     {
-     "all": "e4231d98a4ce112c0245f3967d8a594e683c9a19cffc9f478de8de7c05521d4c",
+     "all": "4d2047beb8f456d92e63b328c0b8df6259590cdffa4ecd826579be1d352314e0",
      "temperature": {
       "value": -0.225,
       "source": "oura_daily_summary",
@@ -14073,7 +14059,7 @@
      }
     },
     {
-     "all": "e7e9178ebbb4f73e909b944958aeb2a355ae5a9ce689adfa37a78fd0c4bbd17a",
+     "all": "171cecf17f18f007dab8c4acae0165c40145cc6c69ee51069944774451d1e6af",
      "temperature": {
       "value": -0.194,
       "source": "oura_daily_summary",
@@ -14100,10 +14086,9 @@
   },
   "2026-07-07 v1 switch=2026-10-17": {
    "temperature": {
-    "digest": "56572554a2f17e009965914e68255d7893c53ca27aa2098bc8b5ad25a0c9e837",
+    "digest": "12d35c774c78ba09f2ee523d00104621172b41ae33a6e421f6ac68bb47488de3",
     "bySource": {
-     "oura_daily_summary": 36,
-     "oura_cloud": 3
+     "oura_daily_summary": 36
     }
    },
    "settling": {
@@ -14123,7 +14108,7 @@
    "excluded": "809c1d11e6b9760ca2e1e32a431d26cbe83f5f505063a5d20d9f7b3e639890f0",
    "scored": [
     {
-     "all": "a4d2b30595d086c4913d6d6f0c4b599a83e2edc0732d8ecc9d29ce531778248a",
+     "all": "4b203b2d38520f88c30fa972b813cdd2a7bab607c193c4ed4fc4bcae834001f0",
      "temperature": {
       "value": 0.276,
       "source": "oura_daily_summary",
@@ -14147,13 +14132,13 @@
      }
     },
     {
-     "all": "870f9731e10310da85aa5f66cb7663a717a542256afd6c35f5fd957d0ab3daa1",
+     "all": "1ba36178783c692b4564fa2b62d3905d05774af249b49c01b9f7ca7d84dc5a11",
      "temperature": {
-      "value": 0.36,
-      "source": "oura_cloud",
+      "value": null,
+      "source": null,
       "score": null,
-      "validDays": 2,
-      "gap": "learning"
+      "validDays": 0,
+      "gap": "missing"
      },
      "settling": {
       "value": 4.26,
@@ -14174,10 +14159,9 @@
   },
   "2026-07-07 v1 switch=null": {
    "temperature": {
-    "digest": "31ecb6aa6dfef7d28b58fba520078ed0a61ff72f7fa814e4bc0ae045a8ab14cb",
+    "digest": "0a649f707c3a2b78cebdb8cd70e500f53f93af8ccb34eaf499d529a9aaab1f41",
     "bySource": {
-     "oura_daily_summary": 34,
-     "oura_cloud": 6
+     "oura_daily_summary": 34
     }
    },
    "settling": {
@@ -14197,7 +14181,7 @@
    "excluded": "91484ffda5cb03b405189ed1df81b1d4154f7af5894cfe49d64dc45f022d3f2a",
    "scored": [
     {
-     "all": "aa4ac53261b16d51e1b6b4c29a6d6e69fa20433f31739daffa6ad760f36eea5a",
+     "all": "f9f92cd0a5339b083ab6792dbeeace3f88fd5de3e8296775b2e497f847251621",
      "temperature": {
       "value": 0.129,
       "source": "oura_daily_summary",
@@ -14221,13 +14205,13 @@
      }
     },
     {
-     "all": "fb6596db1cf72b127c329838bd87d10fc4e3c0087617c30150e64aea728e9d2e",
+     "all": "25441e49ed1466ea5f43ac88aa8aea53c95a73c1e7d35402cbc3d3c9104a3501",
      "temperature": {
-      "value": -0.06,
-      "source": "oura_cloud",
+      "value": null,
+      "source": null,
       "score": null,
-      "validDays": 4,
-      "gap": "learning"
+      "validDays": 0,
+      "gap": "missing"
      },
      "settling": {
       "value": 2.15,
@@ -14248,10 +14232,9 @@
   },
   "2026-07-07 v2 switch=2026-10-17": {
    "temperature": {
-    "digest": "8f3f05e7a58c381e2485506fdc25d71dc6753cd20f5586c2641321ea1126db86",
+    "digest": "53f852c72cbcd41c5b929ac2c8e3477e88b8a280ecfae3760245b35b8be95928",
     "bySource": {
-     "oura_daily_summary": 36,
-     "oura_cloud": 4
+     "oura_daily_summary": 36
     }
    },
    "settling": {
@@ -14271,7 +14254,7 @@
    "excluded": "484cac0ee3147b63bbe54fdfbc9ba65e8feefd077bdd18d636247b085018865d",
    "scored": [
     {
-     "all": "5ef124c1cdce0aae8c1ed82d4a86bbfea49757477f73dca0ef00029713c3feb3",
+     "all": "19aaddc4573c5dda532f5721a78c7c33d57fdd44b2adfca5abb9f127bcc21452",
      "temperature": {
       "value": 0.275,
       "source": "oura_daily_summary",
@@ -14295,13 +14278,13 @@
      }
     },
     {
-     "all": "fc3050246b838cbe8941bb7b02894179d92a7c81a7d1a55431176b880c166db1",
+     "all": "8619ff5291651249cf6114a9ca1acccb473e3a479debffae0ec1739110de602a",
      "temperature": {
-      "value": -0.18,
-      "source": "oura_cloud",
+      "value": null,
+      "source": null,
       "score": null,
-      "validDays": 3,
-      "gap": "learning"
+      "validDays": 0,
+      "gap": "missing"
      },
      "settling": {
       "value": 99,
@@ -14322,10 +14305,9 @@
   },
   "2026-07-07 v2 switch=null": {
    "temperature": {
-    "digest": "858d1db9f7c4a71982f609562fc269a2d423b29447f82dce0de995b39c78dc00",
+    "digest": "6f38232d55aba37386b80c7c2785768ca63fd22487e6399d9827577ca0e4adf8",
     "bySource": {
-     "oura_daily_summary": 35,
-     "oura_cloud": 5
+     "oura_daily_summary": 35
     }
    },
    "settling": {
@@ -14345,7 +14327,7 @@
    "excluded": "8ab1cf38731155738504f14f69286f71bbde0bc605eb811d4625eee315244590",
    "scored": [
     {
-     "all": "e6297f9324877560a7fcc17c3b229fe6995d478bb7999c585d8e711e1af7692a",
+     "all": "16869ce7eeeb693e852c0ff66339f8fe51b22ae5d39e424e3c8339ac590612cd",
      "temperature": {
       "value": -0.212,
       "source": "oura_daily_summary",
@@ -14369,13 +14351,13 @@
      }
     },
     {
-     "all": "88fb9215351a29c81a7be68174d4c2e39be4d9e520e3f0fb871c39903b21abb5",
+     "all": "d7787287956b9c19ab9353dd15bd014653d25883acd9fc86c81bb8ee47845402",
      "temperature": {
-      "value": 0.39,
-      "source": "oura_cloud",
+      "value": null,
+      "source": null,
       "score": null,
-      "validDays": 4,
-      "gap": "learning"
+      "validDays": 0,
+      "gap": "missing"
      },
      "settling": {
       "value": 65,
@@ -14396,10 +14378,9 @@
   },
   "2026-07-07 v3 switch=2026-10-17": {
    "temperature": {
-    "digest": "50a3ca3f9b4b101b5a5eae6f621cdeaf702459db3f027f6bef6a878135648050",
+    "digest": "ac009cb3282b38c5dc4c51c2a8d32fad02d073e6589643054d2df5895aa14d92",
     "bySource": {
-     "oura_daily_summary": 36,
-     "oura_cloud": 4
+     "oura_daily_summary": 36
     }
    },
    "settling": {
@@ -14419,7 +14400,7 @@
    "excluded": "adc8607b5157ca9cbc8c0eb499032f1a7b8306952715152b9d5bbf57ab17ce27",
    "scored": [
     {
-     "all": "213efd0275007b64724b904c0cb4e5e0eba04293520fb3dcd0ba3428e680fb67",
+     "all": "146914058a9ff47bb8f89c31f0ac5ce98c225a628a51c7011f9ead37bf8b2b41",
      "temperature": {
       "value": 0.084,
       "source": "oura_daily_summary",
@@ -14443,13 +14424,13 @@
      }
     },
     {
-     "all": "08e8ab79e8a626d362e56933645dfbbadf9c38a1f2dc813364da2e51793bc493",
+     "all": "6887d2b33407bb115ec45fa1d595b6a0ba7be93ca288247e346b53271eb6b82d",
      "temperature": {
-      "value": -0.24,
-      "source": "oura_cloud",
+      "value": null,
+      "source": null,
       "score": null,
-      "validDays": 3,
-      "gap": "learning"
+      "validDays": 0,
+      "gap": "missing"
      },
      "settling": {
       "value": null,
@@ -14470,10 +14451,9 @@
   },
   "2026-07-07 v3 switch=null": {
    "temperature": {
-    "digest": "6ddbb125d06856763fd0eaf8a74620788870957d3bfef3bffc4a9071c963f393",
+    "digest": "ccf5ad436dfdf6b5b08db2eac7169a55155fd701c015a1fb1614c43bdb447493",
     "bySource": {
-     "oura_daily_summary": 38,
-     "oura_cloud": 1
+     "oura_daily_summary": 38
     }
    },
    "settling": {
@@ -14493,7 +14473,7 @@
    "excluded": "2dea9f7e2e07dd2be62609578f1f2e66c2a36ea92302c678c81475096b172619",
    "scored": [
     {
-     "all": "a3cc55c5b48d107ad6f3d8713d4dbb249e28a7900d855b9742db5e676f2c9f17",
+     "all": "1dcace8d156ed8489f17f806000d2a84cfd7d3ca30ecbf0b764cf7edfccb50f0",
      "temperature": {
       "value": 0.21,
       "source": "oura_daily_summary",
@@ -14517,13 +14497,13 @@
      }
     },
     {
-     "all": "26ac0ac081db489363048a943e74d8ac1532250ddcf28ba3310be372761bcbed",
+     "all": "c13688774c9bc968bb7d93a0eac15c4ad503e25aa15aaad05f08833f6f175319",
      "temperature": {
-      "value": 0.33,
-      "source": "oura_cloud",
+      "value": null,
+      "source": null,
       "score": null,
       "validDays": 0,
-      "gap": "learning"
+      "gap": "missing"
      },
      "settling": {
       "value": null,
@@ -14544,10 +14524,9 @@
   },
   "2026-07-07 v4 switch=2026-10-17": {
    "temperature": {
-    "digest": "551e775b665b5257cac9ebf9e706eacd3c66b71f7dfa196d030ae3e24943716f",
+    "digest": "9944f5b265b08feaa50f04c989c194429f3441f512c7f25b953629369aa2711a",
     "bySource": {
-     "oura_daily_summary": 34,
-     "oura_cloud": 5
+     "oura_daily_summary": 34
     }
    },
    "settling": {
@@ -14567,13 +14546,13 @@
    "excluded": "ef2f7c032796f3d9514199358378ef131844b2345f53a6a44358bd5704f4840f",
    "scored": [
     {
-     "all": "f18517e2c08fd21de38b0028007d8c217dfcbdec6a4eb5c4b90f7969a153bae6",
+     "all": "1006606ac59a6e4c2177ee51a10316b49206232cb06e9681e2916e63129ccf1c",
      "temperature": {
-      "value": 0.24,
-      "source": "oura_cloud",
+      "value": null,
+      "source": null,
       "score": null,
-      "validDays": 4,
-      "gap": "learning"
+      "validDays": 0,
+      "gap": "missing"
      },
      "settling": {
       "value": 69,
@@ -14591,7 +14570,7 @@
      }
     },
     {
-     "all": "fd52c415fe21f87cac0502317225a8811c52150807c0592bd016135dd5f6f2af",
+     "all": "1209bf135a4c00b40eabaef6748e4e68069a944aea5c5522ed090467900f9eac",
      "temperature": {
       "value": null,
       "source": null,
@@ -14618,10 +14597,9 @@
   },
   "2026-07-07 v4 switch=null": {
    "temperature": {
-    "digest": "85cf6ea44894cf14f4c6bfb6ef81c160fa05b5d2b93bc3714d91a93013fb01d7",
+    "digest": "30b2e971fff3b2be88fffc3f3049a3822e1a11c94d476e6cb74e7e6b37c86dd8",
     "bySource": {
-     "oura_daily_summary": 37,
-     "oura_cloud": 1
+     "oura_daily_summary": 37
     }
    },
    "settling": {
@@ -14641,7 +14619,7 @@
    "excluded": "45714912d9028c4fae7e1d5d5d58b1400ff4740e56fa73c726df82e3c73dfc05",
    "scored": [
     {
-     "all": "8ac356c4f1ed406a293f765f97332a88416d8ffc3833dd6e3fab2b271d1e4f7a",
+     "all": "55741e0956110be70f94e362428a776cde1cf04e6025b3ca9a9eb312e749fea2",
      "temperature": {
       "value": -0.083,
       "source": "oura_daily_summary",
@@ -14665,7 +14643,7 @@
      }
     },
     {
-     "all": "aff6d88e342c768d631ddaf4c19b6faa1217ea880e12b77e5a8e7cf91e999298",
+     "all": "0e933d12055f30dedb09cf0476b05eb1ea097ece036d07834e7b3387baa137c7",
      "temperature": {
       "value": null,
       "source": null,
@@ -14692,10 +14670,9 @@
   },
   "2026-07-07 v5 switch=2026-10-17": {
    "temperature": {
-    "digest": "bb9c25f793a3f1a598c4410e0ff5d2b1b71852e84f6e49f3113d229d1e712295",
+    "digest": "d07acd2428f21db6d5226f4c25202c5063c59e7a7aebb79f2d7a02ec84018548",
     "bySource": {
-     "oura_daily_summary": 33,
-     "oura_cloud": 5
+     "oura_daily_summary": 33
     }
    },
    "settling": {
@@ -14715,7 +14692,7 @@
    "excluded": "90c12ac975e296980b1c4440a79bc695d5e0cfabd51e77d23f4d60707ca0ae00",
    "scored": [
     {
-     "all": "2e9c476224d3047fc9f67e34f6cd49af97686423d892bd314e7bda80d25d05b2",
+     "all": "6d59f818e3daf4ca5fe4e999734cae2b4c8491bb694a6b6ecde76c76730bd5b1",
      "temperature": {
       "value": 0.203,
       "source": "oura_daily_summary",
@@ -14739,7 +14716,7 @@
      }
     },
     {
-     "all": "687361e0ce72afe7953479a4345385a2dd4fa216c5a36bad7c20981d4b759340",
+     "all": "36869132bad434d71ba5d336014b7638d91d7321b99f54eed3a7a6fa03c94c06",
      "temperature": {
       "value": -0.096,
       "source": "oura_daily_summary",
@@ -14766,10 +14743,9 @@
   },
   "2026-07-07 v5 switch=null": {
    "temperature": {
-    "digest": "24c8b6e944b03068de870b8b16c6889e1873005f70e9f6e5a0fe2c491afdf748",
+    "digest": "05034329698b31d836ba0ca629fef31ff73bb822d830c5b63de8dbd8f51bfa03",
     "bySource": {
-     "oura_daily_summary": 37,
-     "oura_cloud": 2
+     "oura_daily_summary": 37
     }
    },
    "settling": {
@@ -14789,7 +14765,7 @@
    "excluded": "cecad11ca63cc710c8286cbad827c99abf521d3aca396b94166698e53bb171e1",
    "scored": [
     {
-     "all": "55f982c1a042f94d7698860f0a0b206472934cbb44bcb849b04f74fd14eddd4d",
+     "all": "c1424afbdcd694ad56a6018a2e693694ac3b5de32e8d88bb07e983003dfedbaa",
      "temperature": {
       "value": -0.059,
       "source": "oura_daily_summary",
@@ -14813,7 +14789,7 @@
      }
     },
     {
-     "all": "a02d757c6e2d1291ce7581eeb88bdefb66906ec57c66a7e3793fa744ac6107ad",
+     "all": "bc0e8f91476d0c2bdeadfa939ba3b2e23e068167ac49a55066ebf9b3e37e6c7f",
      "temperature": {
       "value": -0.249,
       "source": "oura_daily_summary",
@@ -14840,10 +14816,9 @@
   },
   "2026-07-08 v0 switch=2026-10-17": {
    "temperature": {
-    "digest": "a42a53c08491b1833b5c7f746f3e0ebf161cd64da68ab74f2283129248949491",
+    "digest": "6cff6cb0ca907763393e5acc58199c00dcf256a08914b8e70197f669fa5cca14",
     "bySource": {
-     "oura_daily_summary": 38,
-     "oura_cloud": 2
+     "oura_daily_summary": 38
     }
    },
    "settling": {
@@ -14863,7 +14838,7 @@
    "excluded": "69baa68597d45074ebb66d715e2c2b51cd956b3a5712e23e1e7786d110142e05",
    "scored": [
     {
-     "all": "fdf05371e42ab43d6465cad4c4034c0a87437d1c019ff0204f940035c84ca75f",
+     "all": "09810d3c169348a2dc4863f90a74b05b4e4ba03a6a1294bf48e87b30e0fec0a6",
      "temperature": {
       "value": 0.279,
       "source": "oura_daily_summary",
@@ -14887,7 +14862,7 @@
      }
     },
     {
-     "all": "5cc677210812d52f12bad800f747c24dac4dc35cb69a8567c31594d0d04ab12d",
+     "all": "b54b01b10321285a7e7f2ce6b843ac65d7c75fb350202eb486642908b5796549",
      "temperature": {
       "value": -0.01,
       "source": "oura_daily_summary",
@@ -14914,10 +14889,9 @@
   },
   "2026-07-08 v0 switch=null": {
    "temperature": {
-    "digest": "f772f8d3db7494901463a5969fd5b1fda0ea4a46d5dae73b5e965b44f0cc5237",
+    "digest": "c876f45d3a532aa2084be01c0e715a3ac1ee9ca2aa01eb4b6a5bbd767a7ce3ff",
     "bySource": {
-     "oura_daily_summary": 35,
-     "oura_cloud": 5
+     "oura_daily_summary": 35
     }
    },
    "settling": {
@@ -14937,7 +14911,7 @@
    "excluded": "ff4335e3c7a959facd5a34e5cbf2b2631d69f1e13a517803e738231c49462b44",
    "scored": [
     {
-     "all": "d8702df1b73675d99c82f9d7c0593c315052e982251f150e4ce8385d0e8d9d11",
+     "all": "d0dd47ac2359c48f2217c75ad6d35b9b06881160eeba74062e2592f97f8f8efb",
      "temperature": {
       "value": -0.267,
       "source": "oura_daily_summary",
@@ -14961,7 +14935,7 @@
      }
     },
     {
-     "all": "eb0c97f6f7ac59326250e5744e069565447f789be02e6e8989fa9ef0efe13b8b",
+     "all": "0361c8b175d82441d88337fafc42012b570d030531c82a642e671d1a49c015b7",
      "temperature": {
       "value": -0.134,
       "source": "oura_daily_summary",
@@ -14988,10 +14962,10 @@
   },
   "2026-07-08 v1 switch=2026-10-17": {
    "temperature": {
-    "digest": "e2ac21d29801e53e7f7e00ee7d8bb7db3a9702148c798d58b53078c56793fc89",
+    "digest": "ced5b3b5717ddaadb1406122faa47478a5c00bdf762ef4088bdddb14803919c1",
     "bySource": {
      "oura_daily_summary": 34,
-     "oura_cloud": 6
+     "oura_cloud": 1
     }
    },
    "settling": {
@@ -15011,7 +14985,7 @@
    "excluded": "7f062b0b4572388e4ca99fa1f267b1e799b9d2e7b5396bdfd54e08db12d3068e",
    "scored": [
     {
-     "all": "85b49fc5686539ce7e502ee2b4986359470f9199e1eb0e1fb7f486ac97416f7e",
+     "all": "00b017327dc908bce32699176cacb14caaa9d48b9f9f981adee82a0c5ead48b7",
      "temperature": {
       "value": -0.277,
       "source": "oura_daily_summary",
@@ -15035,12 +15009,12 @@
      }
     },
     {
-     "all": "8abced7407a45f2643fa23f0e8b8c8100b862e814bc5c8c7da1e03acddf1e968",
+     "all": "83b7159e6c260571c5572b8712f8d5be80dac5373ed1703ee305c5166e3a0c55",
      "temperature": {
       "value": 0.15,
       "source": "oura_cloud",
       "score": null,
-      "validDays": 5,
+      "validDays": 0,
       "gap": "learning"
      },
      "settling": {
@@ -15062,10 +15036,10 @@
   },
   "2026-07-08 v1 switch=null": {
    "temperature": {
-    "digest": "5896c58d1d47a6115e94165e8eb8cf407d616661d63e53cbd1963a398c6f3fe1",
+    "digest": "0d90f2378e693d640430a0f600233c9c01761e06f3b4083da8f249b61d64b46c",
     "bySource": {
-     "oura_cloud": 4,
-     "oura_daily_summary": 35
+     "oura_daily_summary": 35,
+     "oura_cloud": 1
     }
    },
    "settling": {
@@ -15085,7 +15059,7 @@
    "excluded": "99bb98888a1ab49aba8966984866679125971c4a4c27f0a293d5ce3f4940f786",
    "scored": [
     {
-     "all": "2d35004f800d01bb0e7402b3365c9c78c41c366a730141d34dcb3aa2e280effe",
+     "all": "d2b9017d03f51d09b323bee473d00c4109a6fa8853f3e2b091021fc1681a428d",
      "temperature": {
       "value": -0.273,
       "source": "oura_daily_summary",
@@ -15109,12 +15083,12 @@
      }
     },
     {
-     "all": "b6c53dbb92fa4791423ce853055f2ff2628701f59f9da03863157aaff3c6700b",
+     "all": "f24346c1282fc67417805b101330a55b46aec9cc70114fb87a3ca4fd55f02888",
      "temperature": {
       "value": 0.4,
       "source": "oura_cloud",
       "score": null,
-      "validDays": 2,
+      "validDays": 0,
       "gap": "learning"
      },
      "settling": {
@@ -15136,10 +15110,10 @@
   },
   "2026-07-08 v2 switch=2026-10-17": {
    "temperature": {
-    "digest": "0095685ace514032f4f899d91e98e0aeadf9cc9c9d13f725c980525710913c95",
+    "digest": "6f039011c8f2011d75ca1364862698dba8edea778df1607fa88408214cac1d2e",
     "bySource": {
      "oura_daily_summary": 33,
-     "oura_cloud": 6
+     "oura_cloud": 1
     }
    },
    "settling": {
@@ -15159,7 +15133,7 @@
    "excluded": "28869b08bfaef47ef8a056106789f3e9a4c0a56fb811f58cc5b88ddbe1b9c67d",
    "scored": [
     {
-     "all": "9aaf6b703cb3899c29ad5db27961cb1fab7ff45ea4270192feee02f4591b00c8",
+     "all": "745e119ab52ac7fba192cca57159ec01a50f35902e65d7c3e935348fbcaa850d",
      "temperature": {
       "value": 0.178,
       "source": "oura_daily_summary",
@@ -15183,12 +15157,12 @@
      }
     },
     {
-     "all": "17bb8f6d05c5376c9ce7f1bf4c0ac02d393b9309afe8b089ef2cc12068c2000a",
+     "all": "126613bb5eb36cfb9361d2b4f64406375fff61230cbbe82e2b1ff741e016b154",
      "temperature": {
       "value": -0.38,
       "source": "oura_cloud",
       "score": null,
-      "validDays": 4,
+      "validDays": 0,
       "gap": "learning"
      },
      "settling": {
@@ -15210,10 +15184,10 @@
   },
   "2026-07-08 v2 switch=null": {
    "temperature": {
-    "digest": "49aebc7538b185427c797911ba30ebf7c20c3600835700ee929b7f1f37490760",
+    "digest": "cfaee23a0507c448cb91e0d80872b9aac83e715f0dc739d80967155c8ab4db49",
     "bySource": {
      "oura_daily_summary": 36,
-     "oura_cloud": 4
+     "oura_cloud": 1
     }
    },
    "settling": {
@@ -15233,7 +15207,7 @@
    "excluded": "2a3e4d2f0b7526c6ab47d56e2df77d8f494e1ba300e3bbdb3323ad19ec508c81",
    "scored": [
     {
-     "all": "a5b23e1557a2a2bbd5140ff5d536453578aa33b23f09fa281b31568a3348c4a9",
+     "all": "6008338c7f628ecb2374d28979780ef69ef999359823cecbd26a3f8dd32f326b",
      "temperature": {
       "value": -0.015,
       "source": "oura_daily_summary",
@@ -15257,12 +15231,12 @@
      }
     },
     {
-     "all": "945bafd5c1fa495d2e2e81f294cf2d0d03106e0d66f660e1a5e335b43234f780",
+     "all": "8ca07fa1faee0e78f8367e39ac3703f9f82ce4dda8edb4df8823d7a0d86bfe71",
      "temperature": {
       "value": -0.1,
       "source": "oura_cloud",
       "score": null,
-      "validDays": 3,
+      "validDays": 0,
       "gap": "learning"
      },
      "settling": {
@@ -15284,10 +15258,10 @@
   },
   "2026-07-08 v3 switch=2026-10-17": {
    "temperature": {
-    "digest": "81526298b4291756c5713f2717d9afa111b86bf7e20b0c1153b3647ab280cfd4",
+    "digest": "44d7fdf92a82617c65906196ea7564f5af40cd974b4ecbe2ad59ae4c5aabfde6",
     "bySource": {
      "oura_daily_summary": 37,
-     "oura_cloud": 3
+     "oura_cloud": 1
     }
    },
    "settling": {
@@ -15307,13 +15281,13 @@
    "excluded": "35170e8f512c549e0aea394788f0f2dae2ab78895da207f73a0b544903efb69d",
    "scored": [
     {
-     "all": "24f60978726990209c54d15713c632f69c19ebc54320d1d22ad2c74fce8140d8",
+     "all": "ce1e2f56b867ac65390a55573a4d4023cfd59b204320f8fe3c1a585f15f4a0f9",
      "temperature": {
-      "value": -0.33,
-      "source": "oura_cloud",
+      "value": null,
+      "source": null,
       "score": null,
-      "validDays": 1,
-      "gap": "learning"
+      "validDays": 0,
+      "gap": "missing"
      },
      "settling": {
       "value": 4.932,
@@ -15331,12 +15305,12 @@
      }
     },
     {
-     "all": "bacde23c9c5f92e9519ade696a8bc6386a7ad24a578c1d07102d8ab5e563fdf7",
+     "all": "cce612c263aad1fe376536478eb2e8e547230b7ca045ab8b560d0a75393b6ed8",
      "temperature": {
       "value": -0.27,
       "source": "oura_cloud",
       "score": null,
-      "validDays": 2,
+      "validDays": 0,
       "gap": "learning"
      },
      "settling": {
@@ -15358,10 +15332,10 @@
   },
   "2026-07-08 v3 switch=null": {
    "temperature": {
-    "digest": "5455ae89a0e95fc4501ebdc982e8a990bc42dfc8d2071c7ab7fc06318ee12280",
+    "digest": "29f99f42181d462f1300311c7efa11818a116e5c51bf54e2f957fce256dc7272",
     "bySource": {
      "oura_daily_summary": 34,
-     "oura_cloud": 5
+     "oura_cloud": 1
     }
    },
    "settling": {
@@ -15380,7 +15354,7 @@
    "excluded": "fd0b2b272928c243ed0339a21ccb481a7ade04f19a8fafc7587b836763626cef",
    "scored": [
     {
-     "all": "2489772cac320c766d0b5e3a2f0cab4ba9f82a62d293a8719fea823beb8ac454",
+     "all": "045a4fc5bd3f3527b375b6e002cf48192a0c5c9d17dc4c6271e456aab41a5df4",
      "temperature": {
       "value": 0.256,
       "source": "oura_daily_summary",
@@ -15404,12 +15378,12 @@
      }
     },
     {
-     "all": "169e8401be96f8e862850c5888acb76109bd1b84e2203b4f6535105ef5f5f32b",
+     "all": "c067514aea761a4135474c7434d8302e25af6ffc16778a54c547fef9db225a68",
      "temperature": {
       "value": 0.14,
       "source": "oura_cloud",
       "score": null,
-      "validDays": 3,
+      "validDays": 0,
       "gap": "learning"
      },
      "settling": {
@@ -15431,10 +15405,9 @@
   },
   "2026-07-08 v4 switch=2026-10-17": {
    "temperature": {
-    "digest": "328070610573243955ef6baadcef478f4cd020f63055ae4e95f9794736e331e7",
+    "digest": "70e0a3e3c7fe2b057e2de546e0772c6b16162467114c2dfbb89b6e95d0bebf6c",
     "bySource": {
-     "oura_daily_summary": 36,
-     "oura_cloud": 2
+     "oura_daily_summary": 36
     }
    },
    "settling": {
@@ -15454,7 +15427,7 @@
    "excluded": "5827f2bd2aebd8dbbfd334864ca322dc34449318d551aaf0b3c81ecea87dc803",
    "scored": [
     {
-     "all": "2a9ee6e587fc6dff2edc65ea0962f27b2d894c39a5e02cc82b74d109018c9301",
+     "all": "650ecac7bd67fdca000abe357692ea2eab3959440ff9453fabbbd42869359b9c",
      "temperature": {
       "value": 0.254,
       "source": "oura_daily_summary",
@@ -15478,7 +15451,7 @@
      }
     },
     {
-     "all": "00bfee2f140fdb6921aed67862263182d77b0d98b599cec3f878c5effe8a6478",
+     "all": "68a3ffe94ba05a44d8b7e1b4f6babdcbcec9c7139685c05bc358844415c89649",
      "temperature": {
       "value": null,
       "source": null,
@@ -15505,10 +15478,9 @@
   },
   "2026-07-08 v4 switch=null": {
    "temperature": {
-    "digest": "39edf5c94135f30105727fcf441d5a77f1951aff4ef289ddf619e80e7fc59b82",
+    "digest": "1cf0c00f3e879be19239cb267b75d58703c7a41938bf6ccc6bf6f76a5aa8b793",
     "bySource": {
-     "oura_daily_summary": 35,
-     "oura_cloud": 2
+     "oura_daily_summary": 35
     }
    },
    "settling": {
@@ -15528,7 +15500,7 @@
    "excluded": "b201cb9c4755a3c53f927105e1bf534012ab2ed4e5d9d513f9c01aa401b7ccb9",
    "scored": [
     {
-     "all": "fb1b848b3d3fbaa35125ef623bf24365e423b4a208a1a3de7df98b5374b017f1",
+     "all": "ab3eaa8c69ff16e7c848c399ba037e49ced2950fda1167bc9ffb8b5fd1ba5eff",
      "temperature": {
       "value": 0.233,
       "source": "oura_daily_summary",
@@ -15552,7 +15524,7 @@
      }
     },
     {
-     "all": "c33724714df598b0cad9e09d6e653c3746e12c9b34d96f9db2dd6dadbbfee6b8",
+     "all": "90edc08761fe727ebbcf711a1f6c6da583e59c61eea5d8d4d30fe8b01c5ccc1c",
      "temperature": {
       "value": null,
       "source": null,
@@ -15579,9 +15551,8 @@
   },
   "2026-07-08 v5 switch=2026-10-17": {
    "temperature": {
-    "digest": "2f7f7c48efeba94d0c6d2386b59c065d69e57050f899d33c920a8713498ea86a",
+    "digest": "8fd1c74355c6663746740e57ffbfeb9d4ebfac61a2715df2647ffc2f66b90fa7",
     "bySource": {
-     "oura_cloud": 8,
      "oura_daily_summary": 32
     }
    },
@@ -15602,13 +15573,13 @@
    "excluded": "3a73931414b762d1d30b78cca1348bcd8375864d0112d4ee88d930ae2df4dc6a",
    "scored": [
     {
-     "all": "36ff031b176958b05bed8933c731467992caffdf1c925afb5a8677c7aaac5983",
+     "all": "eca1a7616d579b5dad846b35e2191fd6f4d03dd4d1274fe3190c0aeaf9491190",
      "temperature": {
-      "value": 0.25,
-      "source": "oura_cloud",
+      "value": null,
+      "source": null,
       "score": null,
-      "validDays": 7,
-      "gap": "learning"
+      "validDays": 0,
+      "gap": "missing"
      },
      "settling": {
       "value": 5.374,
@@ -15626,7 +15597,7 @@
      }
     },
     {
-     "all": "df6d8c2a6c87ce55833a6a9ea20a0562cb9298e78304da5e589b3c059083c907",
+     "all": "9ed8958a8c777dbc70e4c4e5b63edd2de4f8040874e20f2fc7db9a0308863747",
      "temperature": {
       "value": 0.033,
       "source": "oura_daily_summary",
@@ -15675,7 +15646,7 @@
    "excluded": "fbd119de807d9ecbbb536dbbb142a896a5c9821fdf6a39e82294e9eedb082412",
    "scored": [
     {
-     "all": "9dd6f44e4d64b95a86fa193c0a11beac5cde6c680b3372eb87fa99bde1ec5e89",
+     "all": "af1b12b3d22cf651eeaf7c865ab6a7591bf4e92f6c745d3ddef327250ebb2f12",
      "temperature": {
       "value": -0.231,
       "source": "oura_daily_summary",
@@ -15699,7 +15670,7 @@
      }
     },
     {
-     "all": "da4604475f0ad7f1ae6da076e517cacf390cfd7943dba95b1b4e58f54550c690",
+     "all": "ca970bd8d7d0ece0c51dc2f35dedabbf596214df99c2faa1982613fbcb311e25",
      "temperature": {
       "value": 0.177,
       "source": "oura_daily_summary",
@@ -15726,10 +15697,10 @@
   },
   "2026-07-20 v0 switch=2026-10-17": {
    "temperature": {
-    "digest": "516bf8e521b9af2f1fe8e474acb58da3f56b09b44f2cde8331d9dd5cf735bfdb",
+    "digest": "9cfedaf23803da0fe9793625bbdd485e3ded48bfb8c8290a1b231323801205c8",
     "bySource": {
      "oura_daily_summary": 37,
-     "oura_cloud": 2
+     "oura_cloud": 1
     }
    },
    "settling": {
@@ -15749,7 +15720,7 @@
    "excluded": "0b23c78d9a38be58434de7734e9c11b88d24bd770eb670d90894ee9e22ce153d",
    "scored": [
     {
-     "all": "2c6fafc0fa5b613c64625792b29a14d1a21723b501fa718f086832c02fecf03f",
+     "all": "5944836903e3120162934c02138f22484b8d0c3666112db9d17ec0dbd67c1345",
      "temperature": {
       "value": -0.214,
       "source": "oura_daily_summary",
@@ -15773,7 +15744,7 @@
      }
     },
     {
-     "all": "5dabb8a1c85687568f707cf147560a7b0605095543f093b94856f2c733c36bcc",
+     "all": "a3f67a27dfc7cbb91f1f1c1faa90e6dfdcc461b62d97e08706a9da35d6893fa8",
      "temperature": {
       "value": 0.272,
       "source": "oura_daily_summary",
@@ -15800,10 +15771,9 @@
   },
   "2026-07-20 v0 switch=null": {
    "temperature": {
-    "digest": "0f098a91b4743a15884c2fbbbe6f8cf11ab2cef8db95310ea2e3c268c4e1d6d6",
+    "digest": "929e5c44f06fdd8358630ab1a87a68f32af4fe8502f571a89b75660560e06925",
     "bySource": {
-     "oura_daily_summary": 39,
-     "oura_cloud": 1
+     "oura_daily_summary": 39
     }
    },
    "settling": {
@@ -15823,7 +15793,7 @@
    "excluded": "c442679f6620ea5d2af86c411bc35311dc80136e1f0afd60fb53349f2280e560",
    "scored": [
     {
-     "all": "2dcae4496617eeb7339052592ab88a6d66c534e5b7b19811b8656d34c64513d1",
+     "all": "33286c11652b30be6d0ea35a588afe54f34d47c7a53a4513885e756e44796f6c",
      "temperature": {
       "value": 0.011,
       "source": "oura_daily_summary",
@@ -15847,7 +15817,7 @@
      }
     },
     {
-     "all": "382b437378f64c83f0d90a06a6025eb98bb543a2454b0e4f6f9aefd22742d5ae",
+     "all": "997ac1e01c53c19caf5d3de1edbc7c1ee44626000b2f0fb23d54acc760049b4e",
      "temperature": {
       "value": 0.178,
       "source": "oura_daily_summary",
@@ -15874,10 +15844,10 @@
   },
   "2026-07-20 v1 switch=2026-10-17": {
    "temperature": {
-    "digest": "49fc880321672f4eb17c6398c76cd903120dba5d448950b274c22ad1d9cbba36",
+    "digest": "4c0bc2c240f788199dd47b659e478dfe7004bd8e492d71a0b48bb052267b1834",
     "bySource": {
      "oura_daily_summary": 34,
-     "oura_cloud": 4
+     "oura_cloud": 2
     }
    },
    "settling": {
@@ -15897,7 +15867,7 @@
    "excluded": "2e46135a2f18aaf624c76ce002c22f856dcfb88b9fd9c0cefe42fc06b037cff7",
    "scored": [
     {
-     "all": "935c4d9ba2545055c75bb60521536ef58df3ff70f82ed87653da4be4e49f9b03",
+     "all": "3149f91c713528ae7d130ed35a6c8d56781ddae4ce415c97ada538b1b198a174",
      "temperature": {
       "value": 0.262,
       "source": "oura_daily_summary",
@@ -15921,12 +15891,12 @@
      }
     },
     {
-     "all": "8479566700bde075d883d73aebad0a1d67f1cd7ac2ce5b238b5d87f8556db8e7",
+     "all": "7fa6d615f719cea96faa6bd084974c6c3d60bd396bc0bc76fb6311273bfd6844",
      "temperature": {
       "value": -0.19,
       "source": "oura_cloud",
       "score": null,
-      "validDays": 2,
+      "validDays": 1,
       "gap": "learning"
      },
      "settling": {
@@ -15948,10 +15918,10 @@
   },
   "2026-07-20 v1 switch=null": {
    "temperature": {
-    "digest": "2d674cc1197b8132767debd47ec4371aa38cb581a481a5cdd71f40dd7c42e87d",
+    "digest": "26428bc6e210a3347c7f3354e6f7d88da66ffc07fcd9a3d727c804f047c3d60c",
     "bySource": {
      "oura_daily_summary": 34,
-     "oura_cloud": 6
+     "oura_cloud": 2
     }
    },
    "settling": {
@@ -15971,7 +15941,7 @@
    "excluded": "b97168b0af9bae948d8c7c11b7e1fd2936aa814baaf4acffa536ae0655c1dcfa",
    "scored": [
     {
-     "all": "eb7bcd69009e6e4ab3018ae7040c59e658e2e60f3d0aa45b6b59fbc6225d9dc6",
+     "all": "a9919a9e1ab1f7731d3d640db707a6c5e29803f707efdcacf194840287318354",
      "temperature": {
       "value": 0.299,
       "source": "oura_daily_summary",
@@ -15995,12 +15965,12 @@
      }
     },
     {
-     "all": "fd783ae370b9b5ce14dfdd72838c3ccda5aed814bc38876fc8bbd48ca3cd16a1",
+     "all": "e26524a6fdc5e8664160b013e141ee64da74db955e5ae651ffc8524d6b12eb91",
      "temperature": {
       "value": -0.16,
       "source": "oura_cloud",
       "score": null,
-      "validDays": 5,
+      "validDays": 1,
       "gap": "learning"
      },
      "settling": {
@@ -16022,10 +15992,10 @@
   },
   "2026-07-20 v2 switch=2026-10-17": {
    "temperature": {
-    "digest": "7971ccc3613eac1cf46be5ce162f44e0c290215081206e6a052b37d59ff42b47",
+    "digest": "a323b64141b1ca6aaaf5c8af6dd4d788d7903fdc3abd3787e8d26dd95cdd350b",
     "bySource": {
      "oura_daily_summary": 37,
-     "oura_cloud": 2
+     "oura_cloud": 1
     }
    },
    "settling": {
@@ -16044,7 +16014,7 @@
    "excluded": "c36a56096379c70a2e7697d5a20570d4932802956e0f25adf4e01e04662acfed",
    "scored": [
     {
-     "all": "21f3fa70fc35c16f03e126eebae74707b29fd7637915e09b7d59b35dc882a226",
+     "all": "7d625303c620a59b69f13aad53beb45f2a25c773503e48f588f1372952a00c22",
      "temperature": {
       "value": 0.012,
       "source": "oura_daily_summary",
@@ -16068,7 +16038,7 @@
      }
     },
     {
-     "all": "5f2a472d0c6ea37ba185a36926590c94a4c5e0da077c87d363a37b36552c34e7",
+     "all": "a7d412902e7de7f3fb18d1cd877f11d41e20d2658364bd28b1c436d219642050",
      "temperature": {
       "value": -0.14,
       "source": "oura_cloud",
@@ -16095,10 +16065,10 @@
   },
   "2026-07-20 v2 switch=null": {
    "temperature": {
-    "digest": "0c178b9c41103d145b80cf6d60d8ae61a2649fdadb046b236651f69075bf20b0",
+    "digest": "3942e7fe8ea0d6bad1b6d1b4921cc79badb1f3b25d3179311d465330dcc3f697",
     "bySource": {
      "oura_daily_summary": 34,
-     "oura_cloud": 5
+     "oura_cloud": 3
     }
    },
    "settling": {
@@ -16118,7 +16088,7 @@
    "excluded": "7c571f4eecf32a4c92353657ddabb365b53b7ae09a4ed601a4eeea45ea800cef",
    "scored": [
     {
-     "all": "bebf0cd60f01c802d2fee6a7de5f8061a3f0b33b36d99c12af7ad2c234b8ecbe",
+     "all": "e7eefea3cd548501d8721254a6b5b61e218cb92b8c17f31f98da3f23abe0d0a3",
      "temperature": {
       "value": 0.113,
       "source": "oura_daily_summary",
@@ -16142,12 +16112,12 @@
      }
     },
     {
-     "all": "75e5112fc13f841dff19ba692d90d1d90fcc3daa95f6eaec6be527f443fe5e1f",
+     "all": "13b059457409469d356b8cb9573ed9e4335ce622a704764a6a168729a904df9d",
      "temperature": {
       "value": 0.31,
       "source": "oura_cloud",
       "score": null,
-      "validDays": 4,
+      "validDays": 2,
       "gap": "learning"
      },
      "settling": {
@@ -16169,10 +16139,10 @@
   },
   "2026-07-20 v3 switch=2026-10-17": {
    "temperature": {
-    "digest": "740dd2ac4a429cf2a7438aa6bd0201a3429700bf913bbfa60b475b852c31b807",
+    "digest": "b8a3f9423937afa9ca6b16add6e38d0034c49f42cc2538085287800231d5ed00",
     "bySource": {
-     "oura_cloud": 5,
-     "oura_daily_summary": 35
+     "oura_daily_summary": 35,
+     "oura_cloud": 2
     }
    },
    "settling": {
@@ -16192,7 +16162,7 @@
    "excluded": "5043d4f607e0390f597e0cff48e6b06e214ec8ea4c031e265adba43ba3f5da2a",
    "scored": [
     {
-     "all": "90e3340f988e26fcbf975ad9850eebd4d800ad70b7eab27685c0e03d30b85f75",
+     "all": "4e87d45982dc451b47044b5c6f0bc6319bdcfd51fb06cc6036fce3a520811617",
      "temperature": {
       "value": -0.003,
       "source": "oura_daily_summary",
@@ -16216,12 +16186,12 @@
      }
     },
     {
-     "all": "0fbcb6a5700fa65c61e2ca7fb29152081216635cfcea8ae98f1dbd393f86607a",
+     "all": "1f62e9b52a75152c4361cdb540e589e97b34cb7af3042401125c5a8f134f8efc",
      "temperature": {
       "value": -0.31,
       "source": "oura_cloud",
       "score": null,
-      "validDays": 4,
+      "validDays": 1,
       "gap": "learning"
      },
      "settling": {
@@ -16243,10 +16213,10 @@
   },
   "2026-07-20 v3 switch=null": {
    "temperature": {
-    "digest": "88e52dcac1dba4423b6b5693229f2128d677ef12b6d77cd0735ebb74a9cf7e6a",
+    "digest": "c000d942f3c22f2d9b4d530ef928a2693d689a71e5e7ce94e14fc50c2bdbdc49",
     "bySource": {
      "oura_daily_summary": 33,
-     "oura_cloud": 5
+     "oura_cloud": 2
     }
    },
    "settling": {
@@ -16266,7 +16236,7 @@
    "excluded": "187cc93aa3dc0fd34508fe69d42d81beb7f0ac2d3f9936347fb31e37ce2836f5",
    "scored": [
     {
-     "all": "d88e77900e912433e41e7050ae122e397ebafc4cc687ff09658bbbc790dbb243",
+     "all": "5f54ffbc109b66578553072b584ad93eeabe7d106a7437e93adfbea109020278",
      "temperature": {
       "value": 0.227,
       "source": "oura_daily_summary",
@@ -16290,12 +16260,12 @@
      }
     },
     {
-     "all": "4233e39f5bde8744e2fde016d1ce36d1742b760d6b82ea661fced552b426dc58",
+     "all": "98250357b01abfec21f7c0bb7de2650590df19a6160ebc8b70400e14f66435ad",
      "temperature": {
       "value": -0.03,
       "source": "oura_cloud",
       "score": null,
-      "validDays": 4,
+      "validDays": 1,
       "gap": "learning"
      },
      "settling": {
@@ -16317,10 +16287,10 @@
   },
   "2026-07-20 v4 switch=2026-10-17": {
    "temperature": {
-    "digest": "44cd4250d796b9c07fa8abae9dca3f4a1f4b244a2539af1c4bc40d4b823b6a1b",
+    "digest": "cd87baa86f978a31212c5356836acb76377940690c257757c874042d41aa31bd",
     "bySource": {
      "oura_daily_summary": 37,
-     "oura_cloud": 2
+     "oura_cloud": 1
     }
    },
    "settling": {
@@ -16340,7 +16310,7 @@
    "excluded": "45979a366522323e03d559ac5fe943130df15dde6798e7ca00e429f625c844ca",
    "scored": [
     {
-     "all": "07a60ac62fa585d7c065671d49336c5b76d73fd6e2d13cec8d7bd1e5d79d7686",
+     "all": "d390e890c1d9cea2abc8ac7a3004f9c3f4de12501be43157b168b0fbfaa211d1",
      "temperature": {
       "value": -0.036,
       "source": "oura_daily_summary",
@@ -16364,7 +16334,7 @@
      }
     },
     {
-     "all": "a79cc79b64ba897c6a26b2e8fdfa41e04a322668ec1e82282329d3256f3146c7",
+     "all": "4c8f6503f73456943c6b16f74d1470f10f861b9ab8204f4640ccd7eb22fbb9a0",
      "temperature": {
       "value": null,
       "source": null,
@@ -16391,10 +16361,10 @@
   },
   "2026-07-20 v4 switch=null": {
    "temperature": {
-    "digest": "51ba1d2a9312c17eedab4d579461528980f1b68ebc456d262707332886efde9e",
+    "digest": "05d66f2a3d62a290732e841f273d9cf87b79846ee42f2e2dff67bf906eba2d54",
     "bySource": {
      "oura_daily_summary": 33,
-     "oura_cloud": 6
+     "oura_cloud": 1
     }
    },
    "settling": {
@@ -16414,7 +16384,7 @@
    "excluded": "d5a6562c447e28becd9075828a3d6c5a8a2aada0ac29cf6488c83d7d55c8d8ac",
    "scored": [
     {
-     "all": "7c5163c91c9bcb93a689cacdff867cc0645cedc47f6a5e56ece8df3607266b49",
+     "all": "4aba04f7c5d0fbeb9a6710e70eb816d84c4e955b1ce2ea5bcc0ae41f387f535e",
      "temperature": {
       "value": 0.005,
       "source": "oura_daily_summary",
@@ -16438,7 +16408,7 @@
      }
     },
     {
-     "all": "051e4cc81c0ce3b3f158518de52c848de36370ea42198e6641d110b8f2e12ba4",
+     "all": "0f3423eb680bc0540b28e4b3d1ec6d0649d3d18211fe0c85867ab39f258d766d",
      "temperature": {
       "value": null,
       "source": null,
@@ -16465,10 +16435,9 @@
   },
   "2026-07-20 v5 switch=2026-10-17": {
    "temperature": {
-    "digest": "13aa21a2aa2d88461e131057b132e6aab736276c9f09d24e17ae1425552719ff",
+    "digest": "733b3c07049ce8a0dd8ce11de50175fd9cc661181f96a0d24f3b9d10e4226102",
     "bySource": {
-     "oura_daily_summary": 39,
-     "oura_cloud": 1
+     "oura_daily_summary": 39
     }
    },
    "settling": {
@@ -16488,7 +16457,7 @@
    "excluded": "8279e728d2ed44370f6f2dc906188f45fab6f3b9f46739a43acbe474bf821e0a",
    "scored": [
     {
-     "all": "cce544e6361583b339cde1857a4478de2726230507828c64652cd2fff6973a71",
+     "all": "ed0eeabdd147ef9864f178d9fa37a89982b0bf6b2cae47c854a1998e8cd781bd",
      "temperature": {
       "value": 0.121,
       "source": "oura_daily_summary",
@@ -16512,7 +16481,7 @@
      }
     },
     {
-     "all": "0a30cc48ee18ae5e137d8de27a3fcbc2305877ad5c1b0b72325feb122d8271c3",
+     "all": "ee49643d60c1ddfadf6323535258d3b6a6f009cd6a863f3341cd31e637020bc0",
      "temperature": {
       "value": 0.197,
       "source": "oura_daily_summary",
@@ -16539,10 +16508,10 @@
   },
   "2026-07-20 v5 switch=null": {
    "temperature": {
-    "digest": "6edb21c7bf4ac171f0499d25516c991df30a1280cb68891b694b3dcf21832e5b",
+    "digest": "75ceaa962f82876cf0a80593bb6277f6fce1d0479fd54b28a96aac1ce19066fe",
     "bySource": {
      "oura_daily_summary": 32,
-     "oura_cloud": 6
+     "oura_cloud": 2
     }
    },
    "settling": {
@@ -16562,7 +16531,7 @@
    "excluded": "0b0eecfe9744dd64870effba1ef2cb4ad2ac9361062380f4831ce621fd165f01",
    "scored": [
     {
-     "all": "02491650782e7ff6b30eb0574d24b5c6606d6b1c350e7bf896b820e3f946d08a",
+     "all": "f9bb7c7f0643b213429a1b0733b434396135cc563e2948b8f641b136d9fba957",
      "temperature": {
       "value": -0.121,
       "source": "oura_daily_summary",
@@ -16586,12 +16555,12 @@
      }
     },
     {
-     "all": "9ad50507c3a19eac3d4ad320750540fc53ca42b54a6e3ef26c757e2cd96be0dc",
+     "all": "9e639be08d01266938ad3e148ee0c8f8e9d05162e6b80e2a6a967e4afbcb83a0",
      "temperature": {
       "value": -0.3,
       "source": "oura_cloud",
       "score": null,
-      "validDays": 4,
+      "validDays": 1,
       "gap": "learning"
      },
      "settling": {

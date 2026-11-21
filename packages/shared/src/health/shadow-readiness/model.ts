@@ -45,8 +45,12 @@ import type { ShadowReadinessPillar, ShadowReadinessStage } from '@trainingai/sh
  *  - last night's sleep duration counts in Activity too, 3 points, as capacity to train
  *    (`activity.sleep_capacity`); Activity is worth 23 (was 20). It reads the same generic night
  *    duration as `sleep.duration`, whichever source wrote it.
+ * Version 7 = #3615 (owner, 19 Nov):
+ *  - a temperature deviation the source marks `superseded` (for Oura, from before the account re-key on
+ *    2026-07-07) no longer enters the shadow normal or scores a night, as in the live composite. No
+ *    band or point changes; a replay reaching back past the re-key is the only place a day differs.
  */
-export const SHADOW_MODEL_VERSION = 6
+export const SHADOW_MODEL_VERSION = 7
 
 // ── Unit ids ─────────────────────────────────────────────────────────────────────────────────────
 

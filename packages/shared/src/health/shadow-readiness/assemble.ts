@@ -230,7 +230,8 @@ export function prepareShadowHistory(raw: ShadowRawHistory): PreparedShadowHisto
     const dates = [...new Set([...summaryByDate.keys(), ...fallback.keys()])].sort()
     return compact(dates.map(d => obs(d, ring(d), RING_SUMMARY_SRC) ?? fallback.get(d) ?? null))
   }
-  const sourceTemperature = new Map(compact((raw.temperatureDeviations ?? []).map(t => obs(t.date, t.deviationC, t.source))).map(o => [o.date, o]))
+  // #3615: a deviation from before the Oura account was re-keyed is superseded; the live composite never scores or learns it, so shadow doesn't either.
+  const sourceTemperature = new Map(compact((raw.temperatureDeviations ?? []).filter(t => !t.superseded).map(t => obs(t.date, t.deviationC, t.source))).map(o => [o.date, o]))
   const recoveryContributor = new Map(compact((raw.recoveryContributors ?? []).map(c => {
     const o = obs(c.date, c.score, c.source)
     return o ? { ...o, minMeaningfulChange: RECOVERY_CONTRIBUTOR_MIN_CHANGE } : null
