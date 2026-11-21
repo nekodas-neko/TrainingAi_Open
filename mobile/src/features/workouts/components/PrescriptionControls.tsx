@@ -12,12 +12,18 @@ import {
   Badge,
   Card,
   ConfirmationCard,
+  Icon,
   Notice,
   Picker,
   Sheet,
   Stack,
 } from '../../../shared/ui';
 import { useSessionPreparation } from '../data/useSessionPreparation';
+import { intensityToggleModel } from '../data/intensity-toggle';
+import { useWorkoutContext } from '../WorkoutProvider';
+import { dailyCheckStrip } from '../../home/data/recommendation-reasons';
+import { DeloadStrip } from '../../home/components/DeloadStrip';
+import { useTheme } from '../../../shared/theme/ThemeProvider';
 
 export function PrescriptionControls({
   preparation,
@@ -28,18 +34,29 @@ export function PrescriptionControls({
   const [confirm, setConfirm] = useState<string | null>(null);
   const state = preparation.prescribedState;
   const prescription = state?.prescription;
+  const { theme } = useTheme();
+  // Today's rest-or-lighter call is the app's daily check, the one Home's strip shows.
+  const daily = useWorkoutContext().catalog?.recommendation;
+  const strip = dailyCheckStrip(daily);
+  const toggle = intensityToggleModel({
+    prescription,
+    exercises: preparation.asSent,
+    deloadChosen: preparation.deload,
+    suggestedToday: !!daily?.deloadOrRestRecommended,
+  });
   const blocked =
     preparation.session?.exercises
       .filter((exercise) => exercise.deloaded && !exercise.preDeloadStyle?.length)
       .map((exercise) => exercise.name) ?? [];
   return (
     <>
+      {strip && <DeloadStrip strip={strip} />}
       <AppText variant="eyebrow" tone="muted">
         Intensity today
       </AppText>
       <Stack direction="row">
         <AppButton
-          title={`Full${prescription?.deload ? ' · Override' : ' · As prescribed'}`}
+          title={toggle.fullLabel}
           variant={!preparation.deload ? 'primary' : 'surface'}
           busy={action.busy}
           onPress={() => {
@@ -51,13 +68,32 @@ export function PrescriptionControls({
           style={{ flex: 1 }}
         />
         <AppButton
-          title={`Deload${prescription?.deload ? ' · As prescribed' : ' · Lighter loads'}`}
+          title={toggle.deloadLabel}
           variant={preparation.deload ? 'primary' : 'surface'}
           onPress={() => preparation.chooseDeload(true)}
           disabled={action.busy}
           style={{ flex: 1 }}
         />
       </Stack>
+      {toggle.difference && (
+        // #3330: what the other side changes, stated before the flip.
+        <Stack
+          direction="row"
+          align="flex-start"
+          gap="sm"
+          style={{
+            borderRadius: theme.radii.control,
+            backgroundColor: theme.colors.raised,
+            paddingHorizontal: theme.spacing.md,
+            paddingVertical: theme.spacing.sm,
+          }}
+        >
+          <Icon name="swap" size={theme.sizes.iconSmall} tone="brand" />
+          <AppText variant="caption" style={{ flex: 1 }}>
+            {toggle.difference}
+          </AppText>
+        </Stack>
+      )}
       <Picker
         label="Time limit today"
         value={String(
@@ -103,25 +139,13 @@ export function PrescriptionControls({
       ) : (
         <Card tone="brand">
           <Stack direction="row" justify="space-between">
-            <AppText variant="heading">
-              {prescription.deload
-                ? 'Deload session'
-                : prescription.phase[0]?.toUpperCase() + prescription.phase.slice(1)}
-            </AppText>
+            <AppText variant="heading">{toggle.card?.heading}</AppText>
             <Badge label={(state?.prescriptionStatus ?? '').replace(/_/g, ' ')} />
           </Stack>
           <AppText variant="caption" tone="muted">
-            {prescription.reasoning}
+            {toggle.card?.reason}
           </AppText>
-          <AppText variant="caption">
-            Working time · ~
-            {Math.round(
-              preparation.options.fullOverride && prescription.fullSession
-                ? prescription.fullSession.estimatedSessionDurationMin
-                : prescription.estimatedSessionDurationMin,
-            )}{' '}
-            min
-          </AppText>
+          <AppText variant="caption">Working time · ~{toggle.card?.minutes} min</AppText>
           {state?.prescriptionStatus === 'pending' && (
             <Stack direction="row">
               <AppButton

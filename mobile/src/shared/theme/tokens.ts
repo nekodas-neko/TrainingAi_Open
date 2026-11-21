@@ -491,6 +491,13 @@ export const domainTones = {
     },
   },
 };
+// The strip over Home's recommendation card, by how strongly the daily check suggests rest (#3644):
+// the current app's deload banner. Soft is the warning amber, strong the danger red; the middle
+// grade is its orange-500 on dark and orange-700 on light.
+export const deloadStrengthColors = {
+  light: { soft: statusColors.light.warning, recommended: '#c2410c', strong: statusColors.light.danger },
+  dark: { soft: statusColors.dark.warning, recommended: '#f97316', strong: statusColors.dark.danger },
+};
 // Friends feed and leaderboard glyphs: a gold trophy and a purple trending arrow. Dark values are
 // the current app's (Tailwind yellow-400, purple-400); the light ones are darker steps, each at
 // least 4.5:1 on #ffffff.

@@ -13,6 +13,7 @@ import { readableOn } from "@trainingai/shared/utils";
 import { readCacheSync } from "@/lib/sqlite/cache";
 import { daysBetweenDateStrs, formatDateDisplay } from "@trainingai/shared/date-utils";
 import { DeloadExplanation } from "./deload-explanation";
+import { deloadCauseLine } from "@trainingai/shared/ai-periodization/deload-reasons";
 
 function lastSessionDay(
   sessionId: string,
@@ -261,11 +262,9 @@ function RecommendationCardComponent({
             </div>
           ) : recommendation?.deloadOrRestRecommended ? (
             <div className="flex flex-col gap-2">
-              {recommendation.deloadStrength !== 'soft' && (
+              {deloadCauseLine(recommendation) && (
                 <p className="text-xs text-muted-foreground text-center">
-                  {recommendation.temperatureAlert
-                    ? 'Body temp elevated'
-                    : `${recommendation.consecutiveTrainingDays} sessions in a row`}
+                  {deloadCauseLine(recommendation)}
                 </p>
               )}
               <DeloadExplanation recommendation={recommendation} />

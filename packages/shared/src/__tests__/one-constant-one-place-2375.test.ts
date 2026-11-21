@@ -43,11 +43,12 @@ describe('one constant, one place — #2375', () => {
   })
 
   it('the deload explanation and the deload decision grade readiness from the same constant', () => {
-    const ui = read('app/session-select/components/deload-explanation.tsx')
+    // #3644: the words moved to `deload-reasons.ts`, which both apps read.
+    const ui = read('packages/shared/src/ai-periodization/deload-reasons.ts')
     const engine = read('packages/shared/src/ai-periodization/ai-dynamic.ts')
     expect(ui).not.toMatch(/ouraReadiness\s*<\s*\d/)
     // #3824: both read the cut through `cutFor`, chosen by the score's model version.
-    expect(ui).toContain('cutFor("deloadSoft"')
+    expect(ui).toContain("cutFor('deloadSoft'")
     expect(ui).toContain('ouraReadiness < softMin')
     expect(engine).toContain("cutFor('deloadSoft', readinessModelVersion)")
     expect(engine).toContain("cutFor('deloadRecommended', readinessModelVersion)")
