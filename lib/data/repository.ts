@@ -1500,6 +1500,8 @@ export interface WorkoutRepository {
     /** #2253: `rated` or the untouched pre-fill (`expected`); null before #2450 and with no RPE. */
     rpeSource?: import('@trainingai/shared/workout/rpe-source').RpeSource | null
   }>>
+  /** #3893: the session read's inputs for the user's workouts started in `[from, to)`, oldest first. Read only. */
+  getSessionReadLogs(userId: string, from: Date, to: Date): Promise<import('@trainingai/shared/ai-periodization/session-read').SessionReadLog[]>
   getSetTimingRows(userId: string, exerciseNames: string[]): Promise<import('@trainingai/shared/workout/time-profile').TimingRow[]>
   getExercise1rmHistory(userId: string, exerciseNames: string[], tz: string, windowDays?: number): Promise<Record<string, { date: string; rm: number }[]>>
   getWeeklySetsByMuscleGroup(userId: string, programId: string, weekStart: string, weekEnd: string, tz: string): Promise<Record<string, number>>

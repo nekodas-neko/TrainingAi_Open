@@ -17,7 +17,7 @@ import { goalRange } from '@trainingai/shared/ai-periodization/goal-ranges'
 // High RPE with every rep completed on a non-regressing lift → no action (the healthy +1/AMRAP
 // hard session). RPE on target (inside the dead-band) → no action regardless of reps/1RM.
 
-const RPE_DEAD_BAND = 1.5 // trigger threshold: |avg actual − expected RPE|
+export const RPE_DEAD_BAND = 1.5 // trigger threshold: |avg actual − expected RPE|
 const BACKOFF_MIN_PCT = 5
 export const BACKOFF_MAX_PCT = 10
 const COMPLETION_FLOOR = 0.7 // ≤ this (missed badly) → max cut

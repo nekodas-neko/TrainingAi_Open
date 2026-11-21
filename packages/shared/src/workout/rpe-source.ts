@@ -26,3 +26,9 @@ export function rpeSourcesPayload(
   if (!rpeValues.some(v => v != null)) return undefined
   return rpeValues.map((v, i) => (v == null ? null : rated[i] ? 'rated' : 'expected'))
 }
+
+/** An RPE the lifter gave: anything but the untouched pre-fill. A row from before #2450 (no source)
+ *  is read as reported, as `perExerciseRpeDelta` reads it. */
+export function isReportedRpe(source: RpeSource | string | null | undefined): boolean {
+  return source !== 'expected'
+}

@@ -27,6 +27,8 @@ export type AdminJob = {
    * (#3882), and a run is one pass of the route's `POST`.
    */
   countPreview?: boolean;
+  /** The route only reads (#3893): its dry run is the whole job, and no write is ever offered. */
+  dryRunOnly?: boolean;
 };
 
 export const adminJobs: readonly AdminJob[] = [
@@ -118,6 +120,16 @@ export const adminJobs: readonly AdminJob[] = [
     countPreview: true,
     what: 'Saves per-set heart-rate figures for workouts inside the 180-day window that have logged sets but no per-set snapshot yet. Adds rows only; no source data changes. Oldest first, up to 100 per run.',
     expect: 'sessionsToProcess is how many workouts a run would take on (atLeast: true means more than that). After a run, processed is what it did; moreToProcess true means run it again.',
+  },
+  {
+    id: 'session-read-replay',
+    title: 'Replay the session read',
+    issue: '#3893',
+    path: '/api/admin/session-read-replay',
+    range: 'required',
+    dryRunOnly: true,
+    what: 'Runs the session read (in shadow, #3889) over your past workouts and counts, per exercise, how many would have had a different next weight, and which way. Read only: it never writes.',
+    expect: 'sameNextWeight, heavierNextWeight and lighterNextWeight, and under changed the exercises that would have moved. Run it one 31-day page at a time.',
   },
 ];
 

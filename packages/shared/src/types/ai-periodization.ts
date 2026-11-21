@@ -99,6 +99,12 @@ export interface AiPrescription {
    * full numbers, so the session Full trains is unchanged.
    */
   fullSession?: PrescriptionFigures
+  /**
+   * #3893: the session read of each exercise's last session, stored beside the plan IN SHADOW.
+   * Nothing that builds or shows a prescription reads it; the admin replay and step 4 of #3889 will.
+   * Absent on plans stored before it, and when no exercise had a readable last session.
+   */
+  sessionReads?: import('../ai-periodization/session-read').StoredSessionRead[]
   deload: boolean
   reasoning: string
   confidence: number
