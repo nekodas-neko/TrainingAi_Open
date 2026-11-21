@@ -31,7 +31,7 @@ describe.skipIf(!canRun)('web sign-out sets the server-side sign-in cut-off (#38
   /** What `auth()` decides for a cookie of `userId` signed in at `signedInAt`, from the stored row. */
   const accepted = async (userId: string, signedInAt: number) => {
     const { refreshIsActiveClaim } = await import('@/lib/auth/is-active-refresh')
-    const claims = await refreshIsActiveClaim({ userId, signedInAt }, id => repo.getUserById(id))
+    const claims = await refreshIsActiveClaim<{ userId: string; signedInAt: number; isActive?: boolean }>({ userId, signedInAt }, id => repo.getUserById(id))
     return claims.isActive === true
   }
 

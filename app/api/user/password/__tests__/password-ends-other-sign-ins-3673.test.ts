@@ -28,7 +28,7 @@ describe.skipIf(!canRun)('PATCH /api/user/password ends other sign-ins (#3673 it
 
   const accepted = async (userId: string, signedInAt: number) => {
     const { refreshIsActiveClaim } = await import('@/lib/auth/is-active-refresh')
-    return (await refreshIsActiveClaim({ userId, signedInAt }, id => repo.getUserById(id))).isActive === true
+    return (await refreshIsActiveClaim<{ userId: string; signedInAt: number; isActive?: boolean }>({ userId, signedInAt }, id => repo.getUserById(id))).isActive === true
   }
   const nativeRows = async (userId: string) =>
     (await pool.query<{ revoked_reason: string | null }>(
