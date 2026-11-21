@@ -26,6 +26,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import {
   MIN_DISTANCE_M,
+  MIN_AVG_SPEED_KMH,
   MIN_DURATION_SEC,
   MAX_DURATION_SEC,
 } from '@/lib/activity/detection-thresholds'
@@ -51,12 +52,16 @@ vi.mock('@/lib/data', () => {
   // Built inside the factory: `vi.mock` is hoisted above the consts above.
   const repo = async () => ({
     listSleepSessions, getWorkoutSessionsFrom, listFoodLogs, listMealTypes,
-    getOuraWorkouts, getOuraDaily, listActivityLogs, listOuraSessions, getOuraDailyDerived,
+    // #3884: the route reads the generic session; these fixtures are still Oura's rows, mapped by the
+    // connector exactly as the repository does, so every expectation below is the pre-change number.
+    getSourceActivitySessions: async (...a: unknown[]) => ouraActivitySessions((await getOuraWorkouts(...a)) as never),
+    getOuraDaily, listActivityLogs, listOuraSessions, getOuraDailyDerived,
     listTimedDoses, listSupplementVials, listDoseHistory,
   })
   return { getRepository: repo, getRepositoryAsync: repo }
 })
 
+import { ouraActivitySessions } from '@/lib/oura/cloud/activity-sessions-map'
 import { GET } from '@/app/api/day-timeline/route'
 
 const TZ = 'Australia/Brisbane'
@@ -331,6 +336,58 @@ describe('/api/day-timeline — meals', () => {
     const [meal] = await eventsOf('meal')
     expect(meal.title).toBe('Meal')
   })
+})
+
+// #3884: the old reader took Oura's rows (metres, `activity: 'running'`); the new one takes the generic
+// session (kilometres, the app's `run`). This replays the old rules, copied as they were, over the same
+// rows and asserts the timeline holds exactly what they gave, edge distances included.
+describe('/api/day-timeline — walks: old rows and generic sessions agree (#3884)', () => {
+  const OLD = {
+    quality: (w: { start: Date; end: Date; distanceM: number | null }) => {
+      const sec = (w.end.getTime() - w.start.getTime()) / 1000
+      if (sec < MIN_DURATION_SEC || sec > MAX_DURATION_SEC) return false
+      if ((w.distanceM ?? 0) < MIN_DISTANCE_M) return false
+      return ((w.distanceM ?? 0) / 1000) / (sec / 3600) >= MIN_AVG_SPEED_KMH
+    },
+    km: (m: number | null) => (m ? parseFloat((m / 1000).toFixed(2)) : undefined),
+    cal: (c: number | null) => (c ? Math.round(c) : undefined),
+  }
+  const distances = [
+    null, 0, -5, 1, 749, 749.9999, MIN_DISTANCE_M - 1e-9, MIN_DISTANCE_M, MIN_DISTANCE_M + 1e-9, 750.5, 1234, 1999.5,
+    2000, 4999, 5000.4, 8123.456, ...Array.from({ length: 60 }, (_, i) => 700 + i * 1.37),
+  ]
+  const durations = [MIN_DURATION_SEC - 1, MIN_DURATION_SEC, 600, 1800, 3600, MAX_DURATION_SEC, MAX_DURATION_SEC + 1]
+
+  it('emits the same walks, titles, distances and calories as the old rules did', async () => {
+    let compared = 0
+    for (const activity of ['walking', 'running', 'cycling', 'houseWork']) {
+      for (const distanceM of distances) {
+        for (const sec of durations) {
+          for (const calories of [null, 0, 99.5, 250]) {
+            const row = ouraWalk({ activity, distanceM, calories, endDatetime: ends(sec) })
+            getOuraWorkouts.mockResolvedValue([row])
+            const got = await eventsOf('walk')
+            const old = { start: row.startDatetime, end: row.endDatetime as Date, distanceM: distanceM as number | null }
+            if (!OLD.quality(old)) {
+              expect(got, `${activity} ${distanceM} m ${sec}s`).toEqual([])
+            } else {
+              expect(got, `${activity} ${distanceM} m ${sec}s`).toHaveLength(1)
+              expect(got[0]).toMatchObject({
+                title: activity === 'running' ? 'Run' : 'Walk',
+                durationMin: Math.round(sec / 60),
+              })
+              expect(got[0].distanceKm).toBe(OLD.km(distanceM))
+              expect(got[0].calories).toBe(OLD.cal(calories))
+            }
+            compared++
+          }
+        }
+      }
+    }
+    expect(compared).toBeGreaterThan(5000)
+  })
+
+  const ends = (seconds: number) => new Date(bne(DAY, '12:00').getTime() + seconds * 1000)
 })
 
 describe('/api/day-timeline — walks', () => {

@@ -66,7 +66,7 @@ export async function GET(req: NextRequest) {
       // #3844: the workouts a connected source recorded itself (Oura's, today). A source files a
       // workout under its own day, so the read is widened a day each side. Best-effort: a failed read
       // offers what the MET alone finds, as before.
-      repo.getOuraWorkouts(userId, { from: shiftDateStr(date, -1), to: shiftDateStr(date, 1) }).catch(() => []),
+      repo.getSourceActivitySessions(userId, { from: shiftDateStr(date, -1), to: shiftDateStr(date, 1) }).catch(() => []),
     ])
 
     // Stored as HH:MM:SS (Postgres time); the parser takes HH:MM.
@@ -88,8 +88,8 @@ export async function GET(req: NextRequest) {
     // and ends before it, so these are not exclusions (which would offer the walk's two ends as two
     // short walks): any detected walk that overlaps one is dropped whole.
     const sourceSpans = sourceWorkouts.flatMap(w => {
-      const startMs = w.startDatetime.getTime()
-      const endMs = w.endDatetime.getTime()
+      const startMs = w.start.getTime()
+      const endMs = w.end.getTime()
       return endMs > startMs ? [{ startMs, endMs }] : []
     })
 

@@ -14,13 +14,16 @@ export interface SourceActivitySession {
   day: string
   /** The app's own activity type where the source's vocabulary has one, else the source's own name. */
   activityType: string
-  /** Set only when the source's name maps to no app type: that name, which the energy budget costs
-   *  at its own MET (`daily-energy.ts`). */
+  /** Set only when the source's name maps to no app type: that name in the generic vocabulary (lowercase
+   *  words, `house work`; the connector converts its own spelling), which the energy budget costs at
+   *  its own MET (`daily-energy.ts`). */
   unmappedActivity?: string
   start: Date
   end: Date
   /** Kilometres, or null when the source sent none or zero. */
   distanceKm: number | null
+  /** Kilocalories the source credited the session, when it sends them. */
+  calories?: number | null
   /** The user said this was not an activity to count (Oura: a workout reviewed on the old review card
    *  without being logged). Still a real session for heart-rate readers. */
   dismissed: boolean
