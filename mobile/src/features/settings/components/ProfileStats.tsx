@@ -1,14 +1,8 @@
+import { formatCount, formatLifetimeDistance, formatLifetimeVolume } from '@trainingai/shared/format/number';
 import { View } from 'react-native';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { Grid, MetricTile, type IconName } from '../../../shared/ui';
 import { programTile, type ProgramWeekSummary } from '../data/profile';
-
-function volume(kg: number | undefined) {
-  if (kg == null) return '—';
-  if (kg >= 1_000_000) return `${(kg / 1_000_000).toFixed(1)} kt`;
-  if (kg >= 1000) return `${(kg / 1000).toFixed(1)} t`;
-  return `${Math.round(kg).toLocaleString()} kg`;
-}
 
 export function ProfileStats({
   lifetime,
@@ -32,34 +26,32 @@ export function ProfileStats({
   const items: { label: string; value: string; icon: IconName; color: string }[] = [
     {
       label: 'Sessions',
-      value: lifetime?.sessions.toLocaleString() ?? '—',
+      value: formatCount(lifetime?.sessions),
       icon: 'workout',
       color: theme.colors.brandText,
     },
     {
       label: 'Sets',
-      value: lifetime?.totalSets.toLocaleString() ?? '—',
+      value: formatCount(lifetime?.totalSets),
       icon: 'sets',
       color: theme.tones.activity.foreground,
     },
     {
       label: 'Volume',
-      value: volume(lifetime?.totalVolumeKg),
+      value: formatLifetimeVolume(lifetime?.totalVolumeKg),
       icon: 'weight',
       color: theme.scores.activity,
     },
     {
       label: 'Best streak',
-      value: lifetime?.bestStreak.toLocaleString() ?? '—',
+      value: formatCount(lifetime?.bestStreak),
       icon: 'flame',
       color: theme.tones.checkin.foreground,
     },
     {
       label: 'Distance',
       value:
-        distance == null || distance <= 0
-          ? '—'
-          : `${distance >= 100 ? Math.round(distance).toLocaleString() : distance.toFixed(1)} km`,
+        formatLifetimeDistance(distance),
       icon: 'pin',
       color: theme.tones.recovery.foreground,
     },

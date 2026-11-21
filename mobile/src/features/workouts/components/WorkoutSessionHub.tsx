@@ -1,3 +1,4 @@
+import { formatDateDisplay, todayInTz } from '@trainingai/shared/date-utils';
 import { useRef, useState } from 'react';
 import { AppButton, AppText, IconButton, Sheet, Stack } from '../../../shared/ui';
 import type { WorkoutRecord } from '../logging/workout';
@@ -53,12 +54,7 @@ export function WorkoutSessionHub({
   return (
     <WorkoutLayout
       title={workout.sessionName}
-      subtitle={new Intl.DateTimeFormat('en-AU', {
-        timeZone: workout.timezone,
-        weekday: 'long',
-        day: 'numeric',
-        month: 'long',
-      }).format(new Date())}
+      subtitle={formatDateDisplay(todayInTz(workout.timezone), 'long')}
       detail={workout.phaseDetail ?? workout.phase ?? undefined}
       onBack={onLeave}
       backLabel="Back to sessions"

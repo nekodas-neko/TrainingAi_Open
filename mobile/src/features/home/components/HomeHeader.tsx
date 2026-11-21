@@ -1,3 +1,4 @@
+import { formatDateDisplay } from '@trainingai/shared/date-utils';
 import { Image, View } from 'react-native';
 import { Pressable } from '../../../shared/ui/Pressable';
 import { AppText, AttentionDot, IconButton, Stack, StatusIndicator } from '../../../shared/ui';
@@ -36,12 +37,7 @@ export function HomeHeader({
   badge?: number;
 }) {
   const { theme } = useTheme();
-  const date = new Intl.DateTimeFormat('en-AU', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    timeZone: 'UTC',
-  }).format(new Date(today + 'T12:00:00Z'));
+  const date = formatDateDisplay(today, 'long');
   return (
     <Stack direction="row" align="center" justify="space-between">
       <Stack gap="xxs" style={{ flex: 1 }}>

@@ -1,3 +1,4 @@
+import { formatCount, formatXp } from '@trainingai/shared/format/number';
 import {
   ACHIEVEMENT_CATEGORY_ORDER,
   LEVEL_THRESHOLDS,
@@ -15,11 +16,11 @@ export function levelHeadline(rewards: Level & { levelLabel?: string }) {
   const { level, xp, nextLevelXp } = rewards;
   return {
     title: `Level ${level} · ${rewards.levelLabel ?? getLevelLabel(level)}`,
-    detail: `${xp.toLocaleString()} XP total · tap for details`,
-    barStart: `${xp.toLocaleString()} XP`,
+    detail: `${formatXp(xp)} total · tap for details`,
+    barStart: formatXp(xp),
     barEnd:
       nextLevelXp > xp
-        ? `${(nextLevelXp - xp).toLocaleString()} to next level`
+        ? `${formatCount(nextLevelXp - xp)} to next level`
         : 'Max level',
   };
 }
@@ -30,9 +31,9 @@ export function levelSheetHero(rewards: Level | null) {
   const { level, xp, currentLevelXp, nextLevelXp } = rewards;
   return {
     label: `Level ${level} · ${getLevelLabel(level)}`,
-    total: `${xp} XP total`,
-    start: `${xp - currentLevelXp} XP`,
-    end: `${nextLevelXp - currentLevelXp} XP to Level ${level + 1}`,
+    total: `${formatXp(xp)} total`,
+    start: formatXp(xp - currentLevelXp),
+    end: `${formatXp(nextLevelXp - currentLevelXp)} to Level ${level + 1}`,
   };
 }
 

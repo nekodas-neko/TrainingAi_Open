@@ -1,3 +1,4 @@
+import { formatCount } from '@trainingai/shared/format/number';
 import { useRecordedIntake } from '../data/useRecordedIntake';
 import { balanceZone, barProgress } from '@trainingai/shared/nutrition/calorie-balance';
 import { useState } from 'react';
@@ -61,10 +62,10 @@ export function NutritionEnergyCard({ date, onGoals }: { date: string; onGoals: 
           }
         >
           <AppText variant="energyRingValue">
-            {total ? Math.round(total.calories).toLocaleString() : '—'}
+            {total ? formatCount(total.calories) : '—'}
           </AppText>
           <AppText variant="energyRingCaption" tone="muted">
-            {goal != null ? `of ${Math.round(goal).toLocaleString()}` : 'kcal'}
+            {goal != null ? `of ${formatCount(goal)}` : 'kcal'}
           </AppText>
         </SegmentRing>
         <Stack gap="md" style={{ flex: 1, minWidth: 0 }}>

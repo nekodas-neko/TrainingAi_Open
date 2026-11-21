@@ -1,3 +1,4 @@
+import { formatCount } from '@trainingai/shared/format/number';
 import { gainTone, type GainTone } from '@trainingai/shared/health/strength-progress';
 import {
   strengthDeltaText,
@@ -58,15 +59,12 @@ export function lastTrainedSession(
 
 export type GoalKey = 'Steps' | 'Calories' | 'Water' | 'Sleep' | 'Workouts';
 
-const roundCount = (n: number) => Math.round(n * 10) / 10;
-/** A count with thousands separators, rounded to one decimal; the one grouping formatter Preview uses. */
-export const formatCount = (n: number) => roundCount(n).toLocaleString('en-US');
 
 /** "3,200 / 8,000", "This week: 3 / 4", with a tick once the goal is met. */
 export function goalCountText(value: number, goal: number, weekly: boolean): string {
   // The raw values, as the current app's GoalProgressBar does: 7.96 of 8 prints "8 / 8" without a tick.
   const done = goal > 0 && value >= goal;
-  return `${weekly ? 'This week: ' : ''}${formatCount(value)} / ${formatCount(goal)}${done ? ' ✓' : ''}`;
+  return `${weekly ? 'This week: ' : ''}${formatCount(value, { decimals: 1 })} / ${formatCount(goal, { decimals: 1 })}${done ? ' ✓' : ''}`;
 }
 
 /** The colour of a strength-trend gain: up green, down red, flat amber, from the status tokens. */

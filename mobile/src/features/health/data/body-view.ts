@@ -1,3 +1,4 @@
+import { formatWaterMl } from '@trainingai/shared/format/number';
 import { formatDateDisplay, formatTimeOfDay } from '@trainingai/shared/date-utils';
 import { formatHoursMinutes } from '@trainingai/shared/format/units';
 import { actualSleepWindow, wokeTime } from '@trainingai/shared/health/actual-sleep-window';
@@ -181,16 +182,9 @@ export function readingCount(count: number): string {
   return `From ${count} reading${count === 1 ? '' : 's'}`;
 }
 
-/** The water goal wording: "Goal: 2.5L" or "Goal: 800ml"; null when there is no goal. */
+/** The water goal wording: "Goal: 2.5 L" or "Goal: 800 ml"; null when there is no goal. */
 export function waterGoalText(goalMl: number | null | undefined): string | null {
-  return goalMl && goalMl > 0
-    ? `Goal: ${goalMl >= 1000 ? `${(goalMl / 1000).toFixed(1)}L` : `${goalMl}ml`}`
-    : null;
-}
-
-/** A water amount the way the current app writes it: 1.8L or 800ml. */
-export function waterText(ml: number | null | undefined): string | null {
-  return ml == null ? null : ml >= 1000 ? `${(ml / 1000).toFixed(1)}L` : `${ml}ml`;
+  return goalMl && goalMl > 0 ? `Goal: ${formatWaterMl(goalMl)}` : null;
 }
 
 /** The muscle-status row's title and severity: capitalised words, as the current app's capitalize class shows them. */

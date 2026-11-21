@@ -1,3 +1,4 @@
+import { formatXp } from '@trainingai/shared/format/number';
 import { useEffect, useRef } from 'react';
 import { ScrollView, View, useWindowDimensions } from 'react-native';
 import { levelProgress } from '@trainingai/shared/achievement-display';
@@ -110,7 +111,7 @@ export function LevelSheet({
               align="center"
               gap="md"
               accessible
-              accessibilityLabel={`Level ${row.level}, ${row.label}, ${row.threshold.toLocaleString()} XP${row.state === 'current' ? ', current level' : row.state === 'past' ? ', reached' : ''}`}
+              accessibilityLabel={`Level ${row.level}, ${row.label}, ${formatXp(row.threshold)}${row.state === 'current' ? ', current level' : row.state === 'past' ? ', reached' : ''}`}
               onLayout={
                 row.state === 'current'
                   ? (event) => {
@@ -155,7 +156,7 @@ export function LevelSheet({
               <View style={{ flex: 1 }}>
                 <AppText variant="subheading">{row.label}</AppText>
                 <AppText variant="micro" tone="muted">
-                  {row.threshold.toLocaleString()} XP
+                  {formatXp(row.threshold)}
                 </AppText>
               </View>
               {row.state === 'current' && (

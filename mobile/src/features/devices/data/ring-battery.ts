@@ -1,3 +1,4 @@
+import { timeAgo } from '@trainingai/shared/format/time-ago';
 import { z } from 'zod';
 import { decideLowBatteryAlert } from '@trainingai/shared/devices/low-battery';
 import { formatHoursMinutes } from '@trainingai/shared/format/units';
@@ -72,11 +73,9 @@ export function checkRingAlert(
   return { notify: decision.notify && settings.enabled, settings: { ...settings, fired } };
 }
 
-export function readingAge(minutes: number) {
-  if (minutes < 2) return 'just now';
-  if (minutes < 60) return `${Math.round(minutes)} min ago`;
-  if (minutes < 48 * 60) return `${Math.round(minutes / 60)} h ago`;
-  return `${Math.round(minutes / 1440)} days ago`;
+/** How long ago a ring reading was taken, in the shared `timeAgo` wording ("3 minutes ago"). */
+export function readingAge(minutes: number, now: Date = new Date()) {
+  return timeAgo(now.getTime() - minutes * 60_000, now) ?? '';
 }
 
 export function daysLeftText(days: number) {

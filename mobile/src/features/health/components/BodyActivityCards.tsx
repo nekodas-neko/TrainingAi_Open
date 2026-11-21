@@ -1,3 +1,5 @@
+import { formatWaterMl } from '@trainingai/shared/format/number';
+import { formatCount } from '@trainingai/shared/format/number';
 import {
   balanceZone,
   barProgress,
@@ -32,13 +34,13 @@ import { useHealthData } from '../data/HealthDataProvider';
 import { energySpec, goalsSpec, trendsSpec } from '../data/models';
 import { ouraStatsSpec, ringBatterySpec } from '../data/body-models';
 import { readingAge } from '../../devices/data/ring-battery';
-import { todayNonWearSec, waterGoalText, waterText, weekdayAxis, wornSeconds } from '../data/body-view';
+import { todayNonWearSec, waterGoalText, weekdayAxis, wornSeconds } from '../data/body-view';
 import type { HealthDetail } from '../screens/HealthDetailScreen';
 import { HealthMetricCard } from './HealthMetricCard';
 import { HealthResourceHeader } from './HealthResourceHeader';
 import { useCueColor } from './RangeBar';
 
-const signed = (value: number) => `${value >= 0 ? '+' : ''}${Math.round(value).toLocaleString()}`;
+const signed = (value: number) => `${value >= 0 ? '+' : ''}${formatCount(value)}`;
 
 /**
  * Energy Balance: kcal left today and the "Well under so far" style verdict, the budget bar, the
@@ -75,7 +77,7 @@ export function EnergyBalanceCard() {
           {remaining !== null && (
             <Stack gap="xxs">
               <AppText variant="title" style={{ fontVariant: ['tabular-nums'] }}>
-                {Math.round(Math.abs(remaining)).toLocaleString()}{' '}
+                {formatCount(Math.abs(remaining))}{' '}
                 <AppText variant="caption" tone="muted">
                   kcal {remaining < 0 ? 'over target' : 'left today'}
                 </AppText>
@@ -103,7 +105,7 @@ export function EnergyBalanceCard() {
             <MetricTile
               compact
               label="Eaten"
-              value={intake.intake === null ? null : Math.round(intake.intake).toLocaleString()}
+              value={intake.intake === null ? null : formatCount(intake.intake)}
             />
             <MetricTile
               compact
@@ -111,7 +113,7 @@ export function EnergyBalanceCard() {
               value={
                 balance.expenditureKcal == null
                   ? null
-                  : Math.round(balance.expenditureKcal).toLocaleString()
+                  : formatCount(balance.expenditureKcal)
               }
             />
             <MetricTile
@@ -123,19 +125,19 @@ export function EnergyBalanceCard() {
           {maintenance && (
             <AppText variant="caption" tone="muted">
               {maintenance.source === 'calibrated'
-                ? `Your measured maintenance is ${Math.round(maintenance.kcal).toLocaleString()} kcal (${maintenance.confidence} confidence, ${maintenance.daysLogged} of ${maintenance.daysInWindow} days logged)${
+                ? `Your measured maintenance is ${formatCount(maintenance.kcal)} kcal (${maintenance.confidence} confidence, ${maintenance.daysLogged} of ${maintenance.daysInWindow} days logged)${
                     maintenance.weightRateKgPerWeek != null && maintenance.weightRateKgPerWeek !== 0
                       ? ` — trending ${maintenance.weightRateKgPerWeek > 0 ? '+' : ''}${maintenance.weightRateKgPerWeek} kg/week`
                       : ''
                   }.`
-                : `Estimated maintenance ${Math.round(maintenance.kcal).toLocaleString()} kcal — ${maintenance.gapMessage ?? 'the profile-based estimate is used until there is enough logged history'}.`}
+                : `Estimated maintenance ${formatCount(maintenance.kcal)} kcal — ${maintenance.gapMessage ?? 'the profile-based estimate is used until there is enough logged history'}.`}
             </AppText>
           )}
           <Disclosure title="How your energy balance is calculated">
             <AppText variant="caption" tone="muted">
               Calories out = your resting burn (
-              {Math.round(balance.restingBaseKcal ?? 0).toLocaleString()} kcal) plus measured
-              movement ({Math.round(balance.activeKcal ?? 0).toLocaleString()} kcal from workouts,
+              {formatCount(balance.restingBaseKcal ?? 0)} kcal) plus measured
+              movement ({formatCount(balance.activeKcal ?? 0)} kcal from workouts,
               activities and every step you take). Your resting burn already has habitual daily
               movement taken out of it, so the movement you record is added once, not counted twice.
             </AppText>
@@ -178,7 +180,7 @@ export function WaterCard({
   return (
     <HealthMetricCard
       title="Water"
-      valueText={waterText(waterMl) ?? '—'}
+      valueText={formatWaterMl(waterMl)}
       tone="recovery"
       caption={waterGoalText(goal) ?? 'Today'}
       onOpen={onOpen}

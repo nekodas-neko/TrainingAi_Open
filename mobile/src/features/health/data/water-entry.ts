@@ -1,3 +1,4 @@
+import { formatCount } from '@trainingai/shared/format/number';
 import {
   validWaterMlDeltaOrNull,
   WATER_ML_DELTA_MAX,
@@ -14,6 +15,6 @@ export function waterEntry(raw: string): { ml: number | null; error: string | nu
   if (!Number.isFinite(typed)) return { ml: null, error: 'Enter a number' };
   const ml = validWaterMlDeltaOrNull(typed);
   return ml === null || ml < 1
-    ? { ml: null, error: `Enter a value between 1 and ${WATER_ML_DELTA_MAX.toLocaleString('en-US')} ml` }
+    ? { ml: null, error: `Enter a value between 1 and ${formatCount(WATER_ML_DELTA_MAX)} ml` }
     : { ml, error: null };
 }

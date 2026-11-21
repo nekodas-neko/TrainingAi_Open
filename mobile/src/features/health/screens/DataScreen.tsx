@@ -1,3 +1,4 @@
+import { formatCount } from '@trainingai/shared/format/number';
 import {
   deviceHealthName,
   deviceHealthAvailable,
@@ -163,7 +164,7 @@ export function DataScreen() {
                 <AppText variant="label">{entry.label}</AppText>
                 <AppText variant="heading">
                   {entry.status === 'records'
-                    ? `${entry.limited ? 'At least ' : ''}${entry.count?.toLocaleString()} records`
+                    ? `${entry.limited ? 'At least ' : ''}${formatCount(entry.count)} records`
                     : entry.status === 'empty'
                       ? 'No readable records'
                       : entry.status === 'unsupported'
@@ -184,7 +185,7 @@ export function DataScreen() {
               {entry.sources.map((source) => (
                 <Stack key={source.bundleIdentifier}>
                   <AppText variant="caption" tone="muted">
-                    {source.name} · {source.count.toLocaleString()} returned records
+                    {source.name} · {formatCount(source.count)} returned records
                   </AppText>
                   <AppText variant="caption" tone="muted">
                     Latest: {formatDayAndTime(source.latestAt, timezone)}

@@ -1,3 +1,4 @@
+import { formatDayAndTime } from '@trainingai/shared/date-utils';
 import { useState } from 'react';
 import { View } from 'react-native';
 import { Pressable } from '../../../shared/ui/Pressable';
@@ -38,11 +39,7 @@ export function AdminErrorsPanel({
                   {e.message}
                 </AppText>
                 <AppText variant="caption" tone="muted">
-                  {new Date(e.createdAt).toLocaleString('en-AU', {
-                    dateStyle: 'short',
-                    timeStyle: 'short',
-                    timeZone: timezone,
-                  })}
+                  {formatDayAndTime(e.createdAt, timezone)}
                   {e.userEmail ? ` · ${e.userEmail}` : ''}
                 </AppText>
               </View>

@@ -50,5 +50,5 @@ test('the plan card applies it on today only and falls back to the planned numbe
   assert.match(src, /eaten: n\.view\.logs\.length \? totals\(n\.view\.logs\) : undefined/);
   assert.match(src, /rescale\?\.byPosition\.get\(m\.position\)/);
   assert.match(src, /rescale\?\.note/);
-  assert.match(src, /\(planned \{m\.targetCalories\.toLocaleString\(\)\}\)/);
+  assert.match(src, /\(planned \{formatCount\(m\.targetCalories\)\}\)/);
 });

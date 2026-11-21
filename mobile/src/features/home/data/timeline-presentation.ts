@@ -1,3 +1,4 @@
+import { formatCount } from '@trainingai/shared/format/number';
 import { formatHoursMinutes } from '@trainingai/shared/format/units';
 import { formatTimeOfDay, shiftDateStr } from '@trainingai/shared/date-utils';
 import type { SleepRow } from '../../health/data/models.ts';
@@ -23,15 +24,15 @@ export function timelineMetrics(event: TimelineEvent, compact = false) {
   const bedtime = ['sleep', 'bedtime'].includes(event.type);
   if (event.durationMin != null && (!compact || !bedtime))
     values.push({ label: 'Duration', value: formatHoursMinutes(event.durationMin) });
-  if (event.sets != null) values.push({ label: 'Sets', value: event.sets.toLocaleString() });
+  if (event.sets != null) values.push({ label: 'Sets', value: formatCount(event.sets) });
   if (event.exerciseCount != null)
-    values.push({ label: 'Exercises', value: event.exerciseCount.toLocaleString() });
+    values.push({ label: 'Exercises', value: formatCount(event.exerciseCount) });
   if (event.distanceKm != null)
     values.push({ label: 'Distance', value: `${event.distanceKm.toFixed(2)} km` });
   if (event.calories != null)
     values.push({
       label: 'Calories',
-      value: `${Math.round(event.calories).toLocaleString()} kcal`,
+      value: `${formatCount(event.calories)} kcal`,
     });
   if (event.sleepDurationH != null && (!compact || !bedtime)) {
     values.push({ label: 'Time asleep', value: formatHoursMinutes(event.sleepDurationH * 60) });
@@ -95,7 +96,7 @@ export type TimelineCardContent = {
 };
 
 const plural = (count: number, one: string, many: string) =>
-  `${count.toLocaleString()} ${count === 1 ? one : many}`;
+  `${formatCount(count)} ${count === 1 ? one : many}`;
 
 /**
  * What one timeline event's card says, per type, as components/home-day-timeline.tsx draws it:
@@ -143,7 +144,7 @@ export function timelineCardContent(event: TimelineEvent): TimelineCardContent {
         parts.length === 2
           ? parts[0]
           : event.calories != null
-            ? `${Math.round(event.calories).toLocaleString()} kcal`
+            ? `${formatCount(event.calories)} kcal`
             : null;
       const window = parts.length === 2 ? parts[1] : parts[0];
       if (calories) metrics.push({ icon: 'flame', text: calories });
@@ -177,7 +178,7 @@ export function timelineCardContent(event: TimelineEvent): TimelineCardContent {
       if (event.calories != null)
         metrics.push({
           icon: 'flame',
-          text: `${Math.round(event.calories).toLocaleString()} kcal`,
+          text: `${formatCount(event.calories)} kcal`,
         });
       if (subtitle) metrics.push({ text: subtitle });
     }

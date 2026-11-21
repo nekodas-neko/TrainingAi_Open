@@ -1,3 +1,4 @@
+import { formatCount } from '@trainingai/shared/format/number';
 import { profileSpec } from '../../health/data/models';
 import { treadmillSteps } from '../data/guidance';
 import { GuidedActivityScreen } from './GuidedActivityScreen';
@@ -360,7 +361,7 @@ function ManualActivityScreen({
               tone="heart"
             />
           </Grid>
-          {steps !== null && <MetricTile label="Steps (est.)" value={steps.toLocaleString()} />}
+          {steps !== null && <MetricTile label="Steps (est.)" value={formatCount(steps)} />}
           <TextField
             label="Notes (optional)"
             value={session.notes}

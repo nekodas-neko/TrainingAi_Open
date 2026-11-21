@@ -1,3 +1,4 @@
+import { formatCount } from '@trainingai/shared/format/number';
 import { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 import { AppButton, AppText, Card, Icon, ListRow, Skeleton, Stack } from '../../../shared/ui';
@@ -75,7 +76,7 @@ export function PlanCard({
       ) : (
         <>
           <AppText variant="caption" tone="muted">
-            {variant?.targetCalories.toLocaleString()} kcal · {meals.length} {meals.length === 1 ? 'meal' : 'meals'}
+            {formatCount(variant?.targetCalories)} kcal · {meals.length} {meals.length === 1 ? 'meal' : 'meals'}
           </AppText>
           {meals.map((m) => (
             <ListRow

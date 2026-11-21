@@ -1,3 +1,4 @@
+import { formatCount } from '@trainingai/shared/format/number';
 import type { MealLoggingStatus } from '@trainingai/shared/nutrition/meal-logging-status';
 import { useRef, useState } from 'react';
 import { Pressable } from '../../../shared/ui/Pressable';
@@ -25,7 +26,7 @@ export function MealSectionHeader({
   const { theme } = useTheme();
   const [busy, setBusy] = useState(false);
   const changing = useRef(false);
-  const summary = `${mealStatusLabels[status]}${calories == null ? '' : ` · ${Math.round(calories).toLocaleString()} kcal`}`;
+  const summary = `${mealStatusLabels[status]}${calories == null ? '' : ` · ${formatCount(calories)} kcal`}`;
   async function skip() {
     if (changing.current) return;
     changing.current = true;

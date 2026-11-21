@@ -1,7 +1,7 @@
+import { formatCount } from '@trainingai/shared/format/number';
 import { plural } from "@trainingai/shared/format/plural";
 import { budgetEnergyModel } from "./energy-model";
 
-const thousands = (value: number) => Math.round(value).toLocaleString();
 
 // A food with no brand has no leading dot: "125 g · 80 kcal", not " · 125 g · 80 kcal".
 export function foodLine(
@@ -9,13 +9,13 @@ export function foodLine(
   servingSizeG: number,
   calories: number,
 ) {
-  return [brand?.trim(), `${servingSizeG} g`, `${thousands(calories)} kcal`]
+  return [brand?.trim(), `${servingSizeG} g`, `${formatCount(calories)} kcal`]
     .filter(Boolean)
     .join(" · ");
 }
 
 export function portionKcalLine(servings: number, totalKcal: number) {
-  return `${plural(servings, "portion", "portions")} · ${thousands(totalKcal / servings)} kcal per portion`;
+  return `${plural(servings, "portion", "portions")} · ${formatCount(totalKcal / servings)} kcal per portion`;
 }
 
 export function recipeCountLine(ingredients: number, servings: number) {
@@ -25,7 +25,7 @@ export function recipeCountLine(ingredients: number, servings: number) {
 /** "+" for a surplus, "−" (a real minus) for a deficit, nothing at zero. */
 export function signedKcal(netKcal: number) {
   const sign = netKcal > 0 ? "+" : netKcal < 0 ? "−" : "";
-  return `${sign}${thousands(Math.abs(netKcal))}`;
+  return `${sign}${formatCount(Math.abs(netKcal))}`;
 }
 
 /**

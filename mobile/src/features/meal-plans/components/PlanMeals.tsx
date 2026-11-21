@@ -1,3 +1,4 @@
+import { formatCount } from '@trainingai/shared/format/number';
 import { plannedMealRecorded } from '../data/recorded-meals';
 import { logPlanMeal as logPlan } from '../data/log-plan-meal';
 import { EstimatedMeals } from './EstimatedMeals';
@@ -297,9 +298,9 @@ export function ActiveMealPlan({
                     {adjusted ? (
                       <>
                         <AppText variant="caption" tone="brand" style={{ fontWeight: '600' }}>
-                          {adjusted.calories.toLocaleString()} kcal
+                          {formatCount(adjusted.calories)} kcal
                         </AppText>{' '}
-                        (planned {m.targetCalories.toLocaleString()})
+                        (planned {formatCount(m.targetCalories)})
                       </>
                     ) : (
                       `${m.targetCalories} kcal target`

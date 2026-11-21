@@ -1,3 +1,4 @@
+import { formatCount } from '@trainingai/shared/format/number';
 import {
   requestHealthConnectPermissions,
   grantedHealthConnectTypes,
@@ -116,7 +117,7 @@ export async function readHealthSnapshot(timezone = DEFAULT_TZ): Promise<HealthS
       source: projection.hrv?.source,
     },
     Steps: {
-      value: today?.steps === undefined ? null : today.steps.toLocaleString(),
+      value: today?.steps === undefined ? null : formatCount(today.steps),
       source: latest('Steps')?.sourcePackage,
     },
     ActiveCaloriesBurned: {

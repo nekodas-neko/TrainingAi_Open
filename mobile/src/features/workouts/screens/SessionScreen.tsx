@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { todayInTz } from '@trainingai/shared/date-utils';
+import { formatDateDisplay, todayInTz } from '@trainingai/shared/date-utils';
 import {
   AppButton,
   AppText,
@@ -63,12 +63,7 @@ export function SessionScreen({
       .map((exercise) => exercise.id) ?? [];
   const allDone =
     !!session?.exercises.length && done.length === session.exercises.length && !active;
-  const date = new Intl.DateTimeFormat('en-AU', {
-    timeZone: workout.timezone,
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-  }).format(new Date());
+  const date = formatDateDisplay(today, 'long');
   return (
     <WorkoutLayout
       title={session?.name ?? 'Workout'}

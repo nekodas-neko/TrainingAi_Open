@@ -1,3 +1,4 @@
+import { formatCount } from '@trainingai/shared/format/number';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { macroCalorieWarning } from '@trainingai/shared/nutrition/scan-totals';
 import { View } from 'react-native';
@@ -115,7 +116,7 @@ export function MacroCalorieWarning({
   });
   if (!warning) return null;
   const amber = theme.status.warning;
-  const kcal = warning.fromMacros.toLocaleString();
+  const kcal = formatCount(warning.fromMacros);
   return (
     <View
       accessibilityRole="alert"
@@ -131,7 +132,7 @@ export function MacroCalorieWarning({
       <Stack direction="row" gap="xs" align="flex-start">
         <Icon name="alert" color={amber} size={14} />
         <AppText variant="label" style={{ flex: 1 }}>
-          These macros come to {kcal} kcal, not {Math.round(calories).toLocaleString()}.
+          These macros come to {kcal} kcal, not {formatCount(calories)}.
         </AppText>
       </Stack>
       <AppText variant="caption" tone="muted">

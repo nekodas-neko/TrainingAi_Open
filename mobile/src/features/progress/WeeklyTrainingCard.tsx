@@ -1,3 +1,4 @@
+import { formatCount } from '@trainingai/shared/format/number';
 import type { z } from 'zod';
 import type { ReactNode } from 'react';
 import { todayInTz } from '@trainingai/shared/date-utils';
@@ -27,7 +28,7 @@ export function WeeklyTrainingCard({
     { label: 'Sets', value: String(data.totalSets), unit: 'logged' },
     {
       label: 'Volume',
-      value: data.totalVolumeKg > 0 ? Math.round(data.totalVolumeKg).toLocaleString() : '—',
+      value: data.totalVolumeKg > 0 ? formatCount(data.totalVolumeKg) : '—',
       unit: 'kg lifted',
     },
     {

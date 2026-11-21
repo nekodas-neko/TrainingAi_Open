@@ -1,3 +1,4 @@
+import { formatLifetimeVolume, formatVolumeKg } from '@trainingai/shared/format/number';
 import { z } from 'zod';
 import { titleName } from '../../rewards/data/view.ts';
 export const userSchema = z.object({
@@ -95,7 +96,9 @@ export function rankValue(entry: LeaderboardEntry, period: Period, metric: Metri
 }
 export function rankLabel(value: number, period: Period, metric: Metric) {
   return metric === 'volume'
-    ? `${(value / 1000).toLocaleString(undefined, { maximumFractionDigits: 1 })}k kg`
+    ? period === 'weekly'
+      ? formatVolumeKg(value)
+      : formatLifetimeVolume(value)
     : metric === 'streak'
       ? `${value} ${period === 'weekly' ? 'weeks' : 'days'}`
       : String(value);

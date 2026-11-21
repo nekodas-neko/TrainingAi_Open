@@ -1,3 +1,4 @@
+import { formatCount, waterParts } from '@trainingai/shared/format/number';
 import { balanceProvenance, budgetLine } from '../../nutrition/data/budget-line';
 import { useRecordedIntake } from '../../nutrition/data/useRecordedIntake';
 import { sleepStageLegend, SLEEP_LEGEND_MIN_FONT_SCALE } from '../data/sleep-legend';
@@ -141,14 +142,18 @@ export function HomeMetricTiles({
         if (!value) {
           return [];
         }
+        const water = key === 'waterIntake' ? waterParts(value.value) : null;
         return [
           <MetricCard
             key={key}
             dense
             centered
             label={metricLabels[key as keyof typeof metricLabels]}
-            value={metricValue(value.value, '', key === 'weightKg' || key === 'distanceKm' ? 1 : 0)}
-            unit={value.unit}
+            value={
+              water?.value ??
+              metricValue(value.value, '', key === 'weightKg' || key === 'distanceKm' ? 1 : 0)
+            }
+            unit={water?.unit ?? value.unit}
             icon={value.icon}
             accent={tileColor}
             openLabel={value.nutrition ? 'View Nutrition' : 'View Body measurements'}
@@ -296,7 +301,7 @@ function HomeWidgetBody({
               segments={[{ share: 1, color: theme.colors.brand }]}
             >
               <AppText variant="ringValue" style={{ fontVariant: ['tabular-nums'] }}>
-                {remaining === null ? '…' : Math.abs(Math.round(remaining)).toLocaleString()}
+                {remaining === null ? '…' : formatCount(Math.abs(Math.round(remaining)))}
               </AppText>
               <AppText variant="ringWord" style={{ opacity: 0.4 }}>
                 {remaining !== null && remaining < 0 ? 'over' : 'left'}
@@ -310,7 +315,7 @@ function HomeWidgetBody({
                 <AppText variant="caption" tone="muted" style={{ flexShrink: 1 }}>
                   {goal === null
                     ? ''
-                    : `${Math.round(eaten ?? 0).toLocaleString()} / ${Math.round(goal).toLocaleString()} kcal`}
+                    : `${formatCount(eaten ?? 0)} / ${formatCount(goal)} kcal`}
                 </AppText>
               </Stack>
               <ProgressBar value={eaten !== null && goal ? eaten / goal : 0} />
@@ -380,7 +385,7 @@ function HomeWidgetBody({
             </AppText>
           </Stack>
           <AppText variant="hero">
-            {remaining === null ? '—' : Math.abs(Math.round(remaining)).toLocaleString()}{' '}
+            {remaining === null ? '—' : formatCount(Math.abs(Math.round(remaining)))}{' '}
             <AppText variant="caption" tone="muted">
               kcal {remaining != null && remaining < 0 ? 'over target' : 'left today'}
             </AppText>
@@ -391,7 +396,7 @@ function HomeWidgetBody({
           <AppText variant="micro" tone="muted">
             {metricValue(intake)} eaten · {metricValue(balance?.expenditureKcal)} burned
             {energy?.data?.maintenance?.source === 'calibrated'
-              ? ` · ${Math.round(energy.data.maintenance.kcal).toLocaleString()} maintenance`
+              ? ` · ${formatCount(energy.data.maintenance.kcal)} maintenance`
               : ''}
           </AppText>
           {!balance && energy?.data && (
@@ -594,7 +599,7 @@ function HomeWidgetBody({
                 {goal !== null && (
                   <AppText variant="caption" tone="muted">
                     {' '}
-                    / {goal.toLocaleString()}
+                    / {formatCount(goal)}
                   </AppText>
                 )}
               </AppText>

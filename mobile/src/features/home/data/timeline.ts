@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { formatTimeOfDay, shiftDateStr } from '@trainingai/shared/date-utils';
+import { formatTimeOfDay, shiftDateStr, toAestDay } from '@trainingai/shared/date-utils';
 import { doseTimelineText, isMilligramDosed } from '@trainingai/shared/nutrition/vial-plan';
 import { activeElapsedMs, type WorkoutRecord } from '../../workouts/logging/workout.ts';
 import { sleepWokeEnd } from '../../health/data/body-view.ts';
@@ -106,7 +106,7 @@ export function localTimeline(
         continue;
       }
       const timeMs = Date.parse(at);
-      const date = type === 'wakeup' ? night.date : formatLocalDate(timeMs, timezone);
+      const date = type === 'wakeup' ? night.date : toAestDay(new Date(timeMs), timezone);
       if (
         (date !== today && date !== yesterday) ||
         rows.some(
@@ -131,16 +131,6 @@ export function localTimeline(
     }
   }
   return rows.sort((a, b) => b.timeMs - a.timeMs);
-}
-function formatLocalDate(at: number, timezone: string) {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: timezone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(new Date(at));
-  const value = (type: string) => parts.find((part) => part.type === type)!.value;
-  return `${value('year')}-${value('month')}-${value('day')}`;
 }
 /** The part of a queued supplement tick the dose overlay reads (#2185). */
 export type DoseOperation = {
@@ -209,7 +199,7 @@ export function withLocalDoses(
       continue;
     rows = rows.filter((row) => !isThis(row));
     if (!dose) continue;
-    const date = formatLocalDate(timeMs, timezone);
+    const date = toAestDay(new Date(timeMs), timezone);
     if (date !== today && date !== yesterday) continue;
     rows.push({
       type: 'dose',
