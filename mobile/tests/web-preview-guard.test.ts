@@ -92,7 +92,10 @@ test('nothing but the development adapter switches the localhost allowance on', 
   const walk = (dir: string) => {
     for (const item of fs.readdirSync(dir, { withFileTypes: true })) {
       const full = path.join(dir, item.name);
-      if (item.isDirectory()) walk(full);
+      // #2560: every source-tree walker skips the check fixtures, as it does node_modules.
+      if (item.isDirectory()) {
+        if (!['node_modules', '__check_fixture__'].includes(item.name)) walk(full);
+      }
       else if (/(?<!function )allowLocalHttpBackend\(\)/.test(fs.readFileSync(full, 'utf8'))) callers.push(full);
     }
   };
