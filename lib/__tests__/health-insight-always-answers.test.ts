@@ -31,7 +31,6 @@ const repo = () => ({
 vi.mock('@/lib/data', () => ({ getRepository: async () => repo(), getRepositoryAsync: async () => repo() }))
 vi.mock('ai', () => ({ generateText: (o: unknown) => generateText(o) }))
 vi.mock('@/lib/ai/instrument', () => ({
-  aiModel: () => ({}),
   loggedGenerateText: async (_m: unknown, run: (s: AbortSignal) => Promise<{ text: string }>) =>
     run(new AbortController().signal),
 }))

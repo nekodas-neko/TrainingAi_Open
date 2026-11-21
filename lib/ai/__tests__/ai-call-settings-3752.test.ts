@@ -85,6 +85,13 @@ describe('aiCallSettings', () => {
   it('refuses a section the table does not have', () => {
     expect(() => aiSectionSettings('made-up' as AiSection)).toThrow(/AI_SECTIONS/)
   })
+
+  it('refuses names every object inherits, as it does any unknown section', () => {
+    for (const name of ['constructor', 'toString', 'hasOwnProperty', '__proto__', 'valueOf']) {
+      expect(() => aiSectionSettings(name as AiSection)).toThrow(/AI_SECTIONS/)
+      expect(() => aiCallSettings(name as AiSection)).toThrow(/AI_SECTIONS/)
+    }
+  })
 })
 
 describe('the wrapper applies the table', () => {

@@ -21,7 +21,6 @@ const USER = '00000000-0000-4000-8000-000000001b21'
 vi.mock('@/auth', () => ({ auth: vi.fn(async () => ({ user: { id: USER, timezone: 'Australia/Brisbane' } })) }))
 vi.mock('@/lib/rate-limit', () => ({ rateLimit: () => true }))
 vi.mock('@/lib/ai/instrument', () => ({
-  aiModel: () => ({}),
   contentKey: (...parts: unknown[]) => parts.join('|'),
   loggedGenerateObject: async (_meta: unknown, run: () => Promise<unknown>) => run(),
 }))

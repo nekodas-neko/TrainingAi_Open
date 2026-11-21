@@ -20,7 +20,6 @@ vi.mock('@/auth', () => ({ auth: vi.fn(async () => ({ user: { id: USER, timezone
 vi.mock('@/lib/rate-limit', () => ({ rateLimit: () => true }))
 vi.mock('@/lib/ai/instrument', async orig => ({
   ...(await orig<typeof import('@/lib/ai/instrument')>()),
-  aiModel: () => ({}),
   loggedGenerateObject: vi.fn(async () => { throw new Error('no model call in this test') }),
 }))
 

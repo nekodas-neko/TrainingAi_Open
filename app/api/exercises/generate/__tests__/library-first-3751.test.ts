@@ -11,7 +11,6 @@ vi.mock('@/lib/rate-limit', () => ({ rateLimit: () => true }))
 vi.mock('@/lib/observability', () => ({ reportServerError: () => undefined }))
 vi.mock('ai', () => ({ generateObject: (...a: unknown[]) => generateObject(...a) }))
 vi.mock('@/lib/ai/instrument', () => ({
-  aiModel: () => 'test-model',
   loggedGenerateObject: (_meta: unknown, run: () => Promise<unknown>) => run(),
 }))
 vi.mock('@/lib/data', () => ({ getRepository: async () => ({ listExerciseLibrary }) }))

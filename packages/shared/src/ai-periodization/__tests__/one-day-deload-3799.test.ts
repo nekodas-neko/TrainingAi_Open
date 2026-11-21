@@ -28,7 +28,6 @@ vi.mock('../signals', async importOriginal => ({
   aggregateSignals: async () => mocks.signals,
 }))
 vi.mock('@/lib/ai/instrument', () => ({
-  aiModel: () => ({}),
   loggedGenerateObject: async () => ({ object: mocks.modelAnswer }),
 }))
 

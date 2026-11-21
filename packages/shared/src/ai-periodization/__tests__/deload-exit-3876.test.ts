@@ -26,7 +26,6 @@ vi.mock('../signals', async importOriginal => ({
   aggregateSignals: async () => { mocks.whileBuilding?.(); return mocks.signals },
 }))
 vi.mock('@/lib/ai/instrument', () => ({
-  aiModel: () => ({}),
   loggedGenerateObject: async () => ({ object: structuredClone(mocks.modelAnswer) }),
 }))
 const { generatePrescriptionForSession } = await import('../generate-prescription')

@@ -77,7 +77,8 @@ export const AI_SECTIONS = {
 export type AiSection = keyof typeof AI_SECTIONS
 
 export function aiSectionSettings(section: AiSection): AiSectionSettings {
-  const settings = (AI_SECTIONS as Record<string, AiSectionSettings | undefined>)[section]
+  // Own keys only: 'constructor', 'toString' and the like are on every object and are not sections.
+  const settings = Object.hasOwn(AI_SECTIONS, section) ? (AI_SECTIONS as Record<string, AiSectionSettings>)[section] : undefined
   if (!settings) throw new Error(`No AI call settings for section "${section}" — add it to AI_SECTIONS in lib/ai/instrument.ts`)
   return settings
 }

@@ -16,8 +16,6 @@ const listInjuries = vi.fn(async (_userId: string) => injuryRows)
 vi.mock('@/lib/data', () => ({ getRepositoryAsync: async () => ({ listInjuries }) }))
 vi.mock('@ai-sdk/google', () => ({ google: { tools: { googleSearch: () => ({}) } } }))
 vi.mock('@/lib/ai/instrument', () => ({
-  COACH_MODEL_ID: 'test',
-  coachModel: () => ({}),
   loggedStreamText: (_meta: unknown, args: { tools: Record<string, unknown>; system: string }) => {
     captured = args as never
     return { toUIMessageStreamResponse: () => new Response('ok') }
