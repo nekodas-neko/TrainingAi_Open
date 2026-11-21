@@ -6,6 +6,7 @@
 // Runs only against a real local dev Postgres — skips without DATABASE_URL.
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { CoachContextSchema } from '@trainingai/shared/coach/context'
+import { toAestDay } from '@trainingai/shared/date-utils'
 
 const canRun = !!process.env.DATABASE_URL
 const TZ = 'Australia/Brisbane'
@@ -127,7 +128,7 @@ describe.skipIf(!canRun)('Coach context ownership (#3896)', () => {
     const recap = await resolve(B, { origin: 'recap', workoutId: ids.b.workout })
     expect((recap as { block: string }).block).toContain('"Leg Press", ')
     expect((recap as { block: string }).block).toContain('did 8 @ 60 kg, 7 @ 60 kg, 6 @ 60 kg')
-    const day = LOGGED_AT.toLocaleDateString('en-CA', { timeZone: TZ })
+    const day = toAestDay(LOGGED_AT, TZ)
     const dayBlock = await resolve(B, { origin: 'day', date: day.replace(/-/g, '/') })
     expect((dayBlock as { block: string }).block).toContain(`from the day ${day}`)
     expect((dayBlock as { block: string }).block).toContain('Workouts that day: "Upper"')
