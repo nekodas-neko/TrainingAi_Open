@@ -63,7 +63,10 @@ jobs:
       - name: Start Postgres with SSL
         run: echo "DATABASE_URL=$(scripts/ci/start-ssl-postgres.sh)" >> "$GITHUB_ENV"
       - name: Start a local S3 stand-in with placeholder model files
-        run: scripts/ci/start-local-s3.sh | sed "s/^export //" >> "$GITHUB_ENV"
+        run: |
+          # Not a pipe: a failure in the script must fail the step, not vanish into `sed`.
+          scripts/ci/start-local-s3.sh > "$RUNNER_TEMP/local-s3.env"
+          sed "s/^export //" "$RUNNER_TEMP/local-s3.env" >> "$GITHUB_ENV"
       - name: Apply all migrations
         run: node scripts/local-db/migrate.js
       - name: Seed the test user and program

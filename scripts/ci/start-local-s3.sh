@@ -28,7 +28,7 @@ root="$(cd "$(dirname "$0")/../.." && pwd)"
 docker rm -f "$S3_CONTAINER" >/dev/null 2>&1 || true
 docker run -d --name "$S3_CONTAINER" -p "$S3_PORT:9000" \
   -e MINIO_ROOT_USER="$ACCESS_KEY" -e MINIO_ROOT_PASSWORD="$SECRET_KEY" \
-  quay.io/minio/minio:latest server /data >/dev/null
+  minio/minio:RELEASE.2025-04-22T22-12-26Z server /data >/dev/null
 
 for _ in $(seq 1 30); do
   curl -sf -o /dev/null "http://localhost:$S3_PORT/minio/health/live" && break
