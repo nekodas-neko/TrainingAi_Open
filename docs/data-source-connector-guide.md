@@ -319,6 +319,55 @@ StressDaySeries { series: { t /* bucket midpoint, ms */, level /* −1..+1, nega
     (`lib/oura/cloud/still-rhr.ts`).
   Both need a generic form before a second wearable gets the chart.
 
+### 3h. Rest periods — **a span the person marked as resting or ill** (#3898; stored, no reader yet)
+
+```ts
+// table source_rest_periods (lib/data/postgres/schema.ts: sourceRestPeriods) — no TS shape yet, nothing reads it
+{ source, sourceRecordId, startDay, endDay | null, startAt | null, endAt | null,
+  episodes: { at, tags: string[] }[], deletedAt | null }
+```
+
+- **One row per (user, source, source record id)**, so a re-fetch is an upsert. `source` is the connector id
+  the other generic tables carry. `startDay` / `endDay` are the source's own local days; `endDay` is null
+  while the period is still on. `startAt` / `endAt` are instants where the source gives them.
+- **`episodes`** are the notes the source logged inside the span, as it sent them (an instant and the tag
+  codes picked). Kept whole; nothing parses them yet.
+- **`deletedAt`** is the tombstone for a period the source deleted. The writer sets it; nothing hard-deletes.
+- **Stored, no reader yet.** The owner keeps all data (20 Nov) but uses the app's own check-in as the rest
+  and illness signal (#3902), so no score, baseline or screen reads this table. A use is its own
+  `type: tuning` proposal. Not to be confused with `rest_days`, the app's own rest days.
+- **Oura's mapping** (step 2 of #3898 writes it; the table only makes room): `rest_mode_period` →
+  `id` → `sourceRecordId`, `start_day`/`end_day`/`start_time`/`end_time` → `startDay`/`endDay`/`startAt`/`endAt`,
+  `episodes` → `episodes`.
+- **Who else could fill it:** any source with an "ill", "rest" or "recovery" mode the person turns on.
+
+### 3i. Day tags — **a tag or note at an instant or over a span** (#3898; stored, no reader yet)
+
+```ts
+// table source_day_tags (lib/data/postgres/schema.ts: sourceDayTags) — no TS shape yet, nothing reads it
+{ source, sourceRecordId, startDay, endDay | null, startAt, endAt | null,
+  tagCodes: string[], customName | null, comment | null, deletedAt | null }
+```
+
+- **One row per (user, source, source record id).** `endAt` / `endDay` are null for a tag at one instant.
+  `tagCodes` holds the source's standard codes picked for the entry, and is empty for a text-only note.
+  A custom tag keeps the source's own marker for it in `tagCodes` and its name in `customName`.
+  `comment` is the free text.
+- **One shape holds both generations of Oura's tag**, so neither loses a field: the newer `enhanced_tag`
+  (one code, an optional duration, a custom name, a comment) and the older `tag` (a day, one timestamp,
+  free text, a list of codes). `tagCodes` is a list so the older tag's several codes fit.
+- **Ids are not guaranteed distinct across the two Oura collections.** The writer (step 2) must keep the
+  two from colliding on `sourceRecordId` (the newer tag supersedes the older one, so it wins a clash) and
+  must not rely on this table to tell them apart.
+- **`deletedAt`** is the tombstone: Oura can delete a tag. The writer sets it; nothing hard-deletes.
+- **Stored, no reader yet.** The tags would feed "what stressed me" (#2177) later, as its own proposal.
+  `oura_tags` is the BLE-era, Oura-shaped table with no writer; it is left alone here.
+- **Oura's mapping:** `enhanced_tag` → `id` → `sourceRecordId`; `start_day`/`end_day`/`start_time`/`end_time`
+  → `startDay`/`endDay`/`startAt`/`endAt`; `tag_type_code` → `tagCodes` (one element, none when null);
+  `custom_name` → `customName`; `comment` → `comment`. Legacy `tag` → `id`; `day` → `startDay`;
+  `timestamp` → `startAt`; `tags` → `tagCodes`; `text` → `comment`.
+- **Who else could fill it:** any source where the person logs lifestyle tags or notes against a day.
+
 ---
 
 ## 4. Calculation inputs — what each score actually needs, and what it does without it

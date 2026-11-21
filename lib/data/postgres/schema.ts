@@ -2501,3 +2501,57 @@ export const nativeBuildSightings = pgTable('native_build_sightings', {
   lastSeenAt:   timestamp('last_seen_at', { withTimezone: true }).notNull().defaultNow(),
   requestCount: integer('request_count').notNull().default(1),
 }, t => [primaryKey({ columns: [t.userId, t.buildCode, t.day] })])
+
+/**
+ * #3898 step 1 (migration 202611212239) — a connected source's rest periods: a span the person
+ * marked as resting or ill. Generic shape (connector guide §3h); stored, no reader yet, no writer
+ * until step 2. `source` is the connector id; one row per (user, source, source record id).
+ * `deletedAt` is the tombstone for a record the source deleted.
+ */
+export const sourceRestPeriods = pgTable('source_rest_periods', {
+  id:             uuid('id').primaryKey().defaultRandom(),
+  userId:         uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  source:         text('source').notNull(),
+  sourceRecordId: text('source_record_id').notNull(),
+  startDay:       date('start_day', { mode: 'string' }).notNull(),
+  endDay:         date('end_day', { mode: 'string' }),
+  startAt:        timestamp('start_at', { withTimezone: true }),
+  endAt:          timestamp('end_at', { withTimezone: true }),
+  episodes:       jsonb('episodes').$type<{ at: string; tags: string[] }[]>().notNull().default(sql`'[]'::jsonb`),
+  deletedAt:      timestamp('deleted_at', { withTimezone: true }),
+  createdAt:      timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt:      timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, t => [
+  unique('source_rest_periods_record_key').on(t.userId, t.source, t.sourceRecordId),
+  index('source_rest_periods_user_start_day_idx').on(t.userId, t.startDay),
+  check('source_rest_periods_source_check', sql`${t.source} <> ''`),
+  check('source_rest_periods_source_record_id_check', sql`${t.sourceRecordId} <> ''`),
+])
+
+/**
+ * #3898 step 1 (migration 202611212239) — a connected source's day tags and notes, at an instant or
+ * over a span. One shape holds the source's older single-note tag and its newer tag with a duration
+ * (connector guide §3i). Stored, no reader yet, no writer until step 2. `tagCodes` is empty for a
+ * text-only note; a custom tag keeps the source's own marker there and its name in `customName`.
+ */
+export const sourceDayTags = pgTable('source_day_tags', {
+  id:             uuid('id').primaryKey().defaultRandom(),
+  userId:         uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  source:         text('source').notNull(),
+  sourceRecordId: text('source_record_id').notNull(),
+  startDay:       date('start_day', { mode: 'string' }).notNull(),
+  endDay:         date('end_day', { mode: 'string' }),
+  startAt:        timestamp('start_at', { withTimezone: true }).notNull(),
+  endAt:          timestamp('end_at', { withTimezone: true }),
+  tagCodes:       text('tag_codes').array().notNull().default([]),
+  customName:     text('custom_name'),
+  comment:        text('comment'),
+  deletedAt:      timestamp('deleted_at', { withTimezone: true }),
+  createdAt:      timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt:      timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, t => [
+  unique('source_day_tags_record_key').on(t.userId, t.source, t.sourceRecordId),
+  index('source_day_tags_user_start_day_idx').on(t.userId, t.startDay),
+  check('source_day_tags_source_check', sql`${t.source} <> ''`),
+  check('source_day_tags_source_record_id_check', sql`${t.sourceRecordId} <> ''`),
+])

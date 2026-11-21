@@ -53,6 +53,9 @@ export const SOFT_DELETED: Record<string, string> = {
   oura_workouts: 'deleted_at',
   // #3153: a session deleted in the Oura app
   oura_sessions: 'deleted_at',
+  // #3898: a rest period or tag deleted at the connected source
+  source_rest_periods: 'deleted_at',
+  source_day_tags: 'deleted_at',
   plan_meal_answers: 'deleted_at',
   blood_panels: 'deleted_at',
   prescribed_runs: 'deleted_at',
@@ -123,6 +126,8 @@ export const EXPORTED: Record<string, ExportScope> = {
   season_results: { kind: 'user_id' },
   session_periodization: { kind: 'user_id' },
   set_hr_stats: { kind: 'user_id' },
+  source_day_tags: { kind: 'user_id' },
+  source_rest_periods: { kind: 'user_id' },
   shadow_readiness: { kind: 'user_id' },
   sleep_session_revisions: { kind: 'user_id' },
   sleep_sessions: { kind: 'user_id' },
