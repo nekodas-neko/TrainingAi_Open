@@ -1,0 +1,75 @@
+name: Route smoke (production build)
+
+# #3933. The route smoke (`scripts/ci/route-smoke.mjs`, #3919) against `next build` + `next start`.
+# CI's "Route smoke" job runs it against `pnpm dev` on every code PR; the two bundlers differ, and
+# #3911's bug was only ever seen on the dev one, so that job cannot say whether a production build
+# has the same fault. A full build takes minutes and several GB, so this is its own workflow and runs
+# after a merge, not on PRs. It is not a required check, and it deploys nothing: a release is still
+# a `v*` tag through release.yml.
+#
+# What a production server needs that the dev one does not, and how it gets it without weakening a
+# guard:
+# - Postgres over SSL: NODE_ENV=production turns pool SSL on (`lib/data/postgres/client.ts`), so a
+#   plain service container is refused. `scripts/ci/start-ssl-postgres.sh` starts one with SSL on.
+# - The model constants: production never falls back to the committed fixtures
+#   (`lib/oura-models/constants-delivery.ts`). `scripts/ci/route-smoke-prod.sh` copies them into
+#   `.oura-constants/`, the directory a deploy downloads its set into.
+#
+# - Model assets: production refuses to boot unless object storage lists every ONNX model
+#   (`instrumentation-node.ts`). `scripts/ci/start-local-s3.sh` runs S3Mock in the job with
+#   placeholder files at those keys and throwaway credentials made up there (not secrets), so no
+#   real bucket credential is in the repo's Actions (owner decision on #3933, option 2). The guard
+#   is untouched; the job never exercises the real bucket listing, which the release workflow does.
+#
+# 0 Gemini calls: the key is blank and the dev call budget is 0 (`lib/ai/dev-call-budget.ts`).
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: route-smoke-prod-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  route-smoke-prod:
+    name: Route smoke (production build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # The same throwaway signing key as the E2E shards and the dev smoke (Q-311): it signs cookies
+      # for a server and a database that are both destroyed with the runner.
+      AUTH_SECRET: e2e-ci-secret-not-used-outside-this-job
+      GOOGLE_GENERATIVE_AI_API_KEY: ''
+      AI_DEV_DAILY_CALL_LIMIT: '0'
+      PORT: '3200'
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5
+        with:
+          version: 10.33.0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - name: Start Postgres with SSL
+        run: echo "DATABASE_URL=$(scripts/ci/start-ssl-postgres.sh)" >> "$GITHUB_ENV"
+      - name: Start a local S3 stand-in with placeholder model files
+        run: |
+          # Not a pipe: a failure in the script must fail the step, not vanish into `sed`.
+          scripts/ci/start-local-s3.sh > "$RUNNER_TEMP/local-s3.env"
+          sed "s/^export //" "$RUNNER_TEMP/local-s3.env" >> "$GITHUB_ENV"
+      - name: Apply all migrations
+        run: node scripts/local-db/migrate.js
+      - name: Seed the test user and program
+        run: psql "$DATABASE_URL" -f scripts/local-db/seed.sql
+      - name: Build, start the production server, and smoke the main pages and read routes
+        run: scripts/ci/route-smoke-prod.sh
