@@ -2555,3 +2555,37 @@ export const sourceDayTags = pgTable('source_day_tags', {
   check('source_day_tags_source_check', sql`${t.source} <> ''`),
   check('source_day_tags_source_record_id_check', sql`${t.sourceRecordId} <> ''`),
 ])
+
+/**
+ * #3896 step 3 (migration 202611212318) — what a person chose for one lift: a lasting rep range and
+ * rest, and two one-shots (a lighter / heavier step and ±1 set) consumed by the next completed log.
+ * Modelled on `exerciseEstimates`: one row per (user, exercise name) with `exerciseId` carried beside
+ * it. Every preference is nullable; null means the program as written. Stored, no reader and no
+ * writer until steps 4 and 5. `deletedAt` is the tombstone for a cleared preference.
+ */
+export const exercisePreferences = pgTable('exercise_preferences', {
+  id:           uuid('id').primaryKey().defaultRandom(),
+  userId:       uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  exerciseId:   uuid('exercise_id').references(() => exerciseLibrary.id, { onDelete: 'set null' }),
+  exerciseName: text('exercise_name').notNull(),
+  repMin:       smallint('rep_min'),
+  repMax:       smallint('rep_max'),
+  restSec:      integer('rest_sec'),
+  nextLoadStep: text('next_load_step').$type<'lighter' | 'heavier'>(),
+  setsDelta:    smallint('sets_delta').$type<-1 | 1>(),
+  oneShotSetAt: timestamp('one_shot_set_at', { withTimezone: true }),
+  source:       text('source').$type<'coach' | 'checkin' | 'editor'>().notNull(),
+  deletedAt:    timestamp('deleted_at', { withTimezone: true }),
+  createdAt:    timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt:    timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, t => [
+  unique('exercise_preferences_lift_key').on(t.userId, t.exerciseName),
+  uniqueIndex('exercise_preferences_user_exercise_id_key').on(t.userId, t.exerciseId).where(sql`exercise_id IS NOT NULL`),
+  check('exercise_preferences_exercise_name_check', sql`${t.exerciseName} <> ''`),
+  check('exercise_preferences_rep_range_check', sql`(${t.repMin} IS NULL AND ${t.repMax} IS NULL) OR (${t.repMin} IS NOT NULL AND ${t.repMax} IS NOT NULL AND ${t.repMin} >= 1 AND ${t.repMin} <= ${t.repMax} AND ${t.repMax} <= 30)`),
+  check('exercise_preferences_rest_sec_check', sql`${t.restSec} IS NULL OR ${t.restSec} >= 0`),
+  check('exercise_preferences_next_load_step_check', sql`${t.nextLoadStep} IS NULL OR ${t.nextLoadStep} IN ('lighter', 'heavier')`),
+  check('exercise_preferences_sets_delta_check', sql`${t.setsDelta} IS NULL OR ${t.setsDelta} IN (-1, 1)`),
+  check('exercise_preferences_one_shot_check', sql`((${t.nextLoadStep} IS NOT NULL OR ${t.setsDelta} IS NOT NULL) AND ${t.oneShotSetAt} IS NOT NULL) OR (${t.nextLoadStep} IS NULL AND ${t.setsDelta} IS NULL AND ${t.oneShotSetAt} IS NULL)`),
+  check('exercise_preferences_source_check', sql`${t.source} IN ('coach', 'checkin', 'editor')`),
+])
