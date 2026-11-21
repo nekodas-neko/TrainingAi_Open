@@ -1,6 +1,7 @@
 import type { WorkoutRepository } from '@/lib/data/repository'
-import { todayInTz, shiftDateStr, daysBetweenDateStrs, dateStrMidnightInTz } from '@trainingai/shared/date-utils'
-import { computeBodyBatteryDay, BODY_BATTERY_MODEL_VERSION } from '@/lib/health/body-battery-day'
+import { todayInTz, shiftDateStr, daysBetweenDateStrs } from '@trainingai/shared/date-utils'
+import { BODY_BATTERY_MODEL_VERSION } from '@/lib/health/body-battery-day'
+import { finishedBodyBatteryDay } from '@/lib/health/body-battery-replay'
 import { isMeasuredBatteryDay } from '@/lib/data/postgres/slices/body-battery'
 
 /**
@@ -94,11 +95,7 @@ async function buildReport(input: RederiveBodyBatteryInput, start: string, end: 
       continue
     }
     try {
-      const { snapshot } = await computeBodyBatteryDay({
-        repo, userId, tz, date: d,
-        until: dateStrMidnightInTz(shiftDateStr(d, 1), tz),
-        computeReadinessIfMissing: false,
-      })
+      const { snapshot } = await finishedBodyBatteryDay(repo, userId, tz, d)
       const same = stored.modelVersion === snapshot.modelVersion && stored.endValue === snapshot.endValue
         && stored.totalCharged === snapshot.totalCharged && stored.totalDrained === snapshot.totalDrained
       let action: DayOutcome['action'] = 'unchanged'
