@@ -25,7 +25,7 @@ name: Route smoke (production build)
 
 on:
   push:
-    branches: [main, chore/route-smoke-production-build] # TEMP: first run, before the file is on main
+    branches: [main]
     paths-ignore:
       - 'docs/**'
       - '**/*.md'
