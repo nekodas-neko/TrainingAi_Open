@@ -1,6 +1,6 @@
 // #3644, #3330, #2204: Preview's recommendation card says why rest is suggested, the Full/Deload
 // toggle says what the other side changes, and Start swipes to reveal Rest on an ordinary day.
-// The words come from the daily check's answer (#3718), through the shared `deload-reasons`.
+// The words come from the daily check's answer, through the shared `deload-reasons`.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { buildCatalog, readSavedCatalog } from '../src/features/workouts/catalog.ts';

@@ -46,11 +46,9 @@ describe('illness in the periodization prompt', () => {
     expect(buildUserPrompt(baseSignals, state, '2026-07-16')).toContain('Illness radar: no data')
   })
 
-  // #3718: rest today is the app's daily check; the prompt never offers the model a rest answer.
-  it('system prompt never offers a rest-day answer and keeps watch advisory-only', () => {
+  it('system prompt gates rest_day_recommended on elevated/fever and keeps watch advisory-only', () => {
     const s = buildSystemPrompt('strength')
-    expect(s).not.toContain('rest_day_recommended')
-    expect(s).toContain('Always\nprescribe a session to train')
+    expect(s).toContain('illness radar is elevated or fever')
     expect(s).toContain('"watch" is context only')
   })
 })

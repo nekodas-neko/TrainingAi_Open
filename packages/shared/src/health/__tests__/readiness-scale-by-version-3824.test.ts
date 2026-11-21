@@ -223,7 +223,7 @@ describe('resilience reads the exact pre-#3778 sub-score', () => {
   })
 })
 
-describe('the prescription prompt shows the score', () => {
+describe('the prescription prompt states the cut for the score it shows', () => {
   const signals = {
     trainingGoal: 'strength', autoApplyPrescriptions: false, effectiveTimeBudgetMin: 60, exercises: [],
     phase: 'accumulation', sessionsInPhase: 2, hoursSinceLastSession: 48, consecutiveSessionDaysOfThisType: 0,
@@ -240,9 +240,8 @@ describe('the prescription prompt shows the score', () => {
     expect(prompt(62, undefined)).toContain('External readiness score: 62/100 (one signal among many)\n')
   })
 
-  // #3718: the line named the prompt's rest-day cut, which left with the rule. The score still reads.
-  it('names no rest-day cut for a score from before the move', () => {
-    expect(prompt(42, V17)).toContain('External readiness score: 42/100 (one signal among many)\n')
-    expect(prompt(42, null)).not.toContain('rest-day cut')
+  it('names the old cut for a score from before the move', () => {
+    expect(prompt(42, V17)).toContain('External readiness score: 42/100 (one signal among many; scored on the earlier scale, so its rest-day cut is 40, not 45)')
+    expect(prompt(42, null)).toContain('its rest-day cut is 40, not 45')
   })
 })

@@ -35,7 +35,7 @@ export function PrescriptionControls({
   const state = preparation.prescribedState;
   const prescription = state?.prescription;
   const { theme } = useTheme();
-  // #3718: today's rest-or-lighter call is the app's daily check, the one Home's strip shows.
+  // Today's rest-or-lighter call is the app's daily check, the one Home's strip shows.
   const daily = useWorkoutContext().catalog?.recommendation;
   const strip = dailyCheckStrip(daily);
   const toggle = intensityToggleModel({

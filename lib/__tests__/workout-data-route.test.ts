@@ -535,16 +535,14 @@ describe('GET /api/workout-data — what drives the bar', () => {
     expect(regeneratePrescriptionSingleFlight).not.toHaveBeenCalled()
   })
 
-  // #3718: the model no longer answers "rest today", so a stored rest-day answer is stale whatever
-  // its expiry. It is regenerated as a training plan on the open, never served as the plan.
-  it('regenerates a stored rest-day answer even before its expiry', async () => {
+  it('leaves an unexpired rest-day offer alone', async () => {
     getSessionPeriodization.mockResolvedValue(periodization({
       prescriptionStatus: 'pending',
       prescription: prescription({ phaseAction: 'rest_day_recommended' }),
     }))
     const body = await (await get('?tab=' + SESSION_ID)).json()
-    expect(body.aiPrescriptionPending).toBe(true)
-    expect(regeneratePrescriptionSingleFlight).toHaveBeenCalledTimes(1)
+    expect(body.aiPrescriptionPending).toBe(false)
+    expect(regeneratePrescriptionSingleFlight).not.toHaveBeenCalled()
   })
 
   it('keeps a dismissed prescription off the bar, and its drops with it', async () => {

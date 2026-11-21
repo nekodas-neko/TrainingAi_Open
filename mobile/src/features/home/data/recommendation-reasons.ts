@@ -15,8 +15,7 @@ import type { RecommendationModel } from './recommendation-model.ts';
 
 // What Home's recommendation card says about a suggested rest (#3644, pick A) and which controls it
 // shows (#2204, pick A). Every word comes from the daily check's answer (`computeAiDynamicNextSession`
-// on the server), through the shared `deload-reasons` the current app also reads. The stored AI plan
-// never says "rest" (#3718).
+// on the server), through the shared `deload-reasons` the current app also reads.
 
 export type StripIcon = 'thermometer' | 'alert' | 'moon';
 export type RecommendationStrip = { message: string; strength: DeloadStrength; icon: StripIcon };

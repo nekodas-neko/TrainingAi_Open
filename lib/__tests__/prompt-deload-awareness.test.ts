@@ -37,9 +37,7 @@ describe('buildUserPrompt — per-exercise deload awareness', () => {
   it('appends the handled-soreness line when deloaded exercise names are passed', () => {
     const p = buildUserPrompt(signals(), state, '2026-07-02', ['Hip Thrust', 'Glute Kickback'])
     expect(p).toContain('Per-exercise deloads already applied to: Hip Thrust, Glute Kickback')
-    expect(p).toContain('do NOT recommend a session swap for this soreness')
-    // #3718: there is no rest-day answer to warn the model off.
-    expect(p).not.toContain('rest day')
+    expect(p).toContain('do NOT recommend a rest day or session swap for this soreness')
   })
 
   it('omits the line when no names are passed (back-compat)', () => {

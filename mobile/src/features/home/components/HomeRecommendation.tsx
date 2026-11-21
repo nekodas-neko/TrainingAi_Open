@@ -374,6 +374,11 @@ export function HomeRecommendation({
             title="Start Workout"
             icon="swipeLeft"
             accessibilityHint="Swipe left to rest today instead"
+            // The tray is hidden from a screen reader while closed, so Rest is also an action here.
+            accessibilityActions={[{ name: 'rest', label: 'Rest today instead' }]}
+            onAccessibilityAction={(event) => {
+              if (event.nativeEvent.actionName === 'rest') void rest(true);
+            }}
             onPress={() => onStart(session.id)}
           />
         </SwipeReveal>

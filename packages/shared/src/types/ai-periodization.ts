@@ -80,8 +80,6 @@ export interface PrescriptionFigures {
 
 export interface AiPrescription {
   phase: PeriodizationPhase
-  /** `rest_day_recommended` is only ever read from a row stored before #3718; nothing writes it now,
-   *  and `prescriptionAgedOut` treats such a row as stale, never as the plan. */
   phaseAction: 'stay' | 'transition_recommended' | 'deload_recommended' | 'session_swap_recommended' | 'rest_day_recommended'
   /** #3766: the move on offer is this session type's own (a deload's way out while the program waits
    *  for its switch-over to one phase), so the screens do not call it the program's. Absent: a

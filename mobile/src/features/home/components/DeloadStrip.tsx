@@ -3,7 +3,7 @@ import { useTheme } from '../../../shared/theme/ThemeProvider';
 import type { RecommendationStrip } from '../data/recommendation-reasons';
 
 /** The one-line "why" over today's card (#3644): amber, orange or red by how strongly the daily
- *  check suggests rest. The pre-workout screen shows the same strip, from the same answer (#3718). */
+ *  check suggests rest. The pre-workout screen shows the same strip, from the same answer. */
 export function DeloadStrip({ strip }: { strip: RecommendationStrip }) {
   const { theme } = useTheme();
   const color = theme.deload[strip.strength];

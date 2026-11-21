@@ -55,12 +55,13 @@ describe('buildUserPrompt — temp + sleep-quality signals', () => {
   })
 })
 
-// #3718: the rest-day rule left the prompt. Temperature and sleep quality still reach the model
-// through the user prompt, where they size the session.
-describe('buildSystemPrompt — no rest-day rule', () => {
+describe('buildSystemPrompt — rest-day rule covers temperature + sleep quality', () => {
   const p = buildSystemPrompt('powerbuilding')
-  it('has no rest-day answer for the model to give', () => {
-    expect(p).not.toContain('rest_day_recommended')
-    expect(p).not.toContain('skipping training entirely')
+  it('folds temp_z into rest_day_recommended at the shared fever threshold', () => {
+    expect(p).toContain('temp_z >= 2.5')
+  })
+  it('prefers sleep_score_trend, keeping sleep_trend as the fallback', () => {
+    expect(p).toContain('sleep_score_trend')
+    expect(p).toContain('sleep_trend')
   })
 })

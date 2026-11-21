@@ -596,8 +596,9 @@ export async function aggregateSignals(
   // Skin-temp z from readiness v8's own per-input choice (`loadNightTemperature`), so
   // prescription/readiness/illness can never disagree about last night's temperature. On a night
   // the ring scored it is the same prior-baseline z this read from the ring summary before.
-  // Only TODAY's night: the resolver's night is the newest in its 28-day window, so a week-old fever
-  // must never lighten today's plan (#3213 review). Same gate as ai_dynamic's temperature alert.
+  // Only TODAY's night: the resolver's night is the newest in its 28-day window, and the prompt
+  // maps temp_z >= FEVER_TEMP_Z to a rest day, so a week-old fever must never recommend skipping
+  // today (#3213 review). Same gate as ai_dynamic's temperature alert.
   const tempZ = nightTemp.nightDate === today ? nightTemp.z : null
 
   // Confidence scoring — one deterministic input set shared by the score and the

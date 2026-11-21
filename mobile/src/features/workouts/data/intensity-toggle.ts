@@ -28,7 +28,7 @@ export type IntensityToggleInput = {
   exercises: readonly ToggleExercise[];
   /** The Deload side is chosen. */
   deloadChosen: boolean;
-  /** The daily check suggests rest or a lighter day (#3718). */
+  /** The daily check suggests rest or a lighter day. */
   suggestedToday: boolean;
 };
 

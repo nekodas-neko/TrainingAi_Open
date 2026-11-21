@@ -4,7 +4,7 @@ import { READINESS_MODEL_VERSION } from '@trainingai/shared/health/readiness-com
 
 // Why the daily check (`computeAiDynamicNextSession`) suggests rest or a lighter day, in words. Both
 // apps read this: the current app's banner and "Why this recommendation?" panel, and Preview's strip
-// and card (#3644). Rest today is this check's call alone; the stored AI plan never makes it (#3718).
+// and card (#3644).
 
 export type DeloadStrength = NonNullable<NextSessionRecommendation['deloadStrength']>
 
