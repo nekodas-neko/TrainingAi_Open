@@ -53,6 +53,7 @@ describe('queue readiness', () => {
     expect(ready(['later'])).toBe(false)
     expect(ready(['in progress'])).toBe(false)
     expect(ready(['needs: owner'])).toBe(false)
+    expect(ready(['needs: owner-review'])).toBe(false)
     expect(isReady(issue(1, ['agent: bugfix']), 'implementer')).toBe(false)
   })
 })
