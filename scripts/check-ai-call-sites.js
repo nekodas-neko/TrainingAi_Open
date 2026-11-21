@@ -96,7 +96,7 @@ function isSource(name) {
 
 /** The source files directly in the repo root (middleware.ts, auth.ts, config files), not below it. */
 function rootFiles(root) {
-  return fs.readdirSync(root, { withFileTypes: true }).filter((e) => e.isFile() && isSource(e.name)).map((e) => path.join(root, e.name));
+  return fs.readdirSync(root).filter((n) => isSource(n) && fs.statSync(path.join(root, n)).isFile()).map((n) => path.join(root, n));
 }
 
 /** The section names in `AI_SECTIONS`, read from the text of instrument.ts. */
