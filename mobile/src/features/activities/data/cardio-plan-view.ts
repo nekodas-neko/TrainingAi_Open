@@ -2,6 +2,7 @@ import type { z } from 'zod';
 import { shiftDateStr } from '@trainingai/shared/date-utils';
 import { cardioPlanKind } from '@trainingai/shared/running/cardio-goals';
 import type { ActiveMinuteBasis } from '@trainingai/shared/running/walking-minutes';
+import type { Tone } from '../../../shared/theme/theme';
 import type { runningPlanSpec } from './models';
 
 type PlanPayload = z.infer<ReturnType<typeof runningPlanSpec>['schema']>;
@@ -61,6 +62,8 @@ export interface Bar {
   complete: boolean;
 }
 export interface WalkingWeekModel {
+  /** The week's status chip (rule B, from the server); null hides it. */
+  status: { label: string; tone: Tone } | null;
   steps: Bar;
   minutes: Bar;
   days: WalkDayCircle[];
@@ -103,11 +106,19 @@ const BASIS_NOTE: Record<ActiveMinuteBasis, string | null> = {
     'Active minutes are estimated, because heart rate was thin and there was no cadence or pace.',
 };
 
+const STATUS_TONE: Record<string, Tone> = { met: 'activity', on_track: 'brand', behind: 'checkin' };
+/** The chip comes only from the server's `status`; a key this build does not know is drawn neutral. */
+export function walkingStatusChip(walking: WalkingBlock): WalkingWeekModel['status'] {
+  const status = walking.week.status;
+  return status ? { label: status.label, tone: STATUS_TONE[status.key] ?? 'neutral' } : null;
+}
+
 /** What the week card shows. Every figure is the server's; this only lays them out. */
 export function walkingWeekModel(walking: WalkingBlock): WalkingWeekModel {
   const { targets, week } = walking;
   const steps = week.stepsToday ?? 0;
   return {
+    status: walkingStatusChip(walking),
     steps: {
       figure: commas(steps),
       caption: `of ${commas(targets.stepsPerDay)} steps today`,

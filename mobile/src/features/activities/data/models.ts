@@ -187,6 +187,10 @@ export const runningPlanSpec = (today: string) => ({
             stepsToday: number.nullable(),
             activeMinutes: number,
             activeMinutesBasis: z.enum(['heart_rate', 'cadence', 'speed', 'estimated']).nullable(),
+            // Optional: an older server sends none, and the chip is then hidden.
+            status: z
+              .object({ key: z.string(), label: z.string() })
+              .nullish(),
             days: z.array(
               z
                 .object({

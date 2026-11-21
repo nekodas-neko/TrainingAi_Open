@@ -5,6 +5,7 @@ import {
   dayLetter,
   planChoiceButton,
   walkingTodayModel,
+  walkingStatusChip,
   walkingWeekModel,
   type WalkingBlock,
 } from '../src/features/activities/data/cardio-plan-view.ts';
@@ -110,4 +111,19 @@ test('today card: a done day and a left-out day', () => {
 test('weekday letters come from the calendar date, with either separator', () => {
   assert.equal(dayLetter('2026-11-16'), 'M');
   assert.equal(dayLetter('2026/11/22'), 'S');
+});
+
+test('the status chip is the server\'s label with a theme tone, and is hidden when none is sent', () => {
+  const withStatus = (status: unknown) => {
+    const b = block();
+    (b.week as { status?: unknown }).status = status;
+    return b;
+  };
+  assert.deepEqual(walkingStatusChip(withStatus({ key: 'on_track', label: 'On track' })), { label: 'On track', tone: 'brand' });
+  assert.deepEqual(walkingStatusChip(withStatus({ key: 'met', label: 'Week met' })), { label: 'Week met', tone: 'activity' });
+  assert.deepEqual(walkingStatusChip(withStatus({ key: 'behind', label: 'Behind' })), { label: 'Behind', tone: 'checkin' });
+  assert.deepEqual(walkingStatusChip(withStatus({ key: 'later', label: 'Later' })), { label: 'Later', tone: 'neutral' });
+  assert.equal(walkingStatusChip(block()), null);
+  assert.equal(walkingStatusChip(withStatus(null)), null);
+  assert.equal(walkingWeekModel(block()).status, null);
 });
