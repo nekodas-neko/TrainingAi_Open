@@ -10,7 +10,7 @@ import { FIELD_LABEL, type PatchChange } from '../patch'
 import type { Consequence, DomainHandler, Db, PreviewResult } from './types'
 import { driftAgainst } from './types'
 
-interface TargetRow {
+export interface TargetRow {
   id: string
   sessionId: string
   exerciseName: string
@@ -47,8 +47,9 @@ function bumpProgramOfSession(db: Db, sessionId: string) {
     .where(sql`${s.programs.id} = (SELECT program_id FROM program_sessions WHERE id = ${sessionId})`)
 }
 
-/** Ownership by join: `session_exercises` has no `user_id`, and the id comes from the client. */
-async function loadTarget(db: Db, userId: string, id: string): Promise<TargetRow | null> {
+/** Ownership by join: `session_exercises` has no `user_id`, and the id comes from the client.
+ *  Also the Coach context's check (`lib/coach/context.ts`), so the two cannot disagree on what is yours. */
+export async function loadTarget(db: Db, userId: string, id: string): Promise<TargetRow | null> {
   const [row] = await db
     .select({
       id: s.sessionExercises.id,

@@ -17,6 +17,9 @@ import { COACH_MAX_STEPS, coachStepOverride } from '@/lib/coach/step-limit'
 import { resolveDanglingWidgetCalls } from '@/lib/coach/dangling-widgets'
 import { errorLog } from '@trainingai/shared/logger'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+import { CoachContextSchema } from '@trainingai/shared/coach/context'
+import { getDb, ensureSchema } from '@/lib/data/postgres/client'
+import { resolveCoachContext } from '@/lib/coach/context'
 
 /**
  * Sized from production, not guessed. The schema caps a conversation at 60 messages but each is
@@ -43,6 +46,13 @@ const BodySchema = z.object({
    * boundary — every tool a narrow scope withholds is one the general scope offers anyway.
    */
   scope: z.string().max(40).optional(),
+  /**
+   * #3896 step 2: the screen the Coach was opened from, as ids only. Every id is ownership-checked
+   * before anything reads by it, and the block the model sees is written from the user's own rows
+   * (`lib/coach/context.ts`) — no client text reaches the prompt. Optional, so a build that does
+   * not send it gets the Coach it had.
+   */
+  context: CoachContextSchema.optional(),
 })
 
 // RV-173: the guards belong here for the same reason they belong on every other prose route —
@@ -71,6 +81,11 @@ You have two tools that draw interactive UI in the conversation instead of askin
 
 Call getProgramStructure only when you need an id for something a sourced list cannot give you —
 a proposeChange target, say. Never write an id you did not read from a tool result.
+When the user names an exercise that may match more than one ("pulldowns"), use source "exercises"
+with "query" set to the words they used, so the list holds only the matches.
+Before discussing whether a lift is too heavy or too light, or proposing a change to one, call
+getExerciseContext: it has the stored plan and what was planned against done. If the prompt has a
+"Where the user opened you" section, the ids in it are real and you may use them directly.
 - proposeChange — when you know exactly what should change. This shows the user a confirmation with
   every field, and nothing is written unless they accept it.
 
@@ -239,14 +254,32 @@ export async function POST(req: Request) {
       errorLog(error, 'API /coach injury context')
     }
 
+    // Before the model is called, and refusing rather than dropping: a context id that is not the
+    // user's answers the same 404 the apply path gives a foreign target, and nothing is streamed.
+    let contextBlock = ''
+    if (parsed.data.context) {
+      await ensureSchema()
+      const resolved = await resolveCoachContext(
+        getDb(), repo, userId, parsed.data.context, tz,
+        // The nutrition scope withholds training reads, so it gets no training block either.
+        { training: scope.readTools === null },
+      )
+      if (!resolved.ok) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+      contextBlock = resolved.block
+    }
+
     const modelMessages = await convertToModelMessages(
       resolveDanglingWidgetCalls(parsed.data.messages as UIMessage[]),
     )
 
+    // The context block joins the same system prompt as everything else, so the prose guards in
+    // SYSTEM (quote the numbers given, metric, no superlatives, no diagnosis) govern what the model
+    // says about it, and the last-step override (`coachStepOverride`) carries it too.
     const system = [
       SYSTEM.replace('TODAY_ISO', todayIso),
       scope.systemSection,
       injuryLine,
+      contextBlock,
     ].filter(Boolean).join('\n\n')
 
     const result = loggedStreamText(
@@ -261,7 +294,7 @@ export async function POST(req: Request) {
           // is a boundary it cannot cross. The general scope withholds nothing, so this is a no-op
           // for every caller that does not name one.
           ...pickTools(buildChatTools(repo, userId, tz, todayIso), scope.readTools),
-          ...buildWidgetTools(repo, userId, scope),
+          ...buildWidgetTools(repo, userId, scope, tz),
           // Grounding for research answers. `useSearchGrounding` was removed in @ai-sdk/google v3 —
           // it is a provider tool now. Measured 2026-08-08 that Gemini accepts it **alongside**
           // function declarations and still returns sources (3 and 7 on two probe prompts), which
