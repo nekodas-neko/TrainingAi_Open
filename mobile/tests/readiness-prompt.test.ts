@@ -149,27 +149,89 @@ test('an uploaded readiness answer expires the cached verdict, so a skip stays s
   assert.ok(manualHealthWritePaths.includes('/api/sleep-verdict'));
 });
 
-// #3659: the verdict is frozen at the first read of the day; today's readiness can be re-scored
-// later. The line states the live score and keeps the verdict's band and wording.
-test('the line states the live score, not the one frozen in the verdict', () => {
-  assert.deepEqual(readinessPrompt(verdict({ verdict: 'normal', score: 61 }), false, 66.4), {
+// #3659: the verdict is frozen at the first read of the day; today can be re-scored later. While
+// the question is unanswered the wording is decided again from the live score against the verdict's
+// own band; once answered, the sentence keeps the frozen score and direction together.
+const band = { low: 57, high: 70 };
+const frozenGood = verdict({ verdict: 'good', score: 78, band });
+const frozenPoor = verdict({ verdict: 'poor', score: 48, band });
+
+test('unanswered: a live score back inside the band is a usual day and nothing is asked', () => {
+  const prompt = readinessPrompt(frozenGood, false, 62);
+  assert.deepEqual(prompt, {
     kind: 'usual',
-    line: 'Readiness 66 is a usual day for you (usual 61–80).',
+    line: 'Readiness 62 is a usual day for you (usual 57–70).',
   });
-  const asked = readinessPrompt(verdict({ verdict: 'poor', score: 47 }), false, 52);
-  assert.equal(asked.kind, 'ask');
-  if (asked.kind === 'ask') {
-    assert.equal(asked.eyebrow, 'Readiness is low today');
-    assert.equal(asked.title, '52 is under your usual 61–80. How do you feel?');
-  }
-  const answered = readinessPrompt(verdict({ verdict: 'good', score: 91, responseState: 'rated' }), false, 88);
-  assert.deepEqual(answered, { kind: 'usual', line: 'Readiness 88 is over your usual 61–80.' });
+  assert.equal(unusualDayCard(prompt, false), null);
 });
 
-test('until the live score loads, the verdict’s own score stands', () => {
+test('unanswered: a live score still outside on the same side asks, with the live score', () => {
+  const prompt = readinessPrompt(frozenGood, false, 74.4);
+  assert.equal(prompt.kind, 'ask');
+  if (prompt.kind === 'ask') {
+    assert.equal(prompt.eyebrow, 'Readiness is high today');
+    assert.equal(prompt.title, '74 is over your usual 57–70. How do you feel?');
+  }
+  assert.ok(unusualDayCard(prompt, false));
+});
+
+test('unanswered: a live score across the band asks with the other wording', () => {
+  const prompt = readinessPrompt(frozenGood, false, 50);
+  assert.equal(prompt.kind, 'ask');
+  if (prompt.kind === 'ask') {
+    assert.equal(prompt.eyebrow, 'Readiness is low today');
+    assert.equal(prompt.title, '50 is under your usual 57–70. How do you feel?');
+  }
+  const usualFrozen = readinessPrompt(verdict({ verdict: 'normal', score: 61, band }), false, 75);
+  assert.equal(usualFrozen.kind, 'ask');
+});
+
+test('unanswered: the band edges are usual, as the shared rule has it', () => {
+  assert.equal(readinessPrompt(frozenGood, false, 57).kind, 'usual');
+  assert.equal(readinessPrompt(frozenGood, false, 70).kind, 'usual');
+});
+
+test('answered or skipped: the frozen score and direction stand whatever the live score is', () => {
+  for (const live of [62, 50, 90, null, undefined]) {
+    assert.deepEqual(readinessPrompt({ ...frozenGood, responseState: 'rated' }, false, live), {
+      kind: 'usual',
+      line: 'Readiness 78 is over your usual 57–70.',
+    });
+    assert.deepEqual(readinessPrompt(frozenPoor, true, live), {
+      kind: 'usual',
+      line: 'Readiness 48 is under your usual 57–70.',
+    });
+  }
+  assert.deepEqual(readinessPrompt(verdict({ verdict: 'normal', score: 61, band, responseState: 'dismissed' }), false, 75), {
+    kind: 'usual',
+    line: 'Readiness 61 is a usual day for you (usual 57–70).',
+  });
+});
+
+test('no live score yet: the verdict’s own score and direction stand', () => {
   for (const live of [undefined, null]) {
-    const prompt = readinessPrompt(verdict({ verdict: 'normal', score: 72 }), false, live);
-    assert.deepEqual(prompt, { kind: 'usual', line: 'Readiness 72 is a usual day for you (usual 61–80).' });
+    assert.deepEqual(readinessPrompt(verdict({ verdict: 'normal', score: 72 }), false, live), {
+      kind: 'usual',
+      line: 'Readiness 72 is a usual day for you (usual 61–80).',
+    });
+    const asked = readinessPrompt(frozenGood, false, live);
+    assert.equal(asked.kind, 'ask');
+    if (asked.kind === 'ask') {
+      assert.equal(asked.title, '78 is over your usual 57–70. How do you feel?');
+    }
+  }
+});
+
+test('a sentence never states a score inside its own range as under or over it', () => {
+  for (let live = 40; live <= 95; live += 0.5) {
+    for (const answered of [false, true]) {
+      const prompt = readinessPrompt(frozenGood, answered, live);
+      if (prompt.kind === 'silent') continue;
+      const m = prompt.line.match(/Readiness (\d+) is (under|over)/);
+      if (!m) continue;
+      const shown = Number(m[1]);
+      assert.ok(m[2] === 'under' ? shown < 57 : shown > 70, `${live} ${answered}: ${prompt.line}`);
+    }
   }
 });
 
