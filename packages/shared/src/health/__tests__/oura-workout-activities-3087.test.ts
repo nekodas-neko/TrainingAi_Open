@@ -4,7 +4,7 @@ import { describe, it, expect } from 'vitest'
 import { sourceSessionActivities, type CountedMovement } from '../oura-workout-activities'
 import { ouraActivitySessions, type OuraWorkoutRow } from '@/lib/oura/cloud/activity-sessions-map'
 import { computeActiveEnergy, stepEnergyKcal, WALKING_CADENCE_SPM } from '../daily-energy'
-import { metIdForOuraActivity, OURA_ON_FOOT_ACTIVITIES } from '../workout-energy'
+import { metIdForActivityName, ON_FOOT_ACTIVITIES } from '../workout-energy'
 import { dateStrMidnightInTz, shiftDateStr, todayInTz } from '../../date-utils'
 
 const TZ = 'Australia/Brisbane'
@@ -26,7 +26,7 @@ describe('ouraWorkoutActivities (#3087)', () => {
 
   it('keeps an activity the app has no type for under its Oura name', () => {
     const [a] = ouraWorkoutActivities([workout('houseWork', at(12), at(12, 30))], none, TZ)
-    expect(a).toMatchObject({ activityType: 'houseWork', ouraActivity: 'houseWork', durationMin: 30 })
+    expect(a).toMatchObject({ activityType: 'houseWork', unmappedActivity: 'house work', durationMin: 30 })
   })
 
   it('skips a workout that overlaps a saved activity log', () => {
@@ -60,19 +60,19 @@ describe('ouraWorkoutActivities (#3087)', () => {
 
 describe('Oura activity names against the MET table (#3087)', () => {
   it('matches camelCase Oura names to the table\'s words', () => {
-    expect(metIdForOuraActivity('houseWork')).toBe(36)
-    expect(metIdForOuraActivity('strengthTraining')).toBe(8)
-    expect(metIdForOuraActivity('crossCountrySkiing')).toBe(3)
-    expect(metIdForOuraActivity('hiit')).toBe(30)
+    expect(metIdForActivityName('houseWork')).toBe(36)
+    expect(metIdForActivityName('strengthTraining')).toBe(8)
+    expect(metIdForActivityName('crossCountrySkiing')).toBe(3)
+    expect(metIdForActivityName('hiit')).toBe(30)
   })
 
   it('names every on-foot Oura activity the way the MET table does', () => {
-    expect(OURA_ON_FOOT_ACTIVITIES.filter(a => metIdForOuraActivity(a) == null)).toEqual([])
+    expect(ON_FOOT_ACTIVITIES.filter(a => metIdForActivityName(a) == null)).toEqual([])
   })
 
   it('finds nothing for a name the table does not use', () => {
-    expect(metIdForOuraActivity('americanFootball')).toBeNull()
-    expect(metIdForOuraActivity('')).toBeNull()
+    expect(metIdForActivityName('americanFootball')).toBeNull()
+    expect(metIdForActivityName('')).toBeNull()
   })
 })
 
@@ -82,7 +82,7 @@ describe('Oura workouts in computeActiveEnergy (#3087)', () => {
   it('an unnamed Oura activity earns nothing rather than the generic fallback', () => {
     const r = computeActiveEnergy({
       profile, strengthSessions: [], pedometerSteps: null,
-      activities: [{ activityType: 'americanFootball', ouraActivity: 'americanFootball', durationMin: 60 }],
+      activities: [{ activityType: 'americanFootball', unmappedActivity: 'american football', durationMin: 60 }],
     })
     expect(r.activityKcal).toBe(0)
   })

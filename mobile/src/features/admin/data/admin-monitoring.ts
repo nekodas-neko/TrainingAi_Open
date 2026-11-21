@@ -18,10 +18,24 @@ const errorEventSchema = z
 export type AdminErrorEvent = z.infer<typeof errorEventSchema>;
 export const adminErrorsSpec = {
   path: '/api/admin/errors',
+  // #3951: every account's errors, so the server serves them to the owner only.
+  deniedMessage: 'Owner only. Error events are visible to the owner account, not to other admins.',
   ttl: 30_000,
   cache: noDiskCache,
   schema: z.array(errorEventSchema),
 };
+
+/**
+ * #3957 review: the view's state is the server's 403 owner-only refusal (the resource layer shows a
+ * spec's `deniedMessage` for a 403 only). It is a fact about the account, not a failure, so the
+ * console shows it plainly with no Retry; retrying can never change it.
+ */
+export function isOwnerOnlyRefusal(
+  state: { data: unknown; error: string | null },
+  spec: { deniedMessage?: string } | null,
+): boolean {
+  return state.data === null && !!spec?.deniedMessage && state.error === spec.deniedMessage;
+}
 
 const aiUsageSchema = z
   .object({

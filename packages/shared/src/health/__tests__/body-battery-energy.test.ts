@@ -66,4 +66,48 @@ describe('energyHero', () => {
     if (!hero.hasData) throw new Error('expected data')
     expect(hero.limited).toBe(true)
   })
+
+  describe('before the ring\'s first upload (#3502)', () => {
+    const waiting = (over: Partial<BodyBatteryEnergyInput> = {}) =>
+      battery({ hasData: false, current: 0, series: [], ...over })
+
+    it('keeps the old "no data" result for every reader that did not opt in', () => {
+      expect(energyHero(waiting())).toEqual({ hasData: false })
+      expect(energyHero(waiting(), {})).toEqual({ hasData: false })
+      expect(energyHero(waiting(), { waitingForRing: false })).toEqual({ hasData: false })
+    })
+
+    it('shows the morning level, its label and "woke at N" when opted in', () => {
+      const hero = energyHero(waiting({ anchor: 76 }), { waitingForRing: true })
+      if (!hero.hasData) throw new Error('expected the morning level')
+      expect(hero.waiting).toBe(true)
+      expect(hero.level).toBe(76)
+      expect(hero.morning).toBe(76)
+      expect(hero.drained).toBe(0)
+      expect(hero.label).toBe('Charged')
+      expect(hero.sub).toBe('woke at 76')
+      expect(hero.origin).toBe('set from sleep')
+    })
+
+    it('says nothing is known when there is no payload or only the fallback anchor', () => {
+      expect(energyHero(null, { waitingForRing: true })).toEqual({ hasData: false })
+      expect(energyHero(undefined, { waitingForRing: true })).toEqual({ hasData: false })
+      expect(
+        energyHero(waiting({ anchorSource: 'default' }), { waitingForRing: true }),
+      ).toEqual({ hasData: false })
+      expect(
+        energyHero(waiting({ anchor: Number.NaN }), { waitingForRing: true }),
+      ).toEqual({ hasData: false })
+    })
+
+    it('is not waiting once a reading has arrived, whether or not the caller opted in', () => {
+      for (const options of [undefined, { waitingForRing: true }]) {
+        const hero = energyHero(battery(), options)
+        if (!hero.hasData) throw new Error('expected data')
+        expect(hero.waiting).toBe(false)
+        expect(hero.level).toBe(46)
+        expect(hero.sub).toBe('woke at 76 · drained 30')
+      }
+    })
+  })
 })

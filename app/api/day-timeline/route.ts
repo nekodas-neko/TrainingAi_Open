@@ -8,6 +8,7 @@ import { fromZonedTime } from 'date-fns-tz'
 import {
   MIN_DISTANCE_M, MIN_AVG_SPEED_KMH, MIN_DURATION_SEC, MAX_DURATION_SEC,
 } from '@/lib/activity/detection-thresholds'
+import type { SourceActivitySession } from '@trainingai/shared/health/activity-sessions'
 import type { SleepSession } from '@trainingai/shared/types/body'
 import { gradedNightForDate } from '@trainingai/shared/health/sleep-night'
 import { sessionActiveMin } from '@trainingai/shared/workout/active-duration'
@@ -51,20 +52,13 @@ function fmtTime(d: Date, tz: string): string {
   return formatTimeOfDay(d, tz)
 }
 
-interface WalkLike {
-  day: string
-  startDatetime: Date
-  endDatetime: Date
-  distanceM: number | null
-  calories: number | null
-  activity: string
-}
-
-function isQualityWalk(w: WalkLike): boolean {
-  const durationSec = (w.endDatetime.getTime() - w.startDatetime.getTime()) / 1000
+// A source-recorded session in the generic shape (#3884), whichever source recorded it.
+function isQualityWalk(w: SourceActivitySession): boolean {
+  const durationSec = (w.end.getTime() - w.start.getTime()) / 1000
   if (durationSec < MIN_DURATION_SEC || durationSec > MAX_DURATION_SEC) return false
-  if ((w.distanceM ?? 0) < MIN_DISTANCE_M) return false
-  const avgSpeedKmh = ((w.distanceM ?? 0) / 1000) / (durationSec / 3600)
+  // Kilometres, as the session carries them (a source's zero reads null): the same bar as metres.
+  if ((w.distanceKm ?? 0) < MIN_DISTANCE_M / 1000) return false
+  const avgSpeedKmh = (w.distanceKm ?? 0) / (durationSec / 3600)
   return avgSpeedKmh >= MIN_AVG_SPEED_KMH
 }
 
@@ -87,14 +81,14 @@ export async function GET(req: Request) {
 
   const repo = await getRepository()
 
-  const [sleepRows, workoutSessions, foodLogs, mealTypes, ouraWorkouts, activityLogs, ouraSessions, derivedRows, doseRows] = await Promise.all([
+  const [sleepRows, workoutSessions, foodLogs, mealTypes, sourceSessions, activityLogs, ouraSessions, derivedRows, doseRows] = await Promise.all([
     // From the day before yesterday: a night is grouped by its windows, and a fragment that ended
     // before midnight carries the earlier date.
     repo.listSleepSessions(userId, shiftDateStr(yesterday, -1), date),
     repo.getWorkoutSessionsFrom(userId, yDayStart),
     repo.listFoodLogs(userId, date),
     repo.listMealTypes(userId),
-    repo.getOuraWorkouts(userId, { from: yesterday, to: date }),
+    repo.getSourceActivitySessions(userId, { from: yesterday, to: date }),
     repo.listActivityLogs(userId, yesterday, date),
     repo.listOuraSessions(userId, yesterday, date),
     repo.getOuraDailyDerived(userId, yesterday, date),
@@ -260,24 +254,24 @@ export async function GET(req: Request) {
     })
   }
 
-  // ── Oura walks/runs (today + yesterday) — skip any that overlap a saved log ──
-  const walks = ouraWorkouts.filter(w =>
+  // ── Source-recorded walks/runs (today + yesterday) — skip any that overlap a saved log ──
+  const walks = sourceSessions.filter(w =>
     (w.day === date || w.day === yesterday) && isQualityWalk(w) &&
-    !activityWindows.some(([s, e]) => w.startDatetime.getTime() < e && w.endDatetime.getTime() > s),
+    !activityWindows.some(([s, e]) => w.start.getTime() < e && w.end.getTime() > s),
   )
   for (const w of walks) {
-    const t = w.startDatetime.getTime()
-    const durationSec = (w.endDatetime.getTime() - t) / 1000
+    const t = w.start.getTime()
+    const durationSec = (w.end.getTime() - t) / 1000
     events.push({
       type: 'walk',
-      time: fmtTime(w.startDatetime, tz),
-      endTime: fmtTime(w.endDatetime, tz),
+      time: fmtTime(w.start, tz),
+      endTime: fmtTime(w.end, tz),
       timeMs: t,
-      title: w.activity === 'running' ? 'Run' : 'Walk',
+      title: w.activityType === 'run' ? 'Run' : 'Walk',
       icon: 'Footprints',
       day: 'today',  // recomputed below from timeMs
       durationMin: Math.round(durationSec / 60),
-      distanceKm: w.distanceM ? parseFloat((w.distanceM / 1000).toFixed(2)) : undefined,
+      distanceKm: w.distanceKm ? parseFloat(w.distanceKm.toFixed(2)) : undefined,
       calories: w.calories ? Math.round(w.calories) : undefined,
     })
   }

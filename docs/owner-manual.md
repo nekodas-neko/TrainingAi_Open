@@ -333,7 +333,8 @@ Everything merged during the week ships together. **A hotfix goes out off-schedu
 production is actually broken**; anything less waits for Tuesday.
 
 1. 🤖 The Orchestrator bumps the version, picks the candidate commit, opens a **release issue**
-   with the checklist, and has the Implementer run the release test (full suite, the route smoke,
+   with the checklist, and has the Implementer run the release test (full suite, the route smoke on
+   `pnpm dev` and on a production build,
    local run of the changed flows, the device pass).
 2. 🤖 It sends you the **release summary** in chat, and posts it on the release issue:
    > **Release v1.487.0: ready for your OK**
@@ -499,8 +500,8 @@ Independent of the switch-over; none blocks it.
 These look like they need a setting changed. They don't.
 
 **"Give the workflow permission to create tags."** Already allowed. The release workflow pushes
-tags with the token GitHub issues for each run, and it declares `permissions: contents: write`,
-which is what lets that token write tags. Your `protect-release-tags` ruleset restricts **updates**
+tags with the token GitHub issues for each run, and its `tag` job declares `permissions: contents:
+write`, which is what lets that token write tags (the other jobs are read-only, #3673). Your `protect-release-tags` ruleset restricts **updates**
 and **deletions** only. **Do not tick "Restrict creations"** — it would block the workflow, and the
 only way round it would be a bypass entry, which defeats the ruleset.
 

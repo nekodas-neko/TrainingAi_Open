@@ -47,7 +47,7 @@ export function ActionTile({
           <AppText variant="subheading" style={{ flex: 1 }} numberOfLines={1}>
             {title}
           </AppText>
-          {caption && (
+          {!!caption && (
             <AppText variant="label" tone="muted">
               {caption}
             </AppText>
@@ -69,7 +69,7 @@ export function ActionTile({
           <AppText variant="caption" style={{ textAlign: 'center' }}>
             {title}
           </AppText>
-          {caption && (
+          {!!caption && (
             <AppText variant="micro" tone="muted" style={{ textAlign: 'center' }}>
               {caption}
             </AppText>

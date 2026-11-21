@@ -46,7 +46,8 @@ export function ChoiceList({ args, onChoose, disabled }: ChoiceListProps) {
    * output tokens are nearly all of Coach's latency) and the safe one: it cannot invent an id it
    * never writes.
    */
-  const key = args.source ? `coach-options:${args.source}:${args.sourceId ?? "all"}` : null;
+  // `query` (#3896) is part of the key: a filtered list must not seed the unfiltered picker.
+  const key = args.source ? `coach-options:${args.source}:${args.sourceId ?? "all"}${args.query ? `:${args.query}` : ""}` : null;
   const [fetched, setFetched] = useState<Option[] | null>(null);
   const [failed, setFailed] = useState(false);
 
@@ -58,13 +59,14 @@ export function ChoiceList({ args, onChoose, disabled }: ChoiceListProps) {
     if (seed?.options) setFetched(seed.options);
     const qs = new URLSearchParams({ source: args.source });
     if (args.sourceId) qs.set("sourceId", args.sourceId);
+    if (args.query) qs.set("query", args.query);
     // RV-84: this was `.catch(() => setFailed(true))`, which `cachedFetch` can never reach — it
     // resolves a boolean on a 429 or a 500 rather than rejecting. The picker sat on
     // "Loading your options…" forever. `onError` is the channel that actually fires.
     cachedFetch<{ options: Option[] }>(key, `/api/coach/options?${qs}`, TTL_SHORT, d => {
       if (d?.options) setFetched(d.options);
     }, { onError: () => setFailed(true) });
-  }, [key, args.source, args.sourceId]);
+  }, [key, args.source, args.sourceId, args.query]);
 
   const options: Option[] = args.source ? fetched ?? [] : args.options ?? [];
 

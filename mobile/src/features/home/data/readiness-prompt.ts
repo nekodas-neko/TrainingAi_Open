@@ -1,10 +1,12 @@
 // What Home's readiness card says today (#2106). A usual score is stated and nothing is asked; a
 // score outside the user's own band is asked about. The band and the verdict come from the server
-// (`/api/readiness-verdict`), never from a client copy of the rule.
+// (`/api/readiness-verdict`); "outside the band" is the shared rule, not a client copy (#3659).
 //
 // The answers are NOT validation of the score. Only unusual days are asked, so an ordinary-looking
 // day the user would have called bad is never sampled; nothing here or downstream may describe an
 // answer as agreement with the score (#2106, OR-171).
+
+import { readinessVerdictOfScore } from '@trainingai/shared/health/readiness-verdict-band';
 
 export type ReadinessVerdictData = {
   verdict: 'poor' | 'normal' | 'good';
@@ -21,6 +23,8 @@ export type ReadinessPrompt =
       kind: 'ask';
       eyebrow: string;
       title: string;
+      /** The score stated without the question, for the card that no longer asks (#3953). */
+      line: string;
       /** The user already answered or skipped today: the card goes back to stating the score. */
       answered: boolean;
     };
@@ -45,34 +49,59 @@ export function readinessPrompt(
   feelAnswered = false,
   /**
    * Today's live readiness (`readinessDisplayScore`), as the score chips show it (#3659). The
-   * verdict is frozen at its first read and today can be re-scored after it, so its own score is
-   * only the fallback until the live one loads. The verdict still picks the band and the wording.
+   * verdict is frozen at its first read and today can be re-scored after it.
    */
   liveScore?: number | null,
 ): ReadinessPrompt {
   if (!verdict) {
     return { kind: 'silent' };
   }
-  const score = Math.round(liveScore ?? verdict.score);
-  if (verdict.verdict === 'normal') {
+  const answered = verdict.responseState !== 'none' || feelAnswered;
+  // Answered or skipped: the sentence is about the day that was answered, so it keeps the frozen
+  // score and direction together. A live score is never mixed with a frozen direction.
+  // Unanswered: decide again from the live score against the verdict's own band, by the shared
+  // rule. It is judged on the rounded numbers the sentence prints, so it cannot contradict itself.
+  const score = Math.round(answered ? verdict.score : (liveScore ?? verdict.score));
+  const band = { low: Math.round(verdict.band.low), high: Math.round(verdict.band.high) };
+  const direction = answered ? verdict.verdict : readinessVerdictOfScore(score, band);
+  if (direction === 'normal') {
     return {
       kind: 'usual',
       line: `Readiness ${score} is a usual day for you (usual ${range(verdict)}).`,
     };
   }
-  const low = verdict.verdict === 'poor';
-  if (verdict.responseState !== 'none' || feelAnswered) {
-    return {
-      kind: 'usual',
-      line: `Readiness ${score} is ${low ? 'under' : 'over'} your usual ${range(verdict)}.`,
-    };
+  const low = direction === 'poor';
+  const line = `Readiness ${score} is ${low ? 'under' : 'over'} your usual ${range(verdict)}.`;
+  if (answered) {
+    return { kind: 'usual', line };
   }
   return {
     kind: 'ask',
+    line,
     eyebrow: low ? 'Readiness is low today' : 'Readiness is high today',
     title: `${score} is ${low ? 'under' : 'over'} your usual ${range(verdict)}. How do you feel?`,
     answered: false,
   };
+}
+
+/** Local marker for "Not now" on a day: a dismissal is never an answer and never reaches the server. */
+export const readinessQuestionDismissKey = (today: string) => `readiness-question:${today}`;
+
+/**
+ * Whether Home's own unusual-day card (#3953) is drawn. It looks only at today's prompt and today's
+ * local dismissal, never at which Home cards are switched on, so a user with Exercise Readiness off
+ * is still asked. Answered days (and a skip already queued) come back as `usual` and so hide it.
+ */
+export function unusualDayCard(
+  prompt: ReadinessPrompt,
+  dismissedToday: boolean,
+): Extract<ReadinessPrompt, { kind: 'ask' }> | null {
+  return prompt.kind === 'ask' && !dismissedToday ? prompt : null;
+}
+
+/** What the Exercise Readiness card says about the score: a statement, never the question (#3953). */
+export function readinessCardLine(prompt: ReadinessPrompt): string | null {
+  return prompt.kind === 'silent' ? null : prompt.line;
 }
 
 type SavedCheckin = {

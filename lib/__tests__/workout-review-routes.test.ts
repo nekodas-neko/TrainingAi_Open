@@ -25,7 +25,9 @@ const getSessionPeriodization = vi.fn(async (_u: string, _s: string) => state() 
 const getActiveProgram = vi.fn(async (_u: string) => program() as Row | null)
 const listProgressionStyles = vi.fn(async (_u: string) => [] as Row[])
 const removeSessionExercise = vi.fn(async (_u: string, _id: string) => true)
-const storePrescription = vi.fn(async (_u: string, _s: string, _p: Row, _e: Date) => undefined)
+const storePrescription = vi.fn(async (_u: string, _s: string, _p: Row, _e: Date, _st?: string, _for?: unknown) => true)
+// #3927: the apply reads the program with the session's structure stamp, from one snapshot.
+const getActiveProgramWithStructureStamp = vi.fn(async (u: string) => ({ program: await getActiveProgram(u), structure: 'stamp-1' }))
 const updatePrescriptionStatus = vi.fn(async (_u: string, _s: string, _st: string) => undefined)
 const aggregateSignals = vi.fn(async (..._a: unknown[]) => signals() as Row | null)
 const loadFigureSignals = vi.fn(async (..._a: unknown[]) => ({ exercises: [
@@ -40,7 +42,7 @@ vi.mock('@/auth', () => ({ auth: async () => (sessionUser ? { user: sessionUser 
 vi.mock('@/lib/data', () => {
   // Built inside the returned function: `vi.mock` is hoisted above the consts above.
   const repo = async () => ({
-    getSessionPeriodization, getActiveProgram, listProgressionStyles,
+    getSessionPeriodization, getActiveProgram, getActiveProgramWithStructureStamp, listProgressionStyles,
     removeSessionExercise, storePrescription, updatePrescriptionStatus,
   })
   return { getRepository: repo, getRepositoryAsync: repo }
@@ -307,6 +309,37 @@ describe('POST /api/workout-review/session/[sessionId]', () => {
       prescription: { phaseAction: 'stay', exercises: [{ sessionExerciseId: SQUAT, sets: 9, reps: 9, pct: 99, restSec: 999 }] },
     }))
     expect((await beforeOf(SQUAT)).pct).toBe(99)
+  })
+
+  // #3968: the review read the stored plan without asking whether it had aged out. Every other
+  // reader goes through the served-plan check (`serveStoredPrescription`), and so does this one now.
+  it('diffs against the base style when the stored plan has expired', async () => {
+    getSessionPeriodization.mockResolvedValue(state({
+      prescriptionStatus: 'accepted',
+      prescriptionExpiresAt: new Date(Date.now() - 60_000),
+      prescription: { phaseAction: 'stay', exercises: [{ sessionExerciseId: SQUAT, sets: 9, reps: 9, pct: 99, restSec: 999 }] },
+    }))
+    expect(await beforeOf(SQUAT)).toEqual({ sets: 3, reps: 5, pct: 80, restSec: 180 })
+  })
+
+  it('still diffs against an accepted plan that has not expired yet', async () => {
+    getSessionPeriodization.mockResolvedValue(state({
+      prescriptionStatus: 'accepted',
+      prescriptionExpiresAt: new Date(Date.now() + 3_600_000),
+      prescription: { phaseAction: 'stay', exercises: [{ sessionExerciseId: SQUAT, sets: 9, reps: 9, pct: 99, restSec: 999 }] },
+    }))
+    expect((await beforeOf(SQUAT)).pct).toBe(99)
+  })
+
+  it('diffs against the base style when the plan\'s deload has ended (#3876)', async () => {
+    // An accepted deload plan, in a deload phase that has already run its sessions: the card hides it,
+    // and so must the review.
+    getSessionPeriodization.mockResolvedValue(state({
+      phase: 'deload', sessionsInPhase: 99,
+      prescriptionStatus: 'accepted',
+      prescription: { phaseAction: 'stay', deload: true, exercises: [{ sessionExerciseId: SQUAT, sets: 9, reps: 9, pct: 40, restSec: 999 }] },
+    }))
+    expect((await beforeOf(SQUAT)).pct).toBe(80)
   })
 
   it('falls back to a role default when an exercise has no progression style', async () => {

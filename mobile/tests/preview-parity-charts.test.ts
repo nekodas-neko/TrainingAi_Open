@@ -58,3 +58,24 @@ test('Nutrition: plain macro columns, a whole-track ramp on the budget bar, a sh
   assert.match(supplements, /borderTopWidth: 1/, 'rows run edge to edge under hairlines');
   assert.match(supplements, /paddingVertical: theme\.spacing\.md/, 'py-3 rows, as the current app\'s');
 });
+
+test('Strength Trend fades its area from the line colour to transparent, as the web Sparkline does (#2901)', async () => {
+  const { FADE_FILL_OPACITY } = await import('../src/shared/ui/chartScale');
+  assert.deepEqual([...FADE_FILL_OPACITY], [0.25, 0]);
+  assert.match(await read('features/progress/StrengthScreen.tsx'), /<LineChart[\s\S]*?fadeFill/);
+  const chart = await read('shared/ui/LineChart.tsx');
+  assert.match(chart, /fadeFill = false/, 'off by default, so other charts keep their flat fill');
+});
+
+test('a tile with an empty unit or caption renders nothing in its View, not an empty string (#3963)', async () => {
+  const tile = await read('shared/ui/MetricTile.tsx');
+  assert.doesNotMatch(tile, /\{(unit|caption) && /, 'an empty string is a text node, and a View may not hold one');
+  assert.match(tile, /\{unit \? \(/);
+});
+
+test('the Level pill is the current app\'s quiet outline: brand at 30% border, 10% wash (#2902)', async () => {
+  const header = await read('features/rewards/components/LevelHeader.tsx');
+  assert.match(header, /borderColor: `\$\{theme\.colors\.brand\}4d`/);
+  assert.match(header, /backgroundColor: `\$\{theme\.colors\.brand\}1a`/);
+  assert.doesNotMatch(header, /brandSurface/);
+});

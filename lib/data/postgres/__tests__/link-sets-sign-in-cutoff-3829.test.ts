@@ -25,10 +25,13 @@ describe.skipIf(!canRun)('#3829 — a link that clears the password sets the sig
   const passwordAccount = async (id: string, email: string, active = true) => raw(
     `INSERT INTO users (id, email, password_hash, is_active, timezone) VALUES ($1, $2, 'a-hash', $3, 'Australia/Brisbane')`,
     [id, email, active])
+  // #3949 review N1: the cut-off is the database clock's next whole second after the write, so it
+  // is a whole second, after the call began, and at most a second past its end.
   const within = (at: Date | null, before: number) => {
     expect(at).not.toBeNull()
-    expect(at!.getTime()).toBeGreaterThanOrEqual(before)
-    expect(at!.getTime()).toBeLessThanOrEqual(Date.now())
+    expect(at!.getTime() % 1000).toBe(0)
+    expect(at!.getTime()).toBeGreaterThan(before)
+    expect(at!.getTime()).toBeLessThanOrEqual(Date.now() + 1000)
   }
 
   beforeAll(async () => {
@@ -60,12 +63,13 @@ describe.skipIf(!canRun)('#3829 — a link that clears the password sets the sig
     expect(await cutoffs(ME)).toEqual({ s: null, d: null })
   })
 
-  it('never moves the cut-off back', async () => {
+  it('never moves the cut-off back, and always past an earlier one', async () => {
     await passwordAccount(ME, EMAIL)
-    const later = new Date(Date.now() + 3_600_000)
+    const later = new Date(Math.floor(Date.now() / 1000) * 1000 + 3_600_000)
     await raw(`UPDATE users SET sign_ins_valid_from = $2 WHERE id = $1`, [ME, later])
     await repo.linkOAuthAccount(ME, SUB)
-    expect((await cutoffs(ME)).s?.getTime()).toBe(later.getTime())
+    // A sign-in stamped at the earlier cut-off is ended by this one (#3949 review N1).
+    expect((await cutoffs(ME)).s?.getTime()).toBe(later.getTime() + 1000)
   })
 
   it('the upsert\'s email collision sets it too', async () => {

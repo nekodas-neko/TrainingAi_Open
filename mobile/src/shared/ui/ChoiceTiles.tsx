@@ -1,4 +1,5 @@
 import { feedback } from '../../integrations/feedback/haptics';
+import type { ReactNode } from 'react';
 import { Pressable } from 'react-native';
 import { AppText } from './AppText';
 import { Stack } from './Stack';
@@ -12,7 +13,7 @@ export function ChoiceTiles<T extends string | number>({
 }: {
   label: string;
   value: T | null;
-  options: readonly { value: T; label: string; caption?: string; emoji?: string }[];
+  options: readonly { value: T; label: string; caption?: string; glyph?: (color: string) => ReactNode }[];
   onChange: (value: T) => void;
   disabled?: boolean;
 }) {
@@ -47,11 +48,7 @@ export function ChoiceTiles<T extends string | number>({
                 value === option.value ? theme.colors.brandSurface : theme.colors.raised,
             }}
           >
-            {option.emoji && (
-              <AppText variant="score" style={{ opacity: value === option.value ? 1 : 0.45 }}>
-                {option.emoji}
-              </AppText>
-            )}
+            {option.glyph?.(value === option.value ? theme.colors.brand : theme.colors.muted)}
             <AppText variant="caption">{option.label}</AppText>
             {option.caption && (
               <AppText variant="micro" tone="muted">

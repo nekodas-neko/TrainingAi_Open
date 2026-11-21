@@ -1,6 +1,7 @@
 import { feedback } from '../../integrations/feedback/haptics';
 import { Pressable } from 'react-native';
 import { AppText } from './AppText';
+import { Icon } from './Icon';
 import { Stack } from './Stack';
 import { useTheme } from '../theme/ThemeProvider';
 export function MultiChoice({
@@ -11,7 +12,8 @@ export function MultiChoice({
 }: {
   label: string;
   value: string[];
-  options: readonly { value: string; label: string }[];
+  /** `marked` draws the refresh icon after the label and says "suggested" to a screen reader. */
+  options: readonly { value: string; label: string; marked?: boolean }[];
   onChange: (value: string[]) => void;
 }) {
   const { theme } = useTheme();
@@ -25,6 +27,7 @@ export function MultiChoice({
             accessibilityRole="checkbox"
             accessibilityState={{ checked: value.includes(option.value) }}
             aria-checked={value.includes(option.value)}
+            accessibilityLabel={option.marked ? `${option.label}, suggested` : undefined}
             onPress={() => {
               feedback();
               onChange(
@@ -37,6 +40,9 @@ export function MultiChoice({
               minHeight: theme.sizes.touchTarget,
               paddingHorizontal: theme.spacing.md,
               justifyContent: 'center',
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: theme.spacing.xs,
               borderWidth: 1,
               borderRadius: theme.radii.pill,
               borderColor: value.includes(option.value)
@@ -50,6 +56,13 @@ export function MultiChoice({
             <AppText variant="caption" tone={value.includes(option.value) ? 'brand' : 'muted'}>
               {option.label}
             </AppText>
+            {option.marked && (
+              <Icon
+                name="refresh"
+                size={theme.sizes.iconSmall}
+                tone={value.includes(option.value) ? 'brand' : 'muted'}
+              />
+            )}
           </Pressable>
         ))}
       </Stack>

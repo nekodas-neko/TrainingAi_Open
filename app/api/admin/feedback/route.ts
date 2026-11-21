@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { requireAdmin, adminErrorResponse } from '@/lib/admin'
+import { requireOwnerSession } from '@/lib/admin/claude-token-auth'
 
 export async function GET() {
   const session = await auth()
@@ -15,6 +16,10 @@ export async function GET() {
   } catch (err) {
     return adminErrorResponse(err)
   }
+  // #3951: feedback is every account's free text, so only the owner reads it. Any other admin gets
+  // the same refusal as db-query and db-snapshot (#3657); an owner that cannot be resolved refuses all.
+  const owner = await requireOwnerSession(session.user.id)
+  if (!owner.ok) return NextResponse.json({ error: owner.error }, { status: owner.status })
 
   const repo = await getRepository()
   const submissions = await repo.listFeedback()

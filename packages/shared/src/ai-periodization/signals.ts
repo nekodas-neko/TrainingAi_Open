@@ -1,4 +1,5 @@
 import type { WorkoutRepository } from '@/lib/data/repository'
+import type { Program } from '@trainingai/shared/types'
 import { sessionSoreness } from './session-soreness'
 import { todayInTz, todayMidnightUtc, toAestDay, startOfWeekInTz, shiftDateStr, dateStrMidnightInTz } from '@trainingai/shared/date-utils'
 import { confidenceFactors, computeConfidence } from '@trainingai/shared/ai-periodization/confidence'
@@ -247,6 +248,10 @@ export interface AggregateSignalsOptions {
    *  that is already trained passes false: it is already among the trained sessions, so adding it
    *  again would weight its phase twice and put the target off the Training card's (#3287). */
   includeSessionInWeekMix?: boolean
+  /** The active program, already read by the caller together with the session's structure stamp
+   *  (`getActiveProgramWithStructureStamp`). The signals are then built from the rows the stamp
+   *  describes, not from a second read that a change could land between (#3927). */
+  program?: Program
 }
 
 export async function aggregateSignals(
@@ -269,7 +274,7 @@ export async function aggregateSignals(
 
   const [rawState, program, allPrs, prevPrs, injuries, styles] = await Promise.all([
     repo.getSessionPeriodization(userId, programSessionId),
-    repo.getActiveProgram(userId),
+    options?.program ?? repo.getActiveProgram(userId),
     repo.listPersonalRecords(userId),
     repo.listPrevious1rm(userId),
     repo.listInjuries(userId),

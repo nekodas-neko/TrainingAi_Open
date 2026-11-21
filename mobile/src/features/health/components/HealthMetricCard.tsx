@@ -19,6 +19,7 @@ export function HealthMetricCard({
   decimals,
   tone = 'neutral',
   accent,
+  headingColor,
   caption,
   points,
   chart,
@@ -38,6 +39,7 @@ export function HealthMetricCard({
   decimals?: number;
   tone?: Tone;
   accent?: string;
+  headingColor?: string;
   caption?: string;
   points?: readonly { label: string; value: number | null; x?: number }[];
   chart?: CardChartOptions;
@@ -57,6 +59,7 @@ export function HealthMetricCard({
       unit={unit}
       tone={tone}
       accent={accent}
+      headingColor={headingColor}
       caption={caption}
       onOpen={onOpen}
       onLog={onLog}

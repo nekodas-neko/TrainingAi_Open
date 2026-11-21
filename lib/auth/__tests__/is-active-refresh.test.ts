@@ -1,5 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
-import { refreshIsActiveClaim } from '../is-active-refresh'
+import { AuthCheckUnavailableError, isAuthCheckUnavailable, refreshIsActiveClaim } from '../is-active-refresh'
+import { isUserFacingError } from '@trainingai/shared/errors'
+import { routeErrorResponse } from '@/lib/api/route-errors'
 
 const NOW = 1_800_000_000_000
 const active = async () => ({ isActive: true })
@@ -33,18 +35,54 @@ describe('refreshIsActiveClaim', () => {
     expect(token.isActive).toBe(true)
   })
 
-  it.each([true, false, undefined])('keeps isActive=%s and retries after a database outage', async isActive => {
-    const token = { userId: 'u1', isActive, isAdmin: true, isActiveCheckedAt: 0 }
-    const original = { ...token }
+  // #3949 review S2: an outage fails closed for that request (a signed-out or password-revoked
+  // cookie must not authenticate while the cut-off cannot be read), as "unavailable", not as "signed
+  // out": it throws `AuthCheckUnavailableError` (503) rather than returning a refused claim, which
+  // every route would answer 401 and Preview would sign out on. It leaves nothing behind: the token
+  // is untouched, and the next call decides from the row alone.
+  it.each([true, false, undefined])('throws a 503 for isActive=%s during a database outage, and passes once it is back', async isActive => {
+    const token = { userId: 'u1', isActive, isAdmin: true, isActiveCheckedAt: 0, signedInAt: 1_799_999_000 }
+    const before = { ...token }
     const lookup = vi.fn().mockRejectedValueOnce(new Error('db down'))
-      .mockResolvedValue({ isActive: false, isAdmin: false })
-    await expect(
-      refreshIsActiveClaim(token, lookup, NOW),
-    ).resolves.toBe(token)
-    expect(token).toEqual(original)
+      .mockResolvedValue({ isActive: true, isAdmin: true })
+    const err = await refreshIsActiveClaim(token, lookup, NOW).then(() => null, (e: unknown) => e)
+    expect(err).toBeInstanceOf(AuthCheckUnavailableError)
+    expect(isAuthCheckUnavailable(err)).toBe(true)
+    expect(isUserFacingError(err) && err.status).toBe(503)
+    expect(token).toEqual(before)
     await refreshIsActiveClaim(token, lookup, NOW + 1)
     expect(lookup).toHaveBeenCalledTimes(2)
-    expect(token).toEqual({ userId: 'u1', isActive: false, isAdmin: false, isActiveCheckedAt: NOW + 1 })
+    expect(token).toEqual({ userId: 'u1', isActive: true, isAdmin: true, isActiveCheckedAt: NOW + 1, signedInAt: 1_799_999_000 })
+  })
+
+  it('the shared route mapper answers the outage as a JSON 503, never a 401', async () => {
+    const err = await refreshIsActiveClaim({ userId: 'u1' }, async () => { throw new Error('db down') }).catch((e: unknown) => e)
+    const res = routeErrorResponse(err)
+    expect(res.status).toBe(503)
+    expect(await res.json()).toEqual({ error: expect.stringMatching(/temporarily unavailable/) })
+  })
+
+  it('a signed-out session is refused during an outage, not let through by it', async () => {
+    const cutoff = new Date(1_800_000_000_000)
+    const token = { userId: 'u1', isActive: true, isAdmin: true, signedInAt: 1_799_999_000 }
+    await expect(refreshIsActiveClaim(token, async () => { throw new Error('db down') }, NOW)).rejects.toBeInstanceOf(AuthCheckUnavailableError)
+    await refreshIsActiveClaim(token, async () => ({ isActive: true, signInsValidFrom: cutoff }), NOW)
+    expect(token.isActive).toBe(false)
+  })
+
+  // #3949 review N1: the sign-in cut-off is strict. A cut-off with a fraction (written from the app
+  // clock before the database clock took over) refuses a sign-in stamped in its own second.
+  it('refuses a sign-in in the same second as a sign-in cut-off, and keeps one at the next', async () => {
+    const cut = new Date(1_800_000_000_400)
+    const at = async (signedInAt: number) => (await refreshIsActiveClaim<{ userId: string; signedInAt: number; isActive?: boolean }>({ userId: 'u1', signedInAt },
+      async () => ({ isActive: true, signInsValidFrom: cut }), NOW)).isActive
+    expect(await at(1_800_000_000)).toBe(false)
+    expect(await at(1_800_000_001)).toBe(true)
+    const whole = new Date(1_800_000_001_000)
+    const atWhole = async (signedInAt: number) => (await refreshIsActiveClaim<{ userId: string; signedInAt: number; isActive?: boolean }>({ userId: 'u1', signedInAt },
+      async () => ({ isActive: true, signInsValidFrom: whole }), NOW)).isActive
+    expect(await atWhole(1_800_000_000)).toBe(false)
+    expect(await atWhole(1_800_000_001)).toBe(true)
   })
 
   it('treats a DELETED user row as deactivation (RV-195 ②)', async () => {
@@ -111,7 +149,8 @@ describe('the per-request read PS-24 depends on', () => {
 
 it('preserves calculation claims on an outage and clears fields the user removed', async () => {
   const token = {userId:'u1',isActive:true,isAdmin:false,timezone:'Australia/Brisbane',heightCm:180,sex:'male'}
-  await refreshIsActiveClaim(token,async () => {throw new Error('offline')})
+  await expect(refreshIsActiveClaim(token,async () => {throw new Error('offline')})).rejects.toBeInstanceOf(AuthCheckUnavailableError)
+  expect(token.isActive).toBe(true)
   expect(token.timezone).toBe('Australia/Brisbane')
   expect(token.heightCm).toBe(180)
   await refreshIsActiveClaim(token,async () => ({isActive:true,heightCm:undefined,sex:undefined}))

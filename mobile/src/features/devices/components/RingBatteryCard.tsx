@@ -24,6 +24,7 @@ import {
   chargeTimeText,
   daysLeftText,
   drainChart,
+  notifyRingAlertSaved,
   parseRingAlert,
   readingAge,
   readingState,
@@ -57,6 +58,7 @@ export function RingBatteryCard() {
       const next = { ...current, ...patch };
       setAlert(next);
       await storage.set(RING_ALERT_KEY, JSON.stringify(next)).catch(() => undefined);
+      notifyRingAlertSaved();
     },
     [storage],
   );

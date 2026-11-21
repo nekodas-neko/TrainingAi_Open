@@ -1,3 +1,4 @@
+import { gpsSpeedForPacing } from './gps-fallback.ts';
 import {
   STRAP_STALE_MS,
   STRAP_WINDOW_SEC,
@@ -310,12 +311,15 @@ export class WalkPace {
     signals: PaceSignals = noSignals,
   ): PacerReading | null {
     if (!segment || (segment.kind !== 'fast' && segment.kind !== 'slow')) return null;
+    const cadenceSpm = this.live(nowMs);
+    // A heart rate with no targets to judge it against is not a reading.
+    const bpm = this.hrTargets ? signals.bpm : null;
     return readPacer({
       kind: segment.kind,
-      cadenceSpm: this.live(nowMs),
-      speedKmh: signals.speedKmh,
-      // A heart rate with no targets to judge it against is not a reading.
-      bpm: this.hrTargets ? signals.bpm : null,
+      cadenceSpm,
+      // A phone that has not moved (a treadmill) is paced by heart rate, not "Stopped" (#3554).
+      speedKmh: gpsSpeedForPacing({ speedKmh: signals.speedKmh, cadenceSpm, bpm }),
+      bpm,
       cadenceTargets: this.targets,
       speedTargets: this.speedTargets,
       hrTargets: this.hrTargets ?? { fast: 0, slow: 0 },

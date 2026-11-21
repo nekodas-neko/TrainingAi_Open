@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sessionTokenFrom } from '@/lib/auth/session-token';
-import { refreshIsActiveClaim } from '@/lib/auth/is-active-refresh';
+import { isAuthCheckUnavailable, refreshIsActiveClaim } from '@/lib/auth/is-active-refresh';
 import { getRepositoryAsync } from '@/lib/data';
 import { consumeMobileAuthToken } from '@/lib/auth/mobile/tokens';
 import { verifyPkce } from '@/lib/auth/mobile/pkce';
@@ -63,14 +63,25 @@ export async function POST(req: NextRequest) {
   if (!session?.userId || typeof session.exp !== 'number' || session.exp <= now) {
     return json({ error: 'Invalid or expired session' }, 401);
   }
-  await refreshIsActiveClaim(session, async (userId) =>
-    (await getRepositoryAsync()).getUserById(userId),
-  );
+  try {
+    await refreshIsActiveClaim(session, async (userId) =>
+      (await getRepositoryAsync()).getUserById(userId),
+    );
+  } catch (err) {
+    // A database fault is "try again", never "invalid session" (`AuthCheckUnavailableError`).
+    if (isAuthCheckUnavailable(err)) return json({ error: 'Sign-in is temporarily unavailable' }, 503);
+    throw err;
+  }
   if (!session.isActive) {
     return json({ error: 'Invalid or expired session' }, 401);
   }
   if (body?.responseType === 'token') {
-    const user = await (await getRepositoryAsync()).getUserById(session.userId);
+    let user: Awaited<ReturnType<Awaited<ReturnType<typeof getRepositoryAsync>>['getUserById']>>;
+    try {
+      user = await (await getRepositoryAsync()).getUserById(session.userId);
+    } catch {
+      return json({ error: 'Sign-in is temporarily unavailable' }, 503);
+    }
     if (!user?.isActive) return json({ error: 'Invalid or expired session' }, 401);
     return json(await issueNativeSession(user, { label: label?.data, id: deviceId?.data }));
   }

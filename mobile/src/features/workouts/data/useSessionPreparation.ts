@@ -86,6 +86,9 @@ export function useSessionPreparation(
     revertedExerciseIds: reverted,
     durationPreset: duration,
   };
+  // #3330: the list as the server sent it, before Full puts weights back, so the toggle can say
+  // what the other side changes before the lifter flips it.
+  const asSent = prepared?.exercises ?? [];
   if (prepared) {
     prepared = prepareSession(prepared, options);
   }
@@ -110,6 +113,7 @@ export function useSessionPreparation(
   }
   return {
     session: prepared,
+    asSent,
     state,
     /** The session's prescription state as the screen may use it: aged out → no prescription. */
     prescribedState,

@@ -58,11 +58,41 @@ describe.skipIf(!canRun)('PATCH /api/admin/users grant-admin and revoke-admin', 
     await pool.query('DELETE FROM users WHERE id = ANY($1::uuid[])', [[OWNER, ADMIN, OTHER, PLAIN, IDLE]])
   })
 
-  it('an admin grants admin to another user, and the row changes', async () => {
+  it('the owner grants admin to another user, and the row changes', async () => {
+    asUser(OWNER)
     const { PATCH } = await import('@/app/api/admin/users/route')
     const res = await PATCH(patch({ userId: OTHER, action: 'grant-admin' }) as never)
     expect(res.status).toBe(200)
     expect(await isAdmin(OTHER)).toBe(true)
+  })
+
+  // #3657: granting was open to any admin, so a second admin could make more admins.
+  it('a non-owner admin cannot grant admin to anyone: 403 with the owner-only message, and nothing changes', async () => {
+    const { PATCH } = await import('@/app/api/admin/users/route')
+    const res = await PATCH(patch({ userId: OTHER, action: 'grant-admin' }) as never)
+    expect(res.status).toBe(403)
+    expect(await res.json()).toEqual({ error: 'Only the owner can make admin' })
+    expect(await isAdmin(OTHER)).toBe(false)
+  })
+
+  it('a non-owner admin is refused inside the transaction too, whatever the route decided', async () => {
+    const { getRepository } = await import('@/lib/data')
+    const repo = await getRepository()
+    expect(await repo.setUserAdmin({ actingAdminId: ADMIN, targetUserId: OTHER, makeAdmin: true, ownerId: OWNER }))
+      .toEqual({ ok: false, reason: 'owner-only' })
+    expect(await repo.setUserAdmin({ actingAdminId: OWNER, targetUserId: OTHER, makeAdmin: true, ownerId: null }))
+      .toEqual({ ok: false, reason: 'owner-unresolved' })
+    expect(await isAdmin(OTHER)).toBe(false)
+  })
+
+  it('refuses every grant when the owner cannot be resolved, the owner included', async () => {
+    for (const k of ['CLAUDE_RO_OWNER_USER_ID', 'ADMIN_EXPORT_USER_ID', 'WEBHOOK_USER_ID']) vi.stubEnv(k, '')
+    asUser(OWNER)
+    const { PATCH } = await import('@/app/api/admin/users/route')
+    const res = await PATCH(patch({ userId: OTHER, action: 'grant-admin' }) as never)
+    expect(res.status).toBe(403)
+    expect(await res.json()).toEqual({ error: 'The owner account is not configured, so no one can make admin.' })
+    expect(await isAdmin(OTHER)).toBe(false)
   })
 
   it('the owner revokes another admin, and the row changes', async () => {
@@ -202,6 +232,7 @@ describe.skipIf(!canRun)('PATCH /api/admin/users grant-admin and revoke-admin', 
   })
 
   it('grant-admin needs an active target: 400, and nothing changes', async () => {
+    asUser(OWNER)
     const { PATCH } = await import('@/app/api/admin/users/route')
     const res = await PATCH(patch({ userId: IDLE, action: 'grant-admin' }) as never)
     expect(res.status).toBe(400)
@@ -216,13 +247,15 @@ describe.skipIf(!canRun)('PATCH /api/admin/users grant-admin and revoke-admin', 
       `SELECT job, actor, target_user_id, outcome FROM agent_action_log
         WHERE target_user_id = $1 AND job IN ('admin-grant-admin','admin-revoke-admin') AND started_at >= $2
         ORDER BY started_at`, [OTHER, since])).rows
+    expect((await PATCH(patch({ userId: OTHER, action: 'grant-admin' }) as never)).status).toBe(403)
+    asUser(OWNER)
     expect((await PATCH(patch({ userId: OTHER, action: 'grant-admin' }) as never)).status).toBe(200)
     asUser(ADMIN)
     expect((await PATCH(patch({ userId: OTHER, action: 'revoke-admin' }) as never)).status).toBe(403)
     asUser(OWNER)
     expect((await PATCH(patch({ userId: OTHER, action: 'revoke-admin' }) as never)).status).toBe(200)
     expect(await rows()).toEqual([
-      { job: 'admin-grant-admin', actor: `admin:${ADMIN}`, target_user_id: OTHER, outcome: 'succeeded' },
+      { job: 'admin-grant-admin', actor: `admin:${OWNER}`, target_user_id: OTHER, outcome: 'succeeded' },
       { job: 'admin-revoke-admin', actor: `admin:${OWNER}`, target_user_id: OTHER, outcome: 'succeeded' },
     ])
   })
@@ -233,7 +266,8 @@ describe.skipIf(!canRun)('PATCH /api/admin/users grant-admin and revoke-admin', 
     const audited = async () => (await pool.query(
       `SELECT 1 FROM agent_action_log WHERE job IN ('admin-grant-admin','admin-revoke-admin')
           AND target_user_id = ANY($1::uuid[]) AND started_at >= $2`, [[ADMIN, OWNER], since])).rows.length
-    // ADMIN is already admin and grants themself; OWNER is already admin and ADMIN grants them.
+    // OWNER is already admin and grants themself; ADMIN is already admin and OWNER grants them.
+    asUser(OWNER)
     expect((await PATCH(patch({ userId: ADMIN, action: 'grant-admin' }) as never)).status).toBe(200)
     expect((await PATCH(patch({ userId: OWNER, action: 'grant-admin' }) as never)).status).toBe(200)
     expect(await isAdmin(ADMIN)).toBe(true)
@@ -270,8 +304,10 @@ describe.skipIf(!canRun)('PATCH /api/admin/users grant-admin and revoke-admin', 
 
   it('404 for an id that matches no user', async () => {
     const { PATCH } = await import('@/app/api/admin/users/route')
+    // Only the owner gets as far as the lookup, on a grant (#3657) as on a revoke.
+    expect((await PATCH(patch({ userId: UNKNOWN, action: 'grant-admin' }) as never)).status).toBe(403)
+    asUser(OWNER)
     expect((await PATCH(patch({ userId: UNKNOWN, action: 'grant-admin' }) as never)).status).toBe(404)
-    asUser(OWNER)   // only the owner gets as far as the lookup on a revoke
     expect((await PATCH(patch({ userId: UNKNOWN, action: 'revoke-admin' }) as never)).status).toBe(404)
   })
 

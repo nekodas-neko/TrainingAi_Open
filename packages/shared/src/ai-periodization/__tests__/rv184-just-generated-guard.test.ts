@@ -15,6 +15,11 @@ let n = 0
 
 function repoWith(state: Record<string, unknown>, budget = 60): WorkoutRepository {
   const known: Record<string, unknown> = {
+    // #3927: the program and the stamp from one snapshot, as the adapter reads them.
+    getActiveProgramWithStructureStamp: async (u: string, id: string) => ({
+      program: await (known.getActiveProgram as (u: string) => unknown)(u),
+      structure: await (known.getSessionStructureStamp as ((u: string, id: string) => unknown) | undefined)?.(u, id),
+    }),
     getSessionStructureStamp: async () => 'stamp-1',
     getActiveProgram: async () => ({ id: 'prog-1', sessions: [{ id: SESSION, timeBudgetMinutes: budget }] }),
     ensureSessionPeriodization: async () => state,

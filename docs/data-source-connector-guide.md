@@ -233,8 +233,10 @@ provenance bug before it was made required).
   `SourceActivitySession` (`packages/shared/src/health/activity-sessions.ts`: day, app activity type
   or the source's unmapped name, start, end, distance, `dismissed`, source) through
   `repo.getSourceActivitySessions`, one reader per connector in
-  `lib/data/postgres/slices/activity-sessions.ts`. The energy budget and the heart-rate recovery
-  profile read only that; Oura's mapping is `lib/oura/cloud/activity-sessions-map.ts`.
+  `lib/data/postgres/slices/activity-sessions.ts`. The energy budget, the heart-rate recovery
+  profile, the day timeline's walks and the walk offer read only that (#3884: `unmappedActivity` is
+  the generic lowercase-words name, `house work`, which the connector converts to; `calories` is
+  optional); Oura's mapping is `lib/oura/cloud/activity-sessions-map.ts`.
 - Distinct from **workout sessions** — structured strength-training data the app's own UI writes. A
   source cannot populate a workout, only enrich one after the fact.
 

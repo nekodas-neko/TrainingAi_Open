@@ -1,4 +1,5 @@
 import { migrateDatabase, type StorageDatabase } from './migrations.ts';
+import { isAllowedLocalHttp } from '../network/local-backend.ts';
 
 export type ScopedStorage = {
   get(key: string): Promise<string | null>;
@@ -13,7 +14,7 @@ export type ScopedStorage = {
 function accountScope(origin: string, accountId: string) {
   const url = new URL(origin);
   if (
-    url.protocol !== 'https:' ||
+    (url.protocol !== 'https:' && !isAllowedLocalHttp(url)) ||
     url.username ||
     url.password ||
     url.pathname !== '/' ||

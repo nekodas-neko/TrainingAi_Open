@@ -21,7 +21,7 @@
  * says false, and every clamp fixture differs from the default, so a route that ignored its input
  * could not pass by landing on the same number.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
 type Row = Record<string, unknown>
@@ -34,7 +34,11 @@ const getAiCallUsageSummary = vi.fn(async (..._a: unknown[]) => ({}) as Row)
 const getTimingAuditData = vi.fn(async (..._a: unknown[]) => ({ sets: [], exercises: [], sessions: [] }) as Row)
 const rateLimit = vi.fn((..._a: unknown[]) => true)
 
-let sessionUser: { id: string; isAdmin?: boolean } | null = { id: 'u-1', isAdmin: true }
+// #3951: the errors and feedback routes serve only the owner, so the signed-in admin here is the
+// configured owner (`CLAUDE_RO_OWNER_USER_ID`). A second admin's refusal is tested against real rows
+// in `app/api/admin/__tests__/owner-only-errors-feedback-3951.test.ts`.
+const SESSION_OWNER = '00000000-0000-4000-8000-0000000039a1'
+let sessionUser: { id: string; isAdmin?: boolean } | null = { id: SESSION_OWNER, isAdmin: true }
 vi.mock('@/auth', () => ({ auth: async () => (sessionUser ? { user: sessionUser } : null) }))
 vi.mock('@/lib/rate-limit', () => ({ rateLimit: (...a: unknown[]) => rateLimit(...a) }))
 vi.mock('@/lib/data', () => {
@@ -70,8 +74,11 @@ beforeEach(() => {
   countFeedback.mockResolvedValue(0)
   getAiCallUsageSummary.mockResolvedValue({ sections: [] })
   getTimingAuditData.mockResolvedValue({ sets: [], exercises: [], sessions: [] })
-  sessionUser = { id: 'u-1', isAdmin: true }
+  sessionUser = { id: SESSION_OWNER, isAdmin: true }
+  vi.stubEnv('CLAUDE_RO_OWNER_USER_ID', SESSION_OWNER)
 })
+
+afterEach(() => { vi.unstubAllEnvs() })
 
 describe('the admin gate on the reports', () => {
   it('refuses every one of them without a session, before reaching the database', async () => {
@@ -83,7 +90,7 @@ describe('the admin gate on the reports', () => {
   it('ignores a stale isAdmin claim and asks the database', async () => {
     // The claim says true and the row says false. With both false the route could read either and
     // still refuse, so the rule — a revoked admin keeps a 30-day token — would not be under test.
-    sessionUser = { id: 'u-1', isAdmin: true }
+    sessionUser = { id: SESSION_OWNER, isAdmin: true }
     getUserById.mockResolvedValue({ isActive: true, isAdmin: false })
     for (const [name, call] of ALL) expect((await call()).status, name).toBe(403)
     expect(listErrorEvents).not.toHaveBeenCalled()
@@ -209,7 +216,7 @@ describe('GET /api/admin/time-audit', () => {
       })),
     })
     const body = await (await timeAudit()).json()
-    expect(getTimingAuditData.mock.calls[0][0]).toBe('u-1')
+    expect(getTimingAuditData.mock.calls[0][0]).toBe(SESSION_OWNER)
     expect(body.sessions).toHaveLength(30)
   })
 

@@ -1,5 +1,6 @@
 import { normalizeMuscle } from '@trainingai/shared/muscles';
 import { daysBetweenDateStrs, isCalendarDate, toAestDay } from '@trainingai/shared/date-utils';
+import type { DeloadReasonInput, DeloadStrength } from '@trainingai/shared/ai-periodization/deload-reasons';
 
 export type MuscleAssignment = { muscle: string; role: 'main' | 'secondary' };
 export type MuscleRecovery = { muscle: string; pct: number };
@@ -85,9 +86,40 @@ export type WorkoutCatalog = {
     consecutiveRestDays?: number;
     streakWarning?: boolean;
     streakBroken?: boolean;
+    /** The daily check's grade of a suggested rest (#3644). */
+    deloadStrength?: DeloadStrength;
+    /** The inputs the reasons for a suggested rest are worded from (`deloadReasons`). */
+    signals?: RecommendationSignals;
   };
   recovery?: MuscleRecovery[] | null;
 };
+export type RecommendationSignals = NonNullable<DeloadReasonInput['signals']>;
+const DELOAD_STRENGTHS: readonly DeloadStrength[] = ['soft', 'recommended', 'strong'];
+
+/** The few `signals` fields the reasons read. A field that is missing or the wrong shape is left
+ *  out, never guessed, so an older or newer server still yields a card. */
+export function recommendationSignals(value: unknown): RecommendationSignals | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const raw = value as Record<string, unknown>;
+  const out: RecommendationSignals = {};
+  const finite = (key: string) =>
+    typeof raw[key] === 'number' && Number.isFinite(raw[key]) ? (raw[key] as number) : undefined;
+  for (const key of [
+    'ouraReadiness',
+    'temperatureDeviation',
+    'temperatureBaselineDays',
+  ] as const) {
+    if (raw[key] === null) out[key] = null;
+    else if (finite(key) !== undefined) out[key] = finite(key);
+  }
+  if (finite('temperatureAlertThresholdC') !== undefined) {
+    out.temperatureAlertThresholdC = finite('temperatureAlertThresholdC');
+  }
+  for (const key of ['ouraReadinessModelVersion', 'energyLevel'] as const) {
+    if (raw[key] === null || typeof raw[key] === 'string') out[key] = raw[key] as string | null;
+  }
+  return out;
+}
 export type CatalogIdentity = { origin: string; userId: string };
 
 function object(value: unknown): Record<string, unknown> {
@@ -294,6 +326,10 @@ export function buildCatalog(
       : {}),
     ...(typeof next.streakWarning === 'boolean' ? { streakWarning: next.streakWarning } : {}),
     ...(typeof next.streakBroken === 'boolean' ? { streakBroken: next.streakBroken } : {}),
+    ...(DELOAD_STRENGTHS.includes(next.deloadStrength as DeloadStrength)
+      ? { deloadStrength: next.deloadStrength as DeloadStrength }
+      : {}),
+    ...(recommendationSignals(next.signals) ? { signals: recommendationSignals(next.signals) } : {}),
   };
   const base = {
     version: 2 as const,
@@ -451,6 +487,15 @@ export function readSavedCatalog(
     }
     if (recommendation.consecutiveRestDays !== undefined) {
       count(recommendation.consecutiveRestDays);
+    }
+    if (
+      recommendation.deloadStrength !== undefined &&
+      !DELOAD_STRENGTHS.includes(recommendation.deloadStrength as DeloadStrength)
+    ) {
+      return null;
+    }
+    if (recommendation.signals !== undefined) {
+      recommendation.signals = recommendationSignals(recommendation.signals);
     }
     if (saved.program !== null) {
       const program = object(saved.program);

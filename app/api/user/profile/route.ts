@@ -4,7 +4,7 @@ import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { ACTIVITY_LEVELS, FITNESS_GOALS } from '@trainingai/shared/types/user'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
-import { invalidBodyResponse } from '@/lib/api/route-errors'
+import { invalidBodyResponse, withRouteErrors } from '@/lib/api/route-errors'
 
 // Eight fields, the longest capped at 100 characters by the schema below. 8 KB is generous.
 const MAX_BODY_BYTES = 8 * 1024
@@ -23,7 +23,14 @@ const ProfileSchema = z.object({
 /** The keys `ProfileSchema` accepts, as data — so the PATCH forwarding cannot drift from it. */
 const PROFILE_FIELDS = Object.keys(ProfileSchema.shape) as (keyof typeof ProfileSchema.shape)[]
 
+// `withRouteErrors`: during a database fault `auth()` throws `AuthCheckUnavailableError`, answered
+// here as a JSON 503. Preview's launch and foreground check reads this route and signs out on its
+// JSON 401, so a fault must never reach it as one.
 export async function GET() {
+  return withRouteErrors(readProfile)
+}
+
+async function readProfile() {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 

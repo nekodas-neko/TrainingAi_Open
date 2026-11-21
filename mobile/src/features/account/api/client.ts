@@ -1,6 +1,7 @@
 import { AI_PAUSED_CODE, AI_PAUSED_MESSAGE, aiPausedMessage } from '@trainingai/shared/ai-paused-notice';
 import { reportError } from '../../../core/reporting/index.ts';
 import { connectivity } from '../../../core/sync/Connectivity.ts';
+import { isAllowedLocalHttp } from '../../../core/network/local-backend.ts';
 import { REFRESH_TOKEN_RE } from '@trainingai/shared/auth/refresh-token';
 import { APP_BUILD_HEADER, APP_VERSION_HEADER } from '@trainingai/shared/native-min-build';
 import { nativeAppVersion, nativeBuildCode } from '../../../integrations/app-info/platform';
@@ -17,13 +18,20 @@ export class ApiError extends Error {
    * answers a failed schema with). A 400 without it is a proxy or gateway page, not the server.
    */
   validation: boolean;
-  constructor(status: number, code?: string, notice?: string, path?: string, validation = false) {
+  /**
+   * The server's own `error` sentence for a refused request (at most 200 characters), for the few
+   * screens that show it as written, such as a wrong current password (#3882). Never the paused
+   * notice, and never put into `message`, which is what gets reported.
+   */
+  serverMessage?: string;
+  constructor(status: number, code?: string, notice?: string, path?: string, validation = false, serverMessage?: string) {
     super(`TrainingAi request failed (${status}).`);
     this.status = status;
     this.code = code;
     this.notice = notice;
     this.path = path;
     this.validation = validation;
+    this.serverMessage = serverMessage;
   }
 }
 /** The server took a push but refused this item for good, in the body of a 200. */
@@ -91,7 +99,14 @@ export function isNothingToAnswer(error: unknown): boolean {
 function failedRequest(path: string, status: number, body: unknown, code?: string) {
   const error = (body as { error?: unknown } | null)?.error;
   return aiPausedMessage(status, body) === null
-    ? new ApiError(status, code, undefined, path, typeof error === 'string' && error.length > 0)
+    ? new ApiError(
+        status,
+        code,
+        undefined,
+        path,
+        typeof error === 'string' && error.length > 0,
+        typeof error === 'string' && error.length > 0 && error.length <= 200 ? error : undefined,
+      )
     : new ApiError(status, AI_PAUSED_CODE, AI_PAUSED_MESSAGE, path);
 }
 /** The paused sentence for an AI failure, else the caller's own line. Never any other server text. */
@@ -119,7 +134,7 @@ export function appIdentityHeaders(
 export function backendOrigin(baseUrl: string): string {
   const base = new URL(baseUrl);
   if (
-    base.protocol !== 'https:' ||
+    (base.protocol !== 'https:' && !isAllowedLocalHttp(base)) ||
     base.username ||
     base.password ||
     base.search ||
@@ -388,7 +403,8 @@ export function createApiClient(
     },
     async media(source: string): Promise<string> {
       const url = new URL(source, base);
-      if (url.protocol !== 'https:' || url.username || url.password) {
+      const localOwn = url.origin === base && isAllowedLocalHttp(url);
+      if ((url.protocol !== 'https:' && !localOwn) || url.username || url.password) {
         throw new Error('Invalid exercise media URL.');
       }
       const own = url.origin === base;

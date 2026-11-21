@@ -24,6 +24,7 @@ import type { Tab } from './navigation/tabs';
 import * as stack from './navigation/stack';
 import type { Entry, Route } from './navigation/stack';
 import { TabBar } from './navigation/TabBar';
+import { usePreviewControls } from '../integrations/web-preview/controls';
 import { RetainedView } from '../shared/ui/RetainedView';
 import { ScrollToTop } from '../shared/ui/ScrollToTop';
 import { useAndroidBack } from '../shared/ui/useAndroidBack';
@@ -186,6 +187,15 @@ function AppShell() {
   // #3724. Below the server's minimum build, the notice covers the app; the data screen (export
   // and sync health) still opens over it, and the notice carries sign-out itself.
   const tooOld = useTooOldNotice();
+  // #3761: the browser preview's screen script only; does nothing in any other build.
+  usePreviewControls({
+    selectTab,
+    open: openOn,
+    healthPanel: setHealthPanel,
+    nutritionDate: (date) =>
+      setNutritionDateRequest((value) => ({ scope: accountKey, date, count: value.count + 1 })),
+    where: () => ({ tab, screen: current?.screen ?? null }),
+  });
   // Android Back with nothing open: any tab but Home goes Home; Home leaves the app. Registered
   // only then, so it never competes with an open screen's own handler.
   useAndroidBack(

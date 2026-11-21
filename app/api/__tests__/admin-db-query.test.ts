@@ -3,10 +3,13 @@
 // lib/data/postgres/__tests__/claude-ro-readonly-role.test.ts — these cover the layer above it.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
+// The agents' token resolves to this admin, and it is also the configured owner (a uuid, as the
+// owner setting requires), so the owner scope the route sets explicitly (#3949 review N7) is it.
+const OWNER_ID = vi.hoisted(() => '0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d')
 const authMock = vi.fn(async () => null as unknown)
 vi.mock('@/auth', () => ({ auth: () => authMock() }))
 
-const getUserById = vi.fn(async () => ({ id: 'admin-1', isActive: true, isAdmin: true }))
+const getUserById = vi.fn(async () => ({ id: OWNER_ID, isActive: true, isAdmin: true }))
 vi.mock('@/lib/data', () => ({ getRepository: vi.fn(async () => ({ getUserById })) }))
 vi.mock('@/lib/rate-limit', () => ({ rateLimit: vi.fn(() => true) }))
 
@@ -59,12 +62,12 @@ const withToken = (t: string) => ({ authorization: `Bearer ${t}` })
 beforeEach(() => {
   configured = true
   authMock.mockReset().mockResolvedValue(null)
-  getUserById.mockReset().mockResolvedValue({ id: 'admin-1', isActive: true, isAdmin: true })
+  getUserById.mockReset().mockResolvedValue({ id: OWNER_ID, isActive: true, isAdmin: true })
   roQuery.mockReset().mockResolvedValue({ rows: [{ n: 1 }], fields: [{ name: 'n' }] })
   auditInsert.mockReset().mockImplementation(defaultAudit)
   feedbackLookupFails = false
   process.env.CLAUDE_DB_QUERY_SECRET = SECRET
-  process.env.ADMIN_EXPORT_USER_ID = 'admin-1'
+  process.env.ADMIN_EXPORT_USER_ID = OWNER_ID
 })
 afterEach(() => {
   delete process.env.CLAUDE_DB_QUERY_SECRET
@@ -90,7 +93,7 @@ describe('POST /api/admin/db-query — auth', () => {
   })
 
   it('403s when the token resolves to a non-admin', async () => {
-    getUserById.mockResolvedValue({ id: 'admin-1', isActive: true, isAdmin: false })
+    getUserById.mockResolvedValue({ id: OWNER_ID, isActive: true, isAdmin: false })
     expect((await post('SELECT 1', withToken(SECRET))).status).toBe(403)
   })
 
@@ -169,11 +172,20 @@ describe('POST /api/admin/db-query — scoped user (#2119)', () => {
     return params[params.length === 3 ? 2 : 7]
   }
 
-  it('an owner query is unchanged: no scope is passed and none is logged', async () => {
+  // #3949 review N7: an owner query sets the owner scope explicitly, to the resolved owner, rather
+  // than leaving it to the read-only role's default. It is still not a "scoped user" read.
+  it('an owner query runs as the resolved owner, set explicitly, and logs no scoped user', async () => {
     expect((await post('SELECT 1', withToken(SECRET))).status).toBe(200)
-    expect(roQuery.mock.calls[0][1]?.ownerId).toBeUndefined()
+    expect(roQuery.mock.calls[0][1]).toEqual({ ownerId: OWNER_ID })
     expect(auditInsert.mock.calls.some(c => String(c[0]).includes('feedback_submissions'))).toBe(false)
     expect(auditRows()[0][1]![7]).toBeNull()
+  })
+
+  it('runs nothing when the owner cannot be resolved: 503, and the refusal is logged', async () => {
+    process.env.ADMIN_EXPORT_USER_ID = 'not-a-uuid'
+    const res = await post('SELECT 1', withToken(SECRET))
+    expect(res.status).toBe(503)
+    expect(roQuery).not.toHaveBeenCalled()
   })
 
   it('runs as the named user when that user has filed feedback, and logs who', async () => {

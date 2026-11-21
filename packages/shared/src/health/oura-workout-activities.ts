@@ -17,7 +17,7 @@
  *   is `lib/oura/cloud/activity-sessions-map.ts`), so `pedometerStepsInside` takes their steps back
  *   out of the passive step term exactly as it does for a logged walk (#3082) — the source's daily
  *   step count already holds them.
- * - **Any other activity keeps the source's name** (`unmappedActivity`, passed on as `ouraActivity`)
+ * - **Any other activity keeps the source's name** (`unmappedActivity`, in the generic vocabulary)
  *   and is costed at that activity's own MET; one the MET table does not name earns nothing rather
  *   than the generic fallback.
  *
@@ -26,12 +26,12 @@
 import { localClockTimeToDate, shiftDateStr, toAestDay } from '../date-utils'
 import type { SourceActivitySession } from './activity-sessions'
 
-export interface OuraBudgetActivity {
+export interface SourceBudgetActivity {
   date: string
   activityType: string
   durationMin: number
   distanceKm: number | null
-  ouraActivity?: string
+  unmappedActivity?: string
 }
 
 /** What is already counted: the day's logged activities and strength sessions. */
@@ -72,9 +72,9 @@ export function sourceSessionActivities(
   workouts: readonly SourceActivitySession[],
   counted: CountedMovement,
   tz: string,
-): OuraBudgetActivity[] {
+): SourceBudgetActivity[] {
   const windows = movementWindows(counted, tz)
-  const out: OuraBudgetActivity[] = []
+  const out: SourceBudgetActivity[] = []
   for (const w of workouts) {
     const start = w.start.getTime()
     const end = w.end.getTime()
@@ -86,7 +86,7 @@ export function sourceSessionActivities(
       activityType: w.activityType,
       durationMin: (end - start) / 60_000,
       distanceKm: w.distanceKm,
-      ...(w.unmappedActivity != null ? { ouraActivity: w.unmappedActivity } : {}),
+      ...(w.unmappedActivity != null ? { unmappedActivity: w.unmappedActivity } : {}),
     })
   }
   return out

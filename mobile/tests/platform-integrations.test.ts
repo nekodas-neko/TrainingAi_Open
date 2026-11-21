@@ -15,7 +15,9 @@ import {
 } from '../src/features/platform/data/models.ts';
 import { PlatformStore } from '../src/features/platform/data/PlatformStore.ts';
 import {
+  anyMealReminderOn,
   notificationsBlocked,
+  notificationsRow,
   planAlerts,
   restAlarmRow,
   wantsNotifications,
@@ -575,19 +577,40 @@ test('notification permission is wanted whenever the rest cue, a walk cue or a r
   assert.equal(wantsNotifications(settings({ walkCues: true }), false), true);
 });
 
-test('the Rest timer alarm row pins its copy and shows Blocked only when permission is refused', () => {
+test('the Rest timer alarm row keeps its rest-only caption and no longer carries the Blocked notice', () => {
   assert.equal(restAlarmRow.title, 'Rest timer alarm');
   assert.equal(
     restAlarmRow.caption,
     "Follows each workout's rest cue. Turn the cue on in the workout to get the alarm.",
   );
-  assert.equal(restAlarmRow.blockedLabel, 'Blocked');
+  assert.equal('blockedCaption' in restAlarmRow, false);
+});
+
+test('the Blocked notice has its own row with the approved neutral wording (#3434)', () => {
+  assert.equal(notificationsRow.blockedLabel, 'Blocked');
   assert.equal(
-    restAlarmRow.blockedCaption,
-    "Android has notifications turned off for this app, so the rest alarm can't sound with the screen off.",
+    notificationsRow.blockedCaption,
+    "Android has notifications turned off for this app, so alerts can't sound with the screen off.",
   );
   const quiet = settings({ walkCues: false });
   assert.equal(notificationsBlocked(quiet, true, false), true, 'cue on, permission refused');
   assert.equal(notificationsBlocked(quiet, true, true), false, 'permission granted');
   assert.equal(notificationsBlocked(quiet, false, false), false, 'nothing needs notifications');
+});
+
+test('meal reminders and the ring battery alert also make notification permission wanted (#3434)', () => {
+  const quiet = settings({ walkCues: false });
+  assert.equal(wantsNotifications(quiet, false, { mealRemindersOn: true }), true);
+  assert.equal(wantsNotifications(quiet, false, { ringBatteryAlertOn: true }), true);
+  assert.equal(wantsNotifications(quiet, false, { dailyRemindersOn: true }), true);
+  assert.equal(wantsNotifications(quiet, false, {}), false);
+  assert.equal(notificationsBlocked(quiet, false, false, { mealRemindersOn: true }), true);
+  assert.equal(notificationsBlocked(quiet, false, false, { ringBatteryAlertOn: true }), true);
+  assert.equal(notificationsBlocked(quiet, false, true, { mealRemindersOn: true }), false);
+});
+
+test('any meal group with reminders on counts; none does not', () => {
+  assert.equal(anyMealReminderOn([]), false);
+  assert.equal(anyMealReminderOn([{ remindersEnabled: false }, {}]), false);
+  assert.equal(anyMealReminderOn([{ remindersEnabled: false }, { remindersEnabled: true }]), true);
 });

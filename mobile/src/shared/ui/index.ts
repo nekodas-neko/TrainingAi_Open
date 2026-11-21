@@ -72,6 +72,7 @@ export { MarkdownText } from './MarkdownText';
 export { ZoneGauge } from './ZoneGauge';
 
 export { SwipeDelete } from './SwipeDelete';
+export { SwipeReveal, type SwipeRevealAction } from './SwipeReveal';
 export { MultiChoice } from './MultiChoice';
 export { SegmentRing } from './SegmentRing';
 export { QrCode } from './QrCode';
@@ -91,3 +92,4 @@ export { HueSlider } from './HueSlider';
 export { SortableStack } from './SortableStack';
 export { BackdropFade } from './BackdropFade';
 export { WeekdayPicker } from './WeekdayPicker';
+export { EnergyBattery, ENERGY_LEVELS } from './EnergyBattery';

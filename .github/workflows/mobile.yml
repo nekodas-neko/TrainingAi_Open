@@ -82,6 +82,8 @@ jobs:
       - run: pnpm exec expo export --platform all --output-dir dist
         env:
           CI: '1'
+      # #3761: the browser preview's development sign-in must not reach a release bundle.
+      - run: node scripts/check-release-bundles.mjs dist
 
   # The name to require. Publishes one pass/fail for the job above; installs nothing. `always()` so
   # it still reports when that job fails or `changes` errors — without it this job is SKIPPED and a

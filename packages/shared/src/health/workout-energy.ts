@@ -76,14 +76,16 @@ export function bmrPerMinute(ageYears: number, weightKg: number, sex: Sex): numb
 }
 
 /**
- * The MET-table id whose name is this Oura activity string, or null when the table has none.
+ * The MET-table id whose name is this source-recorded activity name, or null when the table has none.
  *
- * Oura's API spells activities camelCase (`houseWork`, `strengthTraining`, `crossCountrySkiing`) and
- * the table names them in words (`house work`, `strength training`), so the match splits the case
- * and compares lowercased. #3087: an Oura workout costs at its own activity's MET rather than the
- * generic 6-MET fallback, and an activity the table does not name earns nothing rather than a guess.
+ * The name arrives in the generic vocabulary of `SourceActivitySession.unmappedActivity` (lowercase
+ * words, `house work`; each connector maps its own spelling at its boundary, Oura's camelCase is
+ * `lib/oura/cloud/activity-sessions-map.ts`). The match still splits any case and separators it is
+ * handed and compares lowercased. #3087: a source-recorded workout costs at its own activity's MET
+ * rather than the generic 6-MET fallback, and an activity the table does not name earns nothing
+ * rather than a guess.
  */
-export function metIdForOuraActivity(activity: string): number | null {
+export function metIdForActivityName(activity: string): number | null {
   const want = activity.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[_-]+/g, ' ').trim().toLowerCase()
   if (!want) return null
   for (const [id, row] of Object.entries(activityMetTable())) {
@@ -93,14 +95,15 @@ export function metIdForOuraActivity(activity: string): number | null {
 }
 
 /**
- * Oura activities done on foot, beyond walk/run/hike (which map to the app's own types): their steps
- * are already in Oura's daily step count, so the energy model takes them back out of the passive step
- * term at duration × walking cadence, as #3082 does for a walk with no distance (#3087). Walking
- * cadence under-reads a court sport's steps, so this errs toward subtracting too little.
+ * Source-recorded activities done on foot, beyond walk/run/hike (which map to the app's own types),
+ * in the generic vocabulary of `SourceActivitySession.unmappedActivity`: their steps are already in
+ * the source's daily step count, so the energy model takes them back out of the passive step term at
+ * duration × walking cadence, as #3082 does for a walk with no distance (#3087). Walking cadence
+ * under-reads a court sport's steps, so this errs toward subtracting too little.
  */
-export const OURA_ON_FOOT_ACTIVITIES: readonly string[] = [
-  'houseWork', 'yardwork', 'tennis', 'soccer', 'basketball', 'dancing', 'golf', 'badminton', 'squash',
-  'volleyball', 'handball', 'pickleball', 'padel', 'racquetball', 'nordicWalking', 'orienteering', 'stairExercise',
+export const ON_FOOT_ACTIVITIES: readonly string[] = [
+  'house work', 'yardwork', 'tennis', 'soccer', 'basketball', 'dancing', 'golf', 'badminton', 'squash',
+  'volleyball', 'handball', 'pickleball', 'padel', 'racquetball', 'nordic walking', 'orienteering', 'stair exercise',
 ]
 
 /** MET for an activity at a given intensity tier, or null if the activity id is unknown. */

@@ -10,6 +10,7 @@ import {
   AppText,
   ChoiceTiles,
   Disclosure,
+  EnergyBattery,
   MultiChoice,
   MuscleMap,
   Sheet,
@@ -141,11 +142,11 @@ export function ExerciseReadinessSheet({
         value={energy}
         onChange={setEnergy}
         options={[
-          { value: 'drained', label: 'Drained', emoji: '😴' },
-          { value: 'low', label: 'Low', emoji: '😑' },
-          { value: 'ok', label: 'OK', emoji: '😐' },
-          { value: 'good', label: 'Good', emoji: '😊' },
-          { value: 'pumped', label: 'Pumped', emoji: '⚡' },
+          { value: 'drained', label: 'Drained', glyph: (color) => <EnergyBattery level={1} color={color} /> },
+          { value: 'low', label: 'Low', glyph: (color) => <EnergyBattery level={2} color={color} /> },
+          { value: 'ok', label: 'OK', glyph: (color) => <EnergyBattery level={3} color={color} /> },
+          { value: 'good', label: 'Good', glyph: (color) => <EnergyBattery level={4} color={color} /> },
+          { value: 'pumped', label: 'Pumped', glyph: (color) => <EnergyBattery level={5} color={color} /> },
         ]}
       />
       <AppText variant="label">
@@ -163,7 +164,8 @@ export function ExerciseReadinessSheet({
               value={muscles}
               options={group.muscles.map((value) => ({
                 value,
-                label: `${value}${suggestions.includes(value) ? ' ↻' : ''}${sessionMuscles.some((target) => moodMuscleMatches(target, value)) ? ' •' : ''}`,
+                marked: suggestions.includes(value),
+                label: `${value}${sessionMuscles.some((target) => moodMuscleMatches(target, value)) ? ' •' : ''}`,
               }))}
               onChange={(next) => {
                 setTouched(true);

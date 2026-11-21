@@ -391,3 +391,50 @@ test('exercise media retries once with a renewed token after a 401', async (t) =
   assert.deepEqual(seen, ['Bearer access-0', 'Bearer access-1']);
   assert.equal(f.refreshes().length, 1);
 });
+
+// #3949 review S2: during a database fault the server answers the active check with our own JSON
+// 503 ("temporarily unavailable"), not 401. The profile check (launch, foreground) and renewal must
+// keep the session on it, because both sign out on our own JSON 401.
+test('a JSON 503 from the profile check keeps the session, and the next check signs in', async () => {
+  const f = fixture(renewable(86_000));
+  f.valid.add('access-0');
+  const profileRoute = f.server.profile;
+  f.server.profile = async () => json({ error: 'Sign-in check is temporarily unavailable. Try again.' }, 503);
+  await f.controller.initialize(null);
+  assert.equal(f.controller.state.status, 'signedIn');
+  assert.equal(f.controller.state.hasSession, true);
+  assert.doesNotMatch(f.controller.state.message ?? '', /Sign in again/);
+  assert.equal(f.stored().accessToken, 'access-0');
+  assert.equal(f.stored().refreshToken, refreshToken(0));
+  // Foreground again during the fault.
+  await f.controller.refresh();
+  assert.equal(f.controller.state.hasSession, true);
+  assert.equal(f.storage.has(KEY), true);
+  f.server.profile = profileRoute;
+  await f.controller.refresh();
+  assert.equal(f.controller.state.status, 'signedIn');
+  assert.equal(f.controller.state.message, null);
+  assert.equal(f.controller.state.profile?.id, profile.id);
+});
+
+test("the refresh route's JSON 503 keeps the session, and renewal succeeds once it is back", async () => {
+  const f = fixture(renewable(60));
+  const refreshRoute = f.server.refresh;
+  f.server.refresh = async () => json({ error: 'Session refresh is temporarily unavailable' }, 503);
+  await f.controller.initialize(null);
+  assert.notEqual(f.controller.state.status, 'signedOut');
+  assert.equal(f.controller.state.hasSession, true);
+  assert.equal(f.stored().refreshToken, refreshToken(0));
+  f.server.refresh = refreshRoute;
+  await f.controller.refresh();
+  assert.equal(f.controller.state.status, 'signedIn');
+  assert.equal(f.stored().refreshToken, refreshToken(1));
+});
+
+test('our own JSON 401 from the profile check still signs out', async () => {
+  const f = fixture(renewable(86_000));
+  f.valid.add('access-0');
+  f.server.profile = async () => json({ error: 'Unauthorized' }, 401);
+  await f.controller.initialize(null);
+  assert.equal(f.controller.state.status, 'signedOut');
+});

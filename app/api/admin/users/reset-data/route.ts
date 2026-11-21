@@ -7,7 +7,7 @@ import { invalidUuidResponse } from '@/lib/api/route-errors'
 import { reportServerError } from '@/lib/observability'
 import { rateLimit, settleRateLimitFlushes } from '@/lib/rate-limit'
 import { readOuraGrantBestEffort, revokeOuraGrantAfterCommit } from '@/lib/account/revoke-oura-grant'
-import { resolveOwnerUserId, sameUserId } from '@/lib/admin-owner'
+import { resolveOwnerForRoute, sameUserId } from '@/lib/admin-owner'
 import { clearSessionCookies } from '@/lib/auth/clear-session-cookies'
 import {
   ResetBodySchema, WIPE_MAX_BODY_BYTES, WIPE_RATE, auditActor, precheckWipe, wipeRateKey, wipeRefusalResponse,
@@ -59,7 +59,9 @@ export async function POST(req: NextRequest) {
   const { userId, confirmEmail } = parsed.data
   const badId = invalidUuidResponse(userId)
   if (badId) return badId
-  const ownerId = await resolveOwnerUserId(await getRepository())
+  const owner = await resolveOwnerForRoute(await getRepository())
+  if (!owner.ok) return NextResponse.json({ error: owner.error }, { status: owner.status })
+  const ownerId = owner.ownerId
   // Ids are uuids; a differently cased copy of the caller's own is still the caller.
   const selfReset = sameUserId(userId, adminId)
 

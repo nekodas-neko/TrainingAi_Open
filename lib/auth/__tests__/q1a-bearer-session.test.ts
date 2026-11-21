@@ -142,28 +142,34 @@ describe('auth() — the bearer fallback sits behind the cookie, not beside it',
     expect(await auth()).toBe(cookieSession)
   })
 
-  it.each([true, false])('preserves a cookie with isActive=%s during a database outage', async isActive => {
+  // #3949 review S2: during an outage the cut-offs cannot be read, so a cookie or bearer token is
+  // refused for that request whatever it claims, as "unavailable" (a thrown 503), never as a null
+  // session a route would answer 401, and nothing is persisted: the same session object and the same
+  // token pass on the next request once the database answers.
+  it.each([true, false])('refuses a cookie with isActive=%s as unavailable during a database outage, and accepts it once the database is back', async isActive => {
     const cookieSession = { user: { id: 'cookie-user', isAdmin: true }, isActive }
     baseAuth.mockResolvedValue(cookieSession)
-    getUserById.mockRejectedValue(new Error('db down'))
+    getUserById.mockRejectedValueOnce(new Error('db down'))
     const { auth } = await import('@/auth')
-    await expect(auth()).resolves.toBe(isActive ? cookieSession : null)
-    expect(cookieSession.user.isAdmin).toBe(true)
+    await expect(auth()).rejects.toMatchObject({ name: 'AuthCheckUnavailableError', status: 503 })
+    expect(cookieSession).toEqual({ user: { id: 'cookie-user', isAdmin: true }, isActive })
+    getUserById.mockResolvedValue({ isActive: true, isAdmin: true })
+    const after = await auth()
+    expect(after?.user.id).toBe('cookie-user')
+    expect(after?.isActive).toBe(true)
   })
 
-  it.each([true, false])('preserves a bearer with isActive=%s during a database outage', async isActive => {
+  it.each([true, false])('refuses a bearer with isActive=%s as unavailable during a database outage, and accepts it once the database is back', async isActive => {
     baseAuth.mockResolvedValue(null)
     requestHeaders = bearer(await mint({ userId: 'bearer-user', isActive, isAdmin: true }))
-    getUserById.mockRejectedValue(new Error('db down'))
+    getUserById.mockRejectedValueOnce(new Error('db down'))
     const { auth } = await import('@/auth')
+    await expect(auth()).rejects.toMatchObject({ name: 'AuthCheckUnavailableError', status: 503 })
+    getUserById.mockResolvedValue({ isActive: true, isAdmin: true })
     const session = await auth()
-    if (isActive) {
-      expect(session?.user.id).toBe('bearer-user')
-      expect(session?.isActive).toBe(true)
-      expect(session?.user.isAdmin).toBe(true)
-    } else {
-      expect(session).toBeNull()
-    }
+    expect(session?.user.id).toBe('bearer-user')
+    expect(session?.isActive).toBe(true)
+    expect(session?.user.isAdmin).toBe(true)
   })
 
   it('resolves the bearer when the cookie path yields nothing', async () => {

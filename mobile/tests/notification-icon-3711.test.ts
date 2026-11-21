@@ -55,3 +55,34 @@ test('the notification icon is the white dumbbell on transparent, not a full-col
   // IHDR colour type 6 is RGBA: Android draws a small icon from its alpha channel alone.
   assert.equal(png[25], 6);
 });
+
+// #3711 (20 Nov): the notification's large icon is the launcher icon, and Preview's was Expo's
+// placeholder / Android's robot because app.json named no icon at all. The launcher art is the
+// current app's dumbbell, copied from the root android/ project's mipmaps.
+test('the launcher icon and adaptive layers are named and are real 1024 px PNGs (#3711)', () => {
+  const config = JSON.parse(readFileSync(new URL('../app.json', import.meta.url), 'utf8')).expo;
+  const adaptive = config.android?.adaptiveIcon;
+  assert.ok(adaptive, 'android.adaptiveIcon is not set');
+  const files = [
+    config.icon,
+    adaptive.foregroundImage,
+    adaptive.backgroundImage,
+    adaptive.monochromeImage,
+  ];
+  for (const f of files) {
+    assert.equal(typeof f, 'string');
+    const file = new URL(`../${f}`, import.meta.url);
+    assert.ok(existsSync(file), `${f} is missing`);
+    const png = readFileSync(file);
+    assert.equal(png.subarray(1, 4).toString(), 'PNG');
+    assert.equal(png.readUInt32BE(16), 1024, `${f} width`);
+    assert.equal(png.readUInt32BE(20), 1024, `${f} height`);
+  }
+});
+
+test('the prebuild writes the adaptive launcher icon with its monochrome layer (#3711)', async () => {
+  const { getConfig } = require('expo/config');
+  const { exp } = getConfig(root, { skipSDKVersionRequirement: true, isModdedConfig: true });
+  assert.equal(exp.android.adaptiveIcon.foregroundImage, './assets/android-icon-foreground.png');
+  assert.equal(exp.icon, './assets/icon.png');
+});

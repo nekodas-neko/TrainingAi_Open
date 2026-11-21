@@ -14,6 +14,7 @@ import { invalidateAdminPendingCount } from '@/lib/cache-groups'
 import ExerciseManager from '@/components/admin/exercise-manager'
 import ActivityTypeManager from '@/components/admin/activity-type-manager'
 import { MoreRow, MoreRowGroup } from '@/components/more/more-row'
+import { EmptyState } from '@/components/ui/empty-state'
 import { useTransitionRouter } from "@/lib/view-transition";
 import { initialsOf } from '@/lib/initials';
 
@@ -36,6 +37,9 @@ export default function AdminContent({ currentUserId }: { currentUserId: string 
     screenshotData: string | null; createdAt: string; userEmail: string; userName: string | null
   }[]>([])
   const [feedbackLoading, setFeedbackLoading] = useState(false)
+  // #3951: feedback is the owner's to read. Another admin is refused (403), and a failed load is a
+  // failure: neither may read as "No feedback submissions".
+  const [feedbackFailure, setFeedbackFailure] = useState<'owner-only' | 'failed' | null>(null)
   const [expandedFeedback, setExpandedFeedback] = useState<string | null>(null)
   const [confirmDeleteFeedback, setConfirmDeleteFeedback] = useState<string | null>(null)
   // issue 2383 item 3: deactivating signs that user out to `/pending`, so it asks first. Activation does not.
@@ -69,10 +73,16 @@ export default function AdminContent({ currentUserId }: { currentUserId: string 
     }
 
     setFeedbackLoading(true)
+    setFeedbackFailure(null)
     fetch('/api/admin/feedback')
-      .then(r => r.ok ? r.json() : [])
-      .then(d => { setFeedbackSubmissions(Array.isArray(d) ? d : []) })
-      .catch(() => {})
+      .then(async r => {
+        if (r.status === 403) { setFeedbackFailure('owner-only'); setFeedbackSubmissions([]); return }
+        // A failed reload clears the list: rows left under "Could not load feedback" would read as current.
+        if (!r.ok) { setFeedbackFailure('failed'); setFeedbackSubmissions([]); return }
+        const d = await r.json()
+        setFeedbackSubmissions(Array.isArray(d) ? d : [])
+      })
+      .catch(() => { setFeedbackFailure('failed'); setFeedbackSubmissions([]) })
       .finally(() => setFeedbackLoading(false))
   }
 
@@ -500,7 +510,13 @@ export default function AdminContent({ currentUserId }: { currentUserId: string 
                 {[1, 2].map(i => <div key={i} className="h-16 rounded-xl bg-muted animate-pulse" />)}
               </div>
             )}
-            {!feedbackLoading && feedbackSubmissions.length === 0 && (
+            {!feedbackLoading && feedbackFailure === 'owner-only' && (
+              <EmptyState title="Only the owner can see feedback." />
+            )}
+            {!feedbackLoading && feedbackFailure === 'failed' && (
+              <EmptyState title="Could not load feedback." />
+            )}
+            {!feedbackLoading && !feedbackFailure && feedbackSubmissions.length === 0 && (
               <p className="text-center text-muted-foreground py-8">No feedback submissions.</p>
             )}
             {feedbackSubmissions.map(sub => {
@@ -559,7 +575,11 @@ export default function AdminContent({ currentUserId }: { currentUserId: string 
                             <button
                               type="button"
                               onClick={async () => {
-                                await fetch(`/api/admin/feedback/${sub.id}`, { method: 'DELETE' })
+                                const res = await fetch(`/api/admin/feedback/${sub.id}`, { method: 'DELETE' }).catch(() => null)
+                                if (!res?.ok) {
+                                  toast.error(res?.status === 403 ? 'Only the owner can delete feedback' : 'Could not delete that feedback')
+                                  return
+                                }
                                 setFeedbackSubmissions(prev => prev.filter(s => s.id !== sub.id))
                                 setConfirmDeleteFeedback(null)
                                 setExpandedFeedback(null)

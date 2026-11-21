@@ -101,6 +101,13 @@ import ChartNoAxesColumn from 'lucide-react-native/icons/chart-no-axes-column';
 import ChartLine from 'lucide-react-native/icons/chart-line';
 import Lock from 'lucide-react-native/icons/lock';
 import Cat from 'lucide-react-native/icons/cat';
+import Thermometer from 'lucide-react-native/icons/thermometer';
+import ChevronsLeft from 'lucide-react-native/icons/chevrons-left';
+import ArrowLeftRight from 'lucide-react-native/icons/arrow-left-right';
+import EggFried from 'lucide-react-native/icons/egg-fried';
+import Apple from 'lucide-react-native/icons/apple';
+import Salad from 'lucide-react-native/icons/salad';
+import Cookie from 'lucide-react-native/icons/cookie';
 import type { LucideProps } from 'lucide-react-native';
 import { Platform } from 'react-native';
 import { useTheme } from '../theme/ThemeProvider';
@@ -210,6 +217,13 @@ const icons = {
   batteryFull: BatteryFull,
   batteryLow: BatteryLow,
   batteryWarning: BatteryWarning,
+  thermometer: Thermometer,
+  swipeLeft: ChevronsLeft,
+  swap: ArrowLeftRight,
+  egg: EggFried,
+  apple: Apple,
+  salad: Salad,
+  cookie: Cookie,
 };
 
 export type IconName = keyof typeof icons;

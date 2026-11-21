@@ -8,11 +8,11 @@ import { randomUUID } from 'node:crypto';
 import { encode } from 'next-auth/jwt';
 
 type Row = {
-  id: string; userId: string; familyId: string; tokenHash: string; expiresAt: Date;
+  id: string; userId: string; familyId: string; tokenHash: string; expiresAt: Date; createdAt: Date;
   rotatedAt: Date | null; replacedBy: string | null; revokedAt: Date | null; revokedReason: string | null;
 };
 const db = vi.hoisted(() => ({
-  rows: [] as unknown[], users: new Map<string, unknown>(), fail: false, rateOk: true,
+  rows: [] as unknown[], users: new Map<string, unknown>(), fail: false, userFail: false, rateOk: true,
   session: null as null | { user: { id: string } },
 }));
 const rows = () => db.rows as Row[];
@@ -26,7 +26,7 @@ vi.mock('@/lib/data', () => ({
   getRepositoryAsync: async () => ({
     async createNativeRefreshToken(i: { userId: string; tokenHash: string; expiresAt: Date }) {
       guard();
-      const row: Row = { id: randomUUID(), familyId: randomUUID(), rotatedAt: null, replacedBy: null, revokedAt: null, revokedReason: null, ...i };
+      const row: Row = { id: randomUUID(), familyId: randomUUID(), createdAt: new Date(), rotatedAt: null, replacedBy: null, revokedAt: null, revokedReason: null, ...i };
       rows().push(row);
       return strip(row);
     },
@@ -45,7 +45,7 @@ vi.mock('@/lib/data', () => ({
       const old = rows().find(x => x.id === i.id && x.userId === i.userId && live(x));
       if (!old) return null;
       old.rotatedAt = new Date();
-      const next: Row = { id: randomUUID(), userId: i.userId, familyId: old.familyId, tokenHash: i.newTokenHash, expiresAt: i.expiresAt, rotatedAt: null, replacedBy: null, revokedAt: null, revokedReason: null };
+      const next: Row = { id: randomUUID(), userId: i.userId, familyId: old.familyId, tokenHash: i.newTokenHash, expiresAt: i.expiresAt, createdAt: new Date(), rotatedAt: null, replacedBy: null, revokedAt: null, revokedReason: null };
       rows().push(next);
       old.replacedBy = next.id;
       return strip(next);
@@ -57,7 +57,7 @@ vi.mock('@/lib/data', () => ({
       const successor = old && rows().find(x => x.id === old.replacedBy && x.userId === i.userId && !x.rotatedAt && !x.revokedAt);
       if (!old || !successor) return null;
       successor.revokedAt = new Date(); successor.revokedReason = 'rotation_reuse';
-      const next: Row = { id: randomUUID(), userId: i.userId, familyId: old.familyId, tokenHash: i.newTokenHash, expiresAt: i.expiresAt, rotatedAt: null, replacedBy: null, revokedAt: null, revokedReason: null };
+      const next: Row = { id: randomUUID(), userId: i.userId, familyId: old.familyId, tokenHash: i.newTokenHash, expiresAt: i.expiresAt, createdAt: new Date(), rotatedAt: null, replacedBy: null, revokedAt: null, revokedReason: null };
       rows().push(next);
       old.replacedBy = next.id;
       return strip(next);
@@ -68,7 +68,7 @@ vi.mock('@/lib/data', () => ({
       for (const r of hit) { r.revokedAt = new Date(); r.revokedReason = reason; }
       return hit.length;
     },
-    async getUserById(id: string) { guard(); return db.users.get(id) ?? null },
+    async getUserById(id: string) { guard(); if (db.userFail) throw new Error('database offline: SELECT … $1'); return db.users.get(id) ?? null },
   }),
 }));
 
@@ -98,7 +98,7 @@ const lookup = async (id: string) => (db.users.get(id) as { isActive: boolean } 
 
 beforeEach(() => {
   vi.stubEnv('AUTH_SECRET', SECRET);
-  db.rows = []; db.fail = false; db.rateOk = true; db.session = null;
+  db.rows = []; db.fail = false; db.userFail = false; db.rateOk = true; db.session = null;
   db.users = new Map([[ALICE.id, ALICE], [BOB.id, BOB]]);
 });
 afterEach(() => { vi.unstubAllEnvs(); vi.useRealTimers(); vi.restoreAllMocks() });
@@ -268,6 +268,23 @@ describe('POST /api/auth/native-session/refresh', () => {
     expect(JSON.stringify(await res.json())).not.toContain(issued.refreshToken);
   });
 
+  // #3949 review S2: the active check's own user lookup failing is "try again" (503), never 401,
+  // which Preview's `runRenewal` would sign out on. Nothing is written, so the same refresh token
+  // rotates once the database answers.
+  it('answers 503, not 401, when only the active check fails, writes nothing, and renews afterwards', async () => {
+    const issued = await issueNativeSession(ALICE);
+    const before = JSON.stringify(rows());
+    db.userFail = true;
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const down = await post({ refreshToken: issued.refreshToken });
+    expect(down.status).toBe(503);
+    expect(await down.json()).toEqual({ error: expect.stringMatching(/temporarily unavailable/) });
+    expect(JSON.stringify(rows())).toBe(before);
+    db.userFail = false;
+    const back = await post({ refreshToken: issued.refreshToken });
+    expect(back.status).toBe(200);
+  });
+
   it('is rate-limited', async () => {
     db.rateOk = false;
     expect((await post({ refreshToken: 'A'.repeat(43) })).status).toBe(429);
@@ -320,7 +337,7 @@ describe('seven-day tokens issued before #2076', () => {
       token: { userId, isActive: true, nativeSessionKey: key },
     });
   const seed = (key: string, over: Partial<Row> = {}) =>
-    rows().push({ id: randomUUID(), userId: ALICE.id, familyId: randomUUID(), tokenHash: hashRefreshToken(key)!, expiresAt: new Date(Date.now() + 7 * 86_400_000), rotatedAt: null, replacedBy: null, revokedAt: null, revokedReason: null, ...over });
+    rows().push({ id: randomUUID(), userId: ALICE.id, familyId: randomUUID(), tokenHash: hashRefreshToken(key)!, expiresAt: new Date(Date.now() + 7 * 86_400_000), createdAt: new Date(), rotatedAt: null, replacedBy: null, revokedAt: null, revokedReason: null, ...over });
 
   it('keep working until they expire', async () => {
     const key = 'K'.repeat(43);

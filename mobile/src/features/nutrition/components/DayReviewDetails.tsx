@@ -5,6 +5,7 @@ import {
   AppButton,
   AppText,
   Card,
+  Icon,
   Stack,
   StatusIndicator,
   TextField,
@@ -18,6 +19,7 @@ import { useNutrition } from '../data/NutritionProvider';
 import { scanSchema } from '../data/models';
 import { TrendRowCard } from '../../health/components/TrendRowCard';
 import { MealLoggingStatus } from './MealLoggingStatus';
+import { mealTypeIconName } from './meal-type-icon-names';
 import { aiFailureText } from '../../account/api/client';
 import { failureNotice } from '../../../core/reporting/index.ts';
 const values = z.object({
@@ -123,9 +125,10 @@ export function MealBackfill({
         return (
           <Card key={mt.id}>
             <Stack direction="row" justify="space-between">
-              <AppText variant="label">
-                {mt.emoji} {mt.name}
-              </AppText>
+              <Stack direction="row" align="center" gap="xs">
+                <Icon name={mealTypeIconName(mt.emoji)} tone="brand" />
+                <AppText variant="label">{mt.name}</AppText>
+              </Stack>
             </Stack>
             <MealLoggingStatus
               mealName={mt.name}

@@ -73,6 +73,7 @@ import { RestDayCard } from "@/components/rest-day-card";
 import { ReadinessCheckinCard } from "@/components/checkin/readiness-checkin-card";
 import { StreakCard } from "./components/streak-card";
 import { DeloadBanner } from "./components/deload-banner";
+import { showsDeloadBanner } from "@trainingai/shared/ai-periodization/deload-reasons";
 import { WeekStripCard } from "./components/week-strip-card";
 import { MetricTilesCard } from "./components/metric-tiles-card";
 import type { TrainingLoadResponse } from "@/app/api/training-load/route";
@@ -1186,11 +1187,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
               );
               switch (key) {
                 case "recommendation": {
-                  const showDeloadBanner = (
-                    (recommendation?.deloadOrRestRecommended &&
-                      (recommendation.consecutiveTrainingDays ?? 0) >= 4) ||
-                    recommendation?.temperatureAlert
-                  )
+                  const showDeloadBanner = showsDeloadBanner(recommendation)
                   // Gate the workout recommendation behind mood check-in.
                   // Show check-in card while moodLog is loading or not yet entered.
                   if (moodLog === undefined || moodLog === null) {

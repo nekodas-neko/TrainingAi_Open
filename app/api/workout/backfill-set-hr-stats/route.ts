@@ -64,3 +64,32 @@ export async function POST(req: Request) {
     remaining: pending.length === maxRows,
   })
 }
+
+/**
+ * A count of what the backfill would take on (#3882), changing nothing: the same lister the POST
+ * uses, run once at its ceiling. `atLeast` is true when the ceiling was reached, so the true count
+ * is higher. A GET and not a flag on the POST, so a server that predates this answers 405 instead
+ * of running a backfill for a request that meant to preview one.
+ */
+export async function GET() {
+  const session = await auth()
+  if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  try {
+    await requireAdmin(session.user.id, session.user.isAdmin)
+  } catch (err) {
+    return adminErrorResponse(err)
+  }
+
+  if (!rateLimit(`workout-backfill-set-hr-stats-count:${session.user.id}`, 12, 60_000)) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+  }
+
+  const repo = await getRepositoryAsync()
+  const since = new Date(Date.now() - RETENTION_DAYS * 86_400_000)
+  const pending = await repo.listSessionsMissingSetHrStats(session.user.id, since, 1000)
+  return NextResponse.json(
+    { dryRun: true, summary: { sessionsToProcess: pending.length, atLeast: pending.length === 1000 } },
+    { headers: { 'Cache-Control': 'private, no-store' } },
+  )
+}

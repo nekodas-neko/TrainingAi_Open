@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
+import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { View } from 'react-native';
 import type { z } from 'zod';
-import { AppButton, AppText, Card, NumericStepper, Stack, SwitchRow } from '../../../shared/ui';
+import { AppButton, AppText, Card, Icon, NumericStepper, Stack, SwitchRow } from '../../../shared/ui';
 import { GOAL_BOUNDS } from '@trainingai/shared/validation/goal-bounds';
 import { useCoach } from '../CoachProvider';
 import { coachError, type previewSchema } from '../data/models';
@@ -34,13 +35,29 @@ export function ChangeRows({ patch }: { patch: CoachPatch }) {
   );
 }
 export function Consequences({ data }: { data: z.infer<typeof previewSchema> | null }) {
+  const { theme } = useTheme();
   return (
     <Stack>
       {data?.consequences.map((c, i) => (
-        <AppText key={i} variant="caption" tone="muted">
-          {c.kind === 'warn' ? '⚠ ' : c.kind === 'good' ? '✓ ' : ''}
-          {c.text}
-        </AppText>
+        <Stack
+          key={i}
+          direction="row"
+          align="center"
+          gap="xs"
+          accessible
+          accessibilityLabel={`${c.kind === 'warn' ? 'Warning: ' : c.kind === 'good' ? 'Good: ' : ''}${c.text}`}
+        >
+          {c.kind !== 'info' && (
+            <Icon
+              name={c.kind === 'warn' ? 'alert' : 'check'}
+              size={theme.sizes.iconSmall}
+              tone="muted"
+            />
+          )}
+          <AppText variant="caption" tone="muted" style={{ flexShrink: 1 }}>
+            {c.text}
+          </AppText>
+        </Stack>
       ))}
       {!!data?.drift.length && (
         <AppText variant="caption" tone="danger">

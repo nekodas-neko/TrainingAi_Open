@@ -15,6 +15,8 @@ export type ResourceSpec<T> = {
   ttl?: number;
   partition?: string;
   cache?: (data: T) => boolean;
+  /** What a refusal (401/403) says for this view, when the generic "check your account" would mislead. */
+  deniedMessage?: string;
 };
 export type ResourceState<T = unknown> = {
   data: T | null;
@@ -137,6 +139,7 @@ export class WorkoutResources {
           schema: spec.schema,
           ttl: spec.ttl,
           partition: spec.partition,
+          deniedMessage: spec.deniedMessage,
         },
         cache: spec.cache ? (data) => spec.cache!(spec.schema.parse(data)) : undefined,
         state: empty,
@@ -336,7 +339,9 @@ export class WorkoutResources {
         refreshing: false,
         saved: entry.state.data !== null,
         error: denied
-          ? 'Check your account to access this view.'
+          ? // `deniedMessage` names a 403 (e.g. "Owner only."); a 401 is an expired sign-in, never that.
+            ((error.status === 403 ? entry.spec.deniedMessage : undefined) ??
+            'Check your account to access this view.')
           : aiFailureText(
               error,
               failureNotice(

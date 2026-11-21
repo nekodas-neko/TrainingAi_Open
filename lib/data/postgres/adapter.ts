@@ -1049,8 +1049,51 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     return this.rowToUser(r)
   }
 
+  /**
+   * #3673 item 5: a new password ends every other sign-in of the account, in one transaction with
+   * the write, so a password someone else learned stops working everywhere it was used:
+   * - every native sign-in is revoked (`revokeEveryNativeSignIn`, reason `password_change`);
+   * - every web session signed in up to now is refused from here on (`endSignInsBefore`,
+   *   `users.sign_ins_valid_from`, #3829's column, written from the database clock). Not
+   *   `sessions_valid_from`: that is the data epoch, and moving it would make every device wipe its
+   *   store and read everything again.
+   * The route then gives the caller's own browser a fresh cookie, stamped by `signInStampFor` after
+   * this commits, so at or after the cut-off. Families are locked before the user row, the order
+   * `linkOAuthAccount` uses against a rotation. Throws unless exactly one row was set.
+   */
   async updateUserPassword(userId: string, passwordHash: string): Promise<void> {
-    await this.db.update(s.users).set({ passwordHash }).where(eq(s.users.id, userId))
+    await this.db.transaction(async x => {
+      await nativeRefreshTokens.lockEveryNativeFamily(x, userId)
+      const rows = await x.update(s.users).set({ passwordHash }).where(eq(s.users.id, userId)).returning({ id: s.users.id })
+      if (rows.length !== 1) throw new Error('password was not updated')
+      await nativeRefreshTokens.revokeEveryNativeSignIn(x, userId)
+      await authData.endSignInsBefore(x, userId)
+    })
+  }
+
+  /**
+   * #3854 item 1: a web sign-out ends every sign-in of the account made up to now
+   * (`endSignInsBefore`), so a session cookie a late response sets again after the sign-out cleared
+   * it is refused, whatever its timing.
+   *
+   * #3949 review S3: serialised against a native refresh in flight. Every native family of the
+   * account is locked first (`lockEveryNativeFamily`, the locks `rotateNativeRefreshToken` and
+   * `regrantNativeRefreshToken` take before they read the cut-off), then the cut-off is written from
+   * the database clock. A rotation that holds its family's lock first commits before this writes, so
+   * its successor's `created_at` (and the access token stamped from it) is below the cut-off and is
+   * ended by it; one that comes second waits, then reads the committed cut-off and is refused.
+   * Families before the user row, the order `updateUserPassword` and `linkOAuthAccount` use.
+   */
+  async endSignInsBefore(userId: string): Promise<void> {
+    await this.db.transaction(async x => {
+      await nativeRefreshTokens.lockEveryNativeFamily(x, userId)
+      await authData.endSignInsBefore(x, userId)
+    })
+  }
+
+  /** #3949 review N1: the database-clock `signedInAt` for a new web sign-in (`signInStampFor`). */
+  async signInStampFor(userId: string): Promise<number> {
+    return authData.signInStampFor(this.db, userId)
   }
 
   async getTimingBaselineDate(userId: string): Promise<string | null> {
@@ -1177,10 +1220,14 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async createWorkoutSession(
     userId: string, programSessionId: string | undefined, sessionName: string, startedAt: Date,
     phaseId?: string, phaseType?: ProgramPhaseType, isEarlyDeload = false,
+    // #3888: the same two fields `ensureWorkoutSession` stores, so a session started without a
+    // client id still records the lifter's Deload/Full choice.
+    intensityMode?: 'full' | 'deload' | null, wasOverride = false,
   ): Promise<WorkoutSession> {
     const [r] = await this.db.insert(s.workoutSessions)
-      .values({ userId, programSessionId: programSessionId ?? null, sessionName, startedAt, phaseId: phaseId ?? null, phaseType: phaseType ?? null, isEarlyDeload })
+      .values({ userId, programSessionId: programSessionId ?? null, sessionName, startedAt, phaseId: phaseId ?? null, phaseType: phaseType ?? null, isEarlyDeload, intensityMode: intensityMode ?? null, wasOverride })
       .returning()
+    if (!r) throw new Error('createWorkoutSession: insert returned no row')
     return {
       id: r.id, userId: r.userId, sessionId: r.programSessionId ?? undefined,
       sessionName: r.sessionName, startedAt: r.startedAt,
@@ -8573,6 +8620,15 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
 
   async storePrescription(userId: string, programSessionId: string, prescription: AiPrescription, expiresAt: Date, status?: PrescriptionStatus, generatedFor?: import('@trainingai/shared/types/ai-periodization').PrescriptionGeneratedFor) { return period.storePrescription(this.db, userId, programSessionId, prescription, expiresAt, status, generatedFor) }
   async getSessionStructureStamp(userId: string, programSessionId: string) { return period.getSessionStructureStamp(this.db, userId, programSessionId) }
+  // One repeatable-read snapshot: both reads see the database as of the first (#3927).
+  async getActiveProgramWithStructureStamp(userId: string, programSessionId: string) {
+    return this.db.transaction(async tx => {
+      const db = tx as unknown as typeof this.db
+      const program = await prog.getActiveProgram(db, userId)
+      const structure = await period.getSessionStructureStamp(db, userId, programSessionId)
+      return { program, structure }
+    }, { isolationLevel: 'repeatable read', accessMode: 'read only' })
+  }
   async clearProgramPrescriptions(userId: string, programId: string) { return period.clearProgramPrescriptions(this.db, userId, programId) }
   async updatePrescriptionStatus(userId: string, programSessionId: string, status: PrescriptionStatus) { return period.updatePrescriptionStatus(this.db, userId, programSessionId, status) }
   async voidSessionPrescription(userId: string, programSessionId: string) { return period.voidSessionPrescription(this.db, userId, programSessionId) }

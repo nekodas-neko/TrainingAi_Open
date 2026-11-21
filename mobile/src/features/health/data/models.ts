@@ -205,6 +205,8 @@ export const readinessSpec = (date: string) => ({
         'stressHigh',
         'recoveryHigh',
         'ownResilienceLevel',
+        // #3644: the Rest Day card's bedtime, minutes from the day's local midnight.
+        'recommendedBedtimeStart',
       ] as const),
       readinessContributors: contributors,
       sleepContributors: contributors,

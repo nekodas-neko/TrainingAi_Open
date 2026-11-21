@@ -6,6 +6,28 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.528.0",
+    date: "2026-11-21",
+    changes: [
+      "Both apps: the \"When the day ran stressed\" chart is back for days since the ring moved to Oura Cloud, estimated from your heart rate while you were still. It is one continuous line: dotted where you were moving, with stretches of elevated stress filled amber and a strip marking when you were moving or asleep. A note under the title says how the day was worked out.",
+      "Both apps: the stress band on the heart-rate day chart now points up for more stress, the same way as the stress chart.",
+      "Both apps: signing out ends that sign-in on the server too, and changing your password ends your other sign-ins.",
+      "Both apps: the trainer chat knows which screen and lift it was opened from, can look up an exercise, and gives you a searchable list when it asks you to pick one.",
+      "Both apps: a workout plan that is out of date is refused in four more places, the Deload or Full choice is stored on every new workout, and a workout review no longer takes its \"before\" numbers from an expired plan.",
+      "Current app: on a day rest is suggested, the line beside Rest and Full no longer reads \"0 sessions in a row\" when a drained or sick check-in is the reason.",
+      "TrainingAi Preview: after an exercise's last set the rest card asks how it felt: easier than expected, as expected or harder than expected. It starts on As expected, so you only tap when it differs. Nothing uses the answer yet.",
+      "TrainingAi Preview: the picture-in-picture window is one card in every state, with the exercise, where you are in the session, the set and load, and a labelled clock that always counts. Before the first set it says Ready instead of a rest clock stuck at 0:00.",
+      "TrainingAi Preview: a walk you didn't record stays on offer in Home's updates until you save or dismiss it, as in the current app.",
+      "TrainingAi Preview: text follows your phone's font size setting down as well as up; Progress shows when each lift was last trained; a past day's resting heart rate, HRV and steps move into their own Daily vitals card; and Week in review no longer repeats a record's exercise name.",
+      "TrainingAi Preview: Home's recommendation card says why it suggests rest or a deload. The Full and Deload toggle swaps the exercise list at once and says the difference before you flip. On an ordinary day Start is the one button, and a swipe left reveals Rest.",
+      "TrainingAi Preview: on a day your readiness is outside your usual range, Home asks how you feel in its own card at the top, whatever cards you have switched on, and the sentence always matches today's score. Energy shows your morning level while it waits for the ring's first heart-rate upload.",
+      "TrainingAi Preview: the app has its own launcher and notification icon, and icons replace emojis throughout; the energy scale is a battery that fills. The Training calendar's title sits on one row, the Zone minutes card loses its empty band, and Home's heart-rate card gains the orange workout band, a dashed Estimated line and an axis fitted to the day.",
+      "TrainingAi Preview: change your password from Account. Moving backgrounds start switched off on a new install, the blocked-notifications notice also covers meal reminders and the ring battery alert, and a guided walk on a treadmill is paced by heart rate instead of reading Stopped.",
+      "TrainingAi Preview: the Level pill, the Strength Trend fade and the Light theme's Body Weight and Sleep headings match the current app, and Year in review no longer has a render error.",
+      "Behind the scenes: only the owner's account can read every account's error events and feedback or run the database tools. The day timeline and the energy budget read activities in a source-neutral form, with no number changed. Shadow readiness ignores temperature from before the account re-key. Developers can sign Preview in and check its screens in a browser, with a check that no release build can carry that sign-in, and the route smoke test runs against a production build after each merge.",
+    ],
+  },
+  {
     version: "1.526.0",
     date: "2026-11-20",
     changes: [

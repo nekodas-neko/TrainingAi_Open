@@ -134,6 +134,7 @@ export function StrengthScreen({ section }: { section: 'trend' | 'records' }) {
                   height={theme.sizes.sparkline}
                   showLabels={false}
                   fill
+                  fadeFill
                   stretch
                   dots="none"
                   points={exercise.history.map((point, index) => ({

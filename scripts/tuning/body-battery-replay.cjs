@@ -1,64 +1,43 @@
 #!/usr/bin/env node
 /**
- * Body Battery offline replay — TN-55's fit harness.
+ * Body Battery offline replay: the fit and count harness for #2341 and #3925.
  *
- * Replays the SHIPPED `walkBodyBattery()` over real history pulled from production, and a candidate
- * variant beside it, so charge/drain constants can be fitted without an admin replay endpoint.
- * TN-2 asked for exactly this and assumed it needed server infrastructure; it does not, because
- * `packages/shared/src/health/body-battery-walk.ts` is already a pure function of its inputs.
+ * It replays the app's OWN finished-day recompute, `finishedBodyBatteryDay` in
+ * `lib/health/body-battery-replay.ts` (the function `rederiveBodyBattery` writes through), so it is
+ * always on the shipped model: v8's exercise drain, v9's version-keyed baselines, and the readiness
+ * anchor on the 75-centred scale (18 Nov). It used to bundle the v7 walk alone and mirror the
+ * route's constants by hand, and fell two versions behind (#3925). Nothing here copies a formula.
  *
- *   node scripts/tuning/body-battery-replay.cjs --pull     # fetch inputs (needs CLAUDE_DB_QUERY_SECRET)
- *   node scripts/tuning/body-battery-replay.cjs --validate # prove the harness reproduces production
- *   node scripts/tuning/body-battery-replay.cjs --check    # LA-134's pass test on the stored rows
- *   node scripts/tuning/body-battery-replay.cjs --sweep    # grid-search the constants
+ *   node scripts/tuning/body-battery-replay.cjs --capture FROM TO [USER_ID]   # local database only
+ *   node scripts/tuning/body-battery-replay.cjs --replay [capture.json]       # replay and compare
+ *   node scripts/tuning/body-battery-replay.cjs --count [capture.json]        # #3925 item 1's count
+ *   node scripts/tuning/body-battery-replay.cjs --count-report report.json    # the same, from production
+ *   node scripts/tuning/body-battery-replay.cjs --pull [DAYS]                 # stored rows (claude_ro)
+ *   node scripts/tuning/body-battery-replay.cjs --check [PREFIX]              # LA-134's pass test
  *
- * ⚠ RUN --validate AND READ ITS OUTPUT BEFORE BELIEVING ANY SWEEP NUMBER. The first version of
- * this harness took max(sleep_end) per day as the wake time, which picks up NAPS and put wake at
- * 15:05 or 19:00 — discarding the whole day's heart rate and reporting zero drain on days with
- * 3,000 samples. That is the Q-17 shape, reproduced accidentally. It is caught only by checking
- * the replay against stored values, which is why that step is not optional.
+ * **Capture** runs the real recompute against a repository and records every read it answers
+ * (heart rate, sleep, body metrics, workouts, goals, the stored row and the rest), refusing every
+ * other method, so it cannot write. It opens `LOCAL_DATABASE_URL` (else `DATABASE_URL`) and refuses
+ * any database that is not on this machine: production has no read-only repository connection, so
+ * production is counted through the server instead (below). **Replay** runs the same recompute on
+ * the recording and throws on any read it did not record. **Count** prints how many finished days
+ * would change end value if each were finalised from the full day, and by how much in bands.
  *
- * ⚠ THE STRESS TERM IS RECONSTRUCTED, NOT REPLAYED. `buildDaytimeStressSeriesFromModel` needs the
- * persisted dHRV model and the daytime signal tables, so this harness infers each day's mean
- * |stressLevel| from the residual (stored drain − replayed HR drain) instead. Measured 2026-09-21
- * that residual implies levels of 0.14–0.62, all inside [0,1], which is what makes the
- * reconstruction credible — but it is an inference, and a conclusion that depends on the stress
- * term's *shape* within a day cannot be drawn from it.
+ * **Production, read-only (the Orchestrator):** the agent-key job `rederive-body-battery` with
+ * `dryRun: true` runs `finishedBodyBatteryDay` on production data and writes nothing (no approval
+ * needed; `docs/admin-actions.md` section 12). Save its JSON response, 31 days per call, and run
+ * `--count-report` on each file. It prints counts and bands only, never a health value, so the
+ * output can go on a public issue. The raw report holds end values: keep it off the repository.
  */
 const fs = require('fs')
 const path = require('path')
 const { execFileSync } = require('child_process')
 
+const ROOT = path.resolve(__dirname, '../..')
 const DIR = process.env.BB_REPLAY_DIR || '/tmp/bb-replay'
 const API = 'https://trainingai-production.up.railway.app/api/admin/db-query'
 const TZ = 'Australia/Brisbane'
-
-// Shipped constants — mirrored from lib/health/body-battery-day.ts. If they change there, change
-// them here in the same PR; this file deliberately does not import that module.
-// v7 (issue 2235): the charge ceiling is a bpm offset over resting HR, so the reserve fraction the
-// walk takes is per day — `buildDay` derives it with the bundled `restThresholdFromOffset`.
-const SHIPPED = {
-  restOffsetBpm: 9, chargeRate: 0.120, drainRate: 0.080,
-  stressDrainRate: 0.020, gapHoldMin: 30, sampleCapMin: 7,
-}
-// v6 (2026-09-24 → issue 2235): the same rates with the old reserve-fraction ceiling. `--validate`
-// against stored v6 rows needs this in place of SHIPPED.
-const V6 = {
-  restThreshold: 0.05, chargeRate: 0.120, drainRate: 0.080,
-  stressDrainRate: 0.020, gapHoldMin: 30, sampleCapMin: 7,
-}
-
-// ⚠ `--validate` can only reproduce rows that were computed under the constants AND the walk it is
-// replaying. TN-55 changed both on 2026-09-24, and nothing recomputes history — the route rewrites
-// today's row and no other path writes the table — so every row stamped `v5:` stays v5 forever.
-// Validating against one of those needs V5 below *and* a checkout from before that commit, because
-// `bundleShared()` bundles the live walk and the charge ramp is no longer the ramp those rows were
-// built with. Once the issue 2235 re-derive has run, every stored row is v7 and `--validate` works
-// against the default; before it, validate v6 rows with V6.
-const V5 = {
-  restThreshold: 0.05, chargeRate: 0.20, drainRate: 0.60,
-  stressDrainRate: 0.2, gapHoldMin: 30, sampleCapMin: 7,
-}
+const CAPTURE = path.join(DIR, 'capture.json')
 
 function query(sql, out) {
   const secret = process.env.CLAUDE_DB_QUERY_SECRET
@@ -99,93 +78,116 @@ function pull(daysBack = 70) {
   console.log(`pulled ${daysBack} days into ${DIR}`)
 }
 
-function bundleShared() {
-  const root = path.resolve(__dirname, '../..')
-  const out = {}
-  for (const [key, src] of [['walk', 'health/body-battery-walk.ts'], ['night', 'health/sleep-night.ts']]) {
-    const file = path.join(DIR, `${key}.cjs`)
-    // Windows has no bare `npx`: it is npx.cmd, which Node only spawns through a shell.
-    const win = process.platform === 'win32'
-    execFileSync(win ? 'npx.cmd' : 'npx', ['esbuild', path.join(root, 'packages/shared/src', src),
-      '--bundle', '--format=cjs', '--platform=node', `--outfile=${file}`],
-      { cwd: root, stdio: ['ignore', 'ignore', 'pipe'], shell: win })
-    Object.assign(out, require(file))
-  }
-  return out
-}
-
-function load() {
-  const read = f => JSON.parse(fs.readFileSync(path.join(DIR, f), 'utf8')).rows
-  // `packages/shared` ships as TypeScript with no build output, so bundle the two shipped modules
-  // on the fly. Bundling rather than reimplementing is the whole point: a hand-copied walk would
-  // drift from production silently, and the arithmetic being compared is the arithmetic that runs.
-  const { walkBodyBattery, restThresholdFromOffset, nightSessions } = bundleShared()
-  const brisDay = ms => new Date(ms).toLocaleDateString('en-CA', { timeZone: TZ })
-
-  const sessions = read('sleep.json').map(x => {
-    const s = Number(x.s), e = Number(x.e)
-    return { sleepStart: new Date(s), sleepEnd: new Date(e), date: brisDay(s), durationHours: (e - s) / 3600000 }
+/**
+ * Bundle `lib/health/body-battery-replay.ts` (and, for a capture, the repository) from the source
+ * the app runs. `@/` and `@trainingai/` are bundled; every npm package stays external and loads
+ * from the repository's own node_modules, which is why the bundle is written under it.
+ */
+async function bundleReplay(withRepository = false) {
+  const esbuild = require('esbuild')
+  const outDir = path.join(ROOT, 'node_modules/.cache/bb-replay')
+  fs.mkdirSync(outDir, { recursive: true })
+  const outfile = path.join(outDir, withRepository ? 'replay-with-repo.cjs' : 'replay.cjs')
+  const contents = "export * from '@/lib/health/body-battery-replay'\n" +
+    (withRepository ? "export { getRepository } from '@/lib/data'\n" : '')
+  await esbuild.build({
+    stdin: { contents, resolveDir: ROOT, sourcefile: 'body-battery-replay-entry.ts', loader: 'ts' },
+    bundle: true, format: 'cjs', platform: 'node', outfile, logLevel: 'error',
+    tsconfig: path.join(ROOT, 'tsconfig.json'),
+    plugins: [{
+      name: 'npm-external',
+      setup(build) {
+        build.onResolve({ filter: /^[^./]/ }, args =>
+          args.path.startsWith('@/') || args.path.startsWith('@trainingai/') ? undefined : { path: args.path, external: true })
+      },
+    }],
   })
-  const wake = new Map()
-  for (const n of nightSessions(sessions, TZ)) wake.set(brisDay(n.sleepEnd.getTime()), n.sleepEnd.getTime())
-
-  const hr = new Map()
-  for (const f of fs.readdirSync(DIR).filter(f => /^hr_\d+\.json$/.test(f))) {
-    for (const r of read(f)) {
-      const k = String(r.d).slice(0, 10)
-      const arr = (r.s || '').split(',').filter(Boolean)
-        .map(p => { const [t, b] = p.split(':'); return { tsMs: Number(t), bpm: Number(b) } })
-      hr.set(k, (hr.get(k) || []).concat(arr))
-    }
-  }
-  for (const v of hr.values()) v.sort((a, b) => a.tsMs - b.tsMs)
-  return { days: read('days.json'), wake, hr, walkBodyBattery, restThresholdFromOffset }
+  delete require.cache[outfile]
+  return require(outfile)
 }
 
-function buildDay(ctx, row) {
-  const d = String(row.d).slice(0, 10)
-  const samples = ctx.hr.get(d) || []
-  if (!samples.length) return null
-  const restingHr = Number(row.resting_hr)
-  const reserve = Number(row.hr_max) - restingHr
-  const wakeTime = ctx.wake.get(d) ?? samples[0].tsMs
-  return {
-    d, samples, restingHr, reserve, wakeTime, anchor: Number(row.anchor),
-    stored: { charged: Number(row.total_charged), drained: Number(row.total_drained), n: Number(row.hr_sample_count) },
-    params: {
-      ...SHIPPED, restThreshold: ctx.restThresholdFromOffset(SHIPPED.restOffsetBpm, reserve),
-      anchor: Number(row.anchor), wakeTime, restingHr, reserve, stressAt: () => null,
-    },
-  }
+/**
+ * True only for a Postgres URL on this machine: a socket (`host=/tmp`, or no host at all),
+ * localhost or 127.0.0.1. `new URL` rejects the empty-host socket form, so the host is read by hand.
+ */
+function isLocalDatabase(url) {
+  const m = /^postgres(?:ql)?:\/\/(?:[^@/?#]*@)?([^/?#]*)[^?#]*(?:\?([^#]*))?/.exec(String(url))
+  if (!m) return false
+  const hostPort = m[1]
+  const host = hostPort.startsWith('[') ? hostPort.slice(1, hostPort.indexOf(']')) : hostPort.split(':')[0]
+  const query = new URLSearchParams(m[2] || '')
+  const socket = query.get('host')
+  if (host === '') return socket == null || socket.startsWith('/')
+  return ['localhost', '127.0.0.1', '::1'].includes(host) && (socket == null || socket.startsWith('/'))
 }
 
-function validate(ctx) {
-  console.log('Replaying each day with the SAME sample count the route persisted.\n')
-  console.log('date          n   HR-drain  stored  residual  implied|stress|')
-  let bad = 0, tested = 0
-  for (const row of ctx.days.slice(-14)) {
-    const day = buildDay(ctx, row)
-    if (!day || !day.stored.n) continue
-    const s = day.samples.slice(0, day.stored.n)
-    const r = ctx.walkBodyBattery(s, day.params)
-    let prev = day.wakeTime, mins = 0
-    for (const x of s) {
-      const dt = (x.tsMs - prev) / 60000; prev = x.tsMs
-      if (dt <= 0 || dt > SHIPPED.gapHoldMin) continue
-      mins += Math.min(dt, SHIPPED.sampleCapMin)
-    }
-    const resid = day.stored.drained - r.drained
-    const implied = mins > 0 ? resid / (SHIPPED.stressDrainRate * mins) : NaN
-    tested++
-    // The residual is the unreplayed stress term. Outside [0,1] it is NOT stress, it is a harness bug.
-    if (!(implied >= -0.05 && implied <= 1.05)) bad++
-    console.log(`${day.d} ${String(day.stored.n).padStart(5)} ${r.drained.toFixed(1).padStart(10)}` +
-      `${String(day.stored.drained).padStart(8)}${resid.toFixed(1).padStart(10)}${implied.toFixed(2).padStart(16)}` +
-      (implied >= -0.05 && implied <= 1.05 ? '' : '   <-- OUT OF RANGE: harness bug, not stress'))
+async function capture(from, to, userId, out = CAPTURE) {
+  const url = process.env.LOCAL_DATABASE_URL || process.env.DATABASE_URL
+  if (!url || !isLocalDatabase(url)) {
+    throw new Error('--capture opens only a database on this machine (LOCAL_DATABASE_URL). Count production with --count-report.')
   }
-  console.log(`\n${tested - bad}/${tested} days imply a stress level inside [0,1].`)
-  console.log(bad ? 'FAIL — fix the harness before sweeping.' : 'PASS — the HR half replays faithfully.')
-  return bad === 0
+  process.env.DATABASE_URL = url
+  // The day never calls a model, but the repository module may set one up; keep it off.
+  process.env.GOOGLE_GENERATIVE_AI_API_KEY = ''
+  process.env.AI_DEV_DAILY_CALL_LIMIT = '0'
+  const m = await bundleReplay(true)
+  const repo = await m.getRepository()
+  const uid = userId || process.env.WEBHOOK_USER_ID
+  if (!uid) throw new Error('pass USER_ID (or set WEBHOOK_USER_ID)')
+  const { recording, dates } = await m.captureFinishedDays(repo, uid, TZ, from, to)
+  fs.mkdirSync(path.dirname(out), { recursive: true })
+  fs.writeFileSync(out, JSON.stringify({ dates, recording: JSON.parse(m.serialiseRecording(recording)) }))
+  console.log(`captured ${dates.length} days (${recording.calls.length} reads) into ${out}`)
+}
+
+async function replayFile(file = CAPTURE) {
+  const m = await bundleReplay(false)
+  const { dates, recording } = JSON.parse(fs.readFileSync(file, 'utf8'))
+  const days = await m.replayFinishedDays(m.parseRecording(JSON.stringify(recording)), dates)
+  return { m, days }
+}
+
+function printCount(count, heading) {
+  console.log(heading)
+  console.log(`  days examined        ${count.daysExamined}`)
+  console.log(`  end value unchanged  ${count.unchanged}`)
+  console.log(`  end value changes    ${count.changed}  (${count.up} up, ${count.down} down)`)
+  for (const [band, n] of Object.entries(count.bands)) console.log(`    by ${band.padEnd(6)} points  ${n}`)
+  console.log(`  no stored row, a recompute would add one  ${count.wouldAdd}`)
+  for (const k of ['noRow', 'beforeSignOff', 'keptByWriteGuard']) if (k in count) console.log(`  ${k.padEnd(20)} ${count[k]}`)
+  console.log(`  not recomputed       ${count.notRecomputed}`)
+}
+
+async function replayCommand(file) {
+  const { days } = await replayFile(file)
+  let same = 0, compared = 0
+  for (const d of days) {
+    if (!d.stored || !d.recomputed) continue
+    compared++
+    if (d.stored.endValue === d.recomputed.endValue && d.stored.totalCharged === d.recomputed.totalCharged
+      && d.stored.totalDrained === d.recomputed.totalDrained) same++
+  }
+  console.log(`replayed ${days.length} days: ${days.filter(d => d.recomputed).length} recomputed, ${days.filter(d => d.error).length} failed`)
+  console.log(`${same}/${compared} stored rows match the full-day recompute exactly (a morning snapshot does not).`)
+}
+
+async function countCommand(file) {
+  const { m, days } = await replayFile(file)
+  printCount(m.endValueChangeBands(days.map(d => ({ stored: d.stored?.endValue, recomputed: d.recomputed?.endValue }))),
+    'Finished days whose stored end value would change if finalised from the full day:')
+}
+
+async function countReportCommand(files) {
+  const m = await bundleReplay(false)
+  const days = files.flatMap(f => {
+    const body = JSON.parse(fs.readFileSync(f, 'utf8'))
+    // The agent key wraps the job's result; the admin route returns the report itself.
+    const report = body.report ?? body.result?.report ?? body
+    if (!Array.isArray(report.days)) throw new Error(`${f}: no \`days\` in this report`)
+    if (report.dryRun === false) console.log(`warning: ${f} is a real run, not a dry run`)
+    return report.days
+  })
+  printCount(m.endValueChangeBandsFromReport({ days }), 'Re-derive dry run: finished days whose stored end value would change:')
 }
 
 /**
@@ -227,7 +229,7 @@ function summarise(rows, prefix) {
   }
 }
 
-function check(prefix = 'v7') {
+function check(prefix = 'v9') {
   const rows = JSON.parse(fs.readFileSync(path.join(DIR, 'days.json'), 'utf8')).rows
   const s = summarise(rows, prefix)
   console.log(`Stored ${prefix} rows: ${s.days} days, ${s.informativeDays} informative (>= ${MIN_SAMPLES} HR samples).`)
@@ -240,12 +242,19 @@ function check(prefix = 'v7') {
   return s
 }
 
-if (require.main === module) {
-  const arg = process.argv[2]
-  if (arg === '--pull') pull(Number(process.argv[3]) || 70)
-  else if (arg === '--validate') process.exit(validate(load()) ? 0 : 1)
-  else if (arg === '--check') check(process.argv[3] || 'v7')
+async function main() {
+  const [arg, ...rest] = process.argv.slice(2)
+  if (arg === '--pull') pull(Number(rest[0]) || 70)
+  else if (arg === '--check') check(rest[0] || 'v9')
+  else if (arg === '--capture') await capture(rest[0], rest[1], rest[2])
+  else if (arg === '--replay') await replayCommand(rest[0])
+  else if (arg === '--count') await countCommand(rest[0])
+  else if (arg === '--count-report') await countReportCommand(rest)
   else console.log(fs.readFileSync(__filename, 'utf8').split('*/')[0])
 }
 
-module.exports = { load, buildDay, validate, summarise, SHIPPED, V6, V5 }
+if (require.main === module) {
+  main().then(() => process.exit(0), err => { console.error(err.message || err); process.exit(1) })
+}
+
+module.exports = { summarise, bundleReplay, isLocalDatabase }

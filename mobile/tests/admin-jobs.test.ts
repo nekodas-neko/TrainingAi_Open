@@ -6,6 +6,7 @@ import {
   canWrite,
   jobFailure,
   jobQuery,
+  jobReport,
   rangeProblem,
   remainingOf,
   summaryRows,
@@ -86,4 +87,49 @@ test('failures say nothing was written only when the server said so', () => {
 test('the typed word is the same one the panel shows', () => {
   const card = readFileSync(new URL('../src/features/admin/components/AdminJobCard.tsx', import.meta.url), 'utf8');
   assert.ok(card.includes('WRITE_PHRASE'));
+});
+
+test('the two heart-rate snapshot backfills are listed, each with a count preview (#3882)', () => {
+  const counted = adminJobs.filter((job) => job.countPreview);
+  assert.deepEqual(
+    counted.map((job) => job.path),
+    ['/api/oura-ble/backfill-hr-stats', '/api/workout/backfill-set-hr-stats'],
+  );
+  for (const job of counted) {
+    assert.equal(job.range, 'none');
+    assert.equal(job.movesPastScores, undefined, 'they add rows and move no score');
+    const route = readFileSync(
+      new URL(`../..${job.path.replace('/api/', '/app/api/')}/route.ts`, import.meta.url),
+      'utf8',
+    );
+    assert.match(route, /export async function GET/, `${job.path} answers the read-only count`);
+  }
+});
+
+test('a count preview is read with GET and never with the POST that runs the backfill', () => {
+  const card = readFileSync(
+    new URL('../src/features/admin/components/AdminJobCard.tsx', import.meta.url),
+    'utf8',
+  );
+  assert.match(card, /job\.countPreview && !write\s*\?\s*await reader!\.get\(job\.path\)/);
+  assert.match(card, /job\.countPreview && !write && !reader\) return/, 'no reader, no request at all');
+});
+
+test('a count preview keeps its server answer, and a run is given a summary the card can read', () => {
+  const job = { countPreview: true };
+  const preview = { dryRun: true, summary: { sessionsToProcess: 12, atLeast: false } };
+  assert.deepEqual(jobReport(job, preview, false), preview);
+  assert.equal(canWrite({ dry: jobReport(job, preview, false), dryParams: none, params: none, snapshot: true, typed: 'WRITE' }), true);
+  assert.deepEqual(jobReport(job, { processed: 12, withData: 9, remaining: true }, true), {
+    dryRun: false,
+    summary: { processed: 12, withData: 9, moreToProcess: true },
+  });
+  assert.deepEqual(summaryRows(jobReport(job, { processed: 3, withData: 3, remaining: false }, true)), [
+    { label: 'processed', value: '3' },
+    { label: 'withData', value: '3' },
+    { label: 'moreToProcess', value: 'false' },
+  ]);
+  const other = { dryRun: true, summary: { wouldWrite: 1 } };
+  assert.deepEqual(jobReport({}, other, false), other, 'other jobs pass through untouched');
+  assert.equal(canWrite({ dry: jobReport(job, { processed: 1 }, false), dryParams: none, params: none, snapshot: true, typed: 'WRITE' }), false, 'an answer that is not a count never unlocks a write');
 });
