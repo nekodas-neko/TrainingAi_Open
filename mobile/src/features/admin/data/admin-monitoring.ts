@@ -18,6 +18,8 @@ const errorEventSchema = z
 export type AdminErrorEvent = z.infer<typeof errorEventSchema>;
 export const adminErrorsSpec = {
   path: '/api/admin/errors',
+  // #3951: every account's errors, so the server serves them to the owner only.
+  deniedMessage: 'Owner only. Error events are visible to the owner account, not to other admins.',
   ttl: 30_000,
   cache: noDiskCache,
   schema: z.array(errorEventSchema),

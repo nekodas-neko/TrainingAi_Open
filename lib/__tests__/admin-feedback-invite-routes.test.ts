@@ -20,7 +20,7 @@
  * surrounding whitespace**, because an already-normalised address makes the normalising and
  * non-normalising versions identical and tests neither.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
 type Row = Record<string, unknown>
@@ -32,7 +32,11 @@ const listInvites = vi.fn(async () => [] as string[])
 const addInvite = vi.fn(async (_e: string) => undefined)
 const removeInvite = vi.fn(async (_e: string) => undefined)
 
-let sessionUser: { id: string; isAdmin?: boolean } | null = { id: 'u-1', isAdmin: true }
+// #3951: the errors and feedback routes serve only the owner, so the signed-in admin here is the
+// configured owner (`CLAUDE_RO_OWNER_USER_ID`). A second admin's refusal is tested against real rows
+// in `app/api/admin/__tests__/owner-only-errors-feedback-3951.test.ts`.
+const SESSION_OWNER = '00000000-0000-4000-8000-0000000039a1'
+let sessionUser: { id: string; isAdmin?: boolean } | null = { id: SESSION_OWNER, isAdmin: true }
 vi.mock('@/auth', () => ({ auth: async () => (sessionUser ? { user: sessionUser } : null) }))
 vi.mock('@/lib/data', () => {
   // One repo for both accessors — the admin gate runs for real rather than stubbed.
@@ -59,8 +63,11 @@ beforeEach(() => {
   getUserById.mockResolvedValue({ isActive: true, isAdmin: true })
   listFeedback.mockResolvedValue([])
   listInvites.mockResolvedValue([])
-  sessionUser = { id: 'u-1', isAdmin: true }
+  sessionUser = { id: SESSION_OWNER, isAdmin: true }
+  vi.stubEnv('CLAUDE_RO_OWNER_USER_ID', SESSION_OWNER)
 })
+
+afterEach(() => { vi.unstubAllEnvs() })
 
 describe('the admin gate across both queues', () => {
   const ALL: [string, () => Promise<Response>][] = [
@@ -79,7 +86,7 @@ describe('the admin gate across both queues', () => {
 
   it('ignores a stale isAdmin claim and asks the database', async () => {
     // Claim true, row false. With both false the route could read either and still refuse.
-    sessionUser = { id: 'u-1', isAdmin: true }
+    sessionUser = { id: SESSION_OWNER, isAdmin: true }
     getUserById.mockResolvedValue({ isActive: true, isAdmin: false })
     for (const [name, call] of ALL) expect((await call()).status, name).toBe(403)
     expect(deleteFeedback).not.toHaveBeenCalled()

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { requireAdmin, adminErrorResponse } from '@/lib/admin'
+import { requireOwnerSession } from '@/lib/admin/claude-token-auth'
 
 export async function GET() {
   const session = await auth()
@@ -15,10 +16,13 @@ export async function GET() {
     return adminErrorResponse(err)
   }
 
+  // #3951: only the owner can open feedback, so only the owner's badge counts it. Another admin's
+  // would be a dot they can never clear.
   const repo = await getRepository()
+  const isOwner = (await requireOwnerSession(session.user.id)).ok
   const [count, feedbackCount] = await Promise.all([
     repo.countInactiveUsers(),
-    repo.countFeedback(),
+    isOwner ? repo.countFeedback() : 0,
   ])
   return NextResponse.json({ count, feedbackCount }, {
     headers: { 'Cache-Control': 'private, no-store' },

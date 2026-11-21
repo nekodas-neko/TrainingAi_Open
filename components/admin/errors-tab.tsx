@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { EmptyState } from '@/components/ui/empty-state'
 
 interface ErrorEvent {
   id: string
@@ -17,12 +18,19 @@ export default function ErrorsTab() {
   const [events, setEvents] = useState<ErrorEvent[]>([])
   const [loading, setLoading] = useState(true)
   const [expanded, setExpanded] = useState<string | null>(null)
+  // #3951: error events are the owner's to read. Another admin is refused (403), and a failed load is
+  // a failure: neither may read as "No errors recorded".
+  const [failure, setFailure] = useState<'owner-only' | 'failed' | null>(null)
 
   useEffect(() => {
     fetch('/api/admin/errors')
-      .then(r => r.ok ? r.json() : [])
-      .then(d => setEvents(Array.isArray(d) ? d : []))
-      .catch(() => {})
+      .then(async r => {
+        if (r.status === 403) { setFailure('owner-only'); return }
+        if (!r.ok) { setFailure('failed'); return }
+        const d = await r.json()
+        setEvents(Array.isArray(d) ? d : [])
+      })
+      .catch(() => setFailure('failed'))
       .finally(() => setLoading(false))
   }, [])
 
@@ -33,6 +41,9 @@ export default function ErrorsTab() {
       </div>
     )
   }
+
+  if (failure === 'owner-only') return <EmptyState title="Only the owner can see error events." />
+  if (failure === 'failed') return <EmptyState title="Could not load error events." />
 
   if (events.length === 0) {
     return <p className="text-center text-muted-foreground py-8">No errors recorded — nice.</p>
