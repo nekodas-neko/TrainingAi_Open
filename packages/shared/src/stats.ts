@@ -58,3 +58,14 @@ export function lowerMedian(values: number[]): number | null {
   const s = [...values].sort((a, b) => a - b)
   return s[Math.floor((s.length - 1) / 2)]
 }
+
+/** Round to `places` decimal places (half away from zero for positives, like `Math.round`). */
+export function roundTo(n: number, places: number): number {
+  const f = 10 ** places
+  return Math.round(n * f) / f
+}
+
+/** Bound `n` to `lo..hi`. */
+export function clamp(n: number, lo: number, hi: number): number {
+  return Math.max(lo, Math.min(hi, n))
+}

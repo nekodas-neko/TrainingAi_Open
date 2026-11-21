@@ -7,6 +7,8 @@
 // but not numerically identical to, what the Renpho app shows for the same weigh-in. That is
 // expected, not a bug. Plan: docs/superpowers/plans/2026-07-27-renpho-ble-direct-scale.md
 
+import { clamp } from '@trainingai/shared/stats'
+
 /** Weight delta from the user's last confirmed reading, above which a new weigh-in is staged
  *  as "pending" instead of auto-saved (owner's partner also uses this scale). */
 export const SCALE_WEIGHT_ANOMALY_PCT = 0.15
@@ -104,10 +106,6 @@ export interface ScaleComposition {
   proteinPct: number
   bmrKcal: number
   metabolicAge: number
-}
-
-function clamp(n: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, n))
 }
 
 /** Height²/impedance is the standard BIA predictor variable used across the literature.

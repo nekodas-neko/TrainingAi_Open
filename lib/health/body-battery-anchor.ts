@@ -1,3 +1,5 @@
+import { clamp } from '@trainingai/shared/stats'
+
 export type AnchorSource = 'readiness' | 'sleep' | 'default'
 
 export interface AnchorInputs {
@@ -14,10 +16,6 @@ export interface AnchorResult {
   anchorSource: AnchorSource
   /** True while the anchor may still be replaced today (sleep/default, pre-readiness). */
   provisional: boolean
-}
-
-function clamp(n: number, lo: number, hi: number): number {
-  return Math.max(lo, Math.min(hi, n))
 }
 
 /**

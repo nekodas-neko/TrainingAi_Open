@@ -25,7 +25,7 @@
  * - **A graded ceiling** (#2832): readiness is the lower of the weighted sum and the lowest cap among
  *   the red flags that fired. Scoring is untouched; only the final number is limited.
  */
-import { median, quantile } from '@trainingai/shared/stats'
+import { clamp, median, quantile, roundTo } from '@trainingai/shared/stats'
 import { daysBetweenDateStrs, shiftDateStr } from '@trainingai/shared/date-utils'
 import { computeIllnessRadar } from '@trainingai/shared/health/illness-radar'
 import type { ShadowReadinessPillar, ShadowReadinessStage } from '@trainingai/shared/types/body'
@@ -134,9 +134,6 @@ export interface ShadowScoreResult {
 }
 
 // ── Small pure helpers ───────────────────────────────────────────────────────────────────────────
-
-const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v))
-const round1 = (v: number) => Math.round(v * 10) / 10
 
 /** Piecewise-linear interpolation over a yardstick, clamped at its ends. Works for descending
  *  value axes too (resting HR: lower is better) because points are taken in the order given. */
@@ -369,14 +366,14 @@ export function scoreUnit(
 
   const base: Omit<ShadowUnitResult, 'score' | 'spread' | 'level' | 'day' | 'normal' | 'gap' | 'note'> = {
     quality: qualityFactor(today.rung),
-    reliability: round3(reliabilityFactor(def, input?.history ?? [], today.date)),
+    reliability: roundTo(reliabilityFactor(def, input?.history ?? [], today.date), 3),
     weight: 0, stage, validDays, value: round1Maybe(today.value), provenance,
     daytimeThrough: def.daytime ? today.date : null, flags,
   }
 
   // Fuel is scored from its parts by the caller (`scoreFuel`); the unit carries the result.
   if (def.id === 'body.fuel') {
-    return { ...base, stage: 'settled', score: round1(clamp(today.value, 0, 100)), spread: null, level: null, day: null, normal: null, gap: null, note: input?.note ?? null }
+    return { ...base, stage: 'settled', score: roundTo(clamp(today.value, 0, 100), 1), spread: null, level: null, day: null, normal: null, gap: null, note: input?.note ?? null }
   }
 
   const band = bandFor(def, input!, context)
@@ -399,10 +396,10 @@ export function scoreUnit(
     const level = def.shape !== 'sweet_spot' ? null : normal ? rangeScore(normal.normal, band) : score
     return {
       ...base,
-      score: round1(score),
+      score: roundTo(score, 1),
       spread: normal ? round1Maybe(normal.spread) : null,
-      level: level == null ? null : round1(level),
-      day: level == null || !normal ? null : round1(score - level),
+      level: level == null ? null : roundTo(level, 1),
+      day: level == null || !normal ? null : roundTo(score - level, 1),
       normal: normal ? round1Maybe(normal.normal) : null,
       gap: null,
       note: input?.note ?? (def.reference === 'guarded' && normal
@@ -420,7 +417,7 @@ export function scoreUnit(
       return { ...base, score: null, spread: null, level: null, day: null, normal: null, gap: 'learning', note: 'Learning: no personal normal yet, and this unit has no population yardstick.' }
     }
     const level = gradeOnYardstick(today.value, yardstick)
-    return { ...base, score: round1(clamp(level, 0, 100)), spread: null, level: round1(level), day: null, normal: null, gap: null, note: 'Learning: Level from the population yardstick, Day withheld.' }
+    return { ...base, score: roundTo(clamp(level, 0, 100), 1), spread: null, level: roundTo(level, 1), day: null, normal: null, gap: null, note: 'Learning: Level from the population yardstick, Day withheld.' }
   }
 
   const deviation = (today.value - normal.normal) / normal.spread
@@ -439,10 +436,10 @@ export function scoreUnit(
   }
   return {
     ...base,
-    score: round1(clamp(start + day, 0, 100)),
+    score: roundTo(clamp(start + day, 0, 100), 1),
     spread: round1Maybe(normal.spread),
-    level: level == null ? null : round1(level),
-    day: round1(day),
+    level: level == null ? null : roundTo(level, 1),
+    day: roundTo(day, 1),
     normal: round1Maybe(normal.normal),
     gap: null,
     note: input?.note ?? (level == null && def.shape === 'directional' ? `No Level yardstick: learned base ${LEARNED_BASE} at the normal.` : null),
@@ -481,7 +478,7 @@ function ceilingCaps(units: Record<ShadowUnitId, ShadowUnitResult>, input: Shado
   if (!waitingOnCycle && temp.score != null && temp.value != null) {
     const excess = temp.value - (temp.normal ?? 0)
     if (excess >= CEILING.temperature[0][0]) {
-      caps.push({ id: 'temperature', cap: round1(gradeOnYardstick(excess, CEILING.temperature)), why: `Temperature ${round1(excess)} °C above normal.` })
+      caps.push({ id: 'temperature', cap: roundTo(gradeOnYardstick(excess, CEILING.temperature), 1), why: `Temperature ${roundTo(excess, 1)} °C above normal.` })
     }
   }
 
@@ -567,18 +564,18 @@ export function scoreShadowReadiness(input: ShadowScoreInput): ShadowScoreResult
       const factors = u.quality * u.reliability
       // #2356: a new unit counts half until it has settled. That moves points inside its pillar only;
       // quality and reliability also move the pillar (through its confidence below).
-      u.weight = round3(held.get(id)! * factors * (def.isNew && u.stage !== 'settled' ? NEW_UNIT_WEIGHT_FACTOR : 1))
+      u.weight = roundTo(held.get(id)! * factors * (def.isNew && u.stage !== 'settled' ? NEW_UNIT_WEIGHT_FACTOR : 1), 3)
       sumW += u.weight
       sumWS += u.weight * u.score!
       heldTotal += held.get(id)!
       heldConfident += held.get(id)! * factors
     }
     const scored: Record<string, number> = {}
-    for (const id of scoredIds) scored[id] = round3(units[id].weight / sumW)
+    for (const id of scoredIds) scored[id] = roundTo(units[id].weight / sumW, 3)
     const confidence = heldTotal > 0 ? heldConfident / heldTotal : 0
-    pillars[pillar] = sumW > 0 ? round1(sumWS / sumW) : null
+    pillars[pillar] = sumW > 0 ? roundTo(sumWS / sumW, 1) : null
     worth[pillar] = pillars[pillar] == null ? 0 : PILLAR_POINTS[pillar] * confidence
-    pillarDetail[pillar] = { effectiveWeight: 0, points: PILLAR_POINTS[pillar], confidence: round3(confidence), scored, dropped }
+    pillarDetail[pillar] = { effectiveWeight: 0, points: PILLAR_POINTS[pillar], confidence: roundTo(confidence, 3), scored, dropped }
   }
 
   let sumW = 0
@@ -589,9 +586,9 @@ export function scoreShadowReadiness(input: ShadowScoreInput): ShadowScoreResult
     sumWS += worth[p] * pillars[p]!
   }
   for (const p of SHADOW_PILLARS) {
-    pillarDetail[p].effectiveWeight = pillars[p] == null || sumW === 0 ? 0 : round3(worth[p] / sumW)
+    pillarDetail[p].effectiveWeight = pillars[p] == null || sumW === 0 ? 0 : roundTo(worth[p] / sumW, 3)
   }
-  const uncapped = sumW > 0 ? round1(clamp(sumWS / sumW, 0, 100)) : null
+  const uncapped = sumW > 0 ? roundTo(clamp(sumWS / sumW, 0, 100), 1) : null
 
   // The ceiling: the lowest cap among the red flags that fired.
   const { caps, waitingOnCycle } = ceilingCaps(units, input)
@@ -623,4 +620,3 @@ export function scoreShadowReadiness(input: ShadowScoreInput): ShadowScoreResult
   }
 }
 
-const round3 = (v: number) => Math.round(v * 1000) / 1000

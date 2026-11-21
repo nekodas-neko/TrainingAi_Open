@@ -81,6 +81,13 @@
     "inspect:legacy": "node scripts/inspect-legacy-data.mjs",
     "lint": "eslint . --max-warnings=45"
   },
+  "pnpm": {
+    "overrides": {
+      "shell-quote@<1.11.0": ">=1.11.0 <2",
+      "node-forge@<1.4.3": ">=1.4.3 <2",
+      "source-map-js@<1.2.2": ">=1.2.2 <2"
+    }
+  },
   "private": true,
   "packageManager": "pnpm@10.33.0",
   "type": "module"

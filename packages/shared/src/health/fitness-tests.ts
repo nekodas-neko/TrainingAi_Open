@@ -1,19 +1,16 @@
 // Cardio baseline / fitness-test estimators — One Formula, One Place.
 // Every VO2max equation is pinned to a published source, cited inline. Before
 // adding a new estimator here, confirm no duplicate exists (grep 'vo2max').
+import { roundTo } from '@trainingai/shared/stats'
 import { analyseHrRecovery, type HrReading } from '@trainingai/shared/workout/hr-analysis'
 import { computeObservedHr } from '@trainingai/shared/health/observed-hr'
 import { shiftDateStr } from '@trainingai/shared/date-utils'
 import { latestWeightKg } from '@trainingai/shared/health/latest-weight'
 
-function round1(x: number): number {
-  return Math.round(x * 10) / 10
-}
-
 /** The lowest VO₂max this file treats as a reading. Below it, a number is not a measurement. */
 const VO2_FLOOR = 10
 
-const clampVo2 = (v: number): number => round1(Math.max(VO2_FLOOR, Math.min(100, v)))
+const clampVo2 = (v: number): number => roundTo(Math.max(VO2_FLOOR, Math.min(100, v)), 1)
 
 /**
  * The shortest distance each protocol can turn into a reading (BF-158).
@@ -40,8 +37,8 @@ const clampVo2 = (v: number): number => round1(Math.max(VO2_FLOOR, Math.min(100,
  * under 952 m is 4.8 km/h, and a 6-minute walk under 220 m is 2.2 km/h.
  */
 export const MIN_SCOREABLE_DISTANCE_M: Record<Vo2Equation, number> = {
-  cooper: round1(VO2_FLOOR * 44.73 + 504.9),      // 952.2
-  '6mwt': round1((VO2_FLOOR - 4.948) / 0.023),    // 219.7
+  cooper: roundTo(VO2_FLOOR * 44.73 + 504.9, 1),      // 952.2
+  '6mwt': roundTo((VO2_FLOOR - 4.948) / 0.023, 1),    // 219.7
 }
 
 export type Vo2Equation = '6mwt' | 'cooper'
@@ -119,7 +116,7 @@ export function sixMwtVo2max(input: SixMwtInputs): number {
  *   VO2max = (distance(metres) − 504.9) / 44.73
  */
 export function cooperVo2max(distanceM: number): number {
-  return round1((distanceM - 504.9) / 44.73)
+  return roundTo((distanceM - 504.9) / 44.73, 1)
 }
 
 /**

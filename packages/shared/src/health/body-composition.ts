@@ -7,6 +7,8 @@
 // (bmr = ffm·21.6 + 370). One-Formula-One-Place: this is the only body-comp/BMR derivation for the
 // Oura program; a nutrition-goal BMR estimate lives separately in lib/nutrition (different purpose).
 
+import { roundTo } from '@trainingai/shared/stats'
+
 export interface BodyComposition {
   /** Fat mass in kg = weight · bodyFat%. */
   fatMassKg: number
@@ -115,8 +117,6 @@ export interface BodyCompSnapshot {
   source: 'derived'
 }
 
-const round1 = (x: number) => Math.round(x * 10) / 10
-
 export function bodyCompSnapshot(
   weightKg: number | null | undefined,
   bodyFatPct: number | null | undefined,
@@ -124,10 +124,10 @@ export function bodyCompSnapshot(
   const comp = bodyComposition(weightKg, bodyFatPct)
   if (comp == null) return null
   return {
-    weight_kg: round1(weightKg as number),
-    body_fat_pct: round1(bodyFatPct as number),
-    fat_mass_kg: round1(comp.fatMassKg),
-    ffm_kg: round1(comp.ffmKg),
+    weight_kg: roundTo(weightKg as number, 1),
+    body_fat_pct: roundTo(bodyFatPct as number, 1),
+    fat_mass_kg: roundTo(comp.fatMassKg, 1),
+    ffm_kg: roundTo(comp.ffmKg, 1),
     bmr_kcal: Math.round(comp.bmrKcal),
     source: 'derived',
   }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { iqrBand, lowerMedian, median, quantile } from '@trainingai/shared/stats'
+import { clamp, iqrBand, lowerMedian, median, quantile, roundTo } from '@trainingai/shared/stats'
 
 describe('median', () => {
   it('averages the two middle values on an even count', () => {
@@ -103,5 +103,32 @@ describe('iqrBand', () => {
 
   it('returns null for empty rather than a band at zero', () => {
     expect(iqrBand([], 1)).toBe(null)
+  })
+})
+
+describe('roundTo', () => {
+  it('rounds to the given decimal places like Math.round(n * 10^p) / 10^p', () => {
+    expect(roundTo(1.25, 1)).toBe(Math.round(1.25 * 10) / 10)
+    expect(roundTo(2.345, 2)).toBe(Math.round(2.345 * 100) / 100)
+    expect(roundTo(0.12345, 3)).toBe(0.123)
+    expect(roundTo(-0.04, 1)).toBe(Math.round(-0.04 * 10) / 10)
+    expect(roundTo(7.5, 0)).toBe(8)
+  })
+
+  it('passes non-finite values through as the inline form did', () => {
+    expect(roundTo(Number.NaN, 1)).toBeNaN()
+    expect(roundTo(Infinity, 2)).toBe(Infinity)
+  })
+})
+
+describe('clamp', () => {
+  it('bounds a value to lo..hi', () => {
+    expect(clamp(5, 0, 10)).toBe(5)
+    expect(clamp(-3, 0, 10)).toBe(0)
+    expect(clamp(42, 0, 10)).toBe(10)
+  })
+
+  it('keeps NaN as NaN, as Math.max/Math.min do', () => {
+    expect(clamp(Number.NaN, 0, 100)).toBeNaN()
   })
 })

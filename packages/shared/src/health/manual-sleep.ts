@@ -10,6 +10,7 @@
  * because nobody measured them. Those stay null rather than being estimated, and the sleep score
  * scores what is there (total sleep and timing) and reports the rest as missing coverage.
  */
+import { roundTo } from '@trainingai/shared/stats'
 import { z } from 'zod'
 import { toAestDay } from '@trainingai/shared/date-utils'
 import { manualSleepImplausibleReason } from '@trainingai/shared/validation/plausibility'
@@ -62,8 +63,6 @@ export interface ManualSleepNight {
   timeInBedHours: number
 }
 
-const round2 = (n: number) => Math.round(n * 100) / 100
-
 /**
  * The stored fields of a night from its window. The date is the local date the user WOKE on, in
  * their timezone — the date every `sleep_sessions` row carries and every reader looks a night up by.
@@ -74,7 +73,7 @@ export function manualNightFromWindow(
   tz: string,
   id?: string,
 ): ManualSleepNight {
-  const hours = round2((sleepEnd.getTime() - sleepStart.getTime()) / 3_600_000)
+  const hours = roundTo((sleepEnd.getTime() - sleepStart.getTime()) / 3_600_000, 2)
   return { id, date: toAestDay(sleepEnd, tz), sleepStart, sleepEnd, durationHours: hours, timeInBedHours: hours }
 }
 

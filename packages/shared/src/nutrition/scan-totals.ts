@@ -1,3 +1,4 @@
+import { clamp } from '@trainingai/shared/stats'
 import { KCAL_PER_G } from './atwater'
 import type { NutritionIngredient } from '@trainingai/shared/types/nutrition'
 
@@ -77,7 +78,6 @@ export interface RawNutrition {
   // `**/__tests__/**` from tsc entirely.
 }
 
-function clamp(v: number, min: number, max: number) { return Math.max(min, Math.min(max, v)) }
 function pos(v: unknown): number { return Math.max(0, Number(v) || 0) }
 
 /**
