@@ -8,7 +8,7 @@ import { shiftDateStr, weekStartForDay } from '../../date-utils'
 import {
   applyStepBack, dailyMinutesShare, firstJudgedWeek, initialWalkingState, judgeWeek, measureWeek,
   MINUTES_CEILING_PLUS, parseWalkingState, setMinutesCeiling, startingMinutesTarget, startingStepsTarget,
-  settleWeeks, stepBackOffers, stepsCeiling, walkingDayRationale, walkingDayVerdict, weeksInGrace, weeksToJudge,
+  settleWeeks, stepBackOffers, stepsCeiling, walkingDayRationale, walkingDayVerdict, walkingWeekStatus, weeksInGrace, weeksToJudge,
   type WalkingDayMeasure, type WalkingPlanState,
 } from '../walking-plan'
 
@@ -312,5 +312,97 @@ describe('the steps rule leaves rest and sick days out', () => {
   it('a week with no counted day is neutral', () => {
     const r = measureWeek(MONDAY, week(MONDAY, () => ({ steps: 9000, excluded: 'rest' })), levels)
     expect([r.countedDays, r.stepsMet, r.excluded]).toEqual([0, false, true])
+  })
+})
+
+describe('walkingWeekStatus — rule B (#3779)', () => {
+  // Fixed calendar strings, so nothing rolls with the clock. 140 a week = 20 a day.
+  const WEEK = '2026-11-16'
+  const at = (i: number) => shiftDateStr(WEEK, i)
+  type D = { stepsMet?: boolean; activeMinutes?: number; excluded?: 'rest' | 'sick' | null }
+  const status = (todayIdx: number, byDay: Record<number, D>, over: { startDate?: string; minutesTarget?: number } = {}) =>
+    walkingWeekStatus({
+      weekStart: WEEK, today: at(todayIdx), startDate: over.startDate ?? WEEK, minutesTarget: over.minutesTarget ?? 140,
+      days: Array.from({ length: todayIdx + 1 }, (_, i) => ({
+        date: at(i), stepsMet: false, activeMinutes: 0, excluded: null, ...byDay[i],
+      })),
+    })?.key ?? null
+  const stepDays = (n: number, from = 0): Record<number, D> =>
+    Object.fromEntries(Array.from({ length: n }, (_, i) => [from + i, { stepsMet: true }]))
+
+  it('is "Week met" when both targets are met, with its wording', () => {
+    const s = walkingWeekStatus({
+      weekStart: WEEK, today: at(4), startDate: WEEK, minutesTarget: 140,
+      days: Array.from({ length: 5 }, (_, i) => ({ date: at(i), stepsMet: true, activeMinutes: 30, excluded: null })),
+    })
+    expect(s).toEqual({ key: 'met', label: 'Week met' })
+  })
+  it('one target met only is not "Week met"', () => {
+    // Minutes met (150 >= 140), only 2 step days of 5 needed, and Friday/Saturday/Sunday can still add them.
+    expect(status(4, { 0: { activeMinutes: 150, stepsMet: true }, 1: { stepsMet: true } })).toBe('on_track')
+    // Steps met (5 days), minutes 100 of 140, one day left (Sunday): 40 to go > 20 a day.
+    expect(status(6, { ...stepDays(5), 0: { stepsMet: true, activeMinutes: 100 } })).toBe('behind')
+  })
+  it('is "On track" early in the week with nothing done yet', () => {
+    expect(status(0, {})).toBe('on_track')
+    expect(walkingWeekStatus({ weekStart: WEEK, today: at(0), startDate: WEEK, minutesTarget: 140, days: [] })?.label).toBe('On track')
+  })
+  it('is "Behind" when the minutes left exceed the days left × the daily share', () => {
+    // Today Sunday: one day left, 20 a day. 100 done of 140 → 40 to go.
+    expect(status(6, { ...stepDays(5), 0: { stepsMet: true, activeMinutes: 100 } })).toBe('behind')
+    // Same week with 120 done: 20 to go fits in the one day left.
+    expect(status(6, { ...stepDays(5), 0: { stepsMet: true, activeMinutes: 120 } })).toBe('on_track')
+  })
+  it('is "Behind" when the step days cannot reach min(5, counted days)', () => {
+    // Saturday: 2 step days met, today and Sunday could add 2 → 4 < 5. Minutes are not the problem.
+    expect(status(5, { ...stepDays(2), 0: { stepsMet: true, activeMinutes: 140 } })).toBe('behind')
+    // With 3 met, today + Sunday reach 5.
+    expect(status(5, { ...stepDays(3), 0: { stepsMet: true, activeMinutes: 140 } })).toBe('on_track')
+  })
+  it('does not count today twice when today already met the steps', () => {
+    // Saturday, 4 met including today: only Sunday can add one → 5. With 3 met incl. today → 4.
+    expect(status(5, { ...stepDays(2), 4: { stepsMet: true }, 5: { stepsMet: true }, 0: { stepsMet: true, activeMinutes: 140 } })).toBe('on_track')
+    expect(status(5, { 1: { stepsMet: true }, 4: { stepsMet: true }, 5: { stepsMet: true }, 0: { activeMinutes: 140 } })).toBe('behind')
+  })
+  it('leaves rest and sick days out of the counts', () => {
+    // Mon sick and Tue rest: 5 counted days, so 5 step days are needed (min(5, 5)). Minutes are met.
+    const out = { 0: { excluded: 'sick' as const }, 1: { excluded: 'rest' as const } }
+    // Thursday: Wed and today met, Fri, Sat, Sun can add 3 → 5. On track.
+    expect(status(3, { ...out, 2: { stepsMet: true, activeMinutes: 140 }, 3: { stepsMet: true } })).toBe('on_track')
+    // Saturday: Wed, Thu, Fri met, Sat not met; Sat and Sun can add 2 → 5. On track.
+    expect(status(5, { ...out, 2: { stepsMet: true, activeMinutes: 140 }, 3: { stepsMet: true }, 4: { stepsMet: true } })).toBe('on_track')
+    // Saturday with only Wed and Thu met: 2 + 2 = 4 < 5. Behind.
+    expect(status(5, { ...out, 2: { stepsMet: true, activeMinutes: 140 }, 3: { stepsMet: true } })).toBe('behind')
+    // Minutes logged on a left-out day are not counted, and a left-out day is not a day left.
+    expect(status(6, { ...stepDays(5), 6: { excluded: 'rest', activeMinutes: 140 } })).toBe('behind')
+    // Without that rest day, Sunday's 20 minutes would fit 20 to go.
+    expect(status(6, { ...stepDays(5), 0: { stepsMet: true, activeMinutes: 120 } })).toBe('on_track')
+    // One counted day left in the whole week needs min(5, 1) = 1 step day, not 5.
+    const allOut = Object.fromEntries([0, 1, 2, 3, 4, 5].map((i) => [i, { excluded: 'sick' as const }]))
+    expect(status(6, { ...allOut, 6: { stepsMet: true, activeMinutes: 140 } })).toBe('met')
+  })
+  it('gives a plan that began mid-week a status over its own days', () => {
+    // Plan began Thursday: 4 counted days, so min(5, 4) = 4 step days are needed. The minutes target
+    // is not prorated (rest and sick days do not lower it either), so use one the 4 days can reach.
+    const small = { startDate: at(3), minutesTarget: 56 } // 8 a day
+    // The target is not prorated, so on day one 56 minutes do not fit 4 days × 8; 24 done today do.
+    expect(status(3, {}, small)).toBe('behind')
+    expect(status(3, { 3: { activeMinutes: 24 } }, small)).toBe('on_track')
+    // Friday, Thursday's steps met: 1 + Fri, Sat, Sun = 4. 56 − 24 = 32 to go, 3 days × 8 = 24 → behind.
+    expect(status(4, { 3: { stepsMet: true, activeMinutes: 24 } }, small)).toBe('behind')
+    expect(status(4, { 3: { stepsMet: true, activeMinutes: 32 } }, small)).toBe('on_track')
+    // Minutes logged before the plan began are not the plan's: counting them would make it "met".
+    expect(status(4, { 1: { activeMinutes: 56 }, 3: { stepsMet: true } }, small)).toBe('behind')
+    // And a Thursday-start week can still not need more than its 4 days: all 4 met with minutes is "met".
+    expect(status(6, { 3: { stepsMet: true, activeMinutes: 28 }, 4: { stepsMet: true, activeMinutes: 28 }, 5: { stepsMet: true }, 6: { stepsMet: true } }, small)).toBe('met')
+  })
+  it('has no status without a plan week', () => {
+    // The plan starts after this week ends.
+    expect(status(3, {}, { startDate: shiftDateStr(WEEK, 7) })).toBeNull()
+    // The shown day is outside the shown week.
+    expect(walkingWeekStatus({ weekStart: WEEK, today: shiftDateStr(WEEK, 8), startDate: WEEK, minutesTarget: 140, days: [] })).toBeNull()
+    // Every day left out.
+    const all = Object.fromEntries(Array.from({ length: 7 }, (_, i) => [i, { excluded: 'sick' as const }]))
+    expect(status(6, all)).toBeNull()
   })
 })
