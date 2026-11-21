@@ -17,7 +17,8 @@ vi.mock('@/auth', () => ({ auth: vi.fn(async () => ({ user: { id: 'u1', timezone
 vi.mock('@/lib/rate-limit', () => ({ rateLimit: () => true }))
 vi.mock('@/lib/data', () => ({ getRepositoryAsync: async () => ({ getActiveProgram: async () => program }) }))
 
-import { GET, matchesExerciseQuery } from '@/app/api/coach/options/route'
+import { GET } from '@/app/api/coach/options/route'
+import { matchesExerciseQuery } from '@/lib/coach/exercise-query'
 
 const ids = async (query?: string) => {
   const qs = new URLSearchParams({ source: 'exercises', ...(query !== undefined ? { query } : {}) })

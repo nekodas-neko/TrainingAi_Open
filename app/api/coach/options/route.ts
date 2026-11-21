@@ -7,6 +7,7 @@ import { CHOICE_SOURCES } from '@/lib/coach/widgets'
 import { GROCERY_CATALOGUE, type GroceryCatalogueKey } from '@trainingai/shared/nutrition/grocery-catalogue'
 import { injurySafeAlternatives } from '@trainingai/shared/workout/injury-substitution'
 import { errorLog } from '@trainingai/shared/logger'
+import { matchesExerciseQuery } from '@/lib/coach/exercise-query'
 
 const QuerySchema = z.object({
   source: z.enum(CHOICE_SOURCES),
@@ -15,13 +16,6 @@ const QuerySchema = z.object({
   // widget's own field; it is matched in code and never reaches a query or a prompt.
   query: z.string().trim().min(1).max(60).optional(),
 }).strict()
-
-/** Every word of the query, in any order, inside the name — so "cable pulldown" finds "Cable Lat
- *  Pulldown". Case-insensitive; plain substring tests, no pattern built from the user's words. */
-export function matchesExerciseQuery(name: string, query: string): boolean {
-  const hay = name.toLowerCase()
-  return query.toLowerCase().split(/\s+/).filter(Boolean).every(word => hay.includes(word))
-}
 
 /**
  * The rows behind a Coach picker, read straight from the user's own data.
