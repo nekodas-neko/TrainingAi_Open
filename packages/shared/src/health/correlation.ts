@@ -1,6 +1,8 @@
 // Generic bucketed-correlation engine, extracted from
 // app/api/sleep-performance-correlation/route.ts so all trend views share it.
 
+import { roundTo } from '@trainingai/shared/stats'
+
 export interface BucketDef { label: string; min: number; max: number } // [min, max)
 export interface CorrelationBucket { label: string; avg: number; count: number }
 
@@ -222,7 +224,7 @@ export function correlationInsight(
   const n = points.length
   const r = pearson(points) ?? 0
   const p = pValueForR(r, n)
-  const stats: CorrelationStats = { n, r: round3(r), p: round3(p) }
+  const stats: CorrelationStats = { n, r: roundTo(r, 3), p: roundTo(p, 3) }
 
   if (n < minN) {
     return { insight: `Only ${n} paired days so far — not enough to say anything either way.`, hasSufficientData, stats, withheld: 'sample' }
@@ -237,8 +239,8 @@ export function correlationInsight(
     const pr = partialCorrelation(points.map((pt, i) => ({ ...pt, c: control[i] })))
     if (pr !== null) {
       const pp = pValueForR(pr, n)
-      stats.partialR = round3(pr)
-      stats.partialP = round3(pp)
+      stats.partialR = roundTo(pr, 3)
+      stats.partialP = roundTo(pp, 3)
       if (pp > alpha) {
         return {
           insight: `This pattern disappears once the calendar trend is removed — both measures have simply been drifting together over ${n} days.`,
@@ -309,6 +311,3 @@ export function sessionMean1RmPct(
   return pcts.reduce((a, v) => a + v, 0) / pcts.length
 }
 
-function round3(v: number): number {
-  return Math.round(v * 1000) / 1000
-}

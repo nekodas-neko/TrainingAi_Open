@@ -7,6 +7,7 @@ import {
   supplementReminderDue,
   supplementReminderText,
 } from '@trainingai/shared/reminders/daily-reminders'
+import { notifiedTodayStore } from './notified-today'
 
 export const SUPPLEMENT_REMINDERS_CHANNEL = 'supplement-reminders'
 export const SUPPLEMENT_REMINDER_ROUTE = '/nutrition'
@@ -58,20 +59,7 @@ export function computeSupplementReminderActions(
   })
 }
 
-function readNotifiedToday(): Record<string, string> {
-  try {
-    const raw = localStorage.getItem(NOTIFIED_TODAY_KEY)
-    return raw ? JSON.parse(raw) : {}
-  } catch {
-    return {}
-  }
-}
-
-function writeNotifiedToday(map: Record<string, string>): void {
-  try {
-    localStorage.setItem(NOTIFIED_TODAY_KEY, JSON.stringify(map))
-  } catch {}
-}
+const { read: readNotifiedToday, write: writeNotifiedToday } = notifiedTodayStore(NOTIFIED_TODAY_KEY)
 
 export async function reconcileSupplementReminders(
   supplements: SupplementWithStatus[],

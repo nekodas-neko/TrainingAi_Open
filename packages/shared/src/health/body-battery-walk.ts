@@ -12,6 +12,8 @@
 //
 // The charge ramp was flattened by TN-55; the walk was otherwise lifted verbatim.
 
+import { clamp } from '@trainingai/shared/stats'
+
 /** One heart-rate sample. `tsMs` is epoch milliseconds. */
 export interface BatteryWalkSample {
   tsMs: number
@@ -78,10 +80,6 @@ export interface BatteryWalkResult {
  */
 export function restThresholdFromOffset(offsetBpm: number, reserve: number): number {
   return offsetBpm / reserve
-}
-
-function clamp(n: number, lo: number, hi: number): number {
-  return Math.max(lo, Math.min(hi, n))
 }
 
 /**

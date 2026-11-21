@@ -1,3 +1,4 @@
+import { roundTo } from '@trainingai/shared/stats'
 import { isPlausibleBodyFatPct } from './body-composition'
 import { daysBetweenDateStrs } from '../date-utils'
 
@@ -54,8 +55,6 @@ export const DEFAULT_CALIBRATED_SOURCE = 'scale_ble'
 /** The most days apart a scan and a reading may be and still count as one observation. */
 export const PAIR_WINDOW_DAYS = 3
 
-const round1 = (x: number) => Math.round(x * 10) / 10
-
 /**
  * Derive the correction for one instrument from its pairs.
  *
@@ -75,7 +74,7 @@ export function deriveBodyFatCalibration(
   if (usable.length === 0) return null
   const offsetPct = usable.reduce((sum, p) => sum + (p.referencePct - p.measuredPct), 0) / usable.length
   if (!Number.isFinite(offsetPct)) return null
-  return { source, offsetPct: round1(offsetPct), pairs: [...usable] }
+  return { source, offsetPct: roundTo(offsetPct, 1), pairs: [...usable] }
 }
 
 /**
@@ -96,7 +95,7 @@ export function correctBodyFatPct(
   if (calibration == null || source == null || source !== calibration.source) {
     return { pct: raw, rawPct: raw, corrected: false }
   }
-  const next = round1(raw + calibration.offsetPct)
+  const next = roundTo(raw + calibration.offsetPct, 1)
   if (!isPlausibleBodyFatPct(next)) return { pct: raw, rawPct: raw, corrected: false }
   return { pct: next, rawPct: raw, corrected: true }
 }

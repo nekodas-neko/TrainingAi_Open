@@ -1,3 +1,4 @@
+import { roundTo } from '@trainingai/shared/stats'
 import type { SavedMeal, SavedMealItem, NutritionIngredient } from '../types/nutrition'
 
 // Turning a saved meal into a meal plan's ingredient list (Q-192 / Q-193).
@@ -31,17 +32,13 @@ export function savedMealToIngredients(meal: SavedMeal): NutritionIngredient[] {
     out.push({
       name: food.brand ? `${food.brand} ${food.name}` : food.name,
       weightG,
-      caloriesPer100g: round1(Math.max(0, Number(food.calories) || 0) * per100),
-      proteinPer100g: round1(Math.max(0, Number(food.proteinG) || 0) * per100),
-      carbsPer100g: round1(Math.max(0, Number(food.carbsG) || 0) * per100),
-      fatPer100g: round1(Math.max(0, Number(food.fatG) || 0) * per100),
+      caloriesPer100g: roundTo(Math.max(0, Number(food.calories) || 0) * per100, 1),
+      proteinPer100g: roundTo(Math.max(0, Number(food.proteinG) || 0) * per100, 1),
+      carbsPer100g: roundTo(Math.max(0, Number(food.carbsG) || 0) * per100, 1),
+      fatPer100g: roundTo(Math.max(0, Number(food.fatG) || 0) * per100, 1),
     })
   }
   return out
-}
-
-function round1(v: number): number {
-  return Math.round(v * 10) / 10
 }
 
 /**

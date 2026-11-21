@@ -20,23 +20,11 @@ export {
   type HealthAlertInput,
   type HealthAlertType,
 } from '@trainingai/shared/health/health-alerts'
+import { notifiedTodayStore } from './notified-today'
 
 const NOTIFIED_TODAY_KEY = 'ta_health_alert_notified_today'
 
-function readNotifiedToday(): Record<string, string> {
-  try {
-    const raw = localStorage.getItem(NOTIFIED_TODAY_KEY)
-    return raw ? JSON.parse(raw) : {}
-  } catch {
-    return {}
-  }
-}
-
-function writeNotifiedToday(map: Record<string, string>): void {
-  try {
-    localStorage.setItem(NOTIFIED_TODAY_KEY, JSON.stringify(map))
-  } catch {}
-}
+const { read: readNotifiedToday, write: writeNotifiedToday } = notifiedTodayStore(NOTIFIED_TODAY_KEY)
 
 /** Native-only. Reads the dedup map, computes actions, fires immediate notifications, records fires. */
 export async function reconcileHealthAlerts(input: HealthAlertInput): Promise<void> {

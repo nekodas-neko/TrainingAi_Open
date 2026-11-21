@@ -1,3 +1,4 @@
+import { roundTo } from '@trainingai/shared/stats'
 import { goalRange } from '@trainingai/shared/ai-periodization/goal-ranges'
 
 // RPE-based autoregulation.
@@ -49,10 +50,6 @@ function clamp(n: number, lo: number, hi: number): number {
   return Math.min(hi, Math.max(lo, n))
 }
 
-function round1(n: number): number {
-  return Math.round(n * 10) / 10
-}
-
 export function computeRpeAdjustment(sig: AutoregSignal, ctx: AutoregContext): AutoregAdjustment {
   if (sig.rpeDelta == null) return NONE
   if (ctx.phase === 'deload' || ctx.phase === 'baseline') return NONE
@@ -71,8 +68,8 @@ export function computeRpeAdjustment(sig: AutoregSignal, ctx: AutoregContext): A
       repDelta: 0,
       setDelta: 0,
       note: missedReps
-        ? `−${round1(cutPct)}% load — RPE ran high and you fell short of the prescribed reps`
-        : `−${round1(cutPct)}% load — RPE ran high while your 1RM slipped`,
+        ? `−${roundTo(cutPct, 1)}% load — RPE ran high and you fell short of the prescribed reps`
+        : `−${roundTo(cutPct, 1)}% load — RPE ran high while your 1RM slipped`,
     }
   }
 

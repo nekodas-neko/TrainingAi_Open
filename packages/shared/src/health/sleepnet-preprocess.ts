@@ -1,3 +1,5 @@
+import { roundTo } from '@trainingai/shared/stats'
+
 /**
  * SleepNet (moonstone) preprocessor — TypeScript port of the Oura on-device preprocessing that
  * turns raw ring samples into the model's `highRes (115200,3)` / `lowRes (1800,1)` input tensors.
@@ -270,14 +272,14 @@ export function preprocessSleepNet(night: SleepNetRawNight): SleepNetInput | nul
     // ---- high_res: SpO2 ----
     const spTs = night.spo2.tsMs.map(toRel)
     const spInterp = interpolateWithGaps(highGrid, Float64Array.from(spTs), Float64Array.from(night.spo2.value), 5)
-    for (let i = 0; i < spInterp.length; i++) spInterp[i] = round3(spInterp[i])
+    for (let i = 0; i < spInterp.length; i++) spInterp[i] = roundTo(spInterp[i], 3)
 
     // ---- low_res: motion (input_indexed_on="end" -> shift ts by -30) ----
     const mTs = night.motion.tsMs.map((t) => toRel(t) - 30)
     const filled = fillMotionWithZeros(mTs, night.motion.value)
     const padded = padZerosToBedtime(filled.t, filled.v, bedStart, bedEnd)
     const motionInterp = interpolateWithGaps(lowGrid, Float64Array.from(padded.t), Float64Array.from(padded.v), 60)
-    for (let i = 0; i < motionInterp.length; i++) motionInterp[i] = round3(motionInterp[i])
+    for (let i = 0; i < motionInterp.length; i++) motionInterp[i] = roundTo(motionInterp[i], 3)
 
     // ---- Normalize (clip + method) ----
     clipInPlace(ibiInterp, 300, 1875)
@@ -330,6 +332,3 @@ export function preprocessSleepNet(night: SleepNetRawNight): SleepNetInput | nul
   }
 }
 
-function round3(x: number): number {
-  return Math.round(x * 1000) / 1000
-}

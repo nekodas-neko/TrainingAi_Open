@@ -16,6 +16,7 @@
 //    of the composite), never as an extra weighted contributor — the biomarkers are
 //    already readiness contributors, so re-adding them would double-count (§5.5).
 
+import { roundTo } from '@trainingai/shared/stats'
 import { capitalize } from '@trainingai/shared/format/capitalize'
 import { BASELINE_MIN_NIGHTS } from './readiness-composite'
 import { baselineZ, type Baseline } from './personal-baseline'
@@ -131,7 +132,7 @@ export function computeIllnessRadar(input: IllnessInputs): IllnessResult {
   // Cold baseline, or no biomarker at all → learning, no signal, no suppression.
   if (input.nHistory < BASELINE_MIN_NIGHTS || signals.length === 0) {
     const biomarkers: IllnessResult['biomarkers'] = {}
-    for (const s of signals) biomarkers[s.key] = { z: round2(s.z), contribution: 0 }
+    for (const s of signals) biomarkers[s.key] = { z: roundTo(s.z, 2), contribution: 0 }
     return { flag: 'learning', score: 0, biomarkers, readinessSuppression: 0 }
   }
 
@@ -141,7 +142,7 @@ export function computeIllnessRadar(input: IllnessInputs): IllnessResult {
   for (const s of signals) {
     const contribution = (s.signal * ILLNESS_WEIGHTS[s.key]) / totalWeight
     score += contribution
-    biomarkers[s.key] = { z: round2(s.z), contribution: Math.round(contribution) }
+    biomarkers[s.key] = { z: roundTo(s.z, 2), contribution: Math.round(contribution) }
   }
   score = Math.round(score)
 
@@ -265,10 +266,6 @@ export function illnessAdvisory(
     default:
       return null
   }
-}
-
-function round2(n: number): number {
-  return Math.round(n * 100) / 100
 }
 
 /** The latest persisted illness reading from a `getOuraDailyDerived` range. */

@@ -23,6 +23,7 @@
 // `averageRanks` is imported rather than kept private: rank correlation is the statistic that
 // survives a comparison in mismatched units, and PS-15 added a second one — the device-comparison
 // endpoint (retired in #2862). One copy, in the module that owns correlation.
+import { roundTo } from '@trainingai/shared/stats'
 import { averageRanks } from './correlation'
 
 export interface CalibrationCopy {
@@ -116,8 +117,6 @@ function pearson(xs: number[], ys: number[]): number | null {
   return den > 0 ? num / den : null
 }
 
-const round1 = (v: number) => Math.round(v * 10) / 10
-
 export interface BuildCalibrationInput {
   from: string
   to: string
@@ -168,7 +167,7 @@ export function buildModelReportCalibration(
       rating,
       label: labelOf(rating),
       count: scores.length,
-      meanModelScore: scores.length ? round1(scores.reduce((a, b) => a + b, 0) / scores.length) : null,
+      meanModelScore: scores.length ? roundTo(scores.reduce((a, b) => a + b, 0) / scores.length, 1) : null,
       minModelScore: scores.length ? Math.min(...scores) : null,
       maxModelScore: scores.length ? Math.max(...scores) : null,
     }
@@ -189,7 +188,7 @@ export function buildModelReportCalibration(
   }
 
   const spread = (vals: number[]): CalibrationRange | null =>
-    vals.length ? { min: Math.min(...vals), max: Math.max(...vals), spread: round1(Math.max(...vals) - Math.min(...vals)) } : null
+    vals.length ? { min: Math.min(...vals), max: Math.max(...vals), spread: roundTo(Math.max(...vals) - Math.min(...vals), 1) } : null
   const modelRange = spread(pairedRows.map(r => r.modelScore!))
   const ratingRange = spread(pairedRows.map(r => ratingAsScore(r.rating!)))
 
