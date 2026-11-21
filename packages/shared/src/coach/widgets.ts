@@ -19,6 +19,8 @@ export const ChoiceListSchema = z.object({
   prompt: z.string().min(1).max(160),
   source: z.enum(CHOICE_SOURCES).optional(),
   sourceId: z.string().optional(),
+  /** #3896: for source "exercises", only the exercises whose name holds these words. */
+  query: z.string().max(60).optional(),
   multi: z.boolean().optional(),
   selectAll: z.boolean().optional(),
   options: z

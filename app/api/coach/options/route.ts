@@ -11,7 +11,17 @@ import { errorLog } from '@trainingai/shared/logger'
 const QuerySchema = z.object({
   source: z.enum(CHOICE_SOURCES),
   sourceId: z.string().min(1).optional(),
+  // #3896 step 2: narrows the "exercises" source to the names the user said. Bounded like the
+  // widget's own field; it is matched in code and never reaches a query or a prompt.
+  query: z.string().trim().min(1).max(60).optional(),
 }).strict()
+
+/** Every word of the query, in any order, inside the name — so "cable pulldown" finds "Cable Lat
+ *  Pulldown". Case-insensitive; plain substring tests, no pattern built from the user's words. */
+export function matchesExerciseQuery(name: string, query: string): boolean {
+  const hay = name.toLowerCase()
+  return query.toLowerCase().split(/\s+/).filter(Boolean).every(word => hay.includes(word))
+}
 
 /**
  * The rows behind a Coach picker, read straight from the user's own data.
@@ -41,6 +51,7 @@ export async function GET(req: Request) {
   const parsed = QuerySchema.safeParse({
     source: url.searchParams.get('source'),
     sourceId: url.searchParams.get('sourceId') ?? undefined,
+    query: url.searchParams.get('query') || undefined,
   })
   if (!parsed.success) return NextResponse.json({ error: 'Invalid source' }, { status: 400 })
 
@@ -96,18 +107,20 @@ export async function GET(req: Request) {
       const sessions = parsed.data.sourceId
         ? program.sessions.filter(s => s.id === parsed.data.sourceId)
         : program.sessions
-      return NextResponse.json({
-        options: sessions
-          .slice()
-          .sort((a, b) => a.position - b.position)
-          .flatMap(s =>
-            s.exercises
-              .slice()
-              .sort((a, b) => a.position - b.position)
-              .map(e => ({ id: e.id, title: e.exerciseName, subtitle: s.name })),
-          )
-          .slice(0, 24),
-      })
+      const all = sessions
+        .slice()
+        .sort((a, b) => a.position - b.position)
+        .flatMap(s =>
+          s.exercises
+            .slice()
+            .sort((a, b) => a.position - b.position)
+            .map(e => ({ id: e.id, title: e.exerciseName, subtitle: s.name })),
+        )
+      // A query that matches nothing falls back to every exercise (#3896 §3d): an empty picker is a
+      // dead end, and the whole list is the right question when the name the user gave is not there.
+      const query = parsed.data.query
+      const matched = query ? all.filter(o => matchesExerciseQuery(o.title, query)) : all
+      return NextResponse.json({ options: (matched.length > 0 ? matched : all).slice(0, 24) })
     }
 
     // swap_candidates — same matcher the tool uses, so a suggestion is injury-aware here too.
