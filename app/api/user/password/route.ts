@@ -6,6 +6,7 @@ import { rateLimit } from '@/lib/rate-limit'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 import { freshForFirstPassword, FRESH_SIGN_IN_ERROR } from '@/lib/auth/fresh-sign-in'
 import { nowSeconds } from '@/lib/auth/session-cutoff'
+import { reissueSessionCookie } from '@/lib/auth/reissue-session-cookie'
 const MAX_BODY_BYTES = 4 * 1024
 
 export async function PATCH(req: NextRequest) {
@@ -51,6 +52,13 @@ export async function PATCH(req: NextRequest) {
   }
 
   const hash = await hashPassword(newPassword)
-  await repo.updateUserPassword(session.user.id, hash)
-  return NextResponse.json({ ok: true })
+  // #3673 item 5: the change ends every other sign-in (every native sign-in, and every web session
+  // signed in before `at`), in the same transaction. This browser then gets a fresh cookie stamped
+  // after `at`, so it stays signed in. A native (bearer) caller has no cookie to renew: its own
+  // sign-in ends with the rest and it signs in again with the new password.
+  const at = new Date()
+  await repo.updateUserPassword(session.user.id, hash, at)
+  const res = NextResponse.json({ ok: true })
+  await reissueSessionCookie(req, res)
+  return res
 }

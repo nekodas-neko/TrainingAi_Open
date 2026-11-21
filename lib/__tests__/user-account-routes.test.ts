@@ -6,7 +6,7 @@ const getUserById = vi.fn(async () => ({ isActive: true, isAdmin: false }))
 const sessionTokenFrom = vi.fn(async () => ({ userId: 'u-1', exp: Math.floor(Date.now() / 1000) + 3600 }) as { userId: string; exp: number } | null)
 
 const getUserCredentials = vi.fn(async (_e: string) => userRow() as Row | null)
-const updateUserPassword = vi.fn(async (_u: string, _h: string) => undefined)
+const updateUserPassword = vi.fn(async (_u: string, _h: string, _at?: Date) => undefined)
 const updateUserProfile = vi.fn(async (_u: string, _p: Row) => ({ id: 'u-1', displayName: 'Sam' }) as Row)
 const updateUserAvatar = vi.fn(async (_u: string, _a: string) => ({ avatar: 'stored.png' }) as Row)
 const countWorkoutSessions = vi.fn(async (_u: string) => 42)
@@ -126,7 +126,7 @@ describe('PATCH /api/user/password', () => {
     getUserCredentials.mockResolvedValue(userRow({ passwordHash: null }))
     expect((await password({ newPassword: 'longenough' })).status).toBe(200)
     expect(getUserCredentials).toHaveBeenCalledWith('id-only-account')
-    expect(updateUserPassword).toHaveBeenCalledWith('id-only-account', 'hashed:12')
+    expect(updateUserPassword).toHaveBeenCalledWith('id-only-account', 'hashed:12', expect.any(Date))
   })
 
   it('refuses a password bcrypt would truncate', async () => {
