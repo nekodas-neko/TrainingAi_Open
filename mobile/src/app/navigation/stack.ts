@@ -15,6 +15,7 @@ type Plain = Exclude<
   | 'health-day'
   | 'health-week'
   | 'friend-profile'
+  | 'friend-meals'
   | 'more-devices'
 >;
 export type Route =
@@ -26,6 +27,8 @@ export type Route =
   | { screen: 'health-day'; date: string }
   | { screen: 'health-week'; week: string }
   | { screen: 'friend-profile'; friendId: string }
+  /** A friend's meal library (#2218). `friendId` is the friend's user id, as on their profile. */
+  | { screen: 'friend-meals'; friendId: string }
   | { screen: 'health-detail'; detail: HealthDetail }
   /** `ouraReturn` is the link that cold-started the app, for the Oura screen to finish. */
   | { screen: 'more-devices'; ouraReturn?: string };

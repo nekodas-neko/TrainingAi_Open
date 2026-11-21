@@ -29,6 +29,7 @@ import { useNutrition } from '../data/NutritionProvider';
 import { mealTypeBody } from '../data/models';
 import { MEAL_TYPE_ICON_CHOICES, mealTypeIconName } from './meal-type-icon-names';
 import { GoalRecommendation } from './GoalRecommendation';
+import { MealSharingCard } from './MealSharingCard';
 import { NutritionReminders } from '../../platform/components/NutritionReminders';
 import { ReminderPreferenceSwitch } from '../../platform/components/ReminderPreferenceSwitch';
 const formSchema = z.object({
@@ -187,6 +188,7 @@ export function NutritionSettings({ onClose }: { onClose: () => void }) {
               setEdit('new');
             }}
           />
+          <MealSharingCard />
         </>
       ) : edit !== null ? (
         <>

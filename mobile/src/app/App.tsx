@@ -7,6 +7,7 @@ import { CoachScreen } from '../features/coach/screens/CoachScreen';
 import type { CoachScope } from '../features/coach/data/models';
 import type { Destination } from '../features/coach/components/CoachWidget';
 import { FriendProfileScreen } from '../features/social/screens/FriendProfileScreen';
+import { FriendMealsScreen } from '../features/social/screens/FriendMealsScreen';
 import { useEffect, useState } from 'react';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -219,6 +220,15 @@ function AppShell() {
       case 'friend-profile':
         return (
           <FriendProfileScreen
+            key={`${accountKey}:${entry.friendId}`}
+            userId={entry.friendId}
+            onBack={back}
+            openMeals={() => open({ screen: 'friend-meals', friendId: entry.friendId })}
+          />
+        );
+      case 'friend-meals':
+        return (
+          <FriendMealsScreen
             key={`${accountKey}:${entry.friendId}`}
             userId={entry.friendId}
             onBack={back}

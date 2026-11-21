@@ -1,7 +1,7 @@
 import type { MacroTotals } from '@trainingai/shared/nutrition/meal-macro-fit'
-import type { SharedMeal, SharedMealIngredient } from '@trainingai/shared/nutrition/label-payload'
+import type { SharedMeal } from '@trainingai/shared/nutrition/label-payload'
 import { createFoodItem } from '@trainingai/shared/nutrition/create-food-item'
-import { QUANTITY_MULTIPLIER_MIN } from '@trainingai/shared/nutrition/quantity-bounds'
+import { sharedIngredientToEntry } from '@trainingai/shared/nutrition/shared-meal-entry'
 import { saveMealToLibrary } from './save-meal'
 
 /**
@@ -96,42 +96,6 @@ export async function saveSharedMealToLibrary(
   return { mealId, name: shared.name }
 }
 
-/**
- * One shared ingredient as a per-100 g food item plus the multiplier that restores its weight.
- *
- * Exported for its test rather than for a second caller: the arithmetic is the part that can be
- * wrong in a way nothing visible catches — a scanned meal whose macros are off by a factor of the
- * ingredient's weight still renders, still logs, and is simply untrue.
- */
-export function sharedIngredientToEntry(ing: SharedMealIngredient): {
-  item: Parameters<typeof createFoodItem>[0]
-  quantityMultiplier: number
-} {
-  // A weight of zero cannot be normalised, and the encoder can emit one: `weightG` is rounded, so a
-  // sub-gram garnish arrives as 0. Storing it as a single 1× serving keeps its macros — which is
-  // what the totals depend on — rather than dividing by zero and writing NaN into the library.
-  if (ing.weightG <= 0) {
-    return {
-      item: {
-        name: ing.name, servingSizeG: 100, source: 'manual',
-        calories: Math.round(ing.calories), proteinG: ing.proteinG, carbsG: ing.carbsG, fatG: ing.fatG,
-      },
-      quantityMultiplier: 1,
-    }
-  }
-  const per100 = (v: number) => Math.round((v / ing.weightG) * 100 * 10) / 10
-  return {
-    item: {
-      name: ing.name,
-      servingSizeG: 100,
-      calories: Math.round((ing.calories / ing.weightG) * 100),
-      proteinG: per100(ing.proteinG),
-      carbsG: per100(ing.carbsG),
-      fatG: per100(ing.fatG),
-      source: 'manual',
-    },
-    // The saved-meal schema floors a multiplier at 0.01, and a 0.5 g pinch rounds to 0.00 two
-    // decimals in — which would drop it from the meal entirely.
-    quantityMultiplier: Math.max(QUANTITY_MULTIPLIER_MIN, Math.round((ing.weightG / 100) * 100) / 100),
-  }
-}
+// The per-ingredient arithmetic lives in the shared package, where Preview's copy of a friend's meal
+// uses it too. Re-exported so this module's callers and tests keep one import.
+export { sharedIngredientToEntry }

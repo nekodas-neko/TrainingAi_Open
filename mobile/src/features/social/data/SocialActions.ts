@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { WorkoutResources } from '../../workouts/data/WorkoutResources.ts';
 import { ApiError } from '../../account/api/client.ts';
+import { friendMealLibraries } from './FriendMealLibraries.ts';
 import {
   feedSpec,
   friendProfileSpec,
@@ -87,6 +88,8 @@ export class SocialActions {
         if (z.uuid().safeParse(row.otherUser.id).success) {
           cleanup.push(this.resources.forget(friendProfileSpec(row.otherUser.id)));
         }
+        // #2218: a friend's meal library is not kept past the friendship.
+        friendMealLibraries(this.resources).forget(row.id);
       }
       const updated = await Promise.allSettled(cleanup);
       await Promise.all([

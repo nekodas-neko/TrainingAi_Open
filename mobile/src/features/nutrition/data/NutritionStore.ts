@@ -982,36 +982,57 @@ export class NutritionStore {
     date: string,
     foods: FoodEntry[] = [],
   ) {
+    const [id] = await this.saveMeals([{ payload, foods }], date);
+    return id;
+  }
+  /**
+   * Several meals in one local write, so a batch (a friend's library, #2218) is queued whole or not
+   * at all and works offline. Each meal's new foods go ahead of it, and a food one meal minted is
+   * reused by the next rather than minted again, since the duplicate check sees the earlier ones.
+   * Returns the ids of the saved meals, in order.
+   */
+  async saveMeals(
+    meals: { payload: z.infer<typeof SavedMealSchema>; foods?: FoodEntry[] }[],
+    date: string,
+  ) {
     const available = this.view(date).foods.slice();
-    const aliases = new Map<string, string>();
-    const changes: { domain: 'food_items'; date: string; payload: Record<string, unknown> }[] =
-      [];
-    for (const food of foods) {
-      const id = food.id ?? this.uuid();
-      const valid = normaliseFood(food, id);
-      const snapshot = foodSchema.parse({ source: 'manual', ...valid });
-      const duplicate = findDuplicateFoodItem(snapshot, available);
-      if (
-        duplicate &&
-        (!valid.imageDataUri || duplicate.imageDataUri === valid.imageDataUri) &&
-        (!valid.barcode || duplicate.barcode === valid.barcode)
-      ) {
-        aliases.set(id, duplicate.id);
-      } else {
-        available.push(snapshot);
-        changes.push({ domain: 'food_items', date, payload: valid });
+    const changes: {
+      domain: 'food_items' | 'saved_meals';
+      date: string;
+      payload: Record<string, unknown>;
+    }[] = [];
+    const ids: string[] = [];
+    for (const { payload, foods = [] } of meals) {
+      const aliases = new Map<string, string>();
+      for (const food of foods) {
+        const id = food.id ?? this.uuid();
+        const valid = normaliseFood(food, id);
+        const snapshot = foodSchema.parse({ source: 'manual', ...valid });
+        const duplicate = findDuplicateFoodItem(snapshot, available);
+        if (
+          duplicate &&
+          (!valid.imageDataUri || duplicate.imageDataUri === valid.imageDataUri) &&
+          (!valid.barcode || duplicate.barcode === valid.barcode)
+        ) {
+          aliases.set(id, duplicate.id);
+        } else {
+          available.push(snapshot);
+          changes.push({ domain: 'food_items', date, payload: valid });
+        }
       }
+      const value = SavedMealSchema.parse({
+        ...payload,
+        id: payload.id ?? this.uuid(),
+        items: payload.items.map((i) => ({
+          ...i,
+          foodItemId: aliases.get(i.foodItemId) ?? i.foodItemId,
+        })),
+      });
+      changes.push({ domain: 'saved_meals', date, payload: value });
+      ids.push(value.id!);
     }
-    const value = SavedMealSchema.parse({
-      ...payload,
-      id: payload.id ?? this.uuid(),
-      items: payload.items.map((i) => ({
-        ...i,
-        foodItemId: aliases.get(i.foodItemId) ?? i.foodItemId,
-      })),
-    });
-    await this.enqueue([...changes, { domain: 'saved_meals', date, payload: value }]);
-    return value.id!;
+    await this.enqueue(changes);
+    return ids;
   }
   async logMeal(meal: SavedMeal, date: string, mealTypeId: string, portions = 1) {
     await this.logFoods(

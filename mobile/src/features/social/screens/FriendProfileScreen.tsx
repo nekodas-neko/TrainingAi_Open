@@ -9,6 +9,7 @@ import {
   Card,
   Grid,
   Icon,
+  ListRow,
   PageLayout,
   ProgressBar,
   Sheet,
@@ -20,27 +21,44 @@ import {
 } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
-import { friendProfileSpec, titleLabel, achievementSchema } from '../data/models';
+import { friendProfileSpec, friendsSpec, titleLabel, achievementSchema } from '../data/models';
+import { friendshipWith } from '../data/friend-meals';
+import { useFriendMeals } from '../data/useFriendMeals';
 export function FriendProfileScreen({
   userId,
   onBack,
+  openMeals,
 }: {
   userId: string;
   onBack: () => void;
+  openMeals: () => void;
 }) {
   const valid = z.uuid().safeParse(userId);
   return valid.success ? (
-    <Profile userId={valid.data} onBack={onBack} />
+    <Profile userId={valid.data} onBack={onBack} openMeals={openMeals} />
   ) : (
     <PageLayout title="Profile" onBack={onBack}>
       <StateCard title="Profile unavailable" message="This profile address is invalid." />
     </PageLayout>
   );
 }
-function Profile({ userId, onBack }: { userId: string; onBack: () => void }) {
+function Profile({
+  userId,
+  onBack,
+  openMeals,
+}: {
+  userId: string;
+  onBack: () => void;
+  openMeals: () => void;
+}) {
   const state = useWorkoutResource(friendProfileSpec(userId)),
     profile = state.data,
     { theme } = useTheme();
+  // #2218: the Meals row is there only when the server lets this friend's library be read, so a
+  // friend who has not shared looks as they always did.
+  const friends = useWorkoutResource(friendsSpec);
+  const library = useFriendMeals(friendshipWith(friends.data?.friendships, userId)?.id ?? null);
+  const savedMeals = library.meals?.length ?? 0;
   const [selected, setSelected] = useState<z.infer<typeof achievementSchema> | null>(null);
   const xpProgress = profile
     ? levelProgress(profile.xp, profile.currentLevelXp, profile.nextLevelXp)
@@ -137,6 +155,18 @@ function Profile({ userId, onBack }: { userId: string; onBack: () => void }) {
                 </Card>
               ))}
             </Grid>
+            {savedMeals > 0 && (
+              <Card padded={false}>
+                <ListRow
+                  leading={<Icon name="nutrition" tone="brand" />}
+                  title="Meals"
+                  subtitle={`${plural(savedMeals, 'saved meal', 'saved meals')} you can copy`}
+                  trailing={<Icon name="forward" tone="muted" />}
+                  onPress={openMeals}
+                  divider={false}
+                />
+              </Card>
+            )}
             <Card>
               <AppText variant="eyebrow" tone="muted">
                 Trophy Case
