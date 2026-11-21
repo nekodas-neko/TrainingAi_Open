@@ -8,6 +8,7 @@ import { OURA_API_BASE, type OuraOAuthConfig } from '../config'
 import { encryptOuraToken } from '../token-cipher'
 import { backfillOuraCloud, MAX_RATE_LIMIT_WAITS, startOuraConnectBackfill, validBackfillRange, type OuraBackfillDeps } from '../backfill'
 import { parseRetryAfter } from '../data'
+import { isRingBatteryBackedOff, resetRingBatteryBackoff } from '../ring-battery-backoff'
 import { reconcileOuraCloud } from '../reconcile'
 import { resetOuraCloudReportThrottle } from '../report'
 
@@ -116,6 +117,18 @@ describe('backfillOuraCloud (#2859)', () => {
     const out = await backfillOuraCloud({ repo: { ...repo, getLatestOuraCloudBatteryAt: async () => null, insertOuraCloudBatteryReadings: async () => 0 }, config: CONFIG }, USER, { ...OPTS, dryRun: false, ringBattery: true })
     expect(fetchMock.mock.calls.some(c => String(c[0]).includes('ring_battery_level'))).toBe(false)
     expect(out.ok && out.report.notShared).toContain('ring_battery')
+  })
+
+  // #3884: a refused battery read backs the battery off, as the webhook's catch-up does, so the daily
+  // reconcile stops asking every day for a scope the grant lacks.
+  it('backs the ring battery read off when Oura refuses it (403)', async () => {
+    resetRingBatteryBackoff()
+    oura(path => (path === 'ring_battery_level' ? new Response('', { status: 403 }) : null))
+    const { repo } = fakeRepo()
+    const out = await backfillOuraCloud({ repo: { ...repo, getLatestOuraCloudBatteryAt: async () => null, insertOuraCloudBatteryReadings: async () => 0 }, config: CONFIG }, USER, { ...OPTS, dryRun: false, ringBattery: true })
+    expect(out.ok && out.report.forbidden).toContain('ring_battery')
+    expect(isRingBatteryBackedOff(USER, Date.now())).toBe(true)
+    resetRingBatteryBackoff()
   })
 
   // #3578: the owner's grant from before ring_configuration was requested. It covers `daily` and the

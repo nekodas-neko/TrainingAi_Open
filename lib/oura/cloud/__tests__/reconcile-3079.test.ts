@@ -6,6 +6,7 @@ import { shiftDateStr, toAestDay } from '@trainingai/shared/date-utils'
 import type { WorkoutRepository } from '@/lib/data/repository'
 import type { OuraBackfillResult, backfillOuraCloud } from '../backfill'
 import { NO_WRITES } from '../ingest'
+import { markRingBatteryRefused, resetRingBatteryBackoff } from '../ring-battery-backoff'
 import { reconcileDaysFor, reconcileOuraCloud, reportReconcileGaps, startOuraReconcile, EXPECTED_REFUSED_DESPITE_GRANT, RECONCILE_DAYS, RECONCILE_WEEKLY_DAYS, RECONCILE_WEEKLY_WEEKDAY } from '../reconcile'
 import { OURA_DAILY_REPORT_INTERVAL_MS, reportOuraCloudIssue, resetOuraCloudReportThrottle } from '../report'
 
@@ -60,6 +61,17 @@ describe('reconcileOuraCloud', () => {
     // The two users' "today" differ: the window is each user's own local days.
     expect(out.map(o => o.to)).toEqual(['2026-10-19', '2026-10-18'])
     expect(out.every(o => o.result === 'ok')).toBe(true)
+  })
+
+  it('skips the ring battery read for a user whose last read was refused (#3884), and only that user', async () => {
+    resetRingBatteryBackoff()
+    markRingBatteryRefused('u1', NOW.getTime() - 60_000)
+    const repo = fakeRepo([{ id: 'u1', timezone: 'Australia/Brisbane' }, { id: 'u2', timezone: 'Australia/Brisbane' }])
+    const backfill = vi.fn(async () => okResult()) as unknown as typeof backfillOuraCloud
+    await reconcileOuraCloud({ repo, config: CONFIG, backfill, now: () => NOW })
+    const calls = (backfill as unknown as ReturnType<typeof vi.fn>).mock.calls
+    expect(calls.map(c => [c[1], c[2].ringBattery])).toEqual([['u1', false], ['u2', true]])
+    resetRingBatteryBackoff()
   })
 
   it("one user's failure is reported and the next user still runs", async () => {

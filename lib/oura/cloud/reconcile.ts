@@ -28,6 +28,7 @@
 // `FIRST_PASS_DELAY_MS` after boot, then one every `RECONCILE_INTERVAL_MS`. A release restarts the
 // clock, so the read also runs shortly after every deploy.
 import type { Pool } from 'pg'
+import { isRingBatteryBackedOff } from './ring-battery-backoff'
 import { getPool } from '@/lib/data/postgres/client'
 import type { WorkoutRepository } from '@/lib/data/repository'
 import { DEFAULT_TZ, shiftDateStr, toAestDay } from '@trainingai/shared/date-utils'
@@ -119,7 +120,7 @@ export async function reconcileOuraCloud(deps: ReconcileDeps): Promise<Reconcile
       const result = await backfill({ repo: deps.repo, config: deps.config, rescore: rescoreWithTodayReadiness(deps.repo), workoutHr: workoutHrReattributor(deps.repo), stillRhr: stillRhrRefresher(deps.repo) }, userId, {
         // #3875: the battery too, so a quiet day with no sleep, activity or workout event still
         // records a level. Its own 401 or 403 is a per-type refusal and never stops the pass.
-        from, to, dryRun: false, heartRate: true, ringBattery: true, tz, tombstoneAbsent: true, stampData: false,
+        from, to, dryRun: false, heartRate: true, ringBattery: !isRingBatteryBackedOff(userId, now.getTime()), tz, tombstoneAbsent: true, stampData: false,
       })
       const outcome = outcomeOf(result)
       out.push({ userId, from, to, result: outcome })
