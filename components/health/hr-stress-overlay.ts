@@ -19,7 +19,10 @@ import { toSegments, type StressBucket } from '@/components/body-battery/stress-
  * with a null between them — one dataset, gaps intact.
  */
 
-/** A point on the HR chart's x axis (minutes since local midnight); `y: null` breaks the line. */
+/**
+ * A point on the HR chart's x axis (minutes since local midnight); `y: null` breaks the line. `y` is the
+ * level NEGATED, so stress points up here as it does on "When the day ran stressed" (#3935).
+ */
 export interface StressPoint {
   x: number
   y: number | null
@@ -38,7 +41,8 @@ export function stressOverlay(buckets: StressBucket[], tz: string): StressOverla
     // The break belongs between runs, never before the first or after the last — a leading null
     // would give Chart.js a point at x undefined and shift the whole series.
     if (points.length) points.push({ x: seg[0].x, y: null })
-    for (const p of seg) points.push({ x: p.x, y: p.level })
+    // `0 - level`, not `-level`: a level of 0 stays 0 rather than −0.
+    for (const p of seg) points.push({ x: p.x, y: 0 - p.level })
   }
   return { points, measured: segments.reduce((n, s) => n + s.length, 0) }
 }

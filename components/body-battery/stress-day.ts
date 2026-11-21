@@ -11,7 +11,8 @@
  * the parts worth pinning.
  */
 
-import type { ClockSkip } from '@trainingai/shared/date-utils'
+import { wallClockMinuteReader, type ClockSkip } from '@trainingai/shared/date-utils'
+import { stressRuns } from '@trainingai/shared/health/stress-day-line'
 
 /** A measured bucket: midpoint in epoch ms, level ∈ [−1,+1] with negative meaning stressed. */
 export interface StressBucket {
@@ -37,14 +38,6 @@ export interface PlacedPoint {
  * stress level for six hours nobody measured, which is the single way this chart could lie.
  */
 export type StressSegment = PlacedPoint[]
-
-/**
- * Buckets are nominally 30 minutes apart, so anything past this is a real hole rather than jitter.
- *
- * Two and a half buckets: it tolerates one dropped reading (the ring stops sampling when you are
- * still) without tolerating an hour and a half of silence.
- */
-const GAP_MINUTES = 75
 
 /**
  * The clock formatter, built per CALL and never at module scope (LA-124, the same shape as RV-80).
@@ -79,27 +72,27 @@ export function minutesIntoDay(t: number, tz: string): number {
  * Sorted first: the series arrives in order today, but a back-filled day assembled from stored rows
  * has no such guarantee, and an out-of-order point would draw a line doubling back on itself.
  */
-export function toSegments(buckets: StressBucket[], tz: string): StressSegment[] {
+export function toSegments(buckets: StressBucket[], tz: string, gapMs?: number): StressSegment[] {
   const fmt = clockFormat(tz)
-  // Sorted and gap-tested on the instant, not on wall-clock minutes: on a spring-forward day the
-  // clock skips an hour, so 01:55 → 03:00 reads as 65 minutes apart when it is really five.
-  const placed = buckets
-    .map(b => ({ t: b.t, x: minutesFrom(fmt, b.t), level: b.level }))
-    .sort((a, b) => a.t - b.t)
+  // Split on the instant, not on wall-clock minutes (`stressRuns`): on a spring-forward day the clock
+  // skips an hour, so 01:55 → 03:00 reads as 65 minutes apart when it is really five.
+  return stressRuns(buckets, gapMs).map(run => run.map(b => ({ x: minutesFrom(fmt, b.t), level: b.level, t: b.t })))
+}
 
-  const segments: StressSegment[] = []
-  let run: StressSegment = []
-  let prevT = 0
-  for (const { t, x, level } of placed) {
-    if (run.length && (t - prevT) / 60_000 > GAP_MINUTES) {
-      segments.push(run)
-      run = []
-    }
-    run.push({ x, level, t })
-    prevT = t
-  }
-  if (run.length) segments.push(run)
-  return segments
+/** A span on the chart's axis, `x` in minutes since local midnight, clipped to the day. */
+export interface PlacedSpan { from: number; to: number }
+
+/** Place the route's moving / asleep spans (epoch ms) on the 0–1440 axis, dropping any with no width. */
+export function placeSpans(
+  spans: readonly { startMs: number; endMs: number }[] | undefined,
+  dayStartMs: number,
+  tz: string,
+): PlacedSpan[] {
+  const minute = wallClockMinuteReader(dayStartMs, tz)
+  const clip = (m: number) => Math.max(0, Math.min(1440, m))
+  return (spans ?? [])
+    .map(s => ({ from: clip(minute(s.startMs)), to: clip(minute(s.endMs)) }))
+    .filter(s => s.to > s.from)
 }
 
 /**

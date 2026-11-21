@@ -71,6 +71,8 @@ function bodyBatteryRepo() {
     getOuraDaytimeSignals: async () => ({ temp: [], met: [] }),
     getBodyBatteryHistory: async () => [],
     getDaytimeHrvModel: async () => ({ fitted: true }),
+    listCompletedSessionsOverlapping: async () => [],
+    listActivityLogs: async () => [],
   } as unknown as WorkoutRepository
 }
 

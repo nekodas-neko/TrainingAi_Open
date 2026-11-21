@@ -32,6 +32,8 @@ function repo(opts: {
   stored?: { bucketMid: Date; level: number }[]; switchDay?: string | null; normalDays?: number
   /** Rows returned whatever range is asked for, as a repo that ignored its arguments would. */
   derivedIgnoringRange?: DerivedRow[]
+  workouts?: { id: string; startedAt: Date; completedAt: Date | null }[]
+  activities?: { date: string; startTime?: string; endTime?: string; durationMin?: number }[]
 } = {}) {
   const normalDays = opts.normalDays ?? 10
   // What is stored: `normalDays` prior days at 60 bpm, then outliers on the day itself and on every day
@@ -50,6 +52,8 @@ function repo(opts: {
     listSleepSessions: vi.fn(async () => [{ sleepStart: new Date(at(-2)), sleepEnd: new Date(at(6, 30)) }]),
     getOuraDailyDerived: vi.fn(async (_u: string, from: string, to: string) =>
       opts.derivedIgnoringRange ?? storedDays.filter(r => r.day >= from && r.day <= to)),
+    listCompletedSessionsOverlapping: vi.fn(async () => opts.workouts ?? []),
+    listActivityLogs: vi.fn(async () => opts.activities ?? []),
   }
   return r as typeof r & StressDayRepo
 }
@@ -77,20 +81,22 @@ describe('readStressDay (#2860 F1 step 1)', () => {
     const stored = [{ bucketMid: new Date(at(9, 15)), level: -0.4 }, { bucketMid: new Date(at(9, 45)), level: 0.2 }]
     const r = repo({ stored })
     const out = await readStressDay(r, 'u', DAY, TZ, NOW)
-    expect(out).toEqual({ method: 'ring_dhrv', series: [{ t: at(9, 15), level: -0.4 }, { t: at(9, 45), level: 0.2 }] })
+    expect(out).toEqual({
+      method: 'ring_dhrv', series: [{ t: at(9, 15), level: -0.4 }, { t: at(9, 45), level: 0.2 }], moving: [], asleep: [],
+    })
     expect(r.getHrForWindow).not.toHaveBeenCalled()
   })
 
   it('computes nothing for a day before the switch, or with no switch at all', async () => {
     for (const switchDay of ['2026-10-22', null]) {
       const r = repo({ switchDay })
-      expect(await readStressDay(r, 'u', DAY, TZ, NOW)).toEqual({ series: [], method: null })
+      expect(await readStressDay(r, 'u', DAY, TZ, NOW)).toEqual({ series: [], method: null, moving: [], asleep: [] })
       expect(r.getHrForWindow).not.toHaveBeenCalled()
     }
   })
 
   it('draws nothing until the still-time normal has enough prior days', async () => {
-    expect(await readStressDay(repo({ normalDays: 2 }), 'u', DAY, TZ, NOW)).toEqual({ series: [], method: null })
+    expect(await readStressDay(repo({ normalDays: 2 }), 'u', DAY, TZ, NOW)).toEqual({ series: [], method: null, moving: [], asleep: [] })
   })
 
   it('the normal is the fortnight before the day, never the day itself', async () => {
@@ -114,5 +120,32 @@ describe('readStressDay (#2860 F1 step 1)', () => {
     const out = await readStressDay(r, 'u', DAY, TZ, new Date(at(10)))
     expect(r.getHrForWindow.mock.calls[0][2]).toEqual(new Date(at(10)))
     expect(out.series.every(p => p.t < at(10))).toBe(true)
+  })
+
+  it('returns the moving half hours and the day\'s sleep, clipped to the day, for the chart\'s strip (#3939)', async () => {
+    const out = await readStressDay(repo(), 'u', DAY, TZ, NOW)
+    // MET 4 from 12:00 to 13:00, and the minute after it falls in 13:00–13:30, which still gets a level.
+    expect(out.moving).toEqual([{ startMs: at(12), endMs: at(13) }])
+    // The night began before midnight; the strip starts at the day's start.
+    expect(out.asleep).toEqual([{ startMs: at(0), endMs: at(6, 30) }])
+  })
+
+  it('leaves out a recorded workout and a logged activity, each with 15 minutes after it (#3938 item 3)', async () => {
+    // Heart rate runs high 15:00–16:00 while still; a workout 14:20–14:55 and an activity log 15:30–15:40.
+    const base = await readStressDay(repo(), 'u', DAY, TZ, NOW)
+    expect(base.series.map(p => p.t)).toContain(at(15, 15))
+    const r = repo({
+      workouts: [{ id: 'w', startedAt: new Date(at(14, 20)), completedAt: new Date(at(14, 55)) }],
+      activities: [{ date: DAY, startTime: '15:30', endTime: '15:40' }],
+    })
+    const out = await readStressDay(r, 'u', DAY, TZ, NOW)
+    // 14:20–15:10 and 15:30–15:55 are out: 14:00–14:30 keeps 10 still minutes, 14:30–15:00 none,
+    // 15:00–15:30 keeps 15:10–15:30, 15:30–16:00 only 15:55–16:00.
+    const ts = out.series.map(p => p.t)
+    expect(ts).not.toContain(at(14, 45))
+    expect(ts).not.toContain(at(15, 45))
+    expect(out.moving).toContainEqual({ startMs: at(14, 30), endMs: at(15, 0) })
+    expect(r.listCompletedSessionsOverlapping).toHaveBeenCalledWith('u', new Date(mid(DAY)), new Date(mid(shiftDateStr(DAY, 1))), 50)
+    expect(r.listActivityLogs).toHaveBeenCalledWith('u', shiftDateStr(DAY, -1), DAY)
   })
 })
