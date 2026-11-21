@@ -6,6 +6,9 @@ import { CoachPatchSchema } from './patch'
 import { COACH_SCOPES, pickTools, type CoachScope } from './scopes'
 import { ownTargetFromGoals } from '@trainingai/shared/nutrition/calorie-budget'
 import { injurySafeAlternatives } from '@trainingai/shared/workout/injury-substitution'
+import { DEFAULT_TZ } from '@trainingai/shared/date-utils'
+import { getDb, ensureSchema } from '@/lib/data/postgres/client'
+import { ExerciseContextSchema, readExerciseContext } from './context'
 
 /**
  * The widget tools, plus the one read tool they cannot work without.
@@ -46,6 +49,7 @@ export function buildWidgetTools(
   repo: WorkoutRepository,
   userId: string,
   scope: CoachScope = COACH_SCOPES.general,
+  tz: string = DEFAULT_TZ,
 ) {
   const scoped = scopedSchemas(scope)
   const all = {
@@ -193,6 +197,32 @@ export function buildWidgetTools(
       },
     }),
 
+    /**
+     * #3896 step 2: one lift's facts, so "too heavy" is judged from what was planned and done rather
+     * than inferred from weights alone. Read-only. The id is the model's, so it is ownership-checked
+     * by the same join the apply path uses (`loadTarget`) before anything reads by it; a foreign or
+     * unknown id gets the same answer as a missing one. The result is checked against
+     * `ExerciseContextSchema` on the way out, and every number in it is a stored one — none of it
+     * gates anything; a change still goes through proposeChange and the server's own preview.
+     */
+    getExerciseContext: tool({
+      description:
+        "One exercise in the user's program: its stored next plan (sets, reps, % of 1RM, rest, and the bar weight that gives), and its last two logs with what was planned against what was done and the rest before each set. Pass the session exercise id from getProgramStructure or from the context the app gave you. Call this before discussing whether a lift is too heavy or too light, or before proposing a change to one. Read-only.",
+      inputSchema: z.object({ sessionExerciseId: z.string().min(1).max(64) }),
+      outputSchema: z.union([
+        z.object({ found: z.literal(true), exercise: ExerciseContextSchema }),
+        z.object({ found: z.literal(false), note: z.string() }),
+      ]),
+      async execute({ sessionExerciseId }) {
+        const missing = { found: false as const, note: 'No such exercise in the user\'s program.' }
+        // Not a uuid cannot be a row, and Postgres would throw on the cast rather than match nothing.
+        if (!z.uuid().safeParse(sessionExerciseId).success) return missing
+        await ensureSchema()
+        const exercise = await readExerciseContext(getDb(), repo, userId, sessionExerciseId, tz)
+        return exercise ? { found: true as const, exercise: ExerciseContextSchema.parse(exercise) } : missing
+      },
+    }),
+
     renderChoiceList: tool({
       description: [
         'Show the user a list to pick from instead of asking them to type a name.',
@@ -202,7 +232,9 @@ export function buildWidgetTools(
         '· source "sessions" — every session in the program. No sourceId.',
         '· source "exercises" — exercises to choose between. sourceId = a session id to limit it to',
         '  that session; omit sourceId for every exercise in the program, which is what you want',
-        '  when the user said "change an exercise" without naming a day.',
+        '  when the user said "change an exercise" without naming a day. Add `query` with the words',
+        '  the user used ("pulldown") to show only the exercises whose name contains them — use it',
+        '  when the name they gave matches more than one.',
         '· source "swap_candidates" — replacements for an exercise. sourceId = the session exercise',
         '  id. Same matching as findSwapCandidates, so you do NOT need to call that tool first when',
         'you are only going to show the list.',

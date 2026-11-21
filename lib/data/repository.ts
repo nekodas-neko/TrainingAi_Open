@@ -1460,6 +1460,10 @@ export interface WorkoutRepository {
   /** #3895: a stamp of what the session's plan is made from (budget and live exercises), read at a
    *  generation's start and re-checked by `storePrescription`. Null when the session is not the user's. */
   getSessionStructureStamp(userId: string, programSessionId: string): Promise<string | null>
+  /** #3927: the active program and the session's structure stamp, read from one snapshot. A plan built
+   *  from this program is then stored only while the session is still the one it was built from; read
+   *  apart, a change and its undo landing between the two reads stored a plan made for the changed session. */
+  getActiveProgramWithStructureStamp(userId: string, programSessionId: string): Promise<{ program: Program | null; structure: string | null }>
   /** BF-199 Phase 1. Evidence only: nothing reads it to decide anything. */
   recordPrescriptionShadow(userId: string, programSessionId: string, shadow: import('@trainingai/shared/ai-periodization/prescription-shadow').PrescriptionShadow): Promise<void>
   clearProgramPrescriptions(userId: string, programId: string): Promise<void>

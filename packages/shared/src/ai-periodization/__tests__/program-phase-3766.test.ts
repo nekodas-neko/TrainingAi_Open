@@ -586,6 +586,11 @@ function harness(opts: { answers?: PhaseAnswer[]; trainedThisWeek?: string[]; wa
   const programMoves: unknown[][] = []
   const typeMoves: string[] = []
   const known: Record<string, unknown> = {
+    // #3927: the program and the stamp from one snapshot, as the adapter reads them.
+    getActiveProgramWithStructureStamp: async (u: string, id: string) => ({
+      program: await (known.getActiveProgram as (u: string) => unknown)(u),
+      structure: await (known.getSessionStructureStamp as ((u: string, id: string) => unknown) | undefined)?.(u, id),
+    }),
     getActiveProgram: async () => ({ id: 'prog', sessions: ['push', 'legs', 'pull'].map(id => ({ id, timeBudgetMinutes: 90 })) }),
     ensureSessionPeriodization: async () => state,
     getSessionPeriodization: async () => state,

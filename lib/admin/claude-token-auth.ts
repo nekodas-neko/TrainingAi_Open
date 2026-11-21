@@ -26,8 +26,12 @@ export async function requireOwnerSession(userId: string): Promise<{ ok: true; o
   try {
     ownerId = await resolveOwnerUserId(await getRepository())
   } catch {
+    // The lookup threw (`OwnerLookupUnavailableError`) or the repository could not be reached: a
+    // fault, so "try again", never "only the owner". Nothing owner-only runs either way.
     return { ok: false, status: 503, error: 'Service unavailable' }
   }
+  // No owner resolved (unset, malformed, or naming no active admin) stays 403, as for any other
+  // non-owner: it is a settings state, not a transient fault, and retrying will not change it.
   return ownerId !== null && isOwnerUserId(userId, ownerId) ? { ok: true, ownerId } : { ok: false, status: 403, error: 'Forbidden' }
 }
 
@@ -38,15 +42,24 @@ export async function requireOwnerSession(userId: string): Promise<{ ok: true; o
  * there was one (a session), else resolved now the same way (`resolveOwnerUserId`, the settings
  * `CLAUDE_RO_OWNER_USER_ID` → `ADMIN_EXPORT_USER_ID` → `WEBHOOK_USER_ID`, an existing active
  * admin). So the person the check let in and the rows the query reads can never come from two
- * different settings. Null when the owner cannot be resolved: the caller refuses and runs nothing.
+ * different settings. Refused when the owner cannot be resolved, or when the lookup threw: the
+ * caller answers the refusal and runs nothing. Both are 503 here (a token caller has already
+ * proved itself, so an unconfigured owner is the server's setting at fault, as before), but a
+ * thrown lookup says "Service unavailable", not "not configured".
  */
-export async function scopeOwnerFor(authed: { ownerId?: string }): Promise<string | null> {
-  if (authed.ownerId) return authed.ownerId
+export async function scopeOwnerFor(
+  authed: { ownerId?: string },
+): Promise<{ ok: true; ownerId: string } | { ok: false; status: 503; error: string; reason: 'unavailable' | 'unresolved' }> {
+  if (authed.ownerId) return { ok: true, ownerId: authed.ownerId }
+  let ownerId: string | null
   try {
-    return await resolveOwnerUserId(await getRepository())
+    ownerId = await resolveOwnerUserId(await getRepository())
   } catch {
-    return null
+    return { ok: false, status: 503, error: 'Service unavailable', reason: 'unavailable' }
   }
+  return ownerId
+    ? { ok: true, ownerId }
+    : { ok: false, status: 503, error: 'The owner account is not configured', reason: 'unresolved' }
 }
 
 /**
