@@ -6,6 +6,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.529.0",
+    date: "2026-11-22",
+    changes: [
+      "Both apps: the \"unusual day\" question about your readiness now follows the day's score. If the score changes after the question was first asked, a question you haven't answered yet is brought up to date with it.",
+      "Both apps: once you have rated how an unusual day felt, a later answer to the same question no longer replaces your rating.",
+      "TrainingAi Preview: the walking week now says where you stand: Week met, On track or Behind.",
+      "Both apps: the trainer also reads how you did on each exercise's last session (rest between sets, reps against plan, how it felt). For now it only records this: nothing about it is shown and no plan changes.",
+      "TrainingAi Preview: choose a walking plan or a running plan, and see your walking week on the Cardio Hub.",
+      "TrainingAi Preview: you can enter starting 1RMs when building a program, use your earlier training data as a baseline, and your food region and label style are saved to your account. Tap a muscle to see its 6-week tonnage trend.",
+      "TrainingAi Preview: each kind of number (volume, distance, water, XP, counts) is written the same way on every screen.",
+      "Behind the scenes: dependency security patches and some tidying of shared helper code, with no change to what you see.",
+    ],
+  },
+  {
     version: "1.528.0",
     date: "2026-11-21",
     changes: [
