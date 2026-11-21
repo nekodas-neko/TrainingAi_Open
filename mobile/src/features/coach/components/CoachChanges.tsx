@@ -1,3 +1,4 @@
+import { formatCount } from '@trainingai/shared/format/number';
 import { useEffect, useRef, useState } from 'react';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { View } from 'react-native';
@@ -18,7 +19,7 @@ import { failureNotice } from '../../../core/reporting/index.ts';
 export function patchValue(value: unknown, field: PatchChange['field']) {
   if (value === null || value === undefined || value === '') return '—';
   if (typeof value === 'boolean') return value ? 'Yes' : 'No';
-  return `${typeof value === 'number' ? value.toLocaleString() : value}${FIELD_UNIT[field] ?? ''}`;
+  return `${typeof value === 'number' ? formatCount(value) : value}${FIELD_UNIT[field] ?? ''}`;
 }
 export function ChangeRows({ patch }: { patch: CoachPatch }) {
   return (

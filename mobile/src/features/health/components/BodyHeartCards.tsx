@@ -1,3 +1,4 @@
+import { formatCount } from '@trainingai/shared/format/number';
 import { View } from 'react-native';
 import { formatDayShort } from '@trainingai/shared/date-utils';
 import { acwrBandByKey } from '@trainingai/shared/ai-periodization/acwr';
@@ -238,7 +239,7 @@ function MonotonyMeter({ monotony, strain }: { monotony: number; strain: number 
           <AppText variant="caption" tone="muted">
             Weekly strain
           </AppText>
-          <AppText variant="label">{Math.round(strain).toLocaleString()}</AppText>
+          <AppText variant="label">{formatCount(strain)}</AppText>
         </Stack>
       )}
     </Stack>

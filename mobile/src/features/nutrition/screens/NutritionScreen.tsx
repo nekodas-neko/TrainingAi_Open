@@ -1,3 +1,4 @@
+import { formatWaterMl } from '@trainingai/shared/format/number';
 import { randomUUID } from 'expo-crypto';
 import { useUndo } from '../../../shared/ui/undo/UndoProvider';
 import { useReducedMotion } from '../../../shared/ui/useReducedMotion';
@@ -339,9 +340,7 @@ export function NutritionScreen({
                       title="Water"
                       icon="water"
                       caption={
-                        health.body?.today?.waterMl == null
-                          ? '—'
-                          : (health.body.today.waterMl / 1000).toFixed(1) + ' L'
+                        formatWaterMl(health.body?.today?.waterMl)
                       }
                       onPress={() => setModal('water')}
                     />

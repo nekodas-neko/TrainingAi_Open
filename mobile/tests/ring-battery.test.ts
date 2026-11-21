@@ -55,10 +55,11 @@ test('saved alert settings that are missing or damaged read as the defaults', ()
 });
 
 test('the reading’s age, days left and charge time read in plain words', () => {
-  assert.equal(readingAge(1), 'just now');
-  assert.equal(readingAge(14), '14 min ago');
-  assert.equal(readingAge(180), '3 h ago');
-  assert.equal(readingAge(3 * 1440), '3 days ago');
+  const now = new Date('2026-10-26T02:00:00Z');
+  assert.equal(readingAge(0.2, now), 'less than a minute ago');
+  assert.equal(readingAge(14, now), '14 minutes ago');
+  assert.equal(readingAge(180, now), 'about 3 hours ago');
+  assert.equal(readingAge(3 * 1440, now), '3 days ago');
   assert.equal(daysLeftText(0.4), 'less than a day');
   assert.equal(daysLeftText(1.2), '1 day');
   assert.equal(daysLeftText(2.6), '3 days');

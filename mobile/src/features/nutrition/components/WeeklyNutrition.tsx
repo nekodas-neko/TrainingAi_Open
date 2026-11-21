@@ -1,3 +1,4 @@
+import { formatCount } from '@trainingai/shared/format/number';
 import { formatDateDisplay } from '@trainingai/shared/date-utils';
 import { plural } from '@trainingai/shared/format/plural';
 import { useState } from 'react';
@@ -52,7 +53,7 @@ export function WeeklyNutrition({
   const { days: loggedDays, calories: average } = loggedAverage(days ?? []);
   const target =
     metric === 'calories' && calorieTarget != null && calorieTarget > 0
-      ? { value: calorieTarget, label: `Target: ${Math.round(calorieTarget).toLocaleString()} kcal/day` }
+      ? { value: calorieTarget, label: `Target: ${formatCount(calorieTarget)} kcal/day` }
       : undefined;
   const color = {
     calories: theme.colors.brand,
@@ -112,7 +113,7 @@ export function WeeklyNutrition({
       <AppText variant="caption" tone="muted">
         {average == null
           ? 'No food logged this week yet.'
-          : `${target ? `Target: ${Math.round(calorieTarget!).toLocaleString()} kcal/day · ` : ''}avg of ${plural(loggedDays, 'logged day', 'logged days')}: ${average.toLocaleString()} kcal`}
+          : `${target ? `Target: ${formatCount(calorieTarget!)} kcal/day · ` : ''}avg of ${plural(loggedDays, 'logged day', 'logged days')}: ${formatCount(average)} kcal`}
       </AppText>
       {adherence.data && adherence.data.requiredMealTypeCount > 0 && (
         <Stack gap="xs">

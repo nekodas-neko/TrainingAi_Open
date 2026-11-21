@@ -1,3 +1,4 @@
+import { formatCount } from '@trainingai/shared/format/number';
 import { View } from 'react-native';
 import { AppText, ProgressBar, Sheet, Stack } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
@@ -54,8 +55,8 @@ export function AchievementDetail({
                 variant="caption"
                 style={{ fontWeight: '600', fontVariant: ['tabular-nums'] }}
               >
-                {Math.min(achievement.current, achievement.goal).toLocaleString()} /{' '}
-                {achievement.goal.toLocaleString()}
+                {formatCount(Math.min(achievement.current, achievement.goal))} /{' '}
+                {formatCount(achievement.goal)}
               </AppText>
             </Stack>
             <ProgressBar value={achievement.progress} color={color} />

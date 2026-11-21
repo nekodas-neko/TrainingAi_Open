@@ -1,3 +1,4 @@
+import { formatCount } from '@trainingai/shared/format/number';
 import { useState } from 'react';
 import { View } from 'react-native';
 import { AppText, Card, LoadingIndicator, SegmentedControl, Stack, StateCard } from '../../../shared/ui';
@@ -8,7 +9,6 @@ import {
   adminAiUsageSpec,
   barShares,
   estCostUsd,
-  fmtInt,
   fmtUsd,
 } from '../data/admin-monitoring';
 
@@ -47,13 +47,13 @@ export function AdminAiUsagePanel() {
       ) : (
         <>
           <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
-            <Tile label="Calls" value={fmtInt(s.totalCalls)} />
-            <Tile label="Tokens" value={fmtInt(s.totalTokens)} />
+            <Tile label="Calls" value={formatCount(s.totalCalls)} />
+            <Tile label="Tokens" value={formatCount(s.totalTokens)} />
             <Tile label="Est. cost" value={fmtUsd(totalCost)} />
           </View>
           {s.totalErrors > 0 && (
             <AppText variant="caption" tone="danger">
-              {fmtInt(s.totalErrors)} failed call{s.totalErrors === 1 ? '' : 's'} in this window
+              {formatCount(s.totalErrors)} failed call{s.totalErrors === 1 ? '' : 's'} in this window
             </AppText>
           )}
           {s.doubleTrips.length > 0 && (
@@ -64,7 +64,7 @@ export function AdminAiUsagePanel() {
               </AppText>
               {s.doubleTrips.map((d) => (
                 <AppText key={d.section} variant="caption">
-                  {d.section}: {fmtInt(d.redundantCalls)} redundant · {fmtInt(d.affectedFingerprints)} distinct
+                  {d.section}: {formatCount(d.redundantCalls)} redundant · {formatCount(d.affectedFingerprints)} distinct
                 </AppText>
               ))}
             </Card>
@@ -106,8 +106,8 @@ export function AdminAiUsagePanel() {
                     {x.errors > 0 ? `  ${x.errors} err` : ''}
                   </AppText>
                   <AppText variant="caption" tone="muted">
-                    {fmtInt(x.calls)} calls · {fmtInt(x.totalTokens)} tokens ·{' '}
-                    {fmtUsd(estCostUsd(x.inputTokens, x.outputTokens))} · {fmtInt(x.avgLatencyMs)} ms avg
+                    {formatCount(x.calls)} calls · {formatCount(x.totalTokens)} tokens ·{' '}
+                    {fmtUsd(estCostUsd(x.inputTokens, x.outputTokens))} · {formatCount(x.avgLatencyMs)} ms avg
                   </AppText>
                 </View>
               ))}

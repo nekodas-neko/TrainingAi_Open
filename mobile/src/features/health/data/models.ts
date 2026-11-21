@@ -1,3 +1,4 @@
+import { formatCount } from '@trainingai/shared/format/number';
 import { z } from 'zod';
 import { dayExerciseSchema, daySpec } from '../../workouts/data/models.ts';
 
@@ -872,6 +873,6 @@ export function latestMetric(rows: BodyRow[], field: keyof BodyRow) {
 }
 export function metricValue(value: unknown, unit = '', decimals = 0) {
   return typeof value === 'number' && Number.isFinite(value)
-    ? `${value.toLocaleString(undefined, { maximumFractionDigits: decimals })}${unit ? ` ${unit}` : ''}`
+    ? `${formatCount(value, { decimals })}${unit ? ` ${unit}` : ''}`
     : '—';
 }

@@ -89,7 +89,6 @@ export function estCostUsd(inputTokens: number, outputTokens: number): number {
   );
 }
 export const fmtUsd = (v: number) => (v < 0.01 ? `$${v.toFixed(4)}` : `$${v.toFixed(2)}`);
-export const fmtInt = (v: number) => v.toLocaleString('en-AU');
 /** Bar heights as a share of the busiest bucket, never under 4% so a quiet bucket still shows. */
 export function barShares(calls: readonly number[]): number[] {
   const max = Math.max(0, ...calls);

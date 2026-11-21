@@ -1,3 +1,4 @@
+import { formatCount } from '@trainingai/shared/format/number';
 import { useState } from 'react';
 import {
   COMMON_WORKOUT_ACTIVITIES,
@@ -28,7 +29,7 @@ export function WorkoutEnergy({ workout }: { workout: WorkoutRecord }) {
     <Card style={{ width: '100%', maxWidth: theme.sizes.summaryWidth }}>
       {energy.data?.kcal != null && (
         <AppText variant="caption" tone="muted" style={{ textAlign: 'center' }}>
-          ~{energy.data.kcal.toLocaleString()} kcal ·{' '}
+          ~{formatCount(energy.data.kcal)} kcal ·{' '}
           {energy.data.source === 'hr'
             ? 'from heart rate'
             : `${energy.data.intensity ?? 'moderate'} effort`}

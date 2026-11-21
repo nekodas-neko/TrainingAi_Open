@@ -1,4 +1,4 @@
-import { formatCount } from '../progressPresentation';
+import { formatCount } from '@trainingai/shared/format/number';
 import { rankedContributors } from '@trainingai/shared/health/contributor-ranking';
 
 // Week in review wording and figures, kept out of the screen so they can be tested (#2935).
@@ -64,7 +64,7 @@ export function weakestFactor(
 // sessions" beside it on the same line.
 export function trainingHeadline(volumeKg: number, sessions: number) {
   return {
-    value: formatCount(Math.round(volumeKg)),
+    value: formatCount(volumeKg),
     caption: `kg over ${sessions} session${sessions === 1 ? '' : 's'}`,
   };
 }

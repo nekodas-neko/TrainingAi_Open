@@ -1,3 +1,4 @@
+import { formatVolumeKg } from '@trainingai/shared/format/number';
 import { useState } from 'react';
 import { Pressable } from '../../../shared/ui/Pressable';
 import { ExerciseHistory } from '../components/ExerciseHistory';
@@ -302,12 +303,12 @@ export function HistoryDay({
           {compact && (
             <Stack direction="row" justify="space-between">
               <AppText variant="micro" tone="muted">
-                {Math.round(
+                {formatVolumeKg(
                   entries
                     .filter((e) => e.workoutSessionId === id)
                     .reduce((n, e) => n + exerciseVolume(e.setWeights, e.reps), 0),
-                ).toLocaleString()}{' '}
-                kg volume
+                )}{' '}
+                volume
               </AppText>
               <AppText variant="micro" tone="muted">
                 {entries.filter((e) => e.workoutSessionId === id).length} exercises

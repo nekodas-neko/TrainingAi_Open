@@ -63,7 +63,7 @@ test('dates are calendar days in the user\'s timezone', () => {
   assert.equal(lastUsedLabel('2026-10-26T00:00:00.000Z', now, tz), 'Last used today');
   assert.equal(lastUsedLabel('2026-10-25T05:00:00.000Z', now, tz), 'Last used yesterday');
   assert.equal(lastUsedLabel('2026-10-24T05:00:00.000Z', now, tz), 'Last used 2 days ago');
-  assert.equal(lastUsedLabel('2026-10-05T05:00:00.000Z', now, tz), 'Last used 3 weeks ago');
+  assert.equal(lastUsedLabel('2026-10-05T05:00:00.000Z', now, tz), 'Last used 21 days ago');
   assert.equal(lastUsedLabel('2026-07-05T05:00:00.000Z', now, tz), 'Last used 5 July');
   assert.equal(lastUsedLabel('not a date', now, tz), 'Last used unknown');
 });

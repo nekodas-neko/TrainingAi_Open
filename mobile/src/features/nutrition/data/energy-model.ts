@@ -1,3 +1,4 @@
+import { formatCount } from '@trainingai/shared/format/number';
 // Today's calories against the budget, as the Nutrition energy card shows them. The card and the
 // home-screen widget snapshot both read this, so "kcal left" is worked out in one place.
 
@@ -63,7 +64,7 @@ export function budgetEnergyModel(input: {
 /** The card's figure and its word: "1,240" and "kcal left", or "kcal over". */
 export function remainingText(remaining: number): { value: string; label: string } {
   return {
-    value: Math.round(Math.abs(remaining)).toLocaleString(),
+    value: formatCount(Math.abs(remaining)),
     label: `kcal ${remaining < 0 ? 'over' : 'left'}`,
   };
 }

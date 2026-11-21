@@ -1,3 +1,4 @@
+import { formatCount } from '@trainingai/shared/format/number';
 import { standaloneOrLatest } from '@trainingai/shared/health/series-gaps';
 import { niceTicks, niceScale } from '@trainingai/shared/ui/nice-ticks';
 
@@ -39,7 +40,7 @@ export function tickLabels(ticks: readonly number[]): string[] {
   return ticks.map((t) =>
     compact && t !== 0
       ? `${Number((t / 1000).toFixed(1))}k`
-      : Number(t.toFixed(decimals)).toLocaleString('en-AU', { maximumFractionDigits: decimals }),
+      : formatCount(Number(t.toFixed(decimals)), { decimals }),
   );
 }
 

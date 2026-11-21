@@ -1,3 +1,4 @@
+import { formatCount, formatLifetimeDistance, formatLifetimeVolume, formatXp } from '@trainingai/shared/format/number';
 import { plural } from '@trainingai/shared/format/plural';
 import { levelProgress } from '@trainingai/shared/achievement-display';
 import { useState } from 'react';
@@ -96,7 +97,7 @@ function Profile({ userId, onBack }: { userId: string; onBack: () => void }) {
                   Level {profile.level} · {profile.levelLabel}
                 </AppText>
                 <AppText variant="micro" tone="muted">
-                  {profile.xp.toLocaleString()} XP total
+                  {formatXp(profile.xp)} total
                 </AppText>
               </Card>
             </Stack>
@@ -104,27 +105,22 @@ function Profile({ userId, onBack }: { userId: string; onBack: () => void }) {
               <ProgressBar value={xpProgress} />
               <Stack direction="row" justify="space-between">
                 <AppText variant="micro" tone="muted">
-                  {profile.xp.toLocaleString()} XP
+                  {formatXp(profile.xp)}
                 </AppText>
                 <AppText variant="micro" tone="muted">
                   {profile.nextLevelXp > profile.xp
-                    ? `${(profile.nextLevelXp - profile.xp).toLocaleString()} to next level`
+                    ? `${formatCount(profile.nextLevelXp - profile.xp)} to next level`
                     : 'Max level'}
                 </AppText>
               </Stack>
             </Stack>
             <Grid columns={profile.totalDistanceKm > 0 ? 4 : 3} gap="xs">
               {[
-                ['Sessions', profile.lifetimeSessions.toLocaleString()],
-                [
-                  'Volume',
-                  profile.lifetimeVolumeKg >= 1000
-                    ? `${(profile.lifetimeVolumeKg / 1000).toFixed(1)}T`
-                    : `${Math.round(profile.lifetimeVolumeKg)}kg`,
-                ],
+                ['Sessions', formatCount(profile.lifetimeSessions)],
+                ['Volume', formatLifetimeVolume(profile.lifetimeVolumeKg)],
                 ['Best streak', plural(profile.bestStreak, 'day', 'days')],
                 ...(profile.totalDistanceKm > 0
-                  ? [['Distance', `${profile.totalDistanceKm.toFixed(1)}km`]]
+                  ? [['Distance', formatLifetimeDistance(profile.totalDistanceKm)]]
                   : []),
               ].map(([label, value]) => (
                 <Card key={label}>
@@ -192,8 +188,8 @@ function Profile({ userId, onBack }: { userId: string; onBack: () => void }) {
             <Icon name="award" tone="brand" />
             <AppText>{selected.description}</AppText>
             <AppText variant="caption">
-              {Math.min(selected.current, selected.goal).toLocaleString()} /{' '}
-              {selected.goal.toLocaleString()}
+              {formatCount(Math.min(selected.current, selected.goal))} /{' '}
+              {formatCount(selected.goal)}
             </AppText>
             <ProgressBar value={selected.goal > 0 ? selected.current / selected.goal : 0} />
             <AppText variant="label">+{selected.xpReward} XP</AppText>

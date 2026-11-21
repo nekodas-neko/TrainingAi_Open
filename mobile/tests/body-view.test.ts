@@ -13,7 +13,6 @@ import {
   sleepWokeEnd,
   titleCaseWords,
   waterGoalText,
-  waterText,
   weekdayAxis,
   todayNonWearSec,
   weightPaceLine,
@@ -174,13 +173,10 @@ test("today's non-wear reads the generic wear field, and the older field only wh
 test('wording helpers', () => {
   assert.equal(readingCount(1), 'From 1 reading');
   assert.equal(readingCount(7), 'From 7 readings');
-  assert.equal(waterGoalText(2500), 'Goal: 2.5L');
-  assert.equal(waterGoalText(800), 'Goal: 800ml');
+  assert.equal(waterGoalText(2500), 'Goal: 2.5 L');
+  assert.equal(waterGoalText(800), 'Goal: 800 ml');
   assert.equal(waterGoalText(0), null);
   assert.equal(waterGoalText(null), null);
-  assert.equal(waterText(1800), '1.8L');
-  assert.equal(waterText(250), '250ml');
-  assert.equal(waterText(null), null);
   assert.equal(titleCaseWords('lower back'), 'Lower Back');
   assert.equal(titleCaseWords('mild'), 'Mild');
 });

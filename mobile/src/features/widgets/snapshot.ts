@@ -1,3 +1,4 @@
+import { formatWaterMl } from '@trainingai/shared/format/number';
 import { formatTimeOfDay } from '@trainingai/shared/date-utils';
 import { bodyBatteryBand } from '@trainingai/shared/health/body-battery-band';
 import { energyHero, type BodyBatteryEnergyInput } from '@trainingai/shared/health/body-battery-energy';
@@ -5,7 +6,7 @@ import { scoreColors } from '../../shared/theme/tokens.ts';
 import { chipText, type ScoreChipModel } from '../home/data/score-chips.ts';
 import type { RecommendationModel } from '../home/data/recommendation-model.ts';
 import { remainingText, type EnergyModel } from '../nutrition/data/energy-model.ts';
-import { waterGoalText, waterText } from '../health/data/body-view.ts';
+import { waterGoalText } from '../health/data/body-view.ts';
 import { batterySummary } from '../health/data/battery-summary.ts';
 
 // What the home-screen widgets will draw: one snapshot built only from what the app already holds,
@@ -183,7 +184,7 @@ function nutrition(
   water: { ml: number | null; goalMl: number },
 ): WidgetNutrition {
   const step = (ml: number | null): WidgetWaterStep => ({
-    text: waterText(ml) ?? '—',
+    text: formatWaterMl(ml),
     fraction: ml != null && water.goalMl > 0 ? Math.min(1, ml / water.goalMl) : null,
   });
   const steps = Array.from({ length: WIDGET_WATER_MAX_STEPS + 1 }, (_, taps) =>

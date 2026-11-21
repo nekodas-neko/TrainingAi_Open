@@ -1,3 +1,4 @@
+import { formatCount } from '@trainingai/shared/format/number';
 import type { BodyBatteryLabel } from "@trainingai/shared/health/body-battery-band";
 import { useTheme } from "../../../shared/theme/ThemeProvider";
 import { AppText, ProgressBar, Stack } from "../../../shared/ui";
@@ -49,10 +50,10 @@ export function DayTotals({
       <Stack gap="xs">
         <Stack direction="row" justify="space-between" align="baseline">
           <AppText variant="label" style={{ fontVariant: ["tabular-nums"] }}>
-            {Math.round(calories).toLocaleString()}
+            {formatCount(calories)}
             <AppText variant="caption" tone="muted">
               {budget != null
-                ? ` / ${Math.round(budget).toLocaleString()} kcal`
+                ? ` / ${formatCount(budget)} kcal`
                 : " kcal"}
             </AppText>
           </AppText>
@@ -63,7 +64,7 @@ export function DayTotals({
               style={{ fontVariant: ["tabular-nums"] }}
             >
               {remaining > 0
-                ? `${Math.round(remaining).toLocaleString()} left`
+                ? `${formatCount(remaining)} left`
                 : "Goal reached"}
             </AppText>
           )}

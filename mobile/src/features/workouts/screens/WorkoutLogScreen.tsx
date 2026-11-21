@@ -1,3 +1,4 @@
+import { formatVolumeKg } from '@trainingai/shared/format/number';
 import { useEffect, useRef } from 'react';
 import { feedback } from '../../../integrations/feedback/haptics';
 import { Share, View } from 'react-native';
@@ -158,7 +159,7 @@ export function WorkoutLogScreen({
     },
     { label: 'Total time', value: duration },
     { label: 'Sets', value: String(result.sets) },
-    { label: 'Volume', value: `${Math.round(result.loadVolume).toLocaleString()} kg` },
+    { label: 'Volume', value: formatVolumeKg(result.loadVolume) },
   ];
   return (
     <PageLayout

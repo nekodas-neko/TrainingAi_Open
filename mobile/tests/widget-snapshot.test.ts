@@ -148,13 +148,13 @@ test('the snapshot is version 1 and carries every value already formatted', () =
   assert.deepEqual(snapshot.nutrition?.kcal, { value: '1,240', label: 'kcal left' });
   assert.deepEqual(snapshot.nutrition?.macros.map((m) => m.left), ['62 g left', '118 g left', '24 g left']);
   assert.deepEqual(snapshot.nutrition?.water.steps.slice(0, 3), [
-    { text: '1.3L', fraction: 0.5 },
-    { text: '1.5L', fraction: 0.6 },
-    { text: '1.8L', fraction: 0.7 },
+    { text: '1.3 L', fraction: 0.5 },
+    { text: '1.5 L', fraction: 0.6 },
+    { text: '1.8 L', fraction: 0.7 },
   ]);
   assert.deepEqual(
     [snapshot.nutrition?.water.text, snapshot.nutrition?.water.goal, snapshot.nutrition?.water.fraction, snapshot.nutrition?.water.tapMl],
-    ['1.3L', 'Goal: 2.5L', 0.5, 250],
+    ['1.3 L', 'Goal: 2.5 L', 0.5, 250],
   );
   assert.equal('collection' in snapshot, false);
   // The widget parses JSON: everything survives the round trip.
@@ -177,7 +177,7 @@ test('missing data stays missing in the snapshot rather than turning into zero',
   assert.ok(snapshot.nutrition?.macros.every((m) => m.left === null && m.fraction === null));
   assert.deepEqual(snapshot.nutrition?.water.steps[0], { text: '—', fraction: null });
   // Taps made before any water was logged count from nothing.
-  assert.deepEqual(snapshot.nutrition?.water.steps[2], { text: '500ml', fraction: 0.2 });
+  assert.deepEqual(snapshot.nutrition?.water.steps[2], { text: '500 ml', fraction: 0.2 });
 });
 
 test('rest day and check-in cards reach the snapshot without a session to open', () => {

@@ -1,3 +1,4 @@
+import { formatCount } from '@trainingai/shared/format/number';
 import { useState } from 'react';
 import { View } from 'react-native';
 import { getProtocol } from '@trainingai/shared/fitness-tests/protocols';
@@ -202,7 +203,7 @@ export function StepsQuotaCard({ steps }: { steps: CardioWeek['steps'] }) {
         ).map(([value, goal, label]) => (
           <Stack key={label}>
             <AppText variant="caption">
-              {value.toLocaleString()} / {goal.toLocaleString()} {label}
+              {formatCount(value)} / {formatCount(goal)} {label}
             </AppText>
             <ProgressBar value={goal > 0 ? value / goal : 0} />
           </Stack>

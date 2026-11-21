@@ -1,3 +1,4 @@
+import { timeAgo } from '@trainingai/shared/format/time-ago';
 import { z } from 'zod';
 import { toAestDay, daysBetweenDateStrs, formatDateDisplay } from '@trainingai/shared/date-utils';
 import { ApiError } from '../../account/api/client';
@@ -51,7 +52,7 @@ export function signedInLabel(iso: string, tz: string) {
   return Number.isNaN(at.getTime()) ? 'Signed in' : `Signed in ${formatDateDisplay(toAestDay(at, tz))}`;
 }
 
-/** "Last used just now" · "2 days ago" · "3 weeks ago". Days are calendar days in `tz`. */
+/** "Last used just now" · "today" · "yesterday" · then the shared `timeAgo` wording. Today and yesterday are calendar days in `tz`. */
 export function lastUsedLabel(iso: string, now: Date, tz: string) {
   const at = new Date(iso);
   if (Number.isNaN(at.getTime())) return 'Last used unknown';
@@ -59,7 +60,6 @@ export function lastUsedLabel(iso: string, now: Date, tz: string) {
   const days = daysBetweenDateStrs(toAestDay(at, tz), toAestDay(now, tz));
   if (days <= 0) return 'Last used today';
   if (days === 1) return 'Last used yesterday';
-  if (days < 14) return `Last used ${days} days ago`;
-  if (days < 60) return `Last used ${Math.floor(days / 7)} weeks ago`;
+  if (days < 60) return `Last used ${timeAgo(at, now)}`;
   return `Last used ${formatDateDisplay(toAestDay(at, tz))}`;
 }
