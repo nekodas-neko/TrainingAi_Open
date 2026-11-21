@@ -550,6 +550,25 @@ SELECT
   t.reviewed_at
 FROM public.exercise_media t;
 
+CREATE VIEW claude_ro.exercise_preferences AS
+SELECT
+  t.id,
+  t.user_id,
+  t.exercise_id,
+  t.exercise_name,
+  t.rep_min,
+  t.rep_max,
+  t.rest_sec,
+  t.next_load_step,
+  t.sets_delta,
+  t.one_shot_set_at,
+  t.source,
+  t.deleted_at,
+  t.created_at,
+  t.updated_at
+FROM public.exercise_preferences t
+WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
+
 -- feedback_submissions: withholding "screenshot_data"
 CREATE VIEW claude_ro.feedback_submissions AS
 SELECT

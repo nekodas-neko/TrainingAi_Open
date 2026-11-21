@@ -56,6 +56,8 @@ export const SOFT_DELETED: Record<string, string> = {
   // #3898: a rest period or tag deleted at the connected source
   source_rest_periods: 'deleted_at',
   source_day_tags: 'deleted_at',
+  // #3896: a lift preference the person cleared
+  exercise_preferences: 'deleted_at',
   plan_meal_answers: 'deleted_at',
   blood_panels: 'deleted_at',
   prescribed_runs: 'deleted_at',
@@ -91,6 +93,7 @@ export const EXPORTED: Record<string, ExportScope> = {
   detection_events: { kind: 'user_id' },
   dexa_scans: { kind: 'user_id' },
   exercise_estimates: { kind: 'user_id' },
+  exercise_preferences: { kind: 'user_id' },
   fitness_tests: { kind: 'user_id' },
   food_items: { kind: 'user_id' },
   food_logs: { kind: 'user_id' },
