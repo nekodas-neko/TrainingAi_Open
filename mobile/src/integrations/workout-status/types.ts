@@ -32,6 +32,23 @@ export type WorkoutStatusPayload = {
   setColors: string[] | null;
   /** When the current pause began; null unless `phase` is "paused". */
   pausedAt: number | null;
+  // #3734: where the lifter is in the session, and the clock when nothing else runs.
+  /** The exercise's place among the session's, 1-based, and how many there are; 0 with none. */
+  exerciseIndex: number;
+  exerciseCount: number;
+  /** `startedAt` moved on by the pauses already ended: now minus this is the workout's time. */
+  workoutFrom: number;
+  /** The exercise Next moves to: its place, set count and first set's load; 0 / null with none. */
+  nextUpIndex: number;
+  nextUpSets: number;
+  nextUpLoad: string | null;
+  /**
+   * #3745, the window's copy alone, like `hr`: the answer buttons are offered until `until`, and
+   * `answer` is the one the question stands on. Null when the window doesn't ask.
+   */
+  effortAsk: { until: number; answer: -1 | 0 | 1 } | null;
+  /** The app's accent as `#rrggbb` for the always-dark window; the window's copy alone. */
+  accent: string | null;
   /**
    * The strap's latest reading, for the window only: the notification never reads it, and
    * `workoutStatusFor` leaves it null so a reading every second is not a status change.

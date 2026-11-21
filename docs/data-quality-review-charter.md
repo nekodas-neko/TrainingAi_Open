@@ -181,7 +181,7 @@ Every one of these turns raw data into a number the user sees. For each, ask: *w
 look like, and would anything currently catch it?*
 
 **Scores & composites** — `lib/health/`: `sleep-score.ts`, `readiness-composite.ts`, `activity-score.ts`,
-`score-band.ts`, `illness-radar.ts`, `stress-resilience.ts`, `chronic-stress-assembly.ts`,
+`score-band.ts`, `illness-radar.ts`, `stress-resilience.ts`,
 `recovery-index.ts`, `personal-baseline.ts` (EMA baselines — check maturity gates and units;
 temperature is centi-°C, breathing is rpm×10, and getting that wrong silently produces absurd z-scores).
 
@@ -189,7 +189,7 @@ temperature is centi-°C, breathing is rpm×10, and getting that wrong silently 
 `lib/health/training-stress.ts`, `workout-density.ts`, `workout-energy.ts`.
 
 **Cardio & HR** — `hr-zones.ts`, `zone-minutes.ts`, `observed-hr.ts`, `hr-recovery-profile.ts`,
-`vo2max.ts`, `vdot.ts`, `rmssd.ts`, `hrv-5min.ts`, `cadence.ts`.
+`vo2max.ts`, `vdot.ts`, `rmssd.ts`, `cadence.ts`.
 
 **Energy & nutrition** — `daily-energy.ts`, `daily-goals.ts`, `energy-balance.ts`,
 `body-composition.ts`, `step-estimate.ts`.

@@ -5,6 +5,7 @@ import {
   confirmDetectedWalk,
   detectedActivityPayload,
   initialChoice,
+  offeredToday,
   recordedSpans,
   visibleWalks,
   walkCandidatesSpec,
@@ -178,4 +179,54 @@ test('undoing a dismissal offers the walk again', async () => {
   await home.answerWalk(walk.startMs);
   await home.answerWalk(walk.startMs, false);
   assert.deepEqual(visibleWalks([walk], home.getSnapshot().answeredWalks, []), [walk]);
+});
+
+// #3625: shaped like the route's answer (`WalkCandidatesResponse`, app/api/activity-detection/walks).
+const answer = (walks: typeof walk[], covered: { startMs: number; endMs: number }[] = []) =>
+  walkCandidatesSpec('2026-10-12').schema.parse({
+    date: '2026-10-12',
+    walks: walks.map((w) => ({ ...w, meanMet: 3.1 })),
+    covered,
+  });
+
+test('a walk offered earlier today stays on offer when a later answer no longer lists it', () => {
+  // 20 Nov: the current app's card kept a walk that Preview, reading only the latest answer, dropped.
+  const held = offeredToday(answer([walk]), [], '2026-10-12', tz);
+  assert.deepEqual(held, [walk]);
+  assert.deepEqual(offeredToday(answer([later]), held, '2026-10-12', tz), [later, walk]);
+  // A refresh that failed, or has not landed yet, takes nothing off either.
+  assert.deepEqual(offeredToday(null, held, '2026-10-12', tz), [walk]);
+  assert.deepEqual(visibleWalks(offeredToday(answer([]), held, '2026-10-12', tz), [], []), [walk]);
+});
+
+test('a held walk goes once something logged covers it, and the newer version of it wins', () => {
+  // Logged in the other app, or recorded by the source itself: offering it again would duplicate it.
+  assert.deepEqual(offeredToday(answer([], [{ startMs: at('09:20'), endMs: at('09:40') }]), [walk], '2026-10-12', tz), []);
+  const revised = { startMs: at('09:12'), endMs: at('09:30'), durationMin: 18 };
+  assert.deepEqual(offeredToday(answer([revised]), [walk], '2026-10-12', tz), [revised]);
+  // A server from before the covered list still answers; its walks are read as before.
+  const old = walkCandidatesSpec('2026-10-12').schema.parse({ date: '2026-10-12', walks: [walk] });
+  assert.deepEqual(old.covered, []);
+});
+
+test('a walk held from another day is not offered: the card shows a time with no date', () => {
+  assert.deepEqual(offeredToday(answer([]), [walk], '2026-10-13', tz), []);
+  assert.deepEqual(offeredToday(null, [walk], '2026-10-13', tz), []);
+});
+
+test('the held walks survive a restart and an unchanged answer writes nothing', async () => {
+  const f = stores();
+  const home = f.home();
+  await home.initialize();
+  await home.holdWalks([walk]);
+  const raw = await f.storage.get('home.v1');
+  await home.holdWalks([{ ...walk }]);
+  assert.equal(await f.storage.get('home.v1'), raw);
+  const reopened = f.home();
+  await reopened.initialize();
+  assert.deepEqual(reopened.getSnapshot().offeredWalks, [walk]);
+  // Answered, it stays held for the day but is not shown.
+  await reopened.answerWalk(walk.startMs);
+  const state = reopened.getSnapshot();
+  assert.deepEqual(visibleWalks(offeredToday(null, state.offeredWalks, '2026-10-12', tz), state.answeredWalks, []), []);
 });

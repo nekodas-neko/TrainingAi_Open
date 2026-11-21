@@ -9,9 +9,14 @@ function at(hour: number, minute = 0): number {
 }
 
 describe('stressOverlay', () => {
+  it('points stress up: a stressed (negative) level plots above zero, as on the day chart (#3935)', () => {
+    const { points } = stressOverlay([{ t: at(9, 0), level: -0.8 }, { t: at(9, 30), level: 0.6 }], TZ)
+    expect(points.map(p => p.y)).toEqual([0.8, -0.6])
+  })
+
   it('places a bucket at its local minute-of-day, not the device\'s', () => {
     const { points } = stressOverlay([{ t: at(6, 30), level: -0.4 }], TZ)
-    expect(points).toEqual([{ x: 390, y: -0.4 }])
+    expect(points).toEqual([{ x: 390, y: 0.4 }])
   })
 
   it('keeps a run contiguous with no breaks inside it', () => {
@@ -20,7 +25,7 @@ describe('stressOverlay', () => {
       { t: at(6, 30), level: -0.2 },
       { t: at(7, 0), level: -0.5 },
     ], TZ)
-    expect(points.map(p => p.y)).toEqual([0.1, -0.2, -0.5])
+    expect(points.map(p => p.y)).toEqual([-0.1, 0.2, 0.5])
     expect(points.every(p => p.y !== null)).toBe(true)
   })
 
@@ -36,7 +41,7 @@ describe('stressOverlay', () => {
     // The break sits at the start of the run it precedes, so the gap is empty rather than
     // back-filled toward the earlier run.
     expect(nulls[0].x).toBe(13 * 60 + 15)
-    expect(points.map(p => p.y)).toEqual([-0.3, -0.4, null, 0.2, 0.3])
+    expect(points.map(p => p.y)).toEqual([0.3, 0.4, null, -0.2, -0.3])
   })
 
   it('tolerates one dropped reading without breaking — 60 minutes is under the 75 threshold', () => {

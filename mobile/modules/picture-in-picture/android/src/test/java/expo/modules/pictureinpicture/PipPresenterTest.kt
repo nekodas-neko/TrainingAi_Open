@@ -19,188 +19,57 @@ class PipPresenterTest {
     setColors = listOf("#60a5fa", "#f472b6", "#34d399", "#fbbf24"),
   )
   private val reading = PipHeartRate(128, "Aerobic", "#eab308", t0)
-  private fun asWorking(frame: PipFrame) = frame as PipFrame.Working
-  private fun asResting(frame: PipFrame) = frame as PipFrame.Resting
 
   @Test fun `only an active workout phase opens the window, a pause included`() {
-    for (phase in listOf("rest", "set", "complete", "summary", "paused")) assertTrue(phase, PipPolicy.isActivePhase(phase))
+    for (phase in listOf("ready", "rest", "set", "complete", "summary", "paused")) assertTrue(phase, PipPolicy.isActivePhase(phase))
     for (phase in listOf(PipPolicy.IDLE, "pre", "done", "", null)) assertFalse("$phase", PipPolicy.isActivePhase(phase))
   }
 
   @Test fun `leaving the app enters by hand only where the system does not enter on its own`() {
     // Android 12 and later: a set, a rest and a pause auto-enter, so no manual entry.
-    for (phase in listOf("set", "rest", "paused")) assertFalse(phase, PipPolicy.entersOnLeave(phase, 34))
+    for (phase in listOf("set", "ready", "rest", "paused")) assertFalse(phase, PipPolicy.entersOnLeave(phase, 34))
     for (phase in listOf("complete", "summary")) assertTrue(phase, PipPolicy.entersOnLeave(phase, 34))
     // Before Android 12 there is no auto-enter, so every active phase enters by hand.
-    for (phase in listOf("set", "rest", "paused", "complete", "summary")) assertTrue(phase, PipPolicy.entersOnLeave(phase, 30))
+    for (phase in listOf("set", "ready", "rest", "paused", "complete", "summary")) assertTrue(phase, PipPolicy.entersOnLeave(phase, 30))
     // No workout, no window.
     assertFalse(PipPolicy.entersOnLeave(PipPolicy.IDLE, 34))
     assertFalse(PipPolicy.entersOnLeave(null, 30))
   }
 
-  @Test fun `the system enters on its own only for a set, a rest or a pause`() {
-    for (phase in listOf("set", "rest", "paused")) assertTrue(phase, PipPolicy.autoEnters(phase))
+  @Test fun `the system enters on its own only for a set, a rest, ready or a pause`() {
+    for (phase in listOf("set", "ready", "rest", "paused")) assertTrue(phase, PipPolicy.autoEnters(phase))
     for (phase in listOf("complete", "summary", "pre", "done", PipPolicy.IDLE, "", null)) {
       assertFalse("$phase", PipPolicy.autoEnters(phase))
     }
   }
 
-  @Test fun `the window is portrait while a set runs and square otherwise`() {
-    assertEquals(3 to 4, PipPolicy.aspect("set"))
-    for (phase in listOf("rest", "paused", "complete", "summary", PipPolicy.IDLE, null)) assertEquals("$phase", 1 to 1, PipPolicy.aspect(phase))
-  }
-
-  @Test fun `a set shows its load split into weight, unit and reps, and the set it is on`() {
-    val frame = asWorking(PipPresenter.present("set", working, "#34d399", t0 + 90_000))
-    assertEquals("Set 3 of 4", frame.setLabel)
-    assertEquals("80", frame.weight)
-    assertEquals("kg", frame.unit)
-    assertEquals("× 8", frame.reps)
-    assertEquals(t0, frame.countsFrom)
-    assertEquals(4, frame.sets)
-    assertEquals(2, frame.setsDone)
-    assertEquals("#34d399", frame.setColor)
-    assertEquals(working.setColors, frame.setColors)
-  }
-
-  @Test fun `an unknown load shows nothing, never a made-up one`() {
-    val frame = asWorking(PipPresenter.present("set", working.copy(load = null), null, t0))
-    assertNull(frame.weight)
-    assertNull(frame.unit)
-    assertNull(frame.reps)
-    assertNull(PipPresenter.fromMap(mapOf("exerciseName" to "Squat", "phase" to "working", "load" to " "))?.load)
-    // A set with no start stands at 0:00 rather than guessing one.
-    assertNull(asWorking(PipPresenter.present("set", working.copy(setStartedAt = null), null, t0)).countsFrom)
-  }
-
-  @Test fun `a load splits only into what it says`() {
-    assertEquals(PipPresenter.LoadParts("80", "kg", "× 8"), PipPresenter.splitLoad("80 kg × 8"))
-    assertEquals(PipPresenter.LoadParts("82.5", "kg", null), PipPresenter.splitLoad("82.5 kg"))
-    assertEquals(PipPresenter.LoadParts("135", "lb", "× 5"), PipPresenter.splitLoad("135 lb × 5"))
-    assertEquals(PipPresenter.LoadParts(null, null, "8 reps"), PipPresenter.splitLoad("8 reps"))
-    assertEquals(PipPresenter.LoadParts("Bodyweight", null, "× 12"), PipPresenter.splitLoad("Bodyweight × 12"))
-    assertEquals(PipPresenter.LoadParts(null, null, null), PipPresenter.splitLoad(null))
-    assertEquals(PipPresenter.LoadParts(null, null, null), PipPresenter.splitLoad("  "))
-  }
-
-  @Test fun `a rest counts down to its target and the ring empties`() {
-    val frame = asResting(PipPresenter.present("rest", resting, null, t0 + 45_500))
-    assertEquals(t0, frame.countsFrom)
-    assertEquals(90L, frame.targetSec)
-    assertFalse(frame.over)
-    assertEquals(0.5f, frame.fraction, 0.001f)
-    assertEquals("REST · NEXT 3/4", frame.eyebrow)
-    assertEquals("80 kg × 8", frame.load)
-    // The clock reads the time left.
-    assertEquals("0:45", PipPresenter.restClockText(45, frame.targetSec))
-    assertEquals("1:30", PipPresenter.restClockText(0, frame.targetSec))
-  }
-
-  @Test fun `past its target the rest is over, the ring is full and the clock counts up from zero`() {
-    val frame = asResting(PipPresenter.present("rest", resting, null, t0 + 102_000))
-    assertTrue(frame.over)
-    assertEquals(1f, frame.fraction, 0f)
-    assertEquals("REST OVER", frame.eyebrow)
-    assertEquals("+0:12", PipPresenter.restClockText(102, frame.targetSec))
-    assertTrue(asResting(PipPresenter.present("rest", resting, null, t0 + 90_000)).over)
-    assertFalse(asResting(PipPresenter.present("rest", resting, null, t0 + 89_999)).over)
-    assertEquals("+0:00", PipPresenter.restClockText(90, 90))
-  }
-
-  @Test fun `plus 30 seconds moves the target and the ring follows`() {
-    val longer = resting.copy(restEndsAt = t0 + 120_000)
-    val frame = asResting(PipPresenter.present("rest", longer, null, t0 + 60_000))
-    assertEquals(120L, frame.targetSec)
-    assertEquals(0.5f, frame.fraction, 0.001f)
-    assertFalse(asResting(PipPresenter.present("rest", longer, null, t0 + 100_000)).over)
-  }
-
-  @Test fun `a rest with no target counts up from the last set, and with no start stands still`() {
-    val untimed = asResting(PipPresenter.present("rest", resting.copy(restEndsAt = null), null, t0 + 30_000))
-    assertNull(untimed.targetSec)
-    assertFalse(untimed.over)
-    assertEquals(0f, untimed.fraction, 0f)
-    assertEquals(t0, untimed.countsFrom)
-    assertEquals("0:30", PipPresenter.restClockText(30, untimed.targetSec))
-    val unanchored = asResting(PipPresenter.present("rest", resting.copy(restStartedAt = null), null, t0 + 30_000))
-    assertNull(unanchored.countsFrom)
-    assertNull(unanchored.targetSec)
-  }
-
-  @Test fun `after the last set the rest says done and names no next set`() {
-    val frame = asResting(PipPresenter.present("complete", resting.copy(setsDone = 4), null, t0 + 10_000))
-    assertEquals("REST · DONE", frame.eyebrow)
-    assertNull(frame.load)
-  }
-
-  @Test fun `the summary times its last-set rest, then shows the placeholder with Next`() {
-    val summaryRest = asResting(PipPresenter.present("summary", resting.copy(setsDone = 4), null, t0 + 10_000))
-    assertEquals("REST · DONE", summaryRest.eyebrow)
-    assertEquals(
-      PipFrame.Placeholder("Bench press", true, "Barbell row"),
-      PipPresenter.present("summary", resting.copy(phase = "ready", restEndsAt = null, nextUp = "Barbell row"), null, t0),
-    )
-    assertEquals(
-      PipFrame.Placeholder("Bench press", true),
-      PipPresenter.present("summary", resting.copy(phase = "ready", restEndsAt = null), null, t0),
-    )
-  }
-
-  @Test fun `a pause shows how long it has lasted and what is left of the rest`() {
-    val paused = resting.copy(phase = "paused", pausedAt = t0 + 36_000)
-    val frame = PipPresenter.present("paused", paused, null, t0 + 100_000) as PipFrame.Paused
-    assertEquals(t0 + 36_000, frame.countsFrom)
-    assertEquals("Bench press · rest 0:54 left", frame.caption)
-    // A pause during a set holds no rest.
-    val set = PipPresenter.present("paused", working.copy(phase = "paused", pausedAt = t0), null, t0) as PipFrame.Paused
-    assertEquals("Bench press", set.caption)
-    // A rest already over when paused has nothing left to show.
-    val over = PipPresenter.present("paused", resting.copy(phase = "paused", pausedAt = t0 + 95_000), null, t0) as PipFrame.Paused
-    assertEquals("Bench press", over.caption)
-  }
-
-  @Test fun `the workout's end and a missing status show a placeholder without Next, never a blank window`() {
-    assertEquals(
-      PipFrame.Placeholder("Upper body", false),
-      PipPresenter.present("done", PipStatus("Upper body", "ready"), null, t0),
-    )
-    assertEquals(PipFrame.Placeholder("", false), PipPresenter.present("rest", null, null, t0))
-    assertEquals(PipFrame.Placeholder("", false), PipPresenter.present("paused", null, null, t0))
-  }
-
-  @Test fun `a heart rate shows fresh, shows a dash once stale, and nothing with no strap`() {
-    assertNull(PipPresenter.present("set", working, null, t0).let { asWorking(it).hr })
-    val withHr = working.copy(hr = reading)
-    assertEquals(PipHeartView(128, "Aerobic", "#eab308"), asWorking(PipPresenter.present("set", withHr, null, t0 + 7_999)).hr)
-    assertEquals(PipHeartView(null, "Aerobic", "#eab308"), asWorking(PipPresenter.present("set", withHr, null, t0 + 8_001)).hr)
-    assertEquals(PipHeartView(128, "Aerobic", "#eab308"), asResting(PipPresenter.present("rest", resting.copy(hr = reading), null, t0 + 1_000)).hr)
-  }
-
   @Test fun `the buttons per phase are at most three, the main one in the middle`() {
-    fun actions(phase: String, status: PipStatus? = null) = PipPresenter.buttons(phase, status).map { it.action }
+    fun actions(phase: String, status: PipStatus? = null) = PipPresenter.buttons(phase, status, t0).map { it.action }
     assertEquals(listOf("repsDown", "log", "repsUp"), actions("set"))
     assertEquals(listOf("restPlus", "log", "pause"), actions("rest", resting))
     assertEquals(listOf("log", "pause"), actions("rest", resting.copy(restEndsAt = null)))
+    assertEquals(listOf("log", "pause"), actions("ready", resting.copy(restStartedAt = null, restEndsAt = null)))
     assertEquals(listOf("resume"), actions("paused"))
     assertEquals(listOf("log"), actions("complete"))
     assertEquals(listOf("log"), actions("summary"))
     assertEquals(emptyList<String>(), actions("pre"))
     assertEquals(emptyList<String>(), actions(PipPolicy.IDLE))
-    for (phase in listOf("set", "rest", "paused", "complete", "summary")) {
-      assertTrue(phase, PipPresenter.buttons(phase, resting).size <= PipPolicy.MAX_ACTIONS)
+    for (phase in listOf("set", "ready", "rest", "paused", "complete", "summary")) {
+      assertTrue(phase, PipPresenter.buttons(phase, resting, t0).size <= PipPolicy.MAX_ACTIONS)
     }
-    assertEquals(listOf("Start set"), PipPresenter.buttons("rest", resting).filter { it.action == "log" }.map { it.label })
+    assertEquals(listOf("Start set"), PipPresenter.buttons("rest", resting, t0).filter { it.action == "log" }.map { it.label })
   }
 
   @Test fun `the system is told the exercise and where the set is`() {
     assertEquals("Bench press", PipPresenter.title(working))
     assertNull(PipPresenter.title(null))
     assertNull(PipPresenter.title(working.copy(exerciseName = " ")))
-    assertEquals("Set 3 of 4", PipPresenter.subtitle("set", working))
-    assertEquals("Resting", PipPresenter.subtitle("rest", resting))
-    assertEquals("Paused", PipPresenter.subtitle("paused", resting))
-    assertNull(PipPresenter.subtitle("summary", resting))
-    assertNull(PipPresenter.subtitle("set", null))
+    assertEquals("Set 3 of 4", PipPresenter.subtitle("set", working, t0))
+    assertEquals("Resting", PipPresenter.subtitle("rest", resting, t0))
+    assertEquals("Ready", PipPresenter.subtitle("ready", resting, t0))
+    assertEquals("Paused", PipPresenter.subtitle("paused", resting, t0))
+    assertNull(PipPresenter.subtitle("summary", resting, t0))
+    assertNull(PipPresenter.subtitle("set", null, t0))
   }
 
   @Test fun `wall time maps onto the chronometer's elapsed-realtime base`() {
@@ -227,15 +96,29 @@ class PipPresenterTest {
         "restStartedAt" to null, "nextUp" to null, "pausedAt" to null,
         "hr" to mapOf("bpm" to 128.0, "zoneName" to "Aerobic", "zoneColor" to "#eab308", "at" to t0.toDouble()),
         "setColors" to listOf("#60a5fa", "oklch(1 0 0)", "#34d399"),
+        // #3734 and #3745.
+        "exerciseIndex" to 2.0, "exerciseCount" to 5.0, "workoutFrom" to (t0 - 600_000).toDouble(),
+        "nextUpIndex" to 3.0, "nextUpSets" to 3.0, "nextUpLoad" to "20 kg × 12",
+        "effortAsk" to mapOf("until" to (t0 + 20_000).toDouble(), "answer" to 0.0),
+        "accent" to "#00c84e",
       ),
     )
     assertEquals(
       PipStatus(
         "Bench press", "working", 4, 2, "80 kg × 8", t0, null, null, null, null, reading,
         listOf("#60a5fa", "#34d399"),
+        sessionName = "Upper body", exerciseIndex = 2, exerciseCount = 5, workoutFrom = t0 - 600_000,
+        nextUpIndex = 3, nextUpSets = 3, nextUpLoad = "20 kg × 12", effortUntil = t0 + 20_000,
+        effortAnswer = 0, accent = "#00c84e",
       ),
       read,
     )
+    // An older app's payload, without the new keys, still reads.
+    val old = PipPresenter.fromMap(mapOf("exerciseName" to "Squat", "phase" to "resting"))!!
+    assertEquals(listOf(0, 0, null, null, null, null), listOf(old.exerciseIndex, old.exerciseCount, old.workoutFrom, old.effortUntil, old.effortAnswer, old.accent))
+    // An answer outside the three is not shown as one.
+    assertNull(PipPresenter.fromMap(mapOf("exerciseName" to "Squat", "phase" to "resting", "effortAsk" to mapOf("until" to 1.0, "answer" to 2.0)))!!.effortAnswer)
+    assertNull(PipPresenter.fromMap(mapOf("exerciseName" to "Squat", "phase" to "ready", "accent" to "green"))!!.accent)
     assertNull(PipPresenter.fromMap(null))
     assertNull(PipPresenter.fromMap(mapOf("phase" to "working")))
     assertNull(PipPresenter.fromMap(mapOf("exerciseName" to "x")))

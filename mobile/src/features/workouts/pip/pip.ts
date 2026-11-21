@@ -1,6 +1,8 @@
 import { CATEGORICAL_PALETTE, categoricalColor } from '@trainingai/shared/chart-colors';
 import { workoutFlow } from '../logging/flow.ts';
 import type { WorkoutExercise, WorkoutRecord } from '../logging/workout.ts';
+import type { EffortVsPlan } from '@trainingai/shared/workout/effort-vs-plan';
+import { effortQuestionWindow } from '../logging/effort.ts';
 
 // Picture-in-picture for the workout screen (#3064), ported from the current app:
 // lib/workout/pip-phase.ts (the phase reported to the shell) and the PiP buttons wired in
@@ -11,9 +13,41 @@ import type { WorkoutExercise, WorkoutRecord } from '../logging/workout.ts';
  * Only the active phases open the window on leave; the shell starts in, and returns to, idle. A
  * paused workout keeps a window of its own (#3255), with one button: Resume.
  */
-export type PipPhase = 'idle' | 'pre' | 'set' | 'rest' | 'complete' | 'summary' | 'done' | 'paused';
-export const ACTIVE_PIP_PHASES: readonly PipPhase[] = ['set', 'rest', 'complete', 'summary', 'paused'];
-export type PipAction = 'repsDown' | 'repsUp' | 'log' | 'restPlus' | 'pause' | 'resume';
+export type PipPhase =
+  | 'idle'
+  | 'pre'
+  | 'ready'
+  | 'set'
+  | 'rest'
+  | 'complete'
+  | 'summary'
+  | 'done'
+  | 'paused';
+/** `ready` is an exercise before its first set (#3734): no rest to count, the workout's clock. */
+export const ACTIVE_PIP_PHASES: readonly PipPhase[] = [
+  'ready',
+  'set',
+  'rest',
+  'complete',
+  'summary',
+  'paused',
+];
+/** The three `effort*` actions answer "how did it feel?" in the window (#3745). */
+export type PipAction =
+  | 'repsDown'
+  | 'repsUp'
+  | 'log'
+  | 'restPlus'
+  | 'pause'
+  | 'resume'
+  | 'effortEasier'
+  | 'effortAsExpected'
+  | 'effortHarder';
+export const PIP_EFFORT_ACTIONS = {
+  effortEasier: -1,
+  effortAsExpected: 0,
+  effortHarder: 1,
+} as const satisfies Partial<Record<PipAction, EffortVsPlan>>;
 
 export function allowsPip(phase: PipPhase) {
   return ACTIVE_PIP_PHASES.includes(phase);
@@ -41,7 +75,11 @@ export function workoutPhaseOf(workout: WorkoutRecord | null): PipPhase {
   if (flow.stage === 'summary') return 'summary';
   if (flow.stage === 'warmup' || !exercise) return 'pre';
   if (workout.runningSet) return 'set';
-  return done(exercise) >= exercise.sets.length ? 'complete' : 'rest';
+  if (done(exercise) >= exercise.sets.length) return 'complete';
+  // Before the exercise's first set there is no rest: the window says Ready and shows the
+  // workout's clock, where it once stood at a rest of 0:00 (#3734).
+  const untouched = !exercise.sets.some((set) => set.startedAt !== null || set.completedAt !== null);
+  return untouched && !workout.rest ? 'ready' : 'rest';
 }
 
 type WorkoutSet = WorkoutExercise['sets'][number];
@@ -90,18 +128,35 @@ export type PipCommand =
   | { type: 'record'; exerciseId: string; setId: string }
   | { type: 'start'; exerciseId: string; setId: string }
   | { type: 'advance' }
-  | { type: 'session' };
+  | { type: 'session' }
+  | { type: 'effort'; exerciseId: string; value: EffortVsPlan };
 
 /** What a window button does, as the current app's usePipActions handlers. */
-export function pipCommand(workout: WorkoutRecord | null, action: PipAction): PipCommand | null {
+export function pipCommand(
+  workout: WorkoutRecord | null,
+  action: PipAction,
+  now: number = Date.now(),
+): PipCommand | null {
   const phase = pipPhaseFor(workout);
   if (!workout || !allowsPip(phase)) return null;
   // A paused workout answers to Resume alone; the rest of its buttons are waiting behind it.
   if (phase === 'paused') return action === 'resume' ? { type: 'resume' } : null;
   if (action === 'resume') return null;
+  if (action in PIP_EFFORT_ACTIONS) {
+    // Only while the window offers the question, so a late tap cannot answer it.
+    const asked = effortQuestionWindow(workout, now);
+    return asked
+      ? {
+          type: 'effort',
+          exerciseId: asked.exerciseId,
+          value: PIP_EFFORT_ACTIONS[action as keyof typeof PIP_EFFORT_ACTIONS],
+        }
+      : null;
+  }
   const { exercise } = current(workout);
   if (!exercise) return null;
-  if (action === 'pause') return phase === 'set' || phase === 'rest' ? { type: 'pause' } : null;
+  if (action === 'pause')
+    return phase === 'set' || phase === 'rest' || phase === 'ready' ? { type: 'pause' } : null;
   // +30 s moves a timed rest's end; an untimed rest has none to move.
   if (action === 'restPlus') return phase === 'rest' && workout.rest ? { type: 'restPlus' } : null;
   if (phase === 'set') {
@@ -113,7 +168,7 @@ export function pipCommand(workout: WorkoutRecord | null, action: PipAction): Pi
     return { type: 'reps', exerciseId: exercise.id, setId: set.id, value: String(value) };
   }
   if (action !== 'log') return null;
-  if (phase === 'rest') {
+  if (phase === 'rest' || phase === 'ready') {
     const next = exercise.sets.find((set) => set.completedAt === null);
     return next ? { type: 'start', exerciseId: exercise.id, setId: next.id } : null;
   }

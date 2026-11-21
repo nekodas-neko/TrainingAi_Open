@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { clockSkipOnDay, dateStrMidnightInTz } from '@trainingai/shared/date-utils';
-import { minutesIntoDay, toSegments, coveredMinutes } from '../stress-day';
+import { minutesIntoDay, toSegments, coveredMinutes, placeSpans } from '../stress-day';
 
 const TZ = 'Australia/Brisbane'; // UTC+10, no DST — the owner's zone.
 
@@ -167,5 +167,24 @@ describe('a day with no skipped hour', () => {
     const segments = toSegments([at(1, 15, -0.1), at(1, 45, -0.1), at(3, 15, -0.1), at(3, 45, -0.1)], TZ);
     expect(coveredMinutes(segments, skip)).toBe(coveredMinutes(segments));
     expect(coveredMinutes(segments, skip)).toBe(60 + 60);
+  });
+});
+
+describe('placing the moving / asleep strip on the clock (#3939)', () => {
+  const dayStart = dateStrMidnightInTz('2026-09-08', TZ).getTime();
+  it('maps each span to minutes since local midnight, the day\'s end to 1440', () => {
+    const spans = [
+      { startMs: at(0, 0, 0).t, endMs: at(6, 30, 0).t },
+      { startMs: at(12, 0, 0).t, endMs: at(13, 0, 0).t },
+      { startMs: at(22, 0, 0).t, endMs: dayStart + 24 * 3600_000 },
+    ];
+    expect(placeSpans(spans, dayStart, TZ)).toEqual([
+      { from: 0, to: 390 }, { from: 720, to: 780 }, { from: 1320, to: 1440 },
+    ]);
+  });
+
+  it('takes an older response with no spans, and drops a span with no width', () => {
+    expect(placeSpans(undefined, dayStart, TZ)).toEqual([]);
+    expect(placeSpans([{ startMs: at(9, 0, 0).t, endMs: at(9, 0, 0).t }], dayStart, TZ)).toEqual([]);
   });
 });

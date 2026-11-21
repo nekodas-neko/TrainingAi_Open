@@ -164,6 +164,7 @@ export const batterySpec = (date: string) => ({
     })
     .passthrough(),
 });
+const stressSpan = z.object({ startMs: z.number().finite(), endMs: z.number().finite() });
 export const stressSpec = (date: string) => ({
   path: '/api/body-battery/stress-day',
   query: { date },
@@ -172,6 +173,11 @@ export const stressSpec = (date: string) => ({
     date: z.string(),
     throughMs: n,
     series: z.array(z.object({ t: z.number().finite(), level: z.number().min(-1).max(1) })),
+    // #3939: what the levels are made from, and the moving / asleep spans for the strip. An older
+    // server sends none of these.
+    method: z.enum(['still_hr', 'ring_dhrv']).nullish(),
+    moving: z.array(stressSpan).optional(),
+    asleep: z.array(stressSpan).optional(),
   }),
 });
 export const readinessSpec = (date: string) => ({

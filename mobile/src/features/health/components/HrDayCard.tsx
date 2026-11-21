@@ -6,6 +6,7 @@ import {
 } from '@trainingai/shared/date-utils';
 import { bedtimeToMinuteWindow } from '@trainingai/shared/health/hr-sleep-band';
 import { noHrDataCopy } from '@trainingai/shared/health/hr-source-copy';
+import { stressRuns } from '@trainingai/shared/health/stress-day-line';
 import { HealthResourceHeader } from './HealthResourceHeader';
 import { AppText, Card, Legend, LineChart } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
@@ -61,11 +62,10 @@ export function HrDayCard({
       color: theme.tones.activity.foreground,
     })),
   ];
-  const stressPoints = (stress.data?.series ?? []).flatMap((p, i, rows) => [
-    ...(i && p.t - rows[i - 1].t > 75 * 60000
-      ? [{ x: minute(p.t) - 1, value: null }]
-      : []),
-    { x: minute(p.t), value: p.level },
+  // Negated, so stress points up as on "When the day ran stressed" (#3935).
+  const stressPoints = stressRuns(stress.data?.series ?? []).flatMap((run, i) => [
+    ...(i ? [{ x: minute(run[0].t) - 1, value: null }] : []),
+    ...run.map((p) => ({ x: minute(p.t), value: 0 - p.level })),
   ]);
   // With nothing to draw the card is a heading and one line, as the current app's is: no plot box,
   // legend or footnote. The tall plot returns once readings arrive (Home needs two for a line).
@@ -140,7 +140,7 @@ export function HrDayCard({
           stressPoints.length
             ? [
                 {
-                  label: 'Measured stress',
+                  label: 'Estimated stress',
                   color: theme.tones.recovery.foreground,
                   domain: [-1, 1],
                   points: stressPoints,

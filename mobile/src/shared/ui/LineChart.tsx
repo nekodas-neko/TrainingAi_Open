@@ -73,6 +73,8 @@ export function LineChart({
   smooth = false,
   tension,
   zone,
+  areas = [],
+  strip = [],
 }: {
   points: readonly { label: string; value: number | null; x?: number }[];
   label: string;
@@ -120,6 +122,10 @@ export function LineChart({
   tension?: number;
   /** A shaded horizontal band between two values, each edge a gridline named in a left column. */
   zone?: { from: number; to: number; fromLabel: string; toLabel: string };
+  /** Filled polygons in data coordinates on the main scale (the stress chart's elevated stretches). */
+  areas?: readonly { color: string; points: readonly { x: number; value: number }[] }[];
+  /** A thin strip under the plot marking x spans (the stress chart's moving / asleep), clipped to the x range. */
+  strip?: readonly { from: number; to: number; color: string }[];
 }) {
   const { theme } = useTheme();
   const [selection, setSelection] = useState<number | null>(null);
@@ -297,6 +303,13 @@ export function LineChart({
               strokeDasharray="3 3"
             />
           ))}
+          {areas.map((area, index) => (
+            <Polygon
+              key={`area${index}`}
+              points={area.points.map((p) => `${xx(p.x)},${yy(p.value)}`).join(' ')}
+              fill={area.color}
+            />
+          ))}
           {series.flatMap((s, index) => {
             const segments: { x: number; y: number }[][] = [[]];
             for (const p of s.points) {
@@ -394,6 +407,25 @@ export function LineChart({
             </View>
           )}
         </>
+      )}
+      {strip.length > 0 && width > 1 && (
+        <Svg
+          viewBox="0 0 320 1"
+          width={leftInset ? plotWidth : '100%'}
+          height={theme.spacing.xs}
+          preserveAspectRatio="none"
+          style={{ marginLeft: leftInset || undefined, marginTop: theme.spacing.xs }}
+          pointerEvents="none"
+        >
+          <Rect x={0} y={0} width={320} height={1} fill={theme.colors.raised} />
+          {strip.map((span, index) => {
+            const from = xx(Math.max(xMin, span.from));
+            const to = xx(Math.min(xMax, span.to));
+            return to > from ? (
+              <Rect key={`strip${index}`} x={from} y={0} width={to - from} height={1} fill={span.color} />
+            ) : null;
+          })}
+        </Svg>
       )}
       {interactive && (
         <View style={{ height: theme.sizes.touchTarget, justifyContent: 'center' }}>

@@ -860,6 +860,8 @@ test('re-logging preserves the earlier sets and queues distinct log and set iden
     await f.controller.recordSet(id, first.id, set.id);
   }
   await f.controller.skipRest(id);
+  // The rest card was on screen (#3745), so leaving it for the re-log keeps its answer.
+  await f.controller.showEffort(id, [first.id]);
   const before = JSON.stringify(f.controller.getSnapshot().data.workouts[0].exercises[0]);
   await f.controller.redoExercise(id, first.id);
   assert.deepEqual(

@@ -17,10 +17,6 @@ import {
 } from '@/lib/health/daytime-stress'
 import { hasResilienceConstants, __clearResilienceConstants } from '@/lib/health/stress-resilience'
 import {
-  hasCumulativeStressConstants,
-  __clearCumulativeStressConstants,
-} from '@/lib/oura-models/cumulative-stress'
-import {
   hasStepsDecoderConstants,
   __clearStepsDecoderConstants,
   runStepsMotionDecoder,
@@ -29,7 +25,6 @@ import {
 const clearAll = () => {
   __clearDaytimeStressConstants()
   __clearResilienceConstants()
-  __clearCumulativeStressConstants()
   __clearStepsDecoderConstants()
 }
 
@@ -41,14 +36,12 @@ describe('ensureServerOuraConstants', () => {
     clearAll()
     expect(hasDaytimeStressConstants()).toBe(false)
     expect(hasResilienceConstants()).toBe(false)
-    expect(hasCumulativeStressConstants()).toBe(false)
     expect(hasStepsDecoderConstants()).toBe(false)
 
     ensureServerOuraConstants()
 
     expect(hasDaytimeStressConstants()).toBe(true)
     expect(hasResilienceConstants()).toBe(true)
-    expect(hasCumulativeStressConstants()).toBe(true)
     expect(hasStepsDecoderConstants()).toBe(true)
   })
 
@@ -60,9 +53,9 @@ describe('ensureServerOuraConstants', () => {
 
   it('every port throws when its constants are missing, rather than returning a plausible number', () => {
     clearAll()
-    // The two whose entry points take a one-line input. `stress-resilience` and
-    // `cumulative-stress` have the identical accessor shape but need a full model input to reach
-    // it, and a fabricated one would fail validation first and assert nothing.
+    // The two whose entry points take a one-line input. `stress-resilience` has the identical
+    // accessor shape but needs a full model input to reach it, and a fabricated one would fail
+    // validation first and assert nothing.
     expect(() => daytimeStressLevel(60, 55, 50)).toThrow(/daytime-stress: constants not set/)
     expect(() => runStepsMotionDecoder({ timestamps: [0], data: [[0]] })).toThrow(/constants not set/)
     ensureServerOuraConstants()
