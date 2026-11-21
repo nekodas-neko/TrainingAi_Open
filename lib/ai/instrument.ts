@@ -6,14 +6,22 @@ import { AI_CALL_BUDGET_MS, runWithDeadline } from './deadline'
 import { assertDevAiBudget, recordDevAiCall } from './dev-call-budget'
 import { noteAiBillingError } from './provider-paused'
 
-// ── Model — single source of truth ─────────────────────────────────────────────
-// Was inlined as `google('gemini-3.1-flash-lite')` at 14 call sites; centralised
-// here so the model id lives in one place and the instrumentation below always
-// knows which model was used.
+// ── Call settings — one table, keyed by section ────────────────────────────────
+// Which model, how hard it thinks, how many times the SDK retries and how long the call may run
+// were once chosen by each route (`maxRetries: 0` was typed at ten call sites, the Coach set a
+// thinking level inline). A route now names its SECTION and passes none of these: the wrapper reads
+// them from here and hands them to the call.
+//
+// There is deliberately no temperature. Google's guidance for these models is to leave it at the
+// default, and newer ones ignore it. A repeatable answer has to come from code deciding more.
+//
+// `retries` is the SDK's own `maxRetries`. Every object call is 0, because the one jittered retry
+// lives in `withAiRetry` and a second layer would multiply with it (lib/ai/retry.ts). The Coach is
+// the exception only by omission: it never set the option, so the SDK's default of 2 has always
+// applied, and the table records that rather than changing it. `timeLimitMs` is the wall-clock
+// budget for one logical call including its wrapper retry (lib/ai/deadline.ts); null means the
+// wrapper sets none (a stream has no awaitable result, and the image tool has its own loop).
 export const AI_MODEL_ID = 'gemini-3.1-flash-lite'
-export function aiModel() {
-  return google(AI_MODEL_ID)
-}
 
 /**
  * AI Coach runs on a stronger model than everything else.
@@ -24,13 +32,70 @@ export function aiModel() {
  * `gemini-3.1-pro-preview`; 3.6-flash is **GA rather than preview**, which is the deciding factor
  * for the one route that writes.
  *
- * Deliberately a separate constant rather than moving `AI_MODEL_ID` — the other ~14 AI call sites
- * stay on flash-lite, so the blast radius of this change is one route.
+ * Deliberately a separate constant rather than moving `AI_MODEL_ID` — the other call sites stay on
+ * flash-lite, so the blast radius of this change is one route.
  */
 export const COACH_MODEL_ID = 'gemini-3.6-flash'
 
-export function coachModel() {
-  return google(COACH_MODEL_ID)
+/** The admin exercise-picture tool's default image model (it may be asked for another one). */
+export const IMAGE_MODEL_ID = 'gemini-3.1-flash-image-preview'
+
+export type AiThinkingLevel = 'minimal' | 'low' | 'medium' | 'high'
+
+export interface AiSectionSettings {
+  readonly model: string
+  /** null leaves the model's own default. */
+  readonly thinking: AiThinkingLevel | null
+  readonly retries: number
+  readonly timeLimitMs: number | null
+}
+
+/** A structured-output call: flash-lite, model default thinking, no SDK retry, the shared budget. */
+const OBJECT_CALL = {
+  model: AI_MODEL_ID,
+  thinking: null,
+  retries: 0,
+  timeLimitMs: AI_CALL_BUDGET_MS,
+} as const satisfies AiSectionSettings
+
+export const AI_SECTIONS = {
+  prescription: OBJECT_CALL,
+  'exercises-generate': OBJECT_CALL,
+  'generate-program': OBJECT_CALL,
+  'builder-chat': OBJECT_CALL,
+  'meal-plan-generate': OBJECT_CALL,
+  'meal-plan-generate-meal': OBJECT_CALL,
+  'meal-plan-edit-meal': OBJECT_CALL,
+  'meal-plan-top-up': OBJECT_CALL,
+  'nutrition-scan': OBJECT_CALL,
+  coach: { model: COACH_MODEL_ID, thinking: 'minimal', retries: 2, timeLimitMs: null },
+  // Not a language-model call: `lib/exercise-image-gen.ts` reads `retries` as its extra attempts
+  // and logs under this name. It is in the table so every call that spends the key has one entry.
+  'exercise-image': { model: IMAGE_MODEL_ID, thinking: null, retries: 2, timeLimitMs: null },
+} as const satisfies Record<string, AiSectionSettings>
+
+export type AiSection = keyof typeof AI_SECTIONS
+
+export function aiSectionSettings(section: AiSection): AiSectionSettings {
+  const settings = (AI_SECTIONS as Record<string, AiSectionSettings | undefined>)[section]
+  if (!settings) throw new Error(`No AI call settings for section "${section}" — add it to AI_SECTIONS in lib/ai/instrument.ts`)
+  return settings
+}
+
+/** What the wrapper hands a call, to spread into the SDK options. */
+export interface AiCallSettings {
+  model: ReturnType<typeof google>
+  maxRetries: number
+  providerOptions?: { google: { thinkingConfig: { thinkingLevel: AiThinkingLevel } } }
+}
+
+export function aiCallSettings(section: AiSection): AiCallSettings {
+  const s = aiSectionSettings(section)
+  return {
+    model: google(s.model),
+    maxRetries: s.retries,
+    ...(s.thinking && { providerOptions: { google: { thinkingConfig: { thinkingLevel: s.thinking } } } }),
+  }
 }
 
 // ── Call metadata ───────────────────────────────────────────────────────────────
@@ -38,12 +103,14 @@ export function coachModel() {
 // hashed with the section so double-trip detection can spot the same logical call
 // firing twice. Pass ids/dates/keys only, never raw prompt text or health data.
 export interface AiCallMeta {
-  section: string
+  /** A key of {@link AI_SECTIONS}: the table decides the model, thinking, retries and time limit. */
+  section: AiSection
   userId?: string | null
   // Q-296: what this call ASKED for. `ai_call_log.model` prefers what the provider says it
   // SERVED (`response.modelId`), so this is the fallback — it is what a failed call has, since a
   // call that threw has no response to read. Omit it and the default is assumed, which is what
-  // made every Coach call read as flash-lite for the whole life of the column.
+  // made every Coach call read as flash-lite for the whole life of the column. Defaults to the
+  // section's model in the table.
   model?: string
   fingerprint?: unknown
   /**
@@ -125,7 +192,7 @@ function readUsage(usage: unknown): { input: number | null; output: number | nul
   return { input, output, total, cached }
 }
 
-function logAiCall(meta: AiCallMeta, opts: { usage?: unknown; latencyMs: number; ok: boolean; modelId?: string | null }): void {
+export function logAiCall(meta: AiCallMeta, opts: { usage?: unknown; latencyMs: number; ok: boolean; modelId?: string | null }): void {
   const { input, output, total, cached } = readUsage(opts.usage)
   const fingerprint = meta.fingerprint === undefined ? null : aiFingerprint(meta.section, meta.fingerprint)
   void (async () => {
@@ -141,7 +208,7 @@ function logAiCall(meta: AiCallMeta, opts: { usage?: unknown; latencyMs: number;
         // than a measurement — 22 Coach calls made after COACH_MODEL_ID shipped all read as
         // flash-lite, and any cost or latency work split by model was reading a column that could
         // not disagree with it.
-        model: opts.modelId ?? meta.model ?? AI_MODEL_ID,
+        model: opts.modelId ?? meta.model ?? aiSectionSettings(meta.section).model,
         inputTokens: input,
         outputTokens: output,
         totalTokens: total,
@@ -165,7 +232,7 @@ function logAiCall(meta: AiCallMeta, opts: { usage?: unknown; latencyMs: number;
  * `runWithDeadline` bounds it either way — wiring the signal is what makes an abandoned call
  * actually stop, not what makes the ceiling hold.
  */
-export type AiCall<T> = (signal: AbortSignal) => Promise<T>
+export type AiCall<T> = (signal: AbortSignal, settings: AiCallSettings) => Promise<T>
 
 // ── The one chokepoint ──────────────────────────────────────────────────────────
 // Wraps any generateText/generateObject call: runs it through the shared retry
@@ -183,11 +250,12 @@ export async function withAiLogging<T extends { usage?: unknown }>(
   meta: AiCallMeta,
   fn: AiCall<T>,
   shouldRetry: (err: unknown) => boolean = isRetryableAiError,
-  budgetMs: number = AI_CALL_BUDGET_MS,
+  budgetMs: number = aiSectionSettings(meta.section).timeLimitMs ?? AI_CALL_BUDGET_MS,
 ): Promise<T> {
   // #2816. Off production only. Outside the try, so a refused call makes no request and is not
   // logged to `ai_call_log` as a failure; thrown before the retry loop, so it is never retried.
   assertDevAiBudget()
+  const settings = aiCallSettings(meta.section)
   const started = Date.now()
   const deadlineAt = started + budgetMs
   try {
@@ -197,7 +265,7 @@ export async function withAiLogging<T extends { usage?: unknown }>(
       () => {
         // Each attempt is a billed request, the retry included.
         recordDevAiCall()
-        return runWithDeadline(fn, Math.max(0, deadlineAt - Date.now()))
+        return runWithDeadline(signal => fn(signal, settings), Math.max(0, deadlineAt - Date.now()))
       },
       { shouldRetry, deadlineAt },
     )
@@ -232,7 +300,10 @@ export function loggedGenerateText<T extends { usage?: unknown }>(
 // from the SDK's onFinish callback (and onError for failures). The caller's own
 // onFinish/onError/onStepFinish, if any, still run.
 type StreamTextParams = Parameters<typeof streamText>[0]
-export function loggedStreamText(meta: AiCallMeta, params: StreamTextParams): ReturnType<typeof streamText> {
+// The table owns these three, so a caller cannot pass them.
+type StreamCallerParams = Omit<StreamTextParams, 'model' | 'maxRetries' | 'providerOptions'>
+export function loggedStreamText(meta: AiCallMeta, callerParams: StreamCallerParams): ReturnType<typeof streamText> {
+  const params = { ...callerParams, ...aiCallSettings(meta.section) } as StreamTextParams
   // #2816. One Coach turn is up to COACH_MAX_STEPS model requests, each counted as its step
   // finishes, so a turn started just under the limit can overshoot it by a few. Accepted: the
   // alternative is refusing a turn halfway through its tool calls.

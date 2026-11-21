@@ -10,7 +10,6 @@ function validPrescription(overrides: Partial<Record<string, unknown>> = {}) {
     ],
     deload: false,
     reasoning: 'Test reasoning.',
-    confidence: 0.8,
     ...overrides,
   }
 }
@@ -24,5 +23,17 @@ describe('PrescriptionSchema', () => {
   it('accepts a well-formed, non-empty response', () => {
     const result = PrescriptionSchema.safeParse(validPrescription())
     expect(result.success).toBe(true)
+  })
+
+  // #3752: the model is no longer asked for a confidence, and nothing reads one. An answer that still
+  // carries the key (an older cached one, or the model volunteering it) must not be rejected.
+  it('parses an answer that still carries the old confidence key, and drops it', () => {
+    const result = PrescriptionSchema.safeParse(validPrescription({ confidence: 0.8 }))
+    expect(result.success).toBe(true)
+    if (result.success) expect('confidence' in result.data).toBe(false)
+  })
+
+  it('parses an answer with no confidence at all', () => {
+    expect(PrescriptionSchema.safeParse(validPrescription()).success).toBe(true)
   })
 })

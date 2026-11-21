@@ -2,7 +2,7 @@ import { convertToModelMessages, stepCountIs, type UIMessage } from 'ai'
 import { google } from '@ai-sdk/google'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { COACH_MODEL_ID, coachModel, loggedStreamText } from '@/lib/ai/instrument'
+import { loggedStreamText } from '@/lib/ai/instrument'
 import { aiPausedResponse, aiStreamErrorText } from '@/lib/ai/provider-paused'
 import { PROSE_GUARDS } from '@/lib/ai/prompt-guards'
 import { auth } from '@/auth'
@@ -283,9 +283,8 @@ export async function POST(req: Request) {
     ].filter(Boolean).join('\n\n')
 
     const result = loggedStreamText(
-      { section: 'coach', userId, model: COACH_MODEL_ID },
+      { section: 'coach', userId },
       {
-        model: coachModel(),
         system,
         messages: modelMessages,
         tools: {
@@ -301,7 +300,8 @@ export async function POST(req: Request) {
           // was the open risk: historically the two could not be combined.
           google_search: google.tools.googleSearch({}),
         },
-        // **This is what made Coach fast** (Q-170). Latency here is almost entirely output-token
+        // **The thinking level is what made Coach fast** (Q-170) — set to 'minimal' on the `coach` entry
+        // of `AI_SECTIONS` (lib/ai/instrument.ts), no longer here. Latency here is almost entirely output-token
         // generation — measured at ~1.8 s fixed overhead plus ~270 tokens/sec — and a picker turn
         // was emitting **2,204 output tokens to render a ~400-token widget**. The rest was
         // reasoning the user never sees. Dropping the thinking level took the same turn to 554
@@ -311,7 +311,6 @@ export async function POST(req: Request) {
         // Two other levers were measured first and BOTH made it worse — inlining the program into
         // the system prompt, and forcing a sentence before every tool call. See the Q-170 backlog
         // entry before trying either again.
-        providerOptions: { google: { thinkingConfig: { thinkingLevel: 'minimal' } } },
         // The read-only tools may chain; a widget tool ends the turn by suspending, so this bounds
         // data gathering rather than widget rendering.
         stopWhen: stepCountIs(COACH_MAX_STEPS),

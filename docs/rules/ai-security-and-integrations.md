@@ -34,6 +34,48 @@ key and make testing safer instead ([#2816](https://github.com/nekodas-neko/Trai
 
 ---
 
+## One set of rules for every AI call (#3752)
+
+- **Settings live in one table.** `AI_SECTIONS` in `lib/ai/instrument.ts`, keyed by section name:
+  model, thinking level, SDK retries, time limit. A route names its `section:` and passes none of
+  them: the wrapper (`loggedGenerateObject`, `loggedGenerateText`, `loggedStreamText`) hands the call
+  its settings, and a route spreads them into the SDK options. A new AI call adds a row, not a
+  `maxRetries: 0`. There is **no temperature**: Google's guidance for these models is to leave it at
+  the default and newer ones ignore it, so a repeatable answer has to come from code deciding more.
+- **The model's confidence is not asked for.** The workout plan prompt used to ask for one and the
+  code threw it away in favour of `computeConfidence`. It is gone from the prompt and
+  `PrescriptionSchema`; an older answer that still carries the key parses and the key is dropped.
+- **A custom rule holds the line.** `node scripts/check-ai-call-sites.js` (a Custom Rules step, so
+  `pnpm check:rules`): `generateObject`, `generateText` and `streamText` are called only inside a
+  logged wrapper whose `section:` is a literal key of the table, and `@google/genai` is imported only
+  by `lib/exercise-image-gen.ts`.
+- **The image tool logs.** `lib/exercise-image-gen.ts` spends from the same key and writes one
+  `ai_call_log` row per model request under section `exercise-image` (success, a reply with no image,
+  or a throw). It has no signed-in user in hand, so `user_id` is empty there.
+
+### What the person sees when the model is down
+
+Checked against the code on 2026-11-21. "Paused" means Google refused on billing
+(`aiPausedResponse`, a 503 `ai_paused` with a fixed message); any other failure is the route's own
+error.
+
+| Feature | When the model is down today | What it should offer instead (not built) |
+|---|---|---|
+| Workout plan (`prescription`) | The program as written, from rules, with its own reasoning line (a deload week as the program runs it, or the program's own sets). Never an error. | Nothing to add. |
+| Workout recap | No model is involved: the route answers from the session's numbers (#3748), the same text every time. | Nothing to add. |
+| Coach (`coach`) | When the refusal is billing: the fixed "paused" sentence. Any other failure: a generic error line (`An error occurred.` in the stream, or a 500 `Coach failed`). | Say plainly it could not be reached, and link the screens that answer without it (today's plan, the log). |
+| Food scan (`nutrition-scan`) | An error: 502 "AI service unavailable. Please try again." (or paused). | Offer food **search** and **barcode** on the same screen, with the photo kept so it can be retried. |
+| Meal plan (`meal-plan-generate`) | An error (502, or paused), **except** slots the library fills and a plan that needs nothing from the model, which come back without one. Rerolling or rewriting one meal (`meal-plan-generate-meal`, `meal-plan-edit-meal`) is an error. | Fill every slot from the saved-meal library and offer the last plan again; say which slots could not be filled. |
+| Meal top-up (`meal-plan-top-up`) | The meal as scaled, with its gap shown. Never an error. | Nothing to add. |
+| Program builder (`generate-program`) and builder chat (`builder-chat`) | An error (502/500, or paused). | Offer to start from a saved program or a blank one in the program editor, and keep what the person typed. |
+| New exercise (`exercises-generate`) | A name the library already holds is answered from the library with no model call (#3751). Any other name is an error (500, or paused). | Offer the manual add form (name, muscles, equipment) and the library search. |
+
+The issue listed the recap as "the facts joined into a line" and the coach as "a paused message";
+both were corrected above: the recap no longer calls a model, and the coach shows the paused message
+only for a billing refusal.
+
+---
+
 ## AI & Security Defaults
 
 - Every LLM call returning structured data uses `generateObject`/a response schema — never `JSON.parse` of free text. Keep it that way: prose-only `generateText` routes must never grow a `JSON.parse` of model text, and every `generateText`/`streamText` call is wrapped in try-catch returning a JSON error (`health-insight` and `weekly-digest` once shipped without). Deterministic math lives in code: no LLM self-reported number (confidence, totals) may gate an automatic action **or be shown to the user as fact** — a model handed a score of 80 called it *"perfect"* twice (Q-292), which gates nothing and is read as true. Prose routes import `PROSE_GUARDS` (`lib/ai/prompt-guards.ts`): quote the given numbers, no superlatives, metric units only, and no diagnosis — describe a deviation, never name a condition or suggest infection (#2421, TN-46).

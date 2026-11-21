@@ -36,7 +36,7 @@ import { buildTransitionRationale } from '@trainingai/shared/ai-periodization/tr
 import { syncProgramPhase, applyProgramPhaseCap, programMoveTarget, collectVotes, programDeloadFinished, NEXT_PROGRAM_PHASE } from '@trainingai/shared/ai-periodization/program-phase'
 import { DELOAD_LOWER_PCT, DELOAD_REPS, DELOAD_SETS, DELOAD_REST } from '@trainingai/shared/ai-periodization/deload-constants'
 import { generateObject } from 'ai'
-import { aiModel, loggedGenerateObject } from '@/lib/ai/instrument'
+import { loggedGenerateObject } from '@/lib/ai/instrument'
 import { z } from 'zod'
 import { PrescriptionSchema } from '@trainingai/shared/ai-periodization/prescription-schema'
 import { reconcilePrescription } from '@trainingai/shared/ai-periodization/reconcile-prescription'
@@ -529,12 +529,11 @@ async function runPrescriptionGeneration(
   try {
     const result = await loggedGenerateObject(
       { section: 'prescription', userId, fingerprint: { programSessionId, today } },
-      signal => generateObject({
-        model: aiModel(),
+      (signal, settings) => generateObject({
+        ...settings,
         schema: PrescriptionSchema,
         system: systemPrompt,
         prompt: userPrompt,
-        maxRetries: 0,
         abortSignal: signal,
       }),
     )

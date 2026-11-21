@@ -5,7 +5,7 @@ import { rateLimit } from '@/lib/rate-limit'
 import { generateObject } from 'ai'
 import { PROSE_FIELD_GUARDS } from '@/lib/ai/prompt-guards'
 import { USER_TEXT_NOTE } from '@trainingai/shared/ai/untrusted-text'
-import { aiModel, loggedGenerateObject } from '@/lib/ai/instrument'
+import { loggedGenerateObject } from '@/lib/ai/instrument'
 import { aiPausedResponse } from '@/lib/ai/provider-paused'
 import { z } from 'zod'
 import type { GeneratedProgram } from '@trainingai/shared/types/builder'
@@ -332,12 +332,11 @@ ${exerciseList}${injuryBlock}${referenceBlock}`
   try {
     const { object: raw } = await loggedGenerateObject(
       { section: 'generate-program', userId, fingerprint: userPrompt },
-      signal => generateObject({
-        model: aiModel(),
+      (signal, settings) => generateObject({
+        ...settings,
         schema: GeneratedProgramSchema,
         system: `${systemPrompt}\n\n${PROSE_FIELD_GUARDS}`,
         prompt: userPrompt,
-        maxRetries: 0,
         abortSignal: signal,
       }),
     )

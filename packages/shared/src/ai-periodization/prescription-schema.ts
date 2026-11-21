@@ -19,5 +19,7 @@ export const PrescriptionSchema = z.object({
   })).min(1),
   deload: z.boolean(),
   reasoning: z.string(),
-  confidence: z.number().min(0).max(1),
+  // No `confidence`: the model is no longer asked for one. The plan's confidence is the engine's
+  // own score (`computeConfidence`). An older answer that still carries the key parses fine,
+  // because z.object drops keys it does not know.
 })

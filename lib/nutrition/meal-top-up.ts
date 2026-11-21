@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { generateObject } from 'ai'
-import { aiModel, loggedGenerateObject, contentKey } from '@/lib/ai/instrument'
+import { loggedGenerateObject, contentKey } from '@/lib/ai/instrument'
 import { scaleIngredientsToTargets } from '@trainingai/shared/nutrition/meal-split'
 import { sumIngredients } from '@trainingai/shared/nutrition/scan-totals'
 import {
@@ -112,10 +112,9 @@ export async function scaleWithTopUp(
           missing: contentKey(...missing),
         },
       },
-      signal => generateObject({
-        model: aiModel(),
+      (signal, settings) => generateObject({
+        ...settings,
         schema: TopUpSchema,
-        maxRetries: 0,
         abortSignal: signal,
         prompt: [
           'You are a practical sports nutritionist. A meal is short of its targets and cannot get there by serving more of what it already contains.',

@@ -99,14 +99,14 @@ describe('AI_MODEL_ID', () => {
 describe('withAiLogging', () => {
   it('returns the call result and logs usage with ok=true', async () => {
     const result = await withAiLogging(
-      { section: 'test-sec', userId: 'u1', fingerprint: { a: 1 } },
+      { section: 'prescription', userId: 'u1', fingerprint: { a: 1 } },
       async () => ({ usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 }, text: 'hi' }),
     )
     expect(result.text).toBe('hi')
     await flush()
     expect(insertAiCallLog).toHaveBeenCalledTimes(1)
     expect(insertAiCallLog).toHaveBeenCalledWith(expect.objectContaining({
-      section: 'test-sec', userId: 'u1', model: 'gemini-3.1-flash-lite',
+      section: 'prescription', userId: 'u1', model: 'gemini-3.1-flash-lite',
       inputTokens: 10, outputTokens: 5, totalTokens: 15, ok: true,
     }))
     // fingerprint is hashed, never the raw input
@@ -114,7 +114,7 @@ describe('withAiLogging', () => {
   })
 
   it('derives totalTokens from input+output when the SDK omits it', async () => {
-    await withAiLogging({ section: 's', fingerprint: 'k' }, async () => ({ usage: { inputTokens: 7, outputTokens: 3 } }))
+    await withAiLogging({ section: 'prescription', fingerprint: 'k' }, async () => ({ usage: { inputTokens: 7, outputTokens: 3 } }))
     await flush()
     expect(insertAiCallLog.mock.calls[0][0].totalTokens).toBe(10)
   })
@@ -122,22 +122,22 @@ describe('withAiLogging', () => {
   it('rethrows the underlying error and logs ok=false', async () => {
     const boom = new Error('model exploded')
     await expect(withAiLogging(
-      { section: 'fail-sec', userId: 'u2', fingerprint: 'k' },
+      { section: 'builder-chat', userId: 'u2', fingerprint: 'k' },
       async () => { throw boom },
     )).rejects.toBe(boom)
     await flush()
-    expect(insertAiCallLog).toHaveBeenCalledWith(expect.objectContaining({ section: 'fail-sec', ok: false }))
+    expect(insertAiCallLog).toHaveBeenCalledWith(expect.objectContaining({ section: 'builder-chat', ok: false }))
   })
 
   it('never throws or rejects because logging failed', async () => {
     insertAiCallLog.mockRejectedValueOnce(new Error('db down'))
-    const result = await withAiLogging({ section: 's', fingerprint: 'k' }, async () => ({ usage: {}, ok: 1 }))
+    const result = await withAiLogging({ section: 'prescription', fingerprint: 'k' }, async () => ({ usage: {}, ok: 1 }))
     expect(result.ok).toBe(1)
     await flush() // swallowed, no unhandled rejection
   })
 
   it('logs a null fingerprint when none is provided', async () => {
-    await withAiLogging({ section: 's' }, async () => ({ usage: { totalTokens: 1 } }))
+    await withAiLogging({ section: 'prescription' }, async () => ({ usage: { totalTokens: 1 } }))
     await flush()
     expect(insertAiCallLog.mock.calls[0][0].fingerprint).toBeNull()
   })
@@ -145,10 +145,10 @@ describe('withAiLogging', () => {
 
 describe('loggedGenerateObject', () => {
   it('delegates through withAiLogging and logs the section', async () => {
-    const r = await loggedGenerateObject({ section: 'obj-sec', userId: 'u', fingerprint: 'k' }, async () => ({ object: { ok: true }, usage: { totalTokens: 42 } }))
+    const r = await loggedGenerateObject({ section: 'generate-program', userId: 'u', fingerprint: 'k' }, async () => ({ object: { ok: true }, usage: { totalTokens: 42 } }))
     expect(r.object.ok).toBe(true)
     await flush()
-    expect(insertAiCallLog).toHaveBeenCalledWith(expect.objectContaining({ section: 'obj-sec', totalTokens: 42, ok: true }))
+    expect(insertAiCallLog).toHaveBeenCalledWith(expect.objectContaining({ section: 'generate-program', totalTokens: 42, ok: true }))
   })
 })
 
@@ -166,15 +166,15 @@ describe('withAiLogging — the total budget (RV-70)', () => {
   it('answers within the budget even though the call never resolves', async () => {
     const started = Date.now()
     await expect(
-      withAiLogging({ section: 'bounds-test' }, never, () => false, 25),
+      withAiLogging({ section: 'prescription' }, never, () => false, 25),
     ).rejects.toMatchObject({ name: 'AiTimeoutError' })
     expect(Date.now() - started).toBeLessThan(500)
   })
 
   it('logs the failed call, so a timed-out call is visible in ai_call_log', async () => {
-    await expect(withAiLogging({ section: 'bounds-log' }, never, () => false, 15)).rejects.toThrow()
+    await expect(withAiLogging({ section: 'exercises-generate' }, never, () => false, 15)).rejects.toThrow()
     await flush()
-    expect(insertAiCallLog).toHaveBeenCalledWith(expect.objectContaining({ section: 'bounds-log', ok: false }))
+    expect(insertAiCallLog).toHaveBeenCalledWith(expect.objectContaining({ section: 'exercises-generate', ok: false }))
   })
 
   /**
@@ -191,7 +191,7 @@ describe('withAiLogging — the total budget (RV-70)', () => {
       .mockImplementation(never)
     const started = Date.now()
     await expect(
-      withAiLogging({ section: 'bounds-retry' }, attempts, () => true, 2_000),
+      withAiLogging({ section: 'prescription' }, attempts, () => true, 2_000),
     ).rejects.toMatchObject({ name: 'AiTimeoutError' })
     const elapsed = Date.now() - started
     expect(attempts).toHaveBeenCalledTimes(2)
@@ -201,7 +201,7 @@ describe('withAiLogging — the total budget (RV-70)', () => {
   it('hands the attempt a signal it can be cancelled by', async () => {
     let seen: AbortSignal | undefined
     await expect(
-      withAiLogging({ section: 'bounds-signal' }, signal => { seen = signal; return never() }, () => false, 15),
+      withAiLogging({ section: 'prescription' }, signal => { seen = signal; return never() }, () => false, 15),
     ).rejects.toThrow()
     expect(seen?.aborted).toBe(true)
   })

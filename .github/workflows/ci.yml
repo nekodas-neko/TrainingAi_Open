@@ -456,6 +456,11 @@ jobs:
       - name: No JSON.parse of free-text LLM output in files that call a model
         run: node scripts/check-llm-json-parse.js
 
+      # #3752: a model call outside the logged wrapper gets no log row, no dev budget and no pause
+      # switch. The script reads the section table from lib/ai/instrument.ts and has a test.
+      - name: Every model call goes through the logged wrapper under a section from the table
+        run: node scripts/check-ai-call-sites.js
+
       - name: No hand-rolled invalidateCache outside lib/cache-groups.ts
         run: |
           FOUND=$(grep -rn 'invalidateCache(' app/ components/ lib/ packages/ --include='*.ts' --include='*.tsx' 2>/dev/null \

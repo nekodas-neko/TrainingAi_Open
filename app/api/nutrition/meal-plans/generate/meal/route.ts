@@ -4,7 +4,7 @@ import { generateObject } from 'ai'
 import { userTextBlock, sanitiseUserText, USER_TEXT_NOTE } from '@trainingai/shared/ai/untrusted-text'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
-import { aiModel, loggedGenerateObject, contentKey } from '@/lib/ai/instrument'
+import { loggedGenerateObject, contentKey } from '@/lib/ai/instrument'
 import { aiPausedResponse } from '@/lib/ai/provider-paused'
 import { rateLimit } from '@/lib/rate-limit'
 import { scaleWithTopUp } from '@/lib/nutrition/meal-top-up'
@@ -134,10 +134,9 @@ export async function POST(req: Request) {
           meal: contentKey(input.currentMeal?.name),
         },
       },
-      signal => generateObject({
-        model: aiModel(),
+      (signal, settings) => generateObject({
+        ...settings,
         schema: MealSchema,
-        maxRetries: 0,
         abortSignal: signal,
         prompt: [
           rewriting

@@ -5,7 +5,7 @@ import { generateObject } from 'ai'
 import { userTextBlock, USER_TEXT_NOTE } from '@trainingai/shared/ai/untrusted-text'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
-import { aiModel, loggedGenerateObject, contentKey } from '@/lib/ai/instrument'
+import { loggedGenerateObject, contentKey } from '@/lib/ai/instrument'
 import { aiPausedResponse } from '@/lib/ai/provider-paused'
 import { rateLimit } from '@/lib/rate-limit'
 import { DEFAULT_TZ, todayInTz } from '@trainingai/shared/date-utils'
@@ -253,10 +253,9 @@ export async function POST(req: Request) {
           excluded: contentKey(...(input.excludedFoods ?? [])),
         },
       },
-      signal => generateObject({
-        model: aiModel(),
+      (signal, settings) => generateObject({
+        ...settings,
         schema: DraftSchema,
-        maxRetries: 0,
         abortSignal: signal,
         prompt: [
           'You are a practical sports nutritionist. Design one day of eating.',
