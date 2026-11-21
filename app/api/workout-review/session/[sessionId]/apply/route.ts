@@ -62,9 +62,8 @@ export async function POST(
   }
 
   const repo = await getRepository()
-  const program = await repo.getActiveProgram(userId)
-  const programSession = program?.sessions.find(s => s.id === programSessionId)
-  if (!programSession) return NextResponse.json({ error: 'Session not found' }, { status: 404 })
+  const reviewed = (await repo.getActiveProgram(userId))?.sessions.find(s => s.id === programSessionId)
+  if (!reviewed) return NextResponse.json({ error: 'Session not found' }, { status: 404 })
 
   const state = await repo.getSessionPeriodization(userId, programSessionId)
   if (!state) return NextResponse.json({ error: 'Session is not AI-dynamic' }, { status: 400 })
@@ -72,16 +71,22 @@ export async function POST(
     return NextResponse.json({ error: 'Baseline not complete' }, { status: 400 })
   }
 
-  const byId = new Map(programSession.exercises.map(ex => [ex.id, ex]))
-  const validId = (id: string) => byId.has(id)
-
   // Permanent drops first — remove the session_exercises rows (ownership enforced in repo).
   const permanentlyDropped: string[] = []
   for (const id of new Set(body.dropPermanent)) {
-    if (!validId(id)) continue
+    if (!reviewed.exercises.some(ex => ex.id === id)) continue
     if (await repo.removeSessionExercise(userId, id)) permanentlyDropped.push(id)
   }
   const permanentSet = new Set(permanentlyDropped)
+
+  // #3927: the plan below is built from this read, after this request's own drops, and is stored only
+  // while the session is still what it describes (the guard generation uses, #3895). A Coach change or
+  // an editor save landing before the store voided the slot; the overlay is then not written over it.
+  const { program, structure } = await repo.getActiveProgramWithStructureStamp(userId, programSessionId)
+  const programSession = program?.sessions.find(s => s.id === programSessionId)
+  if (!programSession) return NextResponse.json({ error: 'Session not found' }, { status: 404 })
+  const byId = new Map(programSession.exercises.map(ex => [ex.id, ex]))
+  const validId = (id: string) => byId.has(id)
 
   const adjustments = body.adjustments.filter(a => validId(a.sessionExerciseId) && !permanentSet.has(a.sessionExerciseId))
   const dropThisCycle = [...new Set(body.dropThisCycle)].filter(id => validId(id) && !permanentSet.has(id))
@@ -153,7 +158,13 @@ export async function POST(
         reportServerError(err, { userId, url: '/api/workout-review/session/apply#recost' })
       }
     }
-    await repo.storePrescription(userId, programSessionId, prescription, new Date(Date.now() + 7 * 86_400_000))
+    const stored = await repo.storePrescription(
+      userId, programSessionId, prescription, new Date(Date.now() + 7 * 86_400_000), 'pending',
+      { phase: state.phase, phaseStartedAt: state.phaseStartedAt, structure },
+    )
+    if (!stored) {
+      return NextResponse.json({ error: 'The session changed while this review was applied. Review it again.' }, { status: 409 })
+    }
     // storePrescription writes status 'pending'; accept it so it drives the bar this cycle.
     await repo.updatePrescriptionStatus(userId, programSessionId, 'accepted')
   }

@@ -136,6 +136,9 @@ export function WorkoutReviewSheet({ sessionId, open, onOpenChange, onApplied }:
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
+        // 409: the session changed under the review (#3927). Its permanent drops have landed, so the
+        // program is refetched before the lifter reviews again.
+        if (res.status === 409) await Promise.all([invalidateProgramStructure(), invalidateWorkoutSummaries()]);
         toast.error(body.error ?? "Couldn't apply — try again.");
         return;
       }

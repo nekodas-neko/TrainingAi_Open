@@ -25,7 +25,7 @@ export type RefitResult =
       estimatedSessionDurationMin: number
     }
   /** Not an error — the stored plan cannot be re-fitted, so the caller generates instead. */
-  | { ok: false; reason: 'no_session' | 'no_prescription' | 'no_baseline' | 'expired' | 'not_refittable' }
+  | { ok: false; reason: 'no_session' | 'no_prescription' | 'no_baseline' | 'expired' | 'not_refittable' | 'session_changed' }
 
 /** Statuses whose plan is still the one the lifter is looking at. `consumed` and `dismissed`
  *  are finished with; `none` has nothing stored. Re-fitting any of those would rewrite a plan
@@ -40,9 +40,11 @@ export async function refitPrescriptionToBudget(
   durationPreset: DurationPreset,
   now = new Date(),
 ): Promise<RefitResult> {
-  const activeProgram = await repo.getActiveProgram(userId)
+  // #3927: the program and the session's structure stamp from one snapshot, so the re-fit stores only
+  // while the session is still the one this program describes (the guard generation uses, #3895).
+  const { program: activeProgram, structure } = await repo.getActiveProgramWithStructureStamp(userId, programSessionId)
   const validSession = activeProgram?.sessions.find(s => s.id === programSessionId)
-  if (!validSession) return { ok: false, reason: 'no_session' }
+  if (!validSession || !activeProgram) return { ok: false, reason: 'no_session' }
 
   const state = await repo.getSessionPeriodization(userId, programSessionId)
   const stored = state?.prescription
@@ -67,7 +69,7 @@ export async function refitPrescriptionToBudget(
   const budgetOverrideMin = requestedMin !== validSession.timeBudgetMinutes
     ? budgetForPreset(validSession.timeBudgetMinutes, durationPreset)
     : undefined
-  const signals = await aggregateSignals(userId, programSessionId, repo, tz, undefined, budgetOverrideMin)
+  const signals = await aggregateSignals(userId, programSessionId, repo, tz, undefined, budgetOverrideMin, { program: activeProgram })
   if (!signals) return { ok: false, reason: 'no_session' }
 
   const budget = applyBudgetStage(
@@ -131,13 +133,19 @@ export async function refitPrescriptionToBudget(
   // re-stamping it would quietly extend a window the lifter never earned. `storePrescription`
   // resets the status unless it is passed one, and the acceptance state has not changed —
   // only the shape the budget allows.
-  await repo.storePrescription(
+  // #3927: stored only while the slot is in the phase it was read in and the session is the one the
+  // program above describes. A Coach change or an editor save between the read and this store voided
+  // the slot; the re-fit, made from the plan it voided, is then not written over the void, and the
+  // caller generates for the session as it is.
+  const stamped = await repo.storePrescription(
     userId,
     programSessionId,
     prescription,
     state.prescriptionExpiresAt ?? new Date(Date.now() + 7 * 86_400_000),
     state.prescriptionStatus,
+    { phase: state.phase, phaseStartedAt: state.phaseStartedAt, structure },
   )
+  if (!stamped) return { ok: false, reason: 'session_changed' }
 
   return {
     ok: true,

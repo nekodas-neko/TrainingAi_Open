@@ -195,6 +195,11 @@ function memoryProgram(
   const find = (id: string) => rows.find(r => r.programSessionId === id)!
   const phased = (r: Slot) => r.baselineComplete && r.phase !== 'baseline'
   const known: Record<string, unknown> = {
+    // #3927: the program and the stamp from one snapshot, as the adapter reads them.
+    getActiveProgramWithStructureStamp: async (u: string, id: string) => ({
+      program: await (known.getActiveProgram as (u: string) => unknown)(u),
+      structure: await (known.getSessionStructureStamp as ((u: string, id: string) => unknown) | undefined)?.(u, id),
+    }),
     getActiveProgram: async () => ({ id: 'prog', sessions: rows.map(r => ({ id: r.programSessionId, timeBudgetMinutes: 90 })) }),
     ensureSessionPeriodization: async (_u: string, id: string) => ({ ...find(id) }),
     getSessionPeriodization: async (_u: string, id: string) => ({ ...find(id) }),

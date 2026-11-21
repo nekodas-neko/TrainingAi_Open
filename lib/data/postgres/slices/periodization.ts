@@ -96,8 +96,9 @@ function phaseStartedAtIs(at: Date) {
 }
 
 /**
- * What a session's plan is made from, as one string: its time budget and every live exercise's id,
- * name, catalogue link, style, position, role, superset and muscles. #3895 review: the Coach and
+ * What a session's plan is made from, as one string: its program's training goal and phase mode
+ * (#3927: the plan is written for both, and an editor save can change either alone), its time budget
+ * and every live exercise's id, name, catalogue link, style, position, role, superset and muscles. #3895 review: the Coach and
  * the program editor void a stored plan when they change a session, but a generation already running
  * read the session before the change and stored after the void, so its plan drove the changed (or
  * restored) session for up to seven days. A generation reads this at its start and stores only while
@@ -105,14 +106,14 @@ function phaseStartedAtIs(at: Date) {
  * out, so a write that changes nothing the plan reads does not void it.
  */
 function sessionStructureSql(programSessionId: string) {
-  return sql`(SELECT md5(ps.time_budget_minutes::text || '#' || coalesce((
+  return sql`(SELECT md5(p.training_goal || '#' || p.phase_mode || '#' || ps.time_budget_minutes::text || '#' || coalesce((
       SELECT string_agg(
         se.id::text || ':' || se.exercise_name || ':' || coalesce(se.exercise_id::text, '') || ':' ||
         coalesce(se.style_id::text, '') || ':' || se.position::text || ':' || se.exercise_role || ':' ||
         coalesce(se.superset_group::text, '') || ':' || array_to_string(se.muscle_groups, ','),
         '|' ORDER BY se.position, se.id)
       FROM session_exercises se WHERE se.session_id = ps.id AND se.deleted_at IS NULL), ''))
-    FROM program_sessions ps WHERE ps.id = ${programSessionId})`
+    FROM program_sessions ps JOIN programs p ON p.id = ps.program_id WHERE ps.id = ${programSessionId})`
 }
 
 /** The session's structure stamp (`sessionStructureSql`), null when the session is not the user's. */
