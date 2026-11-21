@@ -17,13 +17,20 @@ export class ApiError extends Error {
    * answers a failed schema with). A 400 without it is a proxy or gateway page, not the server.
    */
   validation: boolean;
-  constructor(status: number, code?: string, notice?: string, path?: string, validation = false) {
+  /**
+   * The server's own `error` sentence for a refused request (at most 200 characters), for the few
+   * screens that show it as written, such as a wrong current password (#3882). Never the paused
+   * notice, and never put into `message`, which is what gets reported.
+   */
+  serverMessage?: string;
+  constructor(status: number, code?: string, notice?: string, path?: string, validation = false, serverMessage?: string) {
     super(`TrainingAi request failed (${status}).`);
     this.status = status;
     this.code = code;
     this.notice = notice;
     this.path = path;
     this.validation = validation;
+    this.serverMessage = serverMessage;
   }
 }
 /** The server took a push but refused this item for good, in the body of a 200. */
@@ -91,7 +98,14 @@ export function isNothingToAnswer(error: unknown): boolean {
 function failedRequest(path: string, status: number, body: unknown, code?: string) {
   const error = (body as { error?: unknown } | null)?.error;
   return aiPausedMessage(status, body) === null
-    ? new ApiError(status, code, undefined, path, typeof error === 'string' && error.length > 0)
+    ? new ApiError(
+        status,
+        code,
+        undefined,
+        path,
+        typeof error === 'string' && error.length > 0,
+        typeof error === 'string' && error.length > 0 && error.length <= 200 ? error : undefined,
+      )
     : new ApiError(status, AI_PAUSED_CODE, AI_PAUSED_MESSAGE, path);
 }
 /** The paused sentence for an AI failure, else the caller's own line. Never any other server text. */

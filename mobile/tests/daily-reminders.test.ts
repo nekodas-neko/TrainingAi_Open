@@ -270,8 +270,8 @@ test('refused notifications are flagged when only a daily reminder needs them', 
     false,
   );
   assert.equal(notificationsBlocked(settings, false, false), false);
-  assert.equal(notificationsBlocked(settings, false, false, true), true);
-  assert.equal(notificationsBlocked(settings, false, true, true), false);
+  assert.equal(notificationsBlocked(settings, false, false, { dailyRemindersOn: true }), true);
+  assert.equal(notificationsBlocked(settings, false, true, { dailyRemindersOn: true }), false);
 });
 
 test('a dated reminder goes on the reminders channel; only a workout or walk cue is a timer', async () => {

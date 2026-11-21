@@ -10,10 +10,12 @@ import { useState } from 'react';
 import { useAccountContext } from '../AccountProvider';
 import { canRetryAccountCheck } from '../session';
 import { SignOutSheet } from '../../settings/components/SignOutSheet';
+import { ChangePasswordSheet } from './ChangePasswordSheet';
 
 export function AccountPanel() {
   const account = useAccountContext();
   const [signingOut, setSigningOut] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
   const accountStatus = {
     loading: 'Loading account…',
     signedOut: 'Not signed in',
@@ -119,6 +121,13 @@ export function AccountPanel() {
               }}
             />
           )}
+          {account.state.status === 'signedIn' && account.dataReader?.patch && (
+            <AppButton
+              title="Change password"
+              variant="secondary"
+              onPress={() => setChangingPassword(true)}
+            />
+          )}
           {account.state.hasSession && (
             <AppButton title="Sign out" variant="danger" onPress={() => setSigningOut(true)} />
           )}
@@ -128,6 +137,7 @@ export function AccountPanel() {
         </>
       )}
       {signingOut && <SignOutSheet onClose={() => setSigningOut(false)} />}
+      {changingPassword && <ChangePasswordSheet onClose={() => setChangingPassword(false)} />}
     </Card>
   );
 }

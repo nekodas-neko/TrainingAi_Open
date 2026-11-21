@@ -13,6 +13,7 @@ import {
   drainChart,
   parseRingAlert,
   readingAge,
+  ringAlertWanted,
 } from '../src/features/devices/data/ring-battery.ts';
 import { ringBatterySpec } from '../src/features/health/data/body-models.ts';
 
@@ -136,4 +137,10 @@ test('the Health “Devices & integrations” row opens Devices and no row says 
   );
   assert.match(src, /title="Devices & integrations"[^>]*onPress=\{openDevices\}/s);
   assert.doesNotMatch(src, /remain deferred/);
+});
+
+test('the ring alert asks for notification permission only when it is on and the ring has a reading (#3434)', () => {
+  assert.equal(ringAlertWanted({ enabled: true, level: 20, fired: false }, true), true);
+  assert.equal(ringAlertWanted({ enabled: false, level: 20, fired: false }, true), false);
+  assert.equal(ringAlertWanted({ enabled: true, level: 20, fired: false }, false), false);
 });
