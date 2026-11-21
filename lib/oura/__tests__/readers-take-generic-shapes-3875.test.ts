@@ -5,7 +5,8 @@
 //   - the next-session AI input's daytime stress (`stressHigh` → `DaytimeHighStress`),
 //   - the health insight's temperature deviation (`temperatureDeviation` → `DailyTemperatureDeviation`),
 //   - the energy budget and the heart-rate recovery profile (`oura_workouts` → `SourceActivitySession`),
-// and #3884 moved the day timeline and the walk offer the same way and renamed the budget's activity names.
+// and #3884 moved the day timeline and the walk offer the same way, renamed the budget's activity names and
+// moved the coach tool's resilience level (`lib/ai-chat/tools.ts`) onto `DailyResilienceLevel`.
 //
 // A source-text sweep, because the mistake is a field name on a row typed loosely enough to compile.
 // Whole-line comments are dropped: the history of where a value came from is worth keeping in them.
@@ -32,12 +33,15 @@ function aiDynamicBlock(): string {
   const src = read('lib/data/postgres/adapter.ts')
   const start = src.indexOf("if (program.phaseMode === 'ai_dynamic') {")
   expect(start, 'the AI Dynamic block has moved; update this guard').toBeGreaterThan(0)
-  return codeOf(src.slice(start, start + 12_000))
+  return codeOf(src.slice(start, start + 40_000))
 }
 
 // Oura's own field and table names, as a reader would touch them.
-const OURA_STRESS = /\.stressHigh\b(?!Minutes)/
-const OURA_TEMPERATURE = /\.temperatureDeviation\b/
+// Dot access, bracket access and destructuring all count: a reader that destructures is the same mistake.
+const field = (name: string, tail = '') =>
+  new RegExp(`\\.${name}\\b${tail}|\\[\\s*['"\`]${name}['"\`]\\s*\\]|\\{[^{}]*\\b${name}\\b${tail}[^{}]*\\}\\s*=(?!=)`)
+const OURA_STRESS = field('stressHigh', '(?!Minutes)')
+const OURA_TEMPERATURE = field('temperatureDeviation')
 const OURA_WORKOUTS = /\bgetOuraWorkouts\b|\boura_workouts\b|\bouraWorkouts\b/
 const OURA_WORKOUT_FIELDS = /\.(?:distanceM|reviewed)\b/
 
@@ -79,6 +83,16 @@ describe('readers take the generic shapes, never Oura\'s fields (#3875)', () => 
       expect(code, f).not.toMatch(OURA_WORKOUT_FIELDS)
       expect(code, f).toContain('getSourceActivitySessions(')
     }
+  })
+
+  it('the coach recovery tool reads Oura\'s resilience word through DailyResilienceLevel', () => {
+    const code = codeOf(read('lib/ai-chat/tools.ts'))
+    expect(code).toContain('ouraResilienceLevels(')
+    // Its own (ring) level is read off `oura_daily_derived`; Oura's word only through the mapping.
+        expect(code).not.toMatch(/\br\.resilienceLevel\b/)
+    expect(code).not.toMatch(OURA_STRESS)
+    expect(code).not.toMatch(OURA_TEMPERATURE)
+    expect(code).toContain('ouraTemperatureDeviations(')
   })
 
   it('the energy budget costs an unmapped activity by the generic name, never Oura\'s', () => {

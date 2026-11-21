@@ -262,12 +262,14 @@ RecoveryContributor       { date, score /* 0-100 */, source, provenance }
 OvernightRecoveryHours    { date, hours, source, provenance }       // our hours from its overnight HR series
 DaytimeHighStress         { date, minutes, source }
 DaytimeHighRecovery       { date, minutes, source }               // display only (#3616)
+DailyResilienceLevel      { date, level /* the source's word */, source }  // coach tool only (#3884)
 ```
 
 - **Read by** the readiness night inputs (`lib/health/readiness-night-inputs.ts`), shadow readiness
   (`shadow-readiness/assemble.ts`) and the readiness score audit; daytime stress also by Body
   Battery's stress-drain fallback (`body-battery-day.ts`), and stress and recovery by the readiness
-  payload's display (`readiness-payload.ts`, #3616). None of them reads a device's field
+  payload's display (`readiness-payload.ts`, #3616); a source's resilience word by the coach's
+  recovery tool (`lib/ai-chat/tools.ts`, #3884). None of them reads a device's field
   names (#3610). Every normal a value joins is keyed on the `source` it carries, so two sources'
   values never share a baseline.
 - **`superseded`** marks a value the source no longer stands behind (Oura: the history before the
@@ -277,7 +279,7 @@ DaytimeHighRecovery       { date, minutes, source }               // display onl
   branches on it.
 - **Oura's mapping** is `lib/oura/cloud/readiness-signals-map.ts`: `daily_readiness.temperature_deviation`,
   the `recovery_index` readiness contributor, `daily_stress.stress_high` and `recovery_high` (seconds →
-  minutes), and our
+  minutes), `daily_resilience.level`, and our
   hours from each night's 5-minute heart-rate series. The recovery contributor and the series hours
   are read through `repo.getRecoveryContributors` / `repo.getOvernightRecoveryHours`
   (`lib/data/postgres/slices/readiness-signals.ts`, one reader per connector id); the temperature and

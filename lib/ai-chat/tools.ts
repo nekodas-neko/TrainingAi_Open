@@ -17,7 +17,7 @@ import { nightSessions } from '@trainingai/shared/health/sleep-night'
 import { computeEnergyBalance } from '@/lib/health/energy-balance-service'
 import { budgetProvenance } from '@trainingai/shared/nutrition/calorie-balance'
 import { dayStepCountsByDate } from '@trainingai/shared/health/activity-steps'
-import { ouraDaytimeHighStress } from '@/lib/oura/cloud/readiness-signals-map'
+import { ouraDaytimeHighStress, ouraResilienceLevels, ouraTemperatureDeviations } from '@/lib/oura/cloud/readiness-signals-map'
 
 export function buildChatTools(repo: WorkoutRepository, userId: string, tz: string, todayIso: string) {
   // User-local midnight, shared by every lookback window below — never Date.now(), which
@@ -105,8 +105,8 @@ export function buildChatTools(repo: WorkoutRepository, userId: string, tz: stri
         // leftovers, so its stress and resilience stand only before that day; Oura's read from it.
         const ringDerived = derived.filter(d => beforeSourceSwitch(d.day, switchDay))
         const ringByDate = new Map(ringDerived.map(d => [d.day, d]))
-        const tempByDate = new Map(oura.map(r => [r.date, r.temperatureDeviation ?? null]))
-        const days = [...new Set([...derivedByDate.keys(), ...tempByDate.keys()])].sort()
+        const tempByDate = new Map(ouraTemperatureDeviations(oura).map(t => [t.date, t.deviationC]))
+        const days = [...new Set([...derivedByDate.keys(), ...oura.map(r => r.date)])].sort()
         return {
           daily: days.map(date => ({
             date, readiness: readinessMap.get(date) ?? null,
@@ -147,9 +147,9 @@ export function buildChatTools(repo: WorkoutRepository, userId: string, tz: stri
             .map(d => ({ date: d.day, level: d.resilienceLevel, band: d.resilienceLevel != null ? resilienceLevelToBand(d.resilienceLevel) : null })),
           // #3077: Oura's own resilience level for a day the app has none, as Oura's word: it is not
           // the app's 1–5 scale and is not mapped onto it.
-          ouraResilience: oura
-            .filter(r => r.resilienceLevel != null && ringByDate.get(r.date)?.resilienceLevel == null)
-            .map(r => ({ date: r.date, level: r.resilienceLevel })),
+          ouraResilience: ouraResilienceLevels(oura)
+            .filter(r => ringByDate.get(r.date)?.resilienceLevel == null)
+            .map(r => ({ date: r.date, level: r.level })),
           trainingStress: derived
             .filter(d => d.trainingLoadOts != null)
             .map(d => ({ date: d.day, ots: d.trainingLoadOts, high: d.trainingLoadHigh ?? null })),
