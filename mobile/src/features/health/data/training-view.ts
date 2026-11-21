@@ -95,8 +95,17 @@ export function periodizationRow(session: {
   return {
     phase,
     label,
+    // The web card offers "Use prior data" on exactly this state.
+    needsBaseline: !!state && phase === 'baseline' && !state.baselineComplete,
     recency: state ? lastTrainedLabel(session.lastTrainedDaysAgo) : null,
   };
+}
+
+export const APPLY_PRIOR_DATA_PATH = '/api/ai-periodization/baseline/complete';
+export const APPLY_PRIOR_DATA_LABEL = 'Use prior data →';
+/** Body of `POST /api/ai-periodization/baseline/complete` (strict: the session id and nothing else). */
+export function applyPriorDataBody(sessionId: string) {
+  return { sessionId };
 }
 
 // Push / pull / legs / other: the bar is scaled to the biggest row so the shortest stays legible,
@@ -176,4 +185,14 @@ export function calendarMarks(input: {
     ];
   }
   return { markers, dots };
+}
+
+export const TONNAGE_TREND_CAPTION = '6-wk tonnage (kg)';
+/** A muscle's weekly tonnage as the web card draws it: only with two or more weeks to join up. */
+export function muscleTonnageValues(
+  trend: { muscles: Record<string, number[]> } | null | undefined,
+  muscle: string,
+): number[] | null {
+  const values = trend?.muscles[muscle];
+  return values && values.length >= 2 ? values : null;
 }

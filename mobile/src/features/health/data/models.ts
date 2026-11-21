@@ -399,6 +399,16 @@ export const muscleSetsSpec = {
     phase: z.object({ scale: n, dominant: text }).passthrough().optional(),
   }),
 };
+// The current app's weekly muscle card reads this when a muscle row is opened (#3964): six weeks
+// of tonnage in kg per muscle, oldest first. Slow-moving, so it is kept for six hours as there.
+export const muscleTonnageTrendSpec = {
+  path: '/api/muscle-tonnage-trend',
+  ttl: 21_600_000,
+  schema: z.object({
+    weekStarts: z.array(z.string()),
+    muscles: z.record(z.string(), z.array(z.number().finite())),
+  }),
+};
 export const recoverySpec = {
   path: '/api/muscle-recovery',
   ttl: 300_000,

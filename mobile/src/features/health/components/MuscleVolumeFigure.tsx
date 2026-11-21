@@ -6,9 +6,26 @@ import {
   TARGET_BARS_CAPTION,
   muscleVolumeColor,
 } from '@trainingai/shared/health/volume-band';
-import { AppText, Legend, MuscleMap, ProgressBar, Stack } from '../../../shared/ui';
+import { useState } from 'react';
+import { View } from 'react-native';
+import {
+  AppText,
+  Legend,
+  LineChart,
+  MuscleMap,
+  ProgressBar,
+  Stack,
+  TouchSurface,
+} from '../../../shared/ui';
+import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
+import { muscleTonnageTrendSpec } from '../data/models';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
-import { muscleLegendItems, muscleSetsLabel } from '../data/training-view';
+import {
+  TONNAGE_TREND_CAPTION,
+  muscleLegendItems,
+  muscleSetsLabel,
+  muscleTonnageValues,
+} from '../data/training-view';
 
 // The week's muscle volume as the current app draws it: a front and back body map and one bar per
 // muscle, both coloured by the same rule (shared `muscleVolumeColor`) so the map cannot disagree
@@ -19,6 +36,9 @@ export function MuscleVolumeFigure({
   muscles: readonly { muscle: string; sets: number; target: number | null }[];
 }) {
   const { theme } = useTheme();
+  // One row open at a time, as on the web card; the trend is fetched on the first open.
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const trend = useWorkoutResource(muscleTonnageTrendSpec, expanded !== null);
   const palette = {
     good: theme.anatomy.main,
     warn: theme.anatomy.secondary,
@@ -55,7 +75,14 @@ export function MuscleVolumeFigure({
       {/* weekly-muscle-sets-card.tsx: space-y-2 rows, each a text-xs label, mb-0.5, then an h-2 bar. */}
       <Stack gap="sm">
         {rows.map((row) => (
-          <Stack key={row.muscle} gap="xxs" style={{ minHeight: theme.sizes.touchTarget }}>
+          <TouchSurface
+            key={row.muscle}
+            accessibilityRole="button"
+            accessibilityState={{ expanded: expanded === row.muscle }}
+            accessibilityLabel={`${capitalize(row.muscle)}, ${muscleSetsLabel(row.sets, row.target)}`}
+            onPress={() => setExpanded(expanded === row.muscle ? null : row.muscle)}
+          >
+          <Stack gap="xxs" style={{ minHeight: theme.sizes.touchTarget }}>
             <Stack direction="row" justify="space-between" align="center">
               <AppText variant="calendarDay" style={{ flex: 1 }}>
                 {capitalize(row.muscle)}
@@ -72,7 +99,37 @@ export function MuscleVolumeFigure({
               color={row.color}
               target={(row.target ?? GENERIC_TARGET) / scale}
             />
+            {expanded === row.muscle && (
+              <Stack direction="row" align="center" gap="sm">
+                {muscleTonnageValues(trend.data, row.muscle) ? (
+                  <>
+                    <View style={{ width: theme.sizes.weightSparkline }}>
+                      <LineChart
+                        label={`${capitalize(row.muscle)} tonnage`}
+                        height={theme.sizes.trendSparkline}
+                        showLabels={false}
+                        stretch
+                        dots="none"
+                        color={row.color}
+                        points={muscleTonnageValues(trend.data, row.muscle)!.map((value, index) => ({
+                          label: String(index + 1),
+                          value,
+                        }))}
+                      />
+                    </View>
+                    <AppText variant="micro" tone="muted">
+                      {TONNAGE_TREND_CAPTION}
+                    </AppText>
+                  </>
+                ) : (
+                  <AppText variant="micro" tone="muted">
+                    {trend.data ? 'Not enough weeks yet' : 'Loading trend…'}
+                  </AppText>
+                )}
+              </Stack>
+            )}
           </Stack>
+          </TouchSurface>
         ))}
       </Stack>
       <AppText variant="micro" tone="muted">

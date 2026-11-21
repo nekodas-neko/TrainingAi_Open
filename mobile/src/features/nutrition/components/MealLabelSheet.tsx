@@ -13,6 +13,8 @@ import {
   Stack,
   StatusIndicator,
 } from '../../../shared/ui';
+import { useHomeState } from '../../home/data/HomeProvider';
+import { mealLabelStyleChoice, mealLabelStylePatch } from '../data/account-preferences';
 import { useWorkoutDraft } from '../../workouts/data/useWorkoutDraft';
 import { mealLabelArtwork } from '../data/meal-label';
 import { MEAL_LABEL_STYLES } from '@trainingai/shared/nutrition/meal-label-geometry';
@@ -24,20 +26,23 @@ export function MealLabelSheet({ meal, onClose }: { meal: SavedMeal; onClose: ()
   const draft = useWorkoutDraft('meal-label-style', z.object({ style: z.string() }), {
     style: 'inlineCentred',
   });
+  const home = useHomeState();
+  // The style follows the account (#3964); the local draft is the fallback until it has one.
+  const style = mealLabelStyleChoice(home.preferences.mealLabelStyle, draft.value.style);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const svg = useRef<Svg | null>(null);
   const { theme } = useTheme();
   const artwork = useMemo(
-    () => mealLabelArtwork(meal, draft.value.style),
-    [meal, draft.value.style],
+    () => mealLabelArtwork(meal, style),
+    [meal, style],
   );
   const payload = artwork.payload;
   async function save(print: boolean) {
     setBusy(true);
     try {
-      await exportMealLabel(meal, draft.value.style, print);
+      await exportMealLabel(meal, style, print);
       setError(null);
       setMessage(null);
     } catch {
@@ -114,9 +119,12 @@ export function MealLabelSheet({ meal, onClose }: { meal: SavedMeal; onClose: ()
     >
       <Picker
         label="Label style"
-        value={draft.value.style}
+        value={style}
         options={styles}
-        onChange={(style) => draft.setValue({ style })}
+        onChange={(next) => {
+          draft.setValue({ style: next });
+          void home.store?.savePreferences(mealLabelStylePatch(next)).catch(() => undefined);
+        }}
       />
       <Card>
         <Stack align="center">

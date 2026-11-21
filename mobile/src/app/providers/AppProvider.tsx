@@ -27,9 +27,9 @@ export function AppProvider({ children }: PropsWithChildren) {
             <DevicesProvider>
               <HealthProvider>
                 <HealthDataProvider>
-                  <NutritionProvider>
-                    <HistoryDownloadProvider>
-                      <HomeProvider>
+                  <HomeProvider>
+                    <NutritionProvider>
+                      <HistoryDownloadProvider>
                         <ActivityProvider>
                           <PlatformProvider>
                             <OuraHandoffProvider>
@@ -43,9 +43,9 @@ export function AppProvider({ children }: PropsWithChildren) {
                             </OuraHandoffProvider>
                           </PlatformProvider>
                         </ActivityProvider>
-                      </HomeProvider>
-                    </HistoryDownloadProvider>
-                  </NutritionProvider>
+                      </HistoryDownloadProvider>
+                    </NutritionProvider>
+                  </HomeProvider>
                 </HealthDataProvider>
               </HealthProvider>
             </DevicesProvider>

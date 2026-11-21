@@ -31,6 +31,9 @@ export const preferencesSchema = UserPreferencesSchema.pick({
   // The current app's reminder switches, read by Preview's daily reminders (#3653).
   mealReminders: true,
   dayReviewReminders: true,
+  // Nutrition's account-wide choices (#3964): the food search region and the meal label style.
+  foodRegion: true,
+  mealLabelStyle: true,
 }).strip();
 export type HomePreferences = z.infer<typeof preferencesSchema>;
 export const widgetLabels = {

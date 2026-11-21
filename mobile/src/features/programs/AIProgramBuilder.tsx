@@ -34,8 +34,10 @@ import {
   GenerateProgramResponseSchema,
   builderSteps,
   generatedDraft,
+  estimateRequestBody,
   reviewedProgram,
   sortedWeekDays,
+  startingOneRmExercises,
 } from './builder-model';
 import { ProgramSessionList } from './ProgramSessionList';
 
@@ -49,6 +51,7 @@ const schema = z.object({
   clonedPhaseSetId: z.string().nullable(),
   phaseCycles: z.record(z.string(), z.number().int().min(1).max(52)).default({}),
   checkNotes: z.array(z.string()).default([]),
+  startingOneRms: z.record(z.string(), z.string()).default({}),
 });
 const equipment = ['dumbbell', 'barbell', 'cable', 'kettlebell', 'full_gym'];
 const muscles = [
@@ -110,6 +113,7 @@ export function AIProgramBuilder({ onBack, onSaved }: { onBack: () => void; onSa
     clonedPhaseSetId: null,
     phaseCycles: {},
     checkNotes: [],
+    startingOneRms: {},
   });
   const value = draft.value;
   const inputs = value.inputs;
@@ -228,6 +232,13 @@ export function AIProgramBuilder({ onBack, onSaved }: { onBack: () => void; onSa
         { ...body.program, sessions: body.program.sessions! },
         { creating: true, clone, linkPhaseSetOwnership: !!value.clonedPhaseSetId },
       );
+      // Optional starting 1RMs seed the first loads; like the web, a failed save does not undo the program.
+      const estimates = estimateRequestBody(value.startingOneRms, startingOneRmExercises(review));
+      if (estimates) {
+        await resources
+          .write('POST', '/api/exercise-estimates', estimates)
+          .catch(() => undefined);
+      }
       await resources.clearDraft('ai-program-builder');
       onSaved();
     });
@@ -533,6 +544,28 @@ export function AIProgramBuilder({ onBack, onSaved }: { onBack: () => void; onSa
             styles={styles.data?.styles ?? []}
             disabled={action.busy}
           />
+          <Disclosure title="Starting weights (optional)">
+            <AppText variant="caption" tone="muted">
+              Enter your 1RM for each main lift to pre-seed working weights. Leave blank for any lift:
+              it will be estimated from your first session.
+            </AppText>
+            {startingOneRmExercises(value.review).map((name) => (
+              <TextField
+                key={name}
+                label={`${name} (kg)`}
+                value={value.startingOneRms[name] ?? ''}
+                onChangeText={(text) =>
+                  draft.setValue({
+                    ...value,
+                    startingOneRms: { ...value.startingOneRms, [name]: text },
+                  })
+                }
+                keyboardType="decimal-pad"
+                placeholder="kg"
+                maxLength={7}
+              />
+            ))}
+          </Disclosure>
           <Card>
             <AppText variant="heading">Adjust with AI</AppText>
             {value.chat.map((entry, index) => (
