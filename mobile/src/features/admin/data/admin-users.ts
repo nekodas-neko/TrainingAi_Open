@@ -45,6 +45,8 @@ const feedbackSchema = z
 export type AdminFeedback = z.infer<typeof feedbackSchema>;
 export const adminFeedbackSpec = {
   path: '/api/admin/feedback',
+  // #3951: every account's feedback, so the server serves it to the owner only.
+  deniedMessage: 'Owner only. Feedback is visible to the owner account, not to other admins.',
   ttl: 30_000,
   cache: noDiskCache,
   schema: z.array(feedbackSchema),
