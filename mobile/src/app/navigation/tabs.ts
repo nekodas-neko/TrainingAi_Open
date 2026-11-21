@@ -14,6 +14,7 @@ export type DetailScreen =
   | 'health-day'
   | 'health-week'
   | 'running'
+  | 'cardio-plan'
   | 'guided-walk'
   | 'fitness-baselines'
   | 'friend-profile'

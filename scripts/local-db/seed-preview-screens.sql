@@ -276,6 +276,26 @@ BEGIN
     ON CONFLICT DO NOTHING;
   END LOOP;
 
+  -- ── Walking plan (#3779): the Cardio Hub's walking week ───────────────────────────────────────
+  -- A walking plan is only a plan row (its targets are set from history on the first read, and its
+  -- state lives in the snapshot). Added only when the user has no active plan. This week's steps are
+  -- made-up, set for Monday to today so the week shows done, part-way and empty days.
+  IF NOT EXISTS (SELECT 1 FROM running_plans WHERE user_id = uid AND is_active) THEN
+    INSERT INTO running_plans (user_id, goal_kind, framework_key, fitness_snapshot, is_active, created_at)
+    VALUES (uid, 'walking', 'walking-heart-health', '{}'::jsonb, true, now() - interval '6 days');
+  END IF;
+  UPDATE body_metrics
+     SET steps = CASE (date - date_trunc('week', today::timestamp)::date)
+                   WHEN 0 THEN 9100 WHEN 1 THEN 8400 WHEN 2 THEN 3200 WHEN 3 THEN 0
+                   WHEN 4 THEN 7800 WHEN 5 THEN 8800 ELSE 6240 END
+   WHERE user_id = uid
+     AND date >= date_trunc('week', today::timestamp)::date AND date < today;
+  IF NOT EXISTS (SELECT 1 FROM body_metrics WHERE user_id = uid AND date = today) THEN
+    INSERT INTO body_metrics (user_id, date, steps) VALUES (uid, today, 6240);
+  ELSE
+    UPDATE body_metrics SET steps = 6240 WHERE user_id = uid AND date = today;
+  END IF;
+
   -- ── Body Battery: today's morning level, with no heart-rate readings yet ──────────────────────
   -- Energy's "Waiting for the ring's heart rate" state needs a readiness-sourced anchor. A read of
   -- /api/body-battery before this runs stores the fallback (50, 'default'), which hides it; only

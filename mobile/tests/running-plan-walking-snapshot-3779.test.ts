@@ -36,3 +36,21 @@ test('a walking plan whose state has not been written yet ({}) parses as no runn
   const parsed = schema.parse({ ...base, plan: { id: 'p-w0', frameworkKey: 'walking-heart-health', goalKind: 'walking', fitnessSnapshot: {} } });
   assert.equal(parsed.plan?.fitnessSnapshot, null);
 });
+
+test('the walking block of the payload parses, and a running payload has none', () => {
+  const walking = {
+    kind: 'walking',
+    targets: { stepsPerDay: 8000, activeMinutesPerWeek: 140, activeMinutesPerDay: 20, stepsCeiling: 12000 },
+    week: {
+      from: '2026-11-16',
+      to: '2026-11-22',
+      stepsToday: null,
+      activeMinutes: 0,
+      activeMinutesBasis: null,
+      days: [{ date: '2026-11-16', steps: null, stepsMet: false, activeMinutes: 0, minutesMet: false, done: false, excluded: null, isToday: true }],
+    },
+  };
+  const parsed = schema.parse({ ...base, plan: { id: 'p-w', frameworkKey: 'walking-heart-health', goalKind: 'walking', fitnessSnapshot: {} }, walking });
+  assert.equal(parsed.walking?.targets.stepsPerDay, 8000);
+  assert.equal(schema.parse({ ...base, plan: null }).walking, undefined);
+});
