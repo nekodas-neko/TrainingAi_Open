@@ -153,9 +153,9 @@ describe.skipIf(!canRun)('db-query and db-snapshot: an admin session must be the
   it('the scope is the owner the check resolved, else resolved the same way, and none when unresolvable', async () => {
     const { scopeOwnerFor } = await import('@/lib/admin/claude-token-auth')
     for (const k of ['CLAUDE_RO_OWNER_USER_ID', 'ADMIN_EXPORT_USER_ID', 'WEBHOOK_USER_ID']) vi.stubEnv(k, '')
-    expect(await scopeOwnerFor({})).toBeNull()
+    expect(await scopeOwnerFor({})).toMatchObject({ ok: false, status: 503, reason: 'unresolved' })
     vi.stubEnv('CLAUDE_RO_OWNER_USER_ID', OWNER)
-    expect(await scopeOwnerFor({})).toBe(OWNER)
-    expect(await scopeOwnerFor({ ownerId: OWNER })).toBe(OWNER)
+    expect(await scopeOwnerFor({})).toEqual({ ok: true, ownerId: OWNER })
+    expect(await scopeOwnerFor({ ownerId: OWNER })).toEqual({ ok: true, ownerId: OWNER })
   })
 })

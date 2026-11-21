@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { resolveOwnerUserId, sameUserId, isOwnerUserId, judgeProtectedTarget } from '@/lib/admin-owner'
+import { resolveOwnerUserId, resolveOwnerForRoute, isOwnerLookupUnavailable, sameUserId, isOwnerUserId, judgeProtectedTarget } from '@/lib/admin-owner'
 
 // #3368 — the owner protection must not switch off quietly. A well-formed uuid is not enough: it
 // has to name an active admin, otherwise the rule protects nobody and nothing says so.
@@ -18,10 +18,19 @@ describe('resolveOwnerUserId', () => {
   ])('is unresolved for %s', async (_n, user) => {
     expect(await resolveOwnerUserId(repoWith(user), env(OWNER))).toBeNull()
   })
-  it('is unresolved when the lookup throws', async () => {
+  // #3957 review: a fault is not "no owner". It throws a typed 503, so the owner's tools say "try
+  // again" during an outage, not "only the owner can see this".
+  it('throws OwnerLookupUnavailableError (503), not null, when the lookup throws', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
     const repo = { getUserById: vi.fn(async () => { throw new Error('db down') }) }
-    expect(await resolveOwnerUserId(repo, env(OWNER))).toBeNull()
+    const err = await resolveOwnerUserId(repo, env(OWNER)).then(() => null, (e: unknown) => e)
+    expect(isOwnerLookupUnavailable(err)).toBe(true)
+    expect((err as { status?: number }).status).toBe(503)
+    expect(await resolveOwnerForRoute(repo, env(OWNER))).toEqual({ ok: false, status: 503, error: 'Service unavailable' })
+  })
+  it('resolveOwnerForRoute passes an unresolved owner through as null, not 503', async () => {
+    expect(await resolveOwnerForRoute(repoWith(null), env(OWNER))).toEqual({ ok: true, ownerId: null })
+    expect(await resolveOwnerForRoute(repoWith(null), {} as NodeJS.ProcessEnv)).toEqual({ ok: true, ownerId: null })
   })
   it('does not look anything up for an unset or malformed setting', async () => {
     const repo = repoWith({ isAdmin: true, isActive: true })

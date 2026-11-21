@@ -14,7 +14,7 @@ import { readOuraGrantBestEffort, revokeOuraGrantAfterCommit } from '@/lib/accou
 import {
   DeleteBodySchema, WIPE_MAX_BODY_BYTES, WIPE_RATE, auditActor, precheckWipe, wipeRateKey, wipeRefusalResponse,
 } from '@/lib/admin/user-wipe'
-import { resolveOwnerUserId, judgeProtectedTarget, judgeRevokeAdmin, sameUserId, ownerRefusalMessage } from '@/lib/admin-owner'
+import { resolveOwnerForRoute, judgeProtectedTarget, judgeRevokeAdmin, sameUserId, ownerRefusalMessage } from '@/lib/admin-owner'
 
 /**
  * #2383 item 3 — the one self-check both mutating handlers share. Deleting or deactivating your own
@@ -86,7 +86,11 @@ export async function PATCH(req: NextRequest) {
   }
 
   const repo = await getRepository()
-  const ownerId = await resolveOwnerUserId(repo)
+  // A failed owner lookup is 503 "try again" for every action, before anything is judged: an
+  // outage must not read as "only the owner can …", and nothing owner-gated runs during it.
+  const owner = await resolveOwnerForRoute(repo)
+  if (!owner.ok) return NextResponse.json({ error: owner.error }, { status: owner.status })
+  const ownerId = owner.ownerId
 
   // Activating yourself is a no-op (you are signed in, so already active); only deactivation locks out.
   if (action === 'deactivate') {
@@ -164,7 +168,9 @@ export async function DELETE(req: NextRequest) {
   if (badId) return badId
   const self = refuseSelf(userId, session.user.id, 'delete')
   if (self) return self
-  const ownerId = await resolveOwnerUserId(await getRepository())
+  const owner = await resolveOwnerForRoute(await getRepository())
+  if (!owner.ok) return NextResponse.json({ error: owner.error }, { status: owner.status })
+  const ownerId = owner.ownerId
 
   // #3369: with the target's email typed, an admin may delete an account that holds data. Without
   // it the long-standing rule stands (issue 2695): only a signup that never got in, which has

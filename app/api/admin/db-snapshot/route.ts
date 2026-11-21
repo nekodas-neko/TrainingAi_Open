@@ -110,10 +110,10 @@ export async function GET(req: NextRequest) {
   // #3949 review N7: every row read is scoped explicitly to the owner this request's check resolved
   // (`scopeOwnerFor`), never to the read-only role's default. Unresolvable: nothing is read.
   const resolvedOwner = await scopeOwnerFor(authed)
-  if (!resolvedOwner) {
-    return NextResponse.json({ error: 'The owner account is not configured; nothing was read' }, { status: 503 })
+  if (!resolvedOwner.ok) {
+    return NextResponse.json({ error: `${resolvedOwner.error}; nothing was read` }, { status: resolvedOwner.status })
   }
-  const ownerId: string = resolvedOwner
+  const ownerId: string = resolvedOwner.ownerId
   const q = req.nextUrl.searchParams
   const bulk = q.get('bulk')
   const tablesParam = q.get('tables')
