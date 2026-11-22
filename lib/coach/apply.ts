@@ -15,8 +15,8 @@ export type { ApplyOutcome } from './domains/types'
 
 /**
  * `today` is a parameter rather than something a handler computes, because a date computed inside
- * the write path is a date computed in whatever timezone the server happens to be in. Only
- * `early_deload` reads it — it stamps the deload's start day — but every entry point takes it so
+ * the write path is a date computed in whatever timezone the server happens to be in. `early_deload`
+ * and `injury` read it — they stamp a start day and a recovered day — but every entry point takes it so
  * the next date-bearing domain cannot quietly reintroduce the bug.
  */
 export function handlerFor(
@@ -28,7 +28,7 @@ export function handlerFor(
     session_exercise: sessionExerciseHandler,
     nutrition_targets: nutritionTargetsHandler,
     user_goals: userGoalsHandler,
-    injury: injuryHandler,
+    injury: injuryHandler(today),
     program_phase: programPhaseHandler,
     early_deload: earlyDeloadHandler(today, timezone),
     // The bar's basis reads (1RM, estimates, records) go through the repository, as every other
