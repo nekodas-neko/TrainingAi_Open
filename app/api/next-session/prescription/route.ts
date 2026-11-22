@@ -6,6 +6,7 @@ import { prescriptionDrivesLoad, prescriptionStyleForExercise } from "@traininga
 import { normalizeStoredPrescription } from "@trainingai/shared/ai-periodization/reconcile-prescription";
 import { isAiPrescriptionPending } from "@trainingai/shared/ai-periodization/prescription-pending";
 import { readProgramDeloadCheck } from "@trainingai/shared/ai-periodization/program-phase";
+import { fitStoredPlanToCheckinBudget } from "@trainingai/shared/ai-periodization/checkin-plan-budget";
 import { resolveBodyweightStyle, resolveWorkingBasis } from "@trainingai/shared/1rm";
 import { mroundStepUp, weightStepFor } from "@trainingai/shared/workout/load-rounding";
 import { rateLimit } from "@/lib/rate-limit";
@@ -84,7 +85,11 @@ export async function GET() {
     repo.getLastExerciseLogsBatch(userId, exerciseNames),
     repo.getLastRealOneRmBatch(userId, exerciseNames),
     repo.listPersonalRecords(userId),
-    isAiDynamic ? repo.getSessionPeriodization(userId, programSession.id) : Promise.resolve(null),
+    // #3890: in the applies-to week, the weekly check-in's shorter session (no model call).
+    isAiDynamic
+      ? repo.getSessionPeriodization(userId, programSession.id)
+          .then(st => st && fitStoredPlanToCheckinBudget(userId, programSession.id, repo, tz, st))
+      : Promise.resolve(null),
     repo.getExerciseEstimates(userId).catch(() => []),
   ]);
   const estimateMap = new Map(estimates.map(e => [e.exerciseName, e.estimated1rm]));

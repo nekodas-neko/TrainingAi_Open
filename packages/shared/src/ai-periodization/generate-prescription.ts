@@ -27,7 +27,7 @@ import { applyBudgetStage, reasoningWithBudgetNote } from '@trainingai/shared/ai
 import { prescriptionFigures, rowUnderFull, hasFullSessionRevert } from '@trainingai/shared/ai-periodization/prescription-figures'
 import { capLoadToAnchor } from '@trainingai/shared/ai-periodization/role-plausibility'
 import { resolveMeasuredRestSec } from '@trainingai/shared/workout/time-profile'
-import { budgetForPreset, requestedBudgetMin, fitBudgetMin, NO_TIME_LIMIT, type DurationPreset } from '@trainingai/shared/workout/duration-model'
+import { budgetForPreset, requestedBudgetMin, fitBudgetMin, type DurationPreset } from '@trainingai/shared/workout/duration-model'
 import { applyAutoregulation, clampPrescribedPct } from '@trainingai/shared/ai-periodization/autoregulation'
 import { shouldTriggerEmergencyDeload, emergencyDeloadTrigger } from '@trainingai/shared/ai-periodization/emergency-deload'
 import { holdsOneDayDeload } from '@trainingai/shared/ai-periodization/one-day-deload'
@@ -42,6 +42,7 @@ import { PrescriptionSchema } from '@trainingai/shared/ai-periodization/prescrip
 import { reconcilePrescription } from '@trainingai/shared/ai-periodization/reconcile-prescription'
 import { buildPrescriptionShadow } from '@trainingai/shared/ai-periodization/prescription-shadow'
 import { loadSessionReads } from '@trainingai/shared/ai-periodization/session-read-plan'
+import { checkinBudgetApplies } from '@trainingai/shared/ai-periodization/checkin-plan-budget'
 import { loadLiftPreferences } from '@trainingai/shared/ai-periodization/lift-preference-read'
 import { clampReps, preferenceAppliesIn, appliedAfterBudgetRest } from '@trainingai/shared/ai-periodization/lift-preference'
 import {
@@ -500,11 +501,11 @@ async function runPrescriptionGeneration(
   // when the person did not pick a length for today (a preset is the more recent, more specific ask; the
   // check-in read is skipped for it). Clamped as a numeric preset is (`budgetForPreset`), so it can never
   // ask for less than any preset can.
+  const checkinFitMin = presetOverrideMin == null && checkinBudgetApplies(checkinBudgetMin, validSession.timeBudgetMinutes)
+    ? checkinBudgetMin!
+    : null
   const budgetOverrideMin = presetOverrideMin ?? (
-    checkinBudgetMin != null && checkinBudgetMin > 0 &&
-      (validSession.timeBudgetMinutes === NO_TIME_LIMIT || checkinBudgetMin < validSession.timeBudgetMinutes)
-      ? budgetForPreset(validSession.timeBudgetMinutes, checkinBudgetMin)
-      : undefined
+    checkinFitMin != null ? budgetForPreset(validSession.timeBudgetMinutes, checkinFitMin) : undefined
   )
   const signals = await aggregateSignals(userId, programSessionId, repo, tz, excludeSessionId, budgetOverrideMin, { program: activeProgram, liftPreferences })
   if (!signals) return { ok: false, error: 'Could not aggregate signals', status: 404 }
@@ -954,6 +955,9 @@ async function runPrescriptionGeneration(
     confidenceReasons: signals.confidenceReasons,
     durationPreset: durationPreset ?? 'standard',
     sessionTimeBudgetMinutes: validSession.timeBudgetMinutes,
+    // #3890: recorded only when the check-in's budget shaped the plan, so a serve-time re-fit knows it
+    // is already fitted (and an undo knows to give the length back). Absent for everyone else.
+    ...(checkinFitMin != null && { checkinBudgetMin: checkinFitMin }),
     refitBaseline,
     ...(droppedIdSet.size > 0 && { droppedExerciseIds: [...droppedIdSet] }),
   }

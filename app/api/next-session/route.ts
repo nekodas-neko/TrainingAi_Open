@@ -5,6 +5,7 @@ import { DEFAULT_TZ } from "@trainingai/shared/date-utils";
 import { estimateProgramSessionMin } from "@trainingai/shared/workout/program-session-duration";
 import { prescriptionDrivesLoad } from "@trainingai/shared/ai-periodization/apply-prescription";
 import { serveStoredPrescription } from "@trainingai/shared/ai-periodization/program-phase";
+import { fitStoredPlanToCheckinBudget } from "@trainingai/shared/ai-periodization/checkin-plan-budget";
 
 export async function GET() {
   const session = await auth();
@@ -20,7 +21,9 @@ export async function GET() {
     // because the drop below depends on the prescription and would otherwise serialise them, and
     // then trimmed to what survives the drop, so the response is exactly what it was.
     const [state, assignments, styles, equipmentByName] = await Promise.all([
-      repo.getSessionPeriodization(userId, recommendation.session.id),
+      // #3890: in the applies-to week, the weekly check-in's shorter session (no model call).
+      repo.getSessionPeriodization(userId, recommendation.session.id)
+        .then(st => st && fitStoredPlanToCheckinBudget(userId, recommendation.session!.id, repo, tz, st)),
       // Q-115-followup: lets the sore-muscle check-in predict the same whole-session escalation
       // computePerExerciseDeload applies server-side, instead of guessing from the flat
       // muscleGroups list (no main/secondary role information).

@@ -28,6 +28,7 @@ import { reportServerError } from "@/lib/observability";
 import { rateLimit } from "@/lib/rate-limit";
 import { estimateProgramSessionMin } from "@trainingai/shared/workout/program-session-duration";
 import { generatePrescriptionForSession } from "@trainingai/shared/ai-periodization/generate-prescription";
+import { fitStoredPlanToCheckinBudget } from "@trainingai/shared/ai-periodization/checkin-plan-budget";
 import { regeneratePrescriptionInBackground as regeneratePrescriptionSingleFlight } from "@trainingai/shared/ai-periodization/regenerate-in-background";
 import { loadLiftPreferences } from "@trainingai/shared/ai-periodization/lift-preference-read";
 
@@ -371,6 +372,8 @@ async function handleWorkoutData(req: NextRequest) {
       ? repo.reconcileSessionsInPhase(userId, program.id)
           .catch(() => {})
           .then(() => repo.getSessionPeriodization(userId, programSession.id))
+          // #3890: in the applies-to week, the weekly check-in's shorter session (no model call).
+          .then(state => state && fitStoredPlanToCheckinBudget(userId, programSession.id, repo, tz, state))
       : Promise.resolve(null),
     repo.listPersonalRecords(userId),
     repo.getExerciseEstimates(userId).catch(() => []),

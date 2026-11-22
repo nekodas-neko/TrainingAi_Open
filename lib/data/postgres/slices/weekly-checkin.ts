@@ -3,26 +3,22 @@
 // Every query is scoped to the user passed in, which the route takes from the session. Lift identity
 // is the `exercise_preferences` rule (migration 202611221206's header): the library id first, the name
 // only when an id is missing, and never a name row whose own id names a different library lift.
-import { and, eq, inArray, isNull, sql } from 'drizzle-orm'
+import { and, eq, inArray, isNotNull, isNull, sql } from 'drizzle-orm'
 import type { getDb } from '../client'
 import * as s from '../schema'
-import { voidSessionPrescription } from './periodization'
 
 type Db = ReturnType<typeof getDb>
 
 /**
- * Mark a date as rest, or withdraw it (a tombstone; re-choosing revives the same row). THE rest-day
- * write: `PostgresAdapter.setRestDay` (the web route and the `rest_days` sync domain) and the weekly
- * check-in's days off both call it, so the two cannot drift. Takes a transaction or the pool.
- *
- * `at` stamps the row's `updated_at` (and the tombstone) with a given instant instead of the clock: the
- * weekly check-in passes its save's `saved_at`, so a date it wrote is recognisable as its own for as long
- * as nobody else has touched the row (`checkinOwnedRestDays`). Every other caller leaves it out.
+ * Mark a date as rest, or withdraw it (a tombstone; re-choosing revives the same row). Home's rest-day
+ * write: `PostgresAdapter.setRestDay` (the web route and the `rest_days` sync domain). Takes a
+ * transaction or the pool. The weekly check-in writes the same rows through `claimRestDay` and
+ * `moveOwnedRestDay`, which are conditional so they never take over a row the person set.
  */
-export async function writeRestDay(db: Db, userId: string, date: string, resting: boolean, at?: Date): Promise<void> {
-  const stamp = at ?? new Date()
+export async function writeRestDay(db: Db, userId: string, date: string, resting: boolean): Promise<void> {
+  const stamp = new Date()
   await db.insert(s.restDays)
-    .values({ userId, date, deletedAt: resting ? null : stamp, ...(at ? { updatedAt: at } : {}) })
+    .values({ userId, date, deletedAt: resting ? null : stamp })
     .onConflictDoUpdate({
       target: [s.restDays.userId, s.restDays.date],
       set: { deletedAt: resting ? null : stamp, updatedAt: stamp },
@@ -30,6 +26,40 @@ export async function writeRestDay(db: Db, userId: string, date: string, resting
       // arm is an UPDATE, and the standing rule is that every one of them is user-scoped.
       setWhere: eq(s.restDays.userId, userId),
     })
+}
+
+/**
+ * #3890: the weekly check-in's own rest-day write. Makes `date` a rest day stamped `stamp` only if it
+ * is not one already: a new row, or a tombstone revived. A row that is already live is the person's
+ * (Home's tap, or theirs from before) and is neither touched nor claimed. One atomic statement, so a
+ * tap landing at the same moment as the save is never re-stamped as the check-in's. True when it wrote.
+ */
+export async function claimRestDay(db: Db, userId: string, date: string, stamp: Date): Promise<boolean> {
+  const rows = await db.insert(s.restDays)
+    .values({ userId, date, deletedAt: null, updatedAt: stamp })
+    .onConflictDoUpdate({
+      target: [s.restDays.userId, s.restDays.date],
+      set: { deletedAt: null, updatedAt: stamp },
+      setWhere: and(eq(s.restDays.userId, userId), isNotNull(s.restDays.deletedAt)),
+    })
+    .returning({ date: s.restDays.date })
+  return rows.length === 1
+}
+
+/**
+ * #3890: re-stamp (`resting`) or withdraw a rest day the check-in wrote, only while it is still the
+ * check-in's: live and stamped `owned`. A row the person changed meanwhile is left as they left it.
+ * True when it wrote.
+ */
+export async function moveOwnedRestDay(db: Db, userId: string, date: string, owned: Date, resting: boolean, to: Date): Promise<boolean> {
+  const rows = await db.update(s.restDays)
+    .set({ deletedAt: resting ? null : to, updatedAt: to })
+    .where(and(
+      eq(s.restDays.userId, userId), eq(s.restDays.date, date),
+      isNull(s.restDays.deletedAt), eq(s.restDays.updatedAt, owned),
+    ))
+    .returning({ date: s.restDays.date })
+  return rows.length === 1
 }
 
 /** Of `dates`, those that are a live rest day of the user's now. One query. */
@@ -45,7 +75,7 @@ export async function liveRestDays(db: Db, userId: string, dates: readonly strin
 /**
  * #3890 A1: of the dates a check-in recorded as its own (`days_off_written`), those that still are: the
  * rest day is live and its `updated_at` is still the check-in's write stamp (`saved_at`, which
- * `writeRestDay` was given). A date the person un-rested, or un-rested and re-rested by hand, has moved
+ * `claimRestDay` and `moveOwnedRestDay` wrote). A date the person un-rested, or un-rested and re-rested by hand, has moved
  * on from that stamp and is theirs now: undo and redo leave it alone and drop it from the record.
  */
 export async function checkinOwnedRestDays(db: Db, userId: string, recorded: readonly string[], stamp: Date | null): Promise<Set<string>> {
@@ -152,29 +182,6 @@ export async function completedWorkoutDays(db: Db, userId: string, programId: st
      ORDER BY ws.started_at
   `)
   return (res.rows as { day: string }[]).map(r => r.day)
-}
-
-/**
- * #3890 D2: the active program's sessions whose stored plan could still be served on or after `from`
- * (the applies-to week's local midnight): a plan not yet trained (`pending`, `auto_applied`) whose expiry
- * is later than that. A plan is generated when the previous session completes and is served for up to 7
- * days, so without this the first sessions of the week keep the length they were made with. Voided with
- * the Coach's own `voidSessionPrescription`, so the next read regenerates (no model call here). An
- * `accepted` plan is the one the person is about to train, and is left alone, as a preset re-fit leaves it.
- */
-export async function voidPlansServedFrom(db: Db, userId: string, from: Date): Promise<string[]> {
-  const res = await db.execute(sql`
-    SELECT sp.program_session_id AS id
-      FROM session_periodization sp
-      JOIN program_sessions ps ON ps.id = sp.program_session_id AND ps.deleted_at IS NULL
-      JOIN programs p ON p.id = ps.program_id AND p.user_id = ${userId} AND p.is_active = true
-     WHERE sp.user_id = ${userId} AND sp.prescription IS NOT NULL
-       AND sp.prescription_status IN ('pending', 'auto_applied')
-       AND (sp.prescription_expires_at IS NULL OR sp.prescription_expires_at > ${from.toISOString()}::timestamptz)
-  `)
-  const ids = (res.rows as { id: string }[]).map(r => r.id)
-  for (const id of ids) await voidSessionPrescription(db, userId, id)
-  return ids
 }
 
 export type CheckinRow = typeof s.weeklyCheckins.$inferSelect

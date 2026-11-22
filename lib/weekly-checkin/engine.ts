@@ -11,7 +11,7 @@
  * **One writer per kind of change.** A lowered or stepped-up lift is the Coach's own lift-preference
  * writer (`applyCoachPatch`, domain `lift_preference`, `nextLoadStep`), stamped `source = 'checkin'`,
  * with its `coach_changes` row and its undo. A logged injury is the Coach's `injury` domain; a swap is
- * its `session_exercise` domain; a rest day is `writeRestDay`, the same write as Home's rest-day tap.
+ * its `session_exercise` domain; a rest day is `claimRestDay` / `moveOwnedRestDay`, conditional writes to the same rows as Home's tap.
  * This module never writes `exercise_preferences`, `injuries`, `session_exercises` or `coach_changes`
  * itself.
  *
@@ -43,8 +43,10 @@
  * `updated_at`. A recorded date whose row has moved on from that stamp was changed by hand and is the
  * person's: never withdrawn, dropped from the record.
  *
- * **A shorter session** voids the stored plans that would be served in the applies-to week, at save and
- * at undo (`voidPlansServedFrom`), so the next read regenerates them with the right budget.
+ * **A shorter session** is only the saved `shorter_session_min`: a save and an undo touch no stored plan.
+ * A plan generated for the applies-to week reads the budget (`generate-prescription`), and a stored plan
+ * served on a date in that week is re-fitted to it where it is read (`fitStoredPlanToCheckinBudget`, the
+ * same no-model duration re-fit a picked preset length uses).
  *
  * `pain_where` is user text: stored, bounded to 200 characters by Zod and the CHECK, returned to its
  * owner, and never put in a prompt or into the injury's notes here.
@@ -54,8 +56,8 @@ import * as s from '@/lib/data/postgres/schema'
 import type { getDb } from '@/lib/data/postgres/client'
 import type { WorkoutRepository } from '@/lib/data/repository'
 import {
-  checkinOwnedRestDays, completedWorkoutDays, getCheckinById, getCheckinByWeek, listCheckinLifts, listProgramLifts, liveRestDays,
-  voidPlansServedFrom, writeRestDay,
+  checkinOwnedRestDays, completedWorkoutDays, getCheckinById, getCheckinByWeek, listCheckinLifts, listProgramLifts,
+  claimRestDay, moveOwnedRestDay,
   type CheckinLiftRow, type CheckinRow, type ProgramLift,
 } from '@/lib/data/postgres/slices/weekly-checkin'
 import { applyCoachPatch, undoCoachChange } from '@/lib/coach/apply'
@@ -574,29 +576,18 @@ export async function saveCheckin(ctx: EngineCtx, input: SaveInput): Promise<Sav
     const owned = await checkinOwnedRestDays(tx, ctx.userId, recorded, row.savedAt)
     const after = new Set(daysOffDates(applies, input.daysOff ?? [], today))
     const written: string[] = []
+    // Every write below is conditional and atomic, and only what it actually wrote is recorded: a tap the
+    // person makes at the same moment as this save is theirs, whichever side of these statements it lands.
     for (const d of recorded) {
       if (!owned.has(d)) continue
       if (daysBetweenDateStrs(today, d) <= 0) { written.push(d); continue }
-      if (after.has(d)) {
-        // Still asked for: re-stamped to this save, so it stays recognisably the check-in's.
-        await writeRestDay(tx, ctx.userId, d, true, stamp)
-        written.push(d)
-      } else {
-        await writeRestDay(tx, ctx.userId, d, false, stamp)
-      }
+      // Still asked for: re-stamped to this save, so it stays recognisably the check-in's.
+      const moved = await moveOwnedRestDay(tx, ctx.userId, d, row.savedAt!, after.has(d), stamp)
+      if (moved && after.has(d)) written.push(d)
     }
-    const fresh = [...after].filter(d => !recorded.includes(d))
-    const alreadyResting = await liveRestDays(tx, ctx.userId, fresh)
-    for (const d of fresh) {
-      if (alreadyResting.has(d)) continue
-      await writeRestDay(tx, ctx.userId, d, true, stamp)
-      written.push(d)
+    for (const d of [...after].filter(d => !recorded.includes(d))) {
+      if (await claimRestDay(tx, ctx.userId, d, stamp)) written.push(d)
     }
-
-    // ── A shorter session: stored plans that would be served in the applies-to week are voided, so the
-    // next read regenerates them with (or, on a change back, without) the budget. No model call here. ──
-    const budgetBefore = wasSaved ? row.shorterSessionMin ?? null : null
-    if (budgetBefore !== input.shorterSessionMin) await voidPlansServedFrom(tx, ctx.userId, dateStrMidnightInTz(applies, ctx.tz))
 
     // ── Pain and swap: offers, never applied here. The same pick keeps its row's lift and status. ──
     const painLift = painSlot ? (samePain ? rowPainLift! : { exerciseName: painSlot.exerciseName, exerciseId: painSlot.exerciseId }) : null
@@ -874,16 +865,15 @@ export async function undoCheckinEffect(ctx: EngineCtx, checkinId: string, targe
         for (const d of recorded) {
           if (!owned.has(d)) continue
           if (daysBetweenDateStrs(today, d) <= 0) { kept.push(d); continue }
-          await writeRestDay(tx, ctx.userId, d, false)
+          await moveOwnedRestDay(tx, ctx.userId, d, row.savedAt!, false, new Date())
         }
         await updateRow({ daysOffWeekdays: [], daysOffWritten: kept.length > 0 ? kept : null })
         return
       }
       case 'shorter_session': {
         if (row.shorterSessionMin == null) throw new CheckinRefusal(409, 'nothing_to_undo', 'Nothing to undo')
+        // No stored plan is touched: the next read in the applies-to week serves it at its own length.
         await updateRow({ shorterSessionMin: null })
-        // Plans made with the shorter budget are voided too, so the next read is the session's own length.
-        await voidPlansServedFrom(tx, ctx.userId, dateStrMidnightInTz(row.appliesWeekStart, ctx.tz))
         return
       }
     }

@@ -195,9 +195,13 @@ describe('a shorter session is next week\'s time budget', () => {
     const out = await generate({ ...noCheckinRows, getCheckinSessionBudgetMin: async (...a: unknown[]) => { asked.push(a); return 40 } })
     expect(asked).toEqual([[expect.any(String), '2026-11-23']])
     expect(out.budget).toEqual([40])
+    // Recorded on the plan, so the serve-time fit knows it is already fitted, and an undo gives it back.
+    expect(out.stored.checkinBudgetMin).toBe(40)
   })
   it('is not applied when it is no shorter than the session', async () => {
-    expect((await generate({ ...noCheckinRows, getCheckinSessionBudgetMin: async () => 60 })).budget).toEqual([undefined])
+    const same = await generate({ ...noCheckinRows, getCheckinSessionBudgetMin: async () => 60 })
+    expect(same.budget).toEqual([undefined])
+    expect('checkinBudgetMin' in same.stored).toBe(false)
     expect((await generate({ ...noCheckinRows, getCheckinSessionBudgetMin: async () => 90 })).budget).toEqual([undefined])
   })
   it('a length picked for today wins, and the check-in is not read', async () => {
