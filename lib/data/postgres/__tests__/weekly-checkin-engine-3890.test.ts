@@ -10,7 +10,7 @@
 //
 // The clock is the engine's `now`, set to a local midday in LAST week (so every fixture is in the past
 // and the "trained since" check sees none of them). Runs only with DATABASE_URL. Fake users and lifts.
-import { describe, it, expect, beforeAll, beforeEach } from 'vitest'
+import { describe, it, expect, beforeAll, beforeEach, afterAll } from 'vitest'
 import { dateStrMidnightInTz, shiftDateStr, todayInTz, weekStartForDay } from '@trainingai/shared/date-utils'
 
 const canRun = !!process.env.DATABASE_URL
@@ -80,12 +80,27 @@ describe.skipIf(!canRun)('weekly check-in engine (#3890 step 2)', () => {
     slice = await import('@/lib/data/postgres/slices/weekly-checkin')
     const repo = await (await import('@/lib/data')).getRepositoryAsync()
     ctxFor = (user, now = NOW) => ({ db: client.getDb(), repo, userId: user, tz: TZ, now })
-    for (const [name, muscle, equipment] of [[SQ, 'quadriceps', 'Barbell'], [BP, 'chest', 'Barbell'], [ALT, 'chest', 'Dumbbell'], [ACC, 'biceps', 'Dumbbell']]) {
+    // A killed earlier run may have left these rows behind; every key referencing them is ON DELETE SET NULL.
+    await removeLibraryRows()
+    // Muscle and equipment names are ones the real library already uses and the home-gym coverage scan
+    // (home-gym-exercise-gaps-migration) counts as home-reachable: lower-case equipment, and "quads" not
+    // "quadriceps". So these rows cannot strand a muscle group in that scan while this file is running.
+    for (const [name, muscle, equipment] of [[SQ, 'quads', 'barbell'], [BP, 'chest', 'barbell'], [ALT, 'chest', 'dumbbell'], [ACC, 'biceps', 'dumbbell']]) {
       ids[`lib:${name}`] = (await pool.query(
         `INSERT INTO exercise_library (name, equipment, muscles) VALUES ($1, ARRAY[$2], $3::jsonb)
          ON CONFLICT (name) DO UPDATE SET equipment = EXCLUDED.equipment, muscles = EXCLUDED.muscles RETURNING id`,
         [name, equipment, JSON.stringify([{ muscle, role: 'main' }])])).rows[0].id
     }
+  })
+
+  const removeLibraryRows = () =>
+    pool.query(`DELETE FROM exercise_library WHERE name = ANY($1)`, [[SQ, BP, ALT, ACC]])
+
+  afterAll(async () => {
+    // Users first: their session exercises, logs and check-ins go with them; the rest of the keys to a
+    // library row are ON DELETE SET NULL.
+    await pool?.query(`DELETE FROM users WHERE id = ANY($1)`, [[A, B, C]])
+    await pool?.query(`DELETE FROM exercise_library WHERE name = ANY($1)`, [[SQ, BP, ALT, ACC]])
   })
 
   beforeEach(async () => {
