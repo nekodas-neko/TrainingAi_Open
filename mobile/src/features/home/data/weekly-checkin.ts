@@ -1,174 +1,27 @@
-import { z } from 'zod';
-import { CHECKIN_ANSWERS, type CheckinAnswer, type CheckinEffect } from '@trainingai/shared/weekly-checkin/effects';
-import type { CheckinDueWhy } from '@trainingai/shared/weekly-checkin/due';
-import type { CheckinSummary, LastSessionAgainstPlan } from '@trainingai/shared/weekly-checkin/summary';
+import type { CheckinAnswer } from '@trainingai/shared/weekly-checkin/effects';
+import {
+  lenientCheckinStateSchema,
+  lenientSaveOutcomeSchema,
+  type LenientCheckinState,
+  type LenientCheckinView,
+  type LenientSaveOutcome,
+} from '@trainingai/shared/weekly-checkin/responses';
 import { shiftDateStr, weekStartForDay } from '@trainingai/shared/date-utils';
 import { MIN_PRESET_BUDGET_MIN } from '@trainingai/shared/workout/duration-model';
 
-// #3890 step 3: the weekly check-in's Home card and sheet read and write the engine's five routes
-// (app/api/weekly-checkin/**, PR #4029). The response interfaces live in lib/weekly-checkin/engine.ts,
-// which is server code the app cannot import, so this schema mirrors them field for field, built on
-// the shared enums and types. It keeps only what the screens use. Every word the result shows about
+// #3890 step 3, #4037: the weekly check-in's Home card and sheet read and write the engine's five routes
+// (app/api/weekly-checkin/**). The response shapes are defined once, in
+// packages/shared/src/weekly-checkin/responses.ts, which the engine builds and this app reads with the
+// lenient schemas from the same file: a value this build does not know becomes 'unknown' or null (never a
+// parse failure), so a newer server never makes the check-in unreadable. Every word the result shows about
 // an effect comes from a server field; nothing here works out an effect itself.
+export { lenientCheckinStateSchema, lenientSaveOutcomeSchema };
 
-// Every list below is checked against the shared type it mirrors: a member the shared type has and
-// the list lacks fails the type check (`Exhaustive`), so a value the engine adds cannot be missed
-// here silently. `satisfies` alone would only catch an extra member.
-type Exhaustive<Union, List extends readonly unknown[]> = [Exclude<Union, List[number]>] extends [never]
-  ? true
-  : { missing: Exclude<Union, List[number]> };
-const EFFECTS = ['held', 'lowered_one_step', 'offered_step_up', 'none'] as const satisfies readonly CheckinEffect[];
-const LAST_SESSIONS = [
-  'beat',
-  'met',
-  'short',
-  'heavier',
-  'not_compared',
-] as const satisfies readonly LastSessionAgainstPlan[];
-const DUE_WHY = [
-  'planned_count_reached',
-  'last_planned_day_logged',
-  'sunday_evening',
-  'grace_monday',
-] as const satisfies readonly CheckinDueWhy[];
-const checkedLists: [
-  Exhaustive<CheckinEffect, typeof EFFECTS>,
-  Exhaustive<LastSessionAgainstPlan, typeof LAST_SESSIONS>,
-  Exhaustive<CheckinDueWhy, typeof DUE_WHY>,
-  Exhaustive<CheckinAnswer, typeof CHECKIN_ANSWERS>,
-] = [true, true, true, true];
-void checkedLists;
-
-/** A value the screens branch on: a known one as is, any other becomes `'unknown'` (never a parse failure). */
-const orUnknown = <const T extends readonly [string, ...string[]]>(list: T) =>
-  z.union([z.enum(list), z.string().transform((): 'unknown' => 'unknown')]);
-/** A value the screens never branch on: a known one as is, any other is dropped to null. */
-const knownOrNull = <const T extends readonly [string, ...string[]]>(list: T) =>
-  z.enum(list).nullable().catch(null);
-
-const answer = orUnknown(CHECKIN_ANSWERS);
-const effect = orUnknown(EFFECTS);
-const offerStatus = orUnknown(['open', 'accepted', 'declined'] as const);
-const lastSession = knownOrNull(LAST_SESSIONS);
-
-const summarySchema = z.object({
-  sessionsDone: z.number(),
-  sessionsPlanned: z.number().nullable(),
-  lines: z.tuple([z.string(), z.string(), z.string()]),
-});
-
-const stateLiftSchema = z.object({
-  sessionExerciseId: z.string(),
-  exerciseName: z.string(),
-  exerciseId: z.string().nullable(),
-  missedRep: z.boolean().nullable(),
-  lastSession,
-});
-
-const knownOffer = z.discriminatedUnion('kind', [
-  z.object({
-    kind: z.literal('step_up'),
-    liftId: z.string(),
-    exerciseName: z.string(),
-    status: offerStatus,
-    changeId: z.string().nullable(),
-  }),
-  z.object({
-    kind: z.literal('pain'),
-    exerciseName: z.string(),
-    where: z.string().nullable(),
-    status: offerStatus,
-    injuryId: z.string().nullable(),
-    muscles: z.array(z.string()),
-  }),
-  z.object({
-    kind: z.literal('swap'),
-    exerciseName: z.string(),
-    status: offerStatus,
-    changeId: z.string().nullable(),
-    alternatives: z.array(
-      z.object({
-        exerciseId: z.string(),
-        name: z.string(),
-        equipment: z.array(z.string()),
-        mainMuscles: z.array(z.string()),
-      }),
-    ),
-  }),
-]);
-
-const viewSchema = z.object({
-  id: z.string(),
-  weekStart: z.string(),
-  appliesWeekStart: z.string(),
-  status: orUnknown(['offered', 'saved', 'dismissed'] as const),
-  savedAt: z.string().nullable(),
-  lifts: z.array(
-    z.object({
-      liftId: z.string(),
-      exerciseName: z.string(),
-      exerciseId: z.string().nullable(),
-      answer,
-      missedRep: z.boolean().nullable(),
-      effect,
-      offerStatus: z.string().nullable(),
-      appliedChangeId: z.string().nullable(),
-      // Anything but a plain true is read as not live: the row never claims a hold it cannot vouch for.
-      holdLive: z.boolean().nullable().catch(null),
-    }),
-  ),
-  daysOff: z.array(z.number()).nullable(),
-  daysOffWritten: z.array(z.string()).nullable(),
-  shorterSessionMin: z.number().nullable(),
-  pain: z.union([
-    z.literal(false),
-    z.null(),
-    z.object({ exerciseName: z.string(), exerciseId: z.string().nullable(), where: z.string().nullable() }),
-  ]),
-  swap: z.object({ exerciseName: z.string(), exerciseId: z.string().nullable() }).nullable(),
-  // An offer of a kind this build does not know is left out; the rest of the check-in still shows.
-  offers: z
-    .array(z.unknown())
-    .transform((items) => items.flatMap((item) => {
-      const parsed = knownOffer.safeParse(item);
-      return parsed.success ? [parsed.data] : [];
-    })),
-});
-
-export const checkinStateSchema = z.object({
-  due: z.boolean(),
-  why: knownOrNull(DUE_WHY),
-  weekStart: z.string().nullable(),
-  summary: summarySchema.nullable(),
-  lifts: z.array(stateLiftSchema),
-  checkin: viewSchema.nullable(),
-});
-
-export const saveOutcomeSchema = z.object({
-  state: checkinStateSchema,
-  kept: z.array(z.object({ exerciseName: z.string(), detail: z.string() })),
-  notApplied: z.array(
-    z.object({
-      exerciseName: z.string(),
-      detail: z.string(),
-      reason: z.string(),
-    }),
-  ),
-});
-
-export type CheckinState = z.infer<typeof checkinStateSchema>;
-export type CheckinView = NonNullable<CheckinState['checkin']>;
+export type CheckinState = LenientCheckinState;
+export type CheckinView = LenientCheckinView;
 export type CheckinOffer = CheckinView['offers'][number];
-export type SaveOutcome = z.infer<typeof saveOutcomeSchema>;
+export type SaveOutcome = LenientSaveOutcome;
 export type SaveNotes = Pick<SaveOutcome, 'kept' | 'notApplied'>;
-
-// The summary fields the card reads are the shared type's own.
-type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
-const summaryMatches: Same<
-  z.infer<typeof summarySchema>,
-  Pick<CheckinSummary, 'sessionsDone' | 'sessionsPlanned' | 'lines'>
-> = true;
-void summaryMatches;
 
 /**
  * The state, cached under one key so a repeat visit paints the last known card at once and revalidates
@@ -178,14 +31,20 @@ void summaryMatches;
 export const weeklyCheckinSpec = () => ({
   path: '/api/weekly-checkin',
   ttl: 300_000,
-  schema: checkinStateSchema,
+  schema: lenientCheckinStateSchema,
 });
 
-/** This week or last week (the Monday grace window): the only weeks a check-in can be about. */
+/**
+ * This week, or last week on the Monday after (the grace day): the only weeks a check-in can be about.
+ * The server only offers or keeps last week's card on that Monday, so a cached state for last week is
+ * not shown on any other day (it would paint for an instant before the answer replaced it, and stay
+ * while offline).
+ */
 export function isReviewWeek(weekStart: string | null, today: string) {
   if (!weekStart) return false;
   const thisWeek = weekStartForDay(today);
-  return weekStart === thisWeek || weekStart === shiftDateStr(thisWeek, -7);
+  if (weekStart === thisWeek) return true;
+  return today === thisWeek && weekStart === shiftDateStr(thisWeek, -7);
 }
 
 export const CHECKIN_PATH = '/api/weekly-checkin';
@@ -290,9 +149,16 @@ export function answersIncomplete(answers: CheckinAnswers): string | null {
   return null;
 }
 
-/** The save route's body: ids only, as the server sent them. */
+/**
+ * The save route's body: ids only, as the server sent them. Every id is one of the state's lifts: a pain
+ * or swap pick whose lift is no longer listed (a reload just before the tap, before the sheet dropped it)
+ * is sent as not answered, never as a stale id (the server answers 404) and never as "nothing hurt".
+ */
 export function saveBody(weekStart: string, state: CheckinState, answers: CheckinAnswers) {
   const where = answers.painWhere.trim().slice(0, PAIN_WHERE_MAX);
+  const listed = new Set(state.lifts.map((l) => l.sessionExerciseId));
+  const painLift = answers.painLift != null && listed.has(answers.painLift) ? answers.painLift : null;
+  const swapLift = answers.swapLift != null && listed.has(answers.swapLift) ? answers.swapLift : null;
   return {
     weekStart,
     lifts: state.lifts.map((l) => ({
@@ -300,10 +166,12 @@ export function saveBody(weekStart: string, state: CheckinState, answers: Checki
       answer: answers.lifts[l.sessionExerciseId] ?? 'about_right',
     })),
     pain:
-      answers.pain === 'yes' && answers.painLift
-        ? { sessionExerciseId: answers.painLift, where: where || null }
-        : false,
-    swap: answers.swap === 'yes' && answers.swapLift ? { sessionExerciseId: answers.swapLift } : null,
+      answers.pain !== 'yes'
+        ? false
+        : painLift
+          ? { sessionExerciseId: painLift, where: where || null }
+          : null,
+    swap: answers.swap === 'yes' && swapLift ? { sessionExerciseId: swapLift } : null,
     daysOff: answers.daysOff.length ? [...new Set(answers.daysOff)].sort((a, b) => a - b) : null,
     shorterSessionMin: SESSION_LENGTHS.find((l) => l.value === answers.length)?.minutes ?? null,
   };
@@ -355,7 +223,10 @@ export function resultRows(view: CheckinView, notes: SaveNotes | null): ResultRo
         ...base,
         title: `${lift.exerciseName}: Heavy`,
         // No change id: the lift already carried that step, so there is nothing of this save's to undo.
-        status: lift.appliedChangeId ? 'One step lighter next time' : 'Already set one step lighter',
+        // `capped` (the server's own test) says the plan also keeps the lift to last time's heaviest weight.
+        status: `${lift.appliedChangeId ? 'One step lighter' : 'Already set one step lighter'}${
+          lift.capped === true ? ', and no heavier than last time' : lift.appliedChangeId ? ' next time' : ''
+        }`,
         undo: lift.appliedChangeId ? { kind: 'lift', liftId: lift.liftId } : undefined,
       });
     } else if (lift.effect === 'held') {
@@ -506,6 +377,14 @@ export function reconcileAnswers(answers: CheckinAnswers, state: CheckinState) {
 }
 export const LIFTS_CHANGED_MESSAGE =
   'The lifts for this week changed, so your answers for those were reset. Check them before saving.';
+
+/**
+ * What to tell the person after a reload dropped answers: the message only when something was reset and
+ * the sheet is open. Set behind a closed sheet it would show, stale, the next time the sheet opens.
+ */
+export function liftsChangedMessage(reset: boolean, sheetOpen: boolean): string | null {
+  return reset && sheetOpen ? LIFTS_CHANGED_MESSAGE : null;
+}
 
 /** The server's reasons for one lift, dropped once that lift's row changes or is undone. */
 export function withoutNotesFor(notes: SaveNotes | null, exerciseName: string): SaveNotes | null {

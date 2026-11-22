@@ -7,8 +7,10 @@ import {
   cardView,
   changeCount,
   changesLine,
-  checkinStateSchema,
+  lenientCheckinStateSchema,
   isReviewWeek,
+  LIFTS_CHANGED_MESSAGE,
+  liftsChangedMessage,
   LATER_PREFIX,
   liftOf,
   reconcileAnswers,
@@ -308,23 +310,23 @@ const rawLift = (state: typeof saved, patch: Record<string, unknown>) =>
 
 test('a lift the engine calls "heavier" parses and the card shows', () => {
   const raw = { ...due, lifts: due.lifts.map((l, i) => (i === 0 ? { ...l, lastSession: 'heavier' } : l)) };
-  const parsed = checkinStateSchema.parse(raw);
+  const parsed = lenientCheckinStateSchema.parse(raw);
   assert.equal(parsed.lifts[0].lastSession, 'heavier');
   assert.equal(cardView(parsed, {}, TODAY)?.kind, 'due');
 });
 
 test('a value the server adds later never hides the card or states something untrue', () => {
-  const lastSession = checkinStateSchema.parse({ ...due, lifts: due.lifts.map((l) => ({ ...l, lastSession: 'sandbagged' })) });
+  const lastSession = lenientCheckinStateSchema.parse({ ...due, lifts: due.lifts.map((l) => ({ ...l, lastSession: 'sandbagged' })) });
   assert.equal(lastSession.lifts[0].lastSession, null);
   assert.equal(cardView(lastSession, {}, TODAY)?.kind, 'due');
-  const unknown = checkinStateSchema.parse(rawLift(saved, { effect: 'paused', holdLive: 'maybe' }));
+  const unknown = lenientCheckinStateSchema.parse(rawLift(saved, { effect: 'paused', holdLive: 'maybe' }));
   const row = resultRows(unknown.checkin!, null)[0];
   assert.equal(row.status, 'Saved');
   assert.equal(row.undo, undefined);
   assert.equal(cardView(unknown, {}, TODAY)?.kind, 'saved');
   assert.equal(changeCount(unknown.checkin!).changes, 2, 'the unknown effect counts as no change');
   // Unknown offer status, unknown offer kind, unknown due reason and check-in status.
-  const odd = checkinStateSchema.parse({
+  const odd = lenientCheckinStateSchema.parse({
     ...saved,
     why: 'eventually',
     checkin: {
@@ -381,7 +383,7 @@ test('a pain offer for a lift with no main muscles offers only "Not now", with t
 });
 
 test('a lowering already in place says so, and the count agrees with the row', () => {
-  const view = checkinStateSchema.parse(rawLift(saved, { appliedChangeId: null })).checkin!;
+  const view = lenientCheckinStateSchema.parse(rawLift(saved, { appliedChangeId: null })).checkin!;
   const row = resultRows(view, null)[0];
   assert.equal(row.status, 'Already set one step lighter');
   assert.equal(row.undo, undefined);
@@ -391,7 +393,7 @@ test('a lowering already in place says so, and the count agrees with the row', (
 test('both values of holdLive are worded truthfully', () => {
   const held = (holdLive: boolean) =>
     resultRows(
-      checkinStateSchema.parse(rawLift(saved, { effect: 'held', holdLive, appliedChangeId: null })).checkin!,
+      lenientCheckinStateSchema.parse(rawLift(saved, { effect: 'held', holdLive, appliedChangeId: null })).checkin!,
       null,
     )[0];
   assert.equal(held(true).status, 'Holding Squat next week');
@@ -400,7 +402,7 @@ test('both values of holdLive are worded truthfully', () => {
   assert.equal(held(false).undo, undefined);
   assert.doesNotMatch(held(false).status, /holding/i);
   const count = (holdLive: boolean) =>
-    changeCount(checkinStateSchema.parse(rawLift(saved, { effect: 'held', holdLive, appliedChangeId: null })).checkin!).changes;
+    changeCount(lenientCheckinStateSchema.parse(rawLift(saved, { effect: 'held', holdLive, appliedChangeId: null })).checkin!).changes;
   assert.equal(count(true), count(false) + 1);
 });
 
@@ -472,4 +474,84 @@ test('"Later" markers do not pile up: writing one removes the earlier days’ an
   assert.equal(store.getSnapshot().markers['morning:2026-11-22'], true, 'other markers stay');
   await store.markOnly(LATER_PREFIX, laterKey('2026-11-16', '2026-11-22'), false);
   assert.deepEqual(keys(), []);
+});
+
+// ── #4043: four leftovers, and the lowered row's wording ──────────────────────────────────
+
+test('#4043 (1): a save that went through but could not be read answers with a notice, not an error message', async () => {
+  const { actions } = api(() => ({ state: { nonsense: true } }));
+  const result = await actions.save(saveBody(due.weekStart!, due, defaultAnswers(due)));
+  assert.equal(result.ok, true);
+  assert.equal('message' in result, false, 'an error message is what the sheet shows in red');
+  assert.match((result as { notice: string }).notice, /went through on the server/);
+  // A refusal is still a message, never a notice.
+  const refused = await api(() => {
+    throw new ApiError(409, 'Conflict', 'That week is not open for a check-in');
+  }).actions.save(saveBody(due.weekStart!, due, defaultAnswers(due)));
+  assert.equal(refused.ok, false);
+  assert.equal('notice' in refused, false);
+});
+
+test('#4043 (2): "the lifts changed" is told only while the sheet is open, and only when something was reset', () => {
+  assert.equal(liftsChangedMessage(true, true), LIFTS_CHANGED_MESSAGE);
+  assert.equal(liftsChangedMessage(true, false), null, 'a closed sheet is not told: it would show on the next open');
+  assert.equal(liftsChangedMessage(false, true), null);
+  assert.equal(liftsChangedMessage(false, false), null);
+});
+
+test('#4043 (3): a pain or swap pick whose lift is no longer listed is never sent', () => {
+  const answers = { ...defaultAnswers(due), pain: 'yes' as const, painLift: ID.squat, painWhere: 'knee', swap: 'yes' as const, swapLift: ID.bench };
+  const fewer = { ...due, lifts: due.lifts.filter((l) => l.sessionExerciseId !== ID.squat && l.sessionExerciseId !== ID.bench) };
+  const body = saveBody(fewer.weekStart!, fewer, answers);
+  // Not answered, not "nothing hurt": the person did not say that.
+  assert.equal(body.pain, null);
+  assert.equal(body.swap, null);
+  assert.deepEqual(body.lifts.map((l) => l.sessionExerciseId), [ID.row, ID.long]);
+  assert.ok(!ids(body).includes(ID.squat) && !ids(body).includes(ID.bench), 'no stale id anywhere in the body');
+  // Picks that are still listed are sent as before.
+  const kept = saveBody(due.weekStart!, due, answers);
+  assert.deepEqual(kept.pain, { sessionExerciseId: ID.squat, where: 'knee' });
+  assert.deepEqual(kept.swap, { sessionExerciseId: ID.bench });
+  // "No" is still "nothing hurt".
+  assert.equal(saveBody(due.weekStart!, due, defaultAnswers(due)).pain, false);
+});
+
+test('#4043 (4): a cached state for last week is accepted only on the Monday after', () => {
+  const thisMonday = '2026-11-23';
+  const lastWeek = '2026-11-16';
+  assert.equal(isReviewWeek(lastWeek, thisMonday), true, 'the grace Monday');
+  for (const day of ['2026-11-24', '2026-11-25', '2026-11-28', '2026-11-29']) {
+    assert.equal(isReviewWeek(lastWeek, day), false, `${day}: last week's card is not shown`);
+  }
+  // This week's is accepted on every day of it.
+  for (const day of ['2026-11-23', '2026-11-24', '2026-11-29']) assert.equal(isReviewWeek(thisMonday, day), true);
+  assert.equal(cardView(due, {}, '2026-11-23')?.kind, 'due');
+  assert.equal(cardView(due, {}, '2026-11-24'), null, 'Tuesday: nothing paints before the answer');
+  assert.equal(cardView(saved, {}, '2026-11-26'), null, 'offline on Thursday: a saved card for last week stays hidden');
+});
+
+test('wording: a lowered lift says it is also no heavier than last time only when the server says capped', () => {
+  const lowered = (patch: Record<string, unknown>) =>
+    resultRows(lenientCheckinStateSchema.parse(rawLift(saved, { effect: 'lowered_one_step', ...patch })).checkin!, null)[0];
+  const capped = lowered({ capped: true });
+  assert.equal(capped.status, 'One step lighter, and no heavier than last time');
+  assert.deepEqual(capped.undo, { kind: 'lift', liftId: ID.squatLift }, 'undo is unchanged');
+  for (const value of [false, null]) {
+    const row = lowered({ capped: value });
+    assert.equal(row.status, 'One step lighter next time');
+    assert.deepEqual(row.undo, { kind: 'lift', liftId: ID.squatLift });
+  }
+  // A state cached before the field existed has none: nothing is claimed.
+  const old = rawLift(saved, { effect: 'lowered_one_step' });
+  delete (old.checkin!.lifts[0] as Record<string, unknown>).capped;
+  assert.equal(resultRows(lenientCheckinStateSchema.parse(old).checkin!, null)[0].status, 'One step lighter next time');
+  // A lowering already in place keeps its own sentence, with the same truthful addition.
+  const already = lowered({ capped: true, appliedChangeId: null });
+  assert.equal(already.status, 'Already set one step lighter, and no heavier than last time');
+  assert.equal(already.undo, undefined);
+  assert.equal(lowered({ capped: false, appliedChangeId: null }).status, 'Already set one step lighter');
+  // `capped` on a lift that is not lowered changes nothing; any non-boolean reads as not capped.
+  assert.equal(lowered({ capped: 'yes' }).status, 'One step lighter next time');
+  const held = resultRows(lenientCheckinStateSchema.parse(rawLift(saved, { effect: 'held', holdLive: true, capped: true })).checkin!, null)[0];
+  assert.equal(held.status, 'Holding Squat next week');
 });

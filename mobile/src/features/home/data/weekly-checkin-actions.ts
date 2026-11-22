@@ -5,8 +5,8 @@ import { coachPaths } from '../../coach/data/models.ts';
 import type { ResourceSpec, WorkoutResources } from '../../workouts/data/WorkoutResources.ts';
 import {
   CHECKIN_PATH,
-  checkinStateSchema,
-  saveOutcomeSchema,
+  lenientCheckinStateSchema,
+  lenientSaveOutcomeSchema,
   type CheckinState,
   type OfferAction,
   type SaveNotes,
@@ -14,7 +14,8 @@ import {
   type saveBody,
 } from './weekly-checkin.ts';
 
-/** `notice`: the call went through but its reply could not be read; the state is being reloaded. */
+/** `notice`: the call went through but its reply could not be read; the state is being reloaded. It is
+ *  good news said plainly, so a screen shows it as a notice, never in the error colour. */
 export type CheckinResult =
   | { ok: true; notes?: SaveNotes; notice?: string }
   | { ok: false; message: string | null };
@@ -54,7 +55,7 @@ export class WeeklyCheckinActions {
   ) {}
   save(body: ReturnType<typeof saveBody>) {
     return this.run(`${CHECKIN_PATH}/save`, body, (response) => {
-      const outcome = saveOutcomeSchema.parse(response);
+      const outcome = lenientSaveOutcomeSchema.parse(response);
       return { state: outcome.state, notes: { kept: outcome.kept, notApplied: outcome.notApplied } };
     });
   }
@@ -68,12 +69,12 @@ export class WeeklyCheckinActions {
       return Promise.resolve<CheckinResult>({ ok: false, message: PENDING_MESSAGE });
     }
     return this.run(`${CHECKIN_PATH}/offer`, { checkinId, decision, offer }, (response) => ({
-      state: checkinStateSchema.parse(response),
+      state: lenientCheckinStateSchema.parse(response),
     }));
   }
   undo(checkinId: string, target: UndoTarget) {
     return this.run(`${CHECKIN_PATH}/undo`, { checkinId, target }, (response) => ({
-      state: checkinStateSchema.parse(response),
+      state: lenientCheckinStateSchema.parse(response),
     }));
   }
   private async run(
