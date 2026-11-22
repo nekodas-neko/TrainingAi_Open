@@ -14,6 +14,7 @@ import { QUANTITY_MULTIPLIER_MIN, QUANTITY_MULTIPLIER_MAX, quantityMultiplierInR
 import { NotFoundError, UserFacingError } from '@trainingai/shared/errors'
 import { eq, and, or, inArray, notInArray, gt, gte, lt, lte, asc, desc, sql, ne, isNotNull, isNull, getTableColumns } from 'drizzle-orm'
 import { getDb, getPool } from './client'
+import { repointStoredExerciseNames } from './exercise-name-tables'
 import { withUserLock } from './user-lock'
 import { estWorkoutKcal, plausibleSessionActiveMin } from '@trainingai/shared/health/workout-energy'
 import { ouraIdForActivityType } from '@trainingai/shared/health/daily-energy'
@@ -3203,6 +3204,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       // stamp backwards. `updatedAt` is also set by `trg_set_updated_at`; the explicit set is kept for clarity.
       await tx.update(s.exerciseLogs).set({ exerciseName: newName, updatedAt: sql`now()`, clientEditedAt: sql`GREATEST(client_edited_at, now())` }).where(eq(s.exerciseLogs.exerciseName, oldName))
       await tx.update(s.personalRecords).set({ exerciseName: newName }).where(eq(s.personalRecords.exerciseName, oldName))
+      await repointStoredExerciseNames(tx, oldName, newName)
       const [row] = await tx.update(s.exerciseLibrary).set({ name: newName }).where(eq(s.exerciseLibrary.id, id)).returning()
       return { id: row.id, name: row.name, muscles: row.muscles as MuscleAssignment[], equipment: row.equipment ?? [], instructions: row.instructions ?? undefined, createdBy: row.createdBy ?? undefined, exerciseType: (row.exerciseType as ExerciseType) ?? 'weighted' }
     })
@@ -3227,6 +3229,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         // stamp backwards. `updatedAt` is also set by `trg_set_updated_at`; the explicit set is kept for clarity.
         await tx.update(s.exerciseLogs).set({ exerciseName: newName, updatedAt: sql`now()`, clientEditedAt: sql`GREATEST(client_edited_at, now())` }).where(eq(s.exerciseLogs.exerciseName, oldName))
         await tx.update(s.personalRecords).set({ exerciseName: newName }).where(eq(s.personalRecords.exerciseName, oldName))
+        await repointStoredExerciseNames(tx, oldName, newName)
         // Old name's cached GIF is now orphaned — the route re-sets or clears the cache for
         // the new name based on the submitted gifUrl.
         await tx.delete(s.exerciseGifCache).where(eq(s.exerciseGifCache.exerciseName, oldName))
