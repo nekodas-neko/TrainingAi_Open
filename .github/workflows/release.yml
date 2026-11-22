@@ -254,10 +254,12 @@ jobs:
         # to the notes. At any other commit it fails and nothing is moved. `verify` still refuses
         # an existing tag on a FRESH run, and on "Re-run all jobs", which re-runs `verify`. A
         # "Re-run failed jobs" does not re-run `verify`, so only that path reaches an existing tag.
-        # A tag already at this commit is answered first. Only when it must be created does the
-        # script fetch main again and repeat `verify`'s workflow comparison; if the files now
-        # differ it does not attempt the push, and says production is live and the tag is the
-        # owner's to make.
+        # A tag already at this commit is answered first. Otherwise the push is always attempted:
+        # production is already live, so not trying protects nothing, and in hotfix mode the
+        # workflow files differ from main's by design. If the files differ, a warning is printed
+        # first. If the push fails, the script fetches main again: with differing files it says
+        # production is live, the tag was not created and how to make it; without, it reports git's
+        # own error. Git's message is quoted either way.
         run: node scripts/release-guards.js tag "$VERSION" "$SHA"
 
       - name: Publish the release notes

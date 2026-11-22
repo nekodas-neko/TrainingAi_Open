@@ -123,7 +123,7 @@ fix (the 1.531.0 run) cannot be finished that way; for it, make the release by h
 Android workflow with `release_tag`. A *draft* release is not seen by the "release exists" check, so
 publish it rather than leaving it as a draft. *Verify* compares the workflow files once, so merge
 nothing that changes `.github/workflows/` while a release run is in progress; if one slips in, the tag
-job stops after the deploy with a message saying so, and the recovery is the one above.
+job tries the push anyway and, if GitHub refuses it, says so and why, and the recovery is the one above.
 
 **If *Tag and publish notes* fails after the tag was created:** production is already serving the
 release and the tag is permanent, so only the release page is missing. **Code** → **Releases** →

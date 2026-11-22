@@ -8,8 +8,12 @@
 //
 //  1. `drift`          — do the workflow files at the commit differ from `origin/main`'s? Asked in
 //                        `verify`, BEFORE the backup and the deploy, when it is still free to stop.
-//  2. `tag`            — create and push `v<version>`, but treat a tag already on the remote at
-//                        exactly this commit as done, so "Re-run failed jobs" can finish a release
+//  2. `tag`            — create and push `v<version>` (always tried: production is already live, so
+//                        there is nothing to protect by not trying, and the rule for when GitHub
+//                        refuses rests on one observed refusal). If the push fails and the workflow
+//                        files differ from a fresh `origin/main`, say so and how to recover; if they
+//                        do not, report git's own error. A tag already on the remote at exactly this
+//                        commit is treated as done, so "Re-run failed jobs" can finish a release
 //                        whose tag someone made by hand. A tag at ANOTHER commit is a hard failure:
 //                        tags are permanent, and a rollback to a tag must always mean one commit.
 //  3. `release-exists` — has the GitHub release page been made already? Same re-run reason.
@@ -19,7 +23,7 @@
 //
 //   node scripts/release-guards.js drift <sha> <release|hotfix>   exit 1 only in release mode
 //   node scripts/release-guards.js tag <version> <sha>            exit 1 if the tag is elsewhere, or the
-//                                                                  workflow files drifted since verify
+//                                                                  push fails (drift named if present)
 //   node scripts/release-guards.js release-exists <tag>           exit 0 yes, 1 no, 2 could not tell
 'use strict';
 
@@ -82,7 +86,7 @@ function remoteTagCommit(tag, { remote = 'origin', cwd } = {}) {
   return (peeled || lines[0])[0];
 }
 
-/** Thrown by `ensureTag` when the push would be refused: the workflow files moved after `verify`. */
+/** Thrown by `ensureTag` when the push failed and the workflow files differ from main's. */
 class TagDriftError extends Error {
   /** @param {string} message @param {string[]} files */
   constructor(message, files) {
@@ -91,12 +95,17 @@ class TagDriftError extends Error {
   }
 }
 
-/** The message for drift found at the tag step, AFTER the deploy: says what state production is in. */
-function lateDriftMessage(files, tag, sha) {
+/**
+ * The message for a refused tag push when the workflow files differ from main's, AFTER the deploy:
+ * says what state production is in, and quotes git so a refusal for another reason is not mislabelled.
+ */
+function lateDriftMessage(files, tag, sha, gitError = '') {
   const list = files.map((f) => `  ${f}`).join('\n');
+  const said = gitError ? ` git said: ${gitError}` : '';
   return (
-    `Production is already serving this release, but ${tag} was NOT created: the workflow files at ` +
-    `${sha.slice(0, 12)} now differ from main's, so GitHub would refuse the tag push.\n${list}\n` +
+    `Production is already serving this release, but ${tag} was NOT created: the push was refused, and ` +
+    `the workflow files at ${sha.slice(0, 12)} differ from main's, which is the usual reason GitHub ` +
+    `refuses it.${said}\n${list}\n` +
     `This usually means a workflow change merged to main after Verify. Recovery: make the tag and ` +
     `release page yourself, either with \`gh release create ${tag} --target ${sha} --title ${tag} ` +
     `--generate-notes --notes-start-tag <previous tag>\` or the GitHub form (Releases, Draft a new ` +
@@ -106,13 +115,16 @@ function lateDriftMessage(files, tag, sha) {
 }
 
 /**
- * 'created' | 'exists' (already at this commit). Throws, with a message, if it is anywhere else.
- * A tag already at this commit is answered FIRST, before the drift check, so a re-run after the
- * owner made the tag by hand still passes while the workflow files still differ. Only when the tag
- * has to be created is main fetched afresh and compared again (`verify`'s comparison is a snapshot).
+ * 'created' | 'exists' (already at this commit). Throws, with a message, if it is anywhere else or
+ * the push fails. A tag already at this commit is answered FIRST, so a re-run after the owner made
+ * the tag by hand still passes while the workflow files differ. Otherwise the push is ALWAYS tried:
+ * production is already live, so not trying protects nothing. When the files differ from main's a
+ * warning is printed first. If the push fails, main is fetched afresh and compared: drift gives a
+ * TagDriftError (recovery steps), no drift gives git's own error. Either way git's stderr is quoted.
+ * A tag created locally before a failed push is left (the runner is thrown away) and never reported.
  */
-/** @param {string} version @param {string} sha @param {{ remote?: string, cwd?: string, base?: string }} [opts] @returns {'created' | 'exists'} */
-function ensureTag(version, sha, { remote = 'origin', cwd, base = 'origin/main' } = {}) {
+/** @param {string} version @param {string} sha @param {{ remote?: string, cwd?: string, base?: string, warn?: (msg: string) => void }} [opts] @returns {'created' | 'exists'} */
+function ensureTag(version, sha, { remote = 'origin', cwd, base = 'origin/main', warn = (m) => console.log(m) } = {}) {
   const tag = `v${version}`;
   const full = gitOrThrow(['rev-parse', '--verify', `${sha}^{commit}`], cwd);
   const there = remoteTagCommit(tag, { remote, cwd });
@@ -128,12 +140,29 @@ function ensureTag(version, sha, { remote = 'origin', cwd, base = 'origin/main' 
   if (local.code === 0 && local.out !== full) {
     throw new Error(`${tag} exists in this checkout at ${local.out.slice(0, 12)}, not at ${full.slice(0, 12)}.`);
   }
-  gitOrThrow(['fetch', '--quiet', remote, 'main'], cwd);
-  const files = workflowDrift(full, { base, cwd });
-  if (files.length > 0) throw new TagDriftError(lateDriftMessage(files, tag, full), files);
+  // Best effort: a failure to compare must not stop the push from being tried.
+  const driftNow = () => {
+    try {
+      gitOrThrow(['fetch', '--quiet', remote, 'main'], cwd);
+      return workflowDrift(full, { base, cwd });
+    } catch {
+      return [];
+    }
+  };
+  const before = driftNow();
+  if (before.length > 0) {
+    warn(
+      `::warning::The workflow files at ${full.slice(0, 12)} differ from main's, so GitHub may refuse this ` +
+        `tag push. Trying anyway: production is already live.%0A${before.map((f) => `  ${f}`).join('%0A')}`
+    );
+  }
   if (local.code !== 0) gitOrThrow(['tag', tag, full], cwd);
-  gitOrThrow(['push', remote, `refs/tags/${tag}`], cwd);
-  return 'created';
+  const push = git(['push', remote, `refs/tags/${tag}`], cwd);
+  if (push.code === 0) return 'created';
+  const gitError = push.err || push.out;
+  const after = driftNow();
+  if (after.length > 0) throw new TagDriftError(lateDriftMessage(after, tag, full, gitError), after);
+  throw new Error(`git push ${remote} refs/tags/${tag} failed: ${gitError}`);
 }
 
 /**

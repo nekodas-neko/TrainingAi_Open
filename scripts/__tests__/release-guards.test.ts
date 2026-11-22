@@ -245,32 +245,69 @@ describe('command line (what release.yml runs)', () => {
       expect(git(origin, 'rev-parse', 'refs/tags/v1.2.3^{commit}')).toBe(first)
     })
 
-    it('absent, but main gained a workflow change since verify: no push, exit 1, says what to do', () => {
+    /** Make the bare origin refuse every push to a tag, as GitHub does for a workflow-file mismatch. */
+    function rejectTagPushes(): void {
+      const hook = path.join(origin, 'hooks', 'pre-receive')
+      mkdirSync(path.dirname(hook), { recursive: true })
+      writeFileSync(hook, '#!/bin/sh\necho "refusing to allow a GitHub App to create or update workflow" >&2\nexit 1\n')
+      chmodSync(hook, 0o755)
+    }
+
+    it('absent, files differ, remote accepts: warns, tries anyway, creates the tag, exit 0', () => {
+      const sha = mainDrifted()
+      git(work, 'update-ref', 'refs/remotes/origin/main', sha)
+      const r = run(['tag', '1.2.3', sha])
+      expect(r.code).toBe(0)
+      expect(r.out).toMatch(/^::warning::/m)
+      expect(r.out).toContain('.github/workflows/ci.yml')
+      expect(r.out).not.toMatch(/::error::/)
+      expect(git(origin, 'rev-parse', 'refs/tags/v1.2.3^{commit}')).toBe(sha)
+    })
+
+    it('absent, files differ, remote rejects: exit 1 with the late-drift message, git quoted, no tag', () => {
       const sha = mainDrifted()
       const summary = path.join(root, 'summary.md')
       // The checkout has not seen the new main yet: the step must fetch it itself.
       git(work, 'update-ref', 'refs/remotes/origin/main', sha)
+      rejectTagPushes()
       const r = run(['tag', '1.2.3', sha], { summary })
       expect(r.code).toBe(1)
       expect(r.out).toMatch(/^::error::/m)
       expect(r.out).toContain('already serving')
       expect(r.out).toContain('NOT created')
       expect(r.out).toContain('.github/workflows/ci.yml')
+      expect(r.out).toContain('refusing to allow')
       expect(r.out).toContain('Re-run failed jobs')
       expect(r.out).toContain('owner-manual')
+      expect(r.out).not.toMatch(/Pushed v1\.2\.3/)
       expect(git(origin, 'tag', '-l', 'v1.2.3')).toBe('')
-      expect(git(work, 'tag', '-l', 'v1.2.3')).toBe('')
       const note = readFileSync(summary, 'utf8')
       expect(note).toContain('tag was not created')
       expect(note).toContain('.github/workflows/ci.yml')
     })
 
-    it('already at the same commit while the files still differ: passes (a re-run after a hand-made tag)', () => {
+    it('absent, no drift, remote rejects: exit 1 with git\'s error and no drift message', () => {
+      const sha = git(work, 'rev-parse', 'HEAD')
+      const summary = path.join(root, 'summary.md')
+      rejectTagPushes()
+      const r = run(['tag', '1.2.3', sha], { summary })
+      expect(r.code).toBe(1)
+      expect(r.out).toMatch(/^::error::/m)
+      expect(r.out).toContain('refusing to allow')
+      expect(r.out).not.toContain('already serving')
+      expect(r.out).not.toContain('NOT created')
+      expect(existsSync(summary)).toBe(false)
+      expect(git(origin, 'tag', '-l', 'v1.2.3')).toBe('')
+    })
+
+    it('already at the same commit while the files still differ: passes without pushing (a re-run after a hand-made tag)', () => {
       const sha = mainDrifted()
       git(origin, 'tag', 'v1.2.3', sha)
+      rejectTagPushes() // a push attempt would fail the run
       const r = run(['tag', '1.2.3', sha])
       expect(r.code).toBe(0)
-      expect(r.out).not.toMatch(/::error::/)
+      expect(r.out).not.toMatch(/::error::|::warning::/)
+      expect(r.out).toMatch(/nothing to create/)
     })
   })
 
