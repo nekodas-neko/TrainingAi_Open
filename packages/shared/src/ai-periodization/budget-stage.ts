@@ -101,6 +101,64 @@ export function buildTimedExercises(
   })
 }
 
+/** The most muscle groups the weekly-target sentence names; the rest are counted. */
+const MAX_NAMED_UNDER_TARGET = 3
+/** A group counts as under when it ends the session at least this many whole sets short — half a set
+ *  of difference is rounding in the 0.5-per-secondary-set tally, not a shortfall worth a sentence. */
+const MIN_SETS_SHORT = 1
+
+/**
+ * #3767 (owner, 22 Nov, option A): one code-owned sentence naming the muscle groups this session
+ * leaves under their weekly target. What the stage knows is the sets logged so far this week plus
+ * this session's own planned sets (`weeklyVolumeContribution`); it does NOT know what the week's
+ * other sessions will plan, and it does not know which days are left, so it makes no claim about
+ * either. It says when it was true instead: a plan is made on first open and served for up to 7
+ * days, so the sentence is about the moment the plan was made.
+ *
+ * Only the muscles this session trains are considered: an upper session says nothing about legs.
+ * That includes a muscle whose only exercise the time budget dropped: it is still under target, and
+ * the stage's own drop note, in the same text, says the exercise was dropped. A muscle none of the
+ * session's exercises touch is never named. Names are the lowercase canonical muscle names, as the
+ * weekly-sets pills show them. Returns '' when there is nothing to say: targets unknown, a deload or
+ * baseline session, no time limit with nothing cut (the plan is the program as written, so there is
+ * no fit to report on), or no group under. It never touches a prescribed number.
+ */
+function weeklyUnderTargetNote(
+  signals: PrescriptionSignals,
+  contribution: Record<string, number>,
+  phase: string | null | undefined,
+  fit: { noTimeLimit: boolean; anythingCut: boolean },
+  /** The ids of the exercises in this session (dropped ones included). */
+  sessionExerciseIds: ReadonlySet<string>,
+): string {
+  if (phase === 'deload' || phase === 'baseline') return ''
+  if (fit.noTimeLimit && !fit.anythingCut) return ''
+  const trained = new Set(signals.exercises
+    .filter(e => sessionExerciseIds.has(e.sessionExerciseId))
+    .flatMap(e => e.muscleAssignments.map(m => normalizeMuscle(m.muscle))))
+  // The contribution is keyed by the raw lowercased label; the targets by the canonical name.
+  const planned = new Map<string, number>()
+  for (const [muscle, sets] of Object.entries(contribution)) {
+    planned.set(normalizeMuscle(muscle), (planned.get(normalizeMuscle(muscle)) ?? 0) + sets)
+  }
+  const short: Array<{ muscle: string; sets: number }> = []
+  for (const muscle of trained) {
+    const target = signals.weeklyTargets[muscle]
+    if (target == null) continue
+    const after = (signals.weeklyLogged[muscle] ?? 0) + (planned.get(muscle) ?? 0)
+    if (target - after >= MIN_SETS_SHORT) short.push({ muscle, sets: target - after })
+  }
+  if (short.length === 0) return ''
+  short.sort((a, b) => b.sets - a.sets || a.muscle.localeCompare(b.muscle))
+  const named = short.slice(0, MAX_NAMED_UNDER_TARGET).map(s => s.muscle)
+  const more = short.length - named.length
+  if (short.length === 1) return `When this plan was made, ${named[0]} was under its weekly target.`
+  const list = more > 0
+    ? `${named.join(', ')} and ${more} more`
+    : `${named.slice(0, -1).join(', ')} and ${named[named.length - 1]}`
+  return `When this plan was made, ${list} were under their weekly target.`
+}
+
 export function applyBudgetStage(
   exercises: BudgetStageExercise[],
   signals: PrescriptionSignals,
@@ -259,6 +317,11 @@ export function applyBudgetStage(
       ? `Even so, the ${activeExercises.length} exercises kept are estimated at ${estimatedSessionDurationMin} min of work against the ${fittedBudgetMin} planned — a session is never cut below ${activeExercises.length}, so ${overrun}.`
       : `Note: even at minimum sets this session is estimated at ${estimatedSessionDurationMin} min of work against the ${fittedBudgetMin} planned, so ${overrun} — it has more exercises than the time budget fits. Consider removing an accessory from this session or raising its time budget.`)
   }
+  const underTarget = weeklyUnderTargetNote(signals, weeklyVolumeContribution, phase ?? signals.phase, {
+    noTimeLimit: fittedBudgetMin === 0,
+    anythingCut: droppedIds.size > 0 || activeExercises.some(ex => (sets.get(ex.sessionExerciseId) ?? ex.sets) < ex.sets),
+  }, new Set(exercises.map(ex => ex.sessionExerciseId)))
+  if (underTarget) notes.push(underTarget)
   const budgetNote = notes.map(n => ` ${n}`).join('')
 
   // #2403: the session `Full` trains. A deloaded row goes back to its recorded full numbers — which
