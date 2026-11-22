@@ -9,11 +9,11 @@ import {
   cardView,
   defaultAnswers,
   LATER_PREFIX,
-  LIFTS_CHANGED_MESSAGE,
+  liftsChangedMessage,
   laterKey,
   liftOf,
   reconcileAnswers,
-  saveBody,
+  prepareSave,
   withoutNotesFor,
   weeklyCheckinSpec,
   type CheckinAnswers,
@@ -69,6 +69,8 @@ export function WeeklyCheckin() {
   const [notes, setNotes] = useState<SaveNotes | null>(null);
   const [sending, setSending] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  // The save went through but its reply could not be read: shown apart from `message`, which is an error.
+  const [notice, setNotice] = useState<string | null>(null);
   const weekStart = state?.weekStart ?? null;
   // A new week under review starts from the defaults again.
   useEffect(() => {
@@ -82,7 +84,9 @@ export function WeeklyCheckin() {
     const next = reconcileAnswers(answers, state);
     if (next.reset) {
       setAnswers(next.answers);
-      setMessage(LIFTS_CHANGED_MESSAGE);
+      // Only while the sheet is open: a message set behind a closed sheet would show on the next open.
+      const told = liftsChangedMessage(next.reset, open);
+      if (told) setMessage(told);
     }
     // Only a change of lifts matters here, not every keystroke in the answers.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -100,13 +104,14 @@ export function WeeklyCheckin() {
   ) {
     setSending(key);
     setMessage(null);
+    setNotice(null);
     try {
       const result = await call();
       if (result.ok) {
         if (result.notes) setNotes(result.notes);
         // The row changed: the reason shown under it belonged to what it was before.
         else if (touchedLift) setNotes((n) => withoutNotesFor(n, touchedLift));
-        if (result.notice) setMessage(result.notice);
+        if (result.notice) setNotice(result.notice);
       } else if (result.message) {
         setMessage(result.message);
       }
@@ -114,6 +119,12 @@ export function WeeklyCheckin() {
       setSending(null);
     }
   }
+  // A message from before the sheet was last closed never shows when it opens again.
+  const openSheet = () => {
+    setMessage(null);
+    setNotice(null);
+    setOpen(true);
+  };
   const later = () => {
     const store = home.store;
     if (!store || !weekStart) return;
@@ -130,9 +141,9 @@ export function WeeklyCheckin() {
     <>
       <WeeklyCheckinCard
         view={view}
-        onStart={() => setOpen(true)}
+        onStart={openSheet}
         onLater={later}
-        onSee={() => setOpen(true)}
+        onSee={openSheet}
       />
       {open && (
         <WeeklyCheckinSheet
@@ -143,9 +154,17 @@ export function WeeklyCheckin() {
           offline={offline}
           sending={sending}
           message={message}
+          notice={notice}
           onSave={() => {
             if (!actions || !state || !weekStart || !current) return;
-            void send('save', () => actions.save(saveBody(weekStart, state, current)));
+            const prepared = prepareSave(weekStart, state, current);
+            if (!prepared.send) {
+              setAnswers(prepared.answers);
+              setNotice(null);
+              setMessage(prepared.message);
+              return;
+            }
+            void send('save', () => actions.save(prepared.body));
           }}
           onOffer={(row: string, offer: OfferAction, decision: 'accept' | 'decline') => {
             const id = state?.checkin?.id;
@@ -160,6 +179,7 @@ export function WeeklyCheckin() {
           onClose={() => {
             setOpen(false);
             setMessage(null);
+            setNotice(null);
           }}
         />
       )}

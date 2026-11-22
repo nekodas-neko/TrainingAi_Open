@@ -2,8 +2,8 @@
 // parsed by the app's own schema before any test uses them, so a field the schema does not know, or
 // a shape that has drifted, fails here first.
 import {
-  checkinStateSchema,
-  saveOutcomeSchema,
+  lenientCheckinStateSchema,
+  lenientSaveOutcomeSchema,
   type CheckinState,
 } from '../../src/features/home/data/weekly-checkin.ts';
 
@@ -31,7 +31,7 @@ const lift = (sessionExerciseId: string, exerciseName: string) => ({
   lastSession: 'met' as const,
 });
 
-export const due: CheckinState = checkinStateSchema.parse({
+export const due: CheckinState = lenientCheckinStateSchema.parse({
   due: true,
   why: 'planned_count_reached',
   weekStart: '2026-11-16',
@@ -124,16 +124,16 @@ export const savedRaw = {
     ],
   },
 };
-export const saved: CheckinState = checkinStateSchema.parse(savedRaw);
+export const saved: CheckinState = lenientCheckinStateSchema.parse(savedRaw);
 
-export const saveResponse = saveOutcomeSchema.parse({
+export const saveResponse = lenientSaveOutcomeSchema.parse({
   state: savedRaw,
   kept: [],
   notApplied: [],
 });
 
 /** The save answered for a lift whose lowering the person undid: it stays held (noted). */
-export const savedWithNotApplied = saveOutcomeSchema.parse({
+export const savedWithNotApplied = lenientSaveOutcomeSchema.parse({
   state: {
     ...savedRaw,
     checkin: {

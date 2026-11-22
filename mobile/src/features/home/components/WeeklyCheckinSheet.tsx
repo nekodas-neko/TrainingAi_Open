@@ -43,6 +43,8 @@ export type CheckinSheetProps = {
   /** The control being sent: 'save', or a result row's key. */
   sending: string | null;
   message: string | null;
+  /** The save went through but its reply could not be read; a neutral line, never the error colour. */
+  notice: string | null;
   onSave: () => void;
   onOffer: (row: string, offer: OfferAction, decision: 'accept' | 'decline') => void;
   onUndo: (row: string, target: UndoTarget) => void;
@@ -68,7 +70,7 @@ export function WeeklyCheckinSheet(props: CheckinSheetProps) {
         footer={<ResultFooter onClose={onClose} label="Close" />}
       >
         <AppText variant="body" accessibilityLiveRegion="polite">
-          {props.message ?? 'This check-in is no longer available.'}
+          {props.message ?? props.notice ?? 'This check-in is no longer available.'}
         </AppText>
       </Sheet>
     );
@@ -196,10 +198,10 @@ function FormBody({ state, answers, onAnswers }: Live) {
   );
 }
 
-function SaveFooter({ answers, offline, sending, message, onSave }: CheckinSheetProps) {
+function SaveFooter({ answers, offline, sending, message, notice, onSave }: CheckinSheetProps) {
   const { theme } = useTheme();
   const incomplete = answersIncomplete(answers);
-  const hint = message ?? incomplete ?? (offline ? 'You’re offline. Save when you’re back online.' : null);
+  const hint = message ?? notice ?? incomplete ?? (offline ? 'You’re offline. Save when you’re back online.' : null);
   return (
     <Stack gap="xs" style={{ paddingTop: theme.spacing.sm }}>
       {hint && (
@@ -231,13 +233,18 @@ function ResultFooter({ onClose, label = 'Done' }: { onClose: () => void; label?
 }
 
 function ResultBody(props: Live) {
-  const { state, notes, message } = props;
+  const { state, notes, message, notice } = props;
   const rows = state.checkin ? resultRows(state.checkin, notes) : [];
   return (
     <>
       {message && (
         <AppText variant="caption" tone="danger" accessibilityLiveRegion="polite">
           {message}
+        </AppText>
+      )}
+      {notice && (
+        <AppText variant="caption" tone="muted" accessibilityLiveRegion="polite">
+          {notice}
         </AppText>
       )}
       {rows.map((row) => (

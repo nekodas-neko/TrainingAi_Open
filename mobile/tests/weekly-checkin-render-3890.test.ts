@@ -4,7 +4,7 @@ import { registerHooks } from 'node:module';
 import { test } from 'node:test';
 import { createElement, type ReactElement } from 'react';
 import { sizes, spacing } from '../src/shared/theme/tokens.ts';
-import { checkinStateSchema, defaultAnswers, type CheckinAnswers } from '../src/features/home/data/weekly-checkin.ts';
+import { lenientCheckinStateSchema, defaultAnswers, type CheckinAnswers } from '../src/features/home/data/weekly-checkin.ts';
 import { ID, LONG_NAME, due, saved, savedWithNotApplied } from './fixtures/weekly-checkin-states.ts';
 
 // #3890 step 3: the weekly check-in card, sheet and result, rendered. The shared UI and the theme are
@@ -61,6 +61,7 @@ function renderSheet(props: Record<string, unknown> = {}) {
       offline: false,
       sending: null,
       message: null,
+      notice: null,
       onSave: noop,
       onOffer: noop,
       onUndo: noop,
@@ -107,7 +108,7 @@ test('after Later the card renders nothing; once saved it is one quiet row with 
     }),
   );
   assert.equal(text(html), 'Week reviewed 2 changes for next week See');
-  assert.doesNotMatch(html, /data-tone/);
+  assert.doesNotMatch(html, /data-tone="(?!muted")/, "a quiet row: no tone but the muted one");
   press('See what changes next week');
   assert.equal(seen, 1);
 });
@@ -240,7 +241,7 @@ test('while one call is in flight, no other control can be tapped', () => {
 });
 
 test('an unknown effect and an unknown lastSession render safely in the result and the form', () => {
-  const odd = checkinStateSchema.parse({
+  const odd = lenientCheckinStateSchema.parse({
     ...saved,
     lifts: saved.lifts.map((l) => ({ ...l, lastSession: 'heavier' })),
     checkin: {
@@ -251,7 +252,7 @@ test('an unknown effect and an unknown lastSession render safely in the result a
   const html = renderSheet({ state: odd });
   assert.ok(text(html).includes('Squat Saved'));
   assert.doesNotMatch(text(html), /lighter next time.*Squat/);
-  assert.ok(renderSheet({ state: checkinStateSchema.parse({ ...due, lifts: due.lifts.map((l) => ({ ...l, lastSession: 'heavier' })) }) }));
+  assert.ok(renderSheet({ state: lenientCheckinStateSchema.parse({ ...due, lifts: due.lifts.map((l) => ({ ...l, lastSession: 'heavier' })) }) }));
 });
 
 test('both holdLive values render: Holding with Undo, or Noted', () => {
@@ -274,7 +275,7 @@ test('both holdLive values render: Holding with Undo, or Noted', () => {
 });
 
 test('with nothing left under review the sheet stays up with the message and a Close button', () => {
-  const closed = checkinStateSchema.parse({ ...due, due: false, weekStart: null, summary: null, lifts: [], checkin: null });
+  const closed = lenientCheckinStateSchema.parse({ ...due, due: false, weekStart: null, summary: null, lifts: [], checkin: null });
   const html = renderSheet({ state: closed, message: 'This check-in is no longer available. Pull to refresh.' });
   assert.ok(text(html).includes('This check-in is no longer available. Pull to refresh.'));
   assert.ok(controls.has('Close'));
@@ -290,4 +291,35 @@ test('a pain offer with no muscle shows no Log injury button, only Not now', () 
   const html = renderSheet({ state });
   assert.ok(text(html).includes('could not tell which muscle'));
   assert.ok(!controls.has('Log injury'));
+});
+
+// ── #4043 ──────────────────────────────────────────────────────────────────────────────────
+
+const NOTICE = 'That went through on the server, but its reply could not be read. The check-in is being reloaded.';
+/** The tone of the text element that carries `words`, or null when the words are not on screen. */
+function toneOf(html: string, words: string) {
+  const at = html.indexOf(words);
+  if (at < 0) return null;
+  return html.slice(html.lastIndexOf('<span', at), at).match(/data-tone="([a-z]+)"/)?.[1] ?? 'none';
+}
+
+test('a save that went through but could not be read shows its notice in a neutral tone, never as an error', () => {
+  // The form, still showing while the state reloads.
+  const form = renderSheet({ notice: NOTICE });
+  assert.ok(text(form).includes('went through on the server'));
+  assert.equal(toneOf(form, NOTICE), 'muted');
+  // The result, once the reload brought the saved state.
+  const result = renderSheet({ state: saved, notice: NOTICE });
+  assert.equal(toneOf(result, NOTICE), 'muted');
+  // An error is still an error, and wins the line when both are set.
+  const error = renderSheet({ message: 'The check-in changed. It has been refreshed.' });
+  assert.equal(toneOf(error, 'The check-in changed. It has been refreshed.'), 'danger');
+  const both = renderSheet({ state: saved, message: 'Not found', notice: NOTICE });
+  assert.equal(toneOf(both, 'Not found'), 'danger');
+  assert.equal(toneOf(both, NOTICE), 'muted');
+});
+
+test('the notice is the only text when nothing is left under review', () => {
+  const closed = lenientCheckinStateSchema.parse({ ...due, due: false, weekStart: null, summary: null, lifts: [], checkin: null });
+  assert.ok(text(renderSheet({ state: closed, notice: NOTICE })).includes('went through on the server'));
 });

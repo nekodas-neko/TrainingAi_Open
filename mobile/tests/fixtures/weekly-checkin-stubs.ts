@@ -20,7 +20,17 @@ const box =
       children,
     );
 
-export const AppText = box('span', 'AppText');
+export const AppText = ({ children, numberOfLines, accessibilityLabel, tone }: Props) =>
+  h(
+    'span',
+    {
+      'data-ui': 'AppText',
+      'data-lines': numberOfLines as number | undefined,
+      'aria-label': accessibilityLabel as string | undefined,
+      'data-tone': tone as string | undefined,
+    },
+    children,
+  );
 export const Stack = box('div', 'Stack');
 export const Card = ({ children, tone }: Props) =>
   h('section', { 'data-ui': 'Card', 'data-tone': tone as string }, children);

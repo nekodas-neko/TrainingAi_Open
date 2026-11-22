@@ -67,7 +67,10 @@ import { checkinDue, checkinWeekStart, localClock, plannedWeekOf, type CheckinDu
 import {
   CHECKIN_HOLD_LIVE, daysOffDates, effectForAnswer, type CheckinAnswer, type CheckinEffect,
 } from '@trainingai/shared/weekly-checkin/effects'
-import { summarizeWeek, type CheckinSummary, type LastSessionAgainstPlan, type WeekLiftLog } from '@trainingai/shared/weekly-checkin/summary'
+import { summarizeWeek, type WeekLiftLog } from '@trainingai/shared/weekly-checkin/summary'
+import type {
+  CheckinOffer, CheckinState, CheckinStateLift, CheckinView, SaveOutcome, SwapAlternative,
+} from '@trainingai/shared/weekly-checkin/responses'
 import { weightStepFor } from '@trainingai/shared/workout/load-rounding'
 import { goalRange } from '@trainingai/shared/ai-periodization/goal-ranges'
 import { checkinHoldBar, preferredRepBand } from '@trainingai/shared/ai-periodization/lift-preference'
@@ -112,64 +115,6 @@ function uniqueLifts(slots: ProgramLift[]): ProgramLift[] {
 }
 
 // ── The state ─────────────────────────────────────────────────────────────────────────────────
-
-export interface CheckinStateLift {
-  /** Send this back as the lift's id in a save. Any slot of the lift is accepted. */
-  sessionExerciseId: string
-  exerciseName: string
-  exerciseId: string | null
-  /** Decision 9's missed rep for this lift (its last session of the week), the value a save acts on. */
-  missedRep: boolean | null
-  /** That session against the plan; null when the lift was not logged this week. */
-  lastSession: LastSessionAgainstPlan | null
-}
-
-export type CheckinOffer =
-  | { kind: 'step_up'; liftId: string; exerciseName: string; status: 'open' | 'accepted' | 'declined'; changeId: string | null }
-  | { kind: 'pain'; exerciseName: string; where: string | null; status: 'open' | 'accepted' | 'declined'; injuryId: string | null; muscles: string[] }
-  | { kind: 'swap'; exerciseName: string; status: 'open' | 'accepted' | 'declined'; changeId: string | null; alternatives: SwapAlternative[] }
-
-export interface SwapAlternative { exerciseId: string; name: string; equipment: string[]; mainMuscles: string[] }
-
-export interface CheckinView {
-  id: string
-  weekStart: string
-  appliesWeekStart: string
-  status: 'offered' | 'saved' | 'dismissed'
-  savedAt: string | null
-  dismissedAt: string | null
-  lifts: {
-    liftId: string; exerciseName: string; exerciseId: string | null; answer: CheckinAnswer; missedRep: boolean | null
-    effect: CheckinEffect; offerStatus: string | null; appliedChangeId: string | null
-    /** For `held`: whether the plan's hold caps this lift (`liftsTheHoldCaps`): it has a last bar and
-     *  carries a load. False for a lift never logged, last logged in a deload, or bodyweight: the card
-     *  then says "noted", never "held". Null for every other effect. */
-    holdLive: boolean | null
-    /** For `held` and `lowered_one_step`: whether the plan caps the lift at its last bar this week (the
-     *  same test as `holdLive`). A lowered lift gets the lower of one step under the plan and its last bar.
-     *  Null for every other effect. */
-    capped: boolean | null
-  }[]
-  daysOff: number[] | null
-  /** The dates the check-in itself made rest days (A1): a date already resting when it applied is not here. */
-  daysOffWritten: string[] | null
-  shorterSessionMin: number | null
-  pain: false | null | { exerciseName: string; exerciseId: string | null; where: string | null }
-  swap: null | { exerciseName: string; exerciseId: string | null }
-  offers: CheckinOffer[]
-}
-
-export interface CheckinState {
-  /** Whether the card should show now. */
-  due: boolean
-  why: CheckinDueWhy | null
-  /** The week under review (local Monday), whether due or already answered; null when none. */
-  weekStart: string | null
-  summary: CheckinSummary | null
-  /** The main lifts to ask about. Empty when nothing is under review. */
-  lifts: CheckinStateLift[]
-  checkin: CheckinView | null
-}
 
 interface Review {
   weekStart: string
@@ -325,7 +270,8 @@ async function viewOf(ctx: EngineCtx, row: CheckinRow): Promise<CheckinView> {
     status: row.status,
     savedAt: row.savedAt?.toISOString() ?? null,
     dismissedAt: row.dismissedAt?.toISOString() ?? null,
-    lifts: lifts.map(l => ({
+    // Annotated, so a field returned here that the shared shape lacks is a compile error.
+    lifts: lifts.map((l): CheckinView['lifts'][number] => ({
       liftId: l.id, exerciseName: l.exerciseName, exerciseId: l.exerciseId, answer: l.answer, missedRep: l.missedRep,
       effect: l.effect, offerStatus: l.offerStatus, appliedChangeId: l.appliedChangeId,
       holdLive: l.effect === 'held' ? CHECKIN_HOLD_LIVE && capped.has(l.exerciseName) : null,
@@ -439,20 +385,6 @@ export interface SaveInput {
   swap: null | { sessionExerciseId: string }
   daysOff: number[] | null
   shorterSessionMin: number | null
-}
-
-export interface SaveOutcome {
-  state: CheckinState
-  /** Lifts whose earlier change could not be taken back and so stays as it was (never doubled). */
-  kept: { exerciseName: string; detail: string }[]
-  /**
-   * Lifts whose lowering was not applied, so they are `held` instead:
-   *   - `refused`: the writer refused it (the detail says why);
-   *   - `undone`: the person undid this check-in's lowering, and saving the same answer again does not
-   *     redo it. Changing the answer away and back is the way to ask for it again;
-   *   - `swapped`: the slot now holds the lift an accepted swap put there, so a lowering would land on it.
-   */
-  notApplied: { exerciseName: string; detail: string; reason: 'refused' | 'undone' | 'swapped' }[]
 }
 
 export async function saveCheckin(ctx: EngineCtx, input: SaveInput): Promise<SaveOutcome> {
