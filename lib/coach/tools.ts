@@ -2,7 +2,7 @@ import { tool } from 'ai'
 import { z } from 'zod'
 import type { WorkoutRepository } from '@/lib/data/repository'
 import { ChoiceListSchema, ChangePreviewSchema, HandoffSchema, NumberDialSchema, ChartSchema, PlanCardSchema } from './widgets'
-import { CoachPatchSchema } from './patch'
+import { CoachPatchSchema, patchChangeSchemaFor } from './patch'
 import { COACH_SCOPES, pickTools, type CoachScope } from './scopes'
 import { ownTargetFromGoals } from '@trainingai/shared/nutrition/calorie-budget'
 import { injurySafeAlternatives } from '@trainingai/shared/workout/injury-substitution'
@@ -35,8 +35,11 @@ function scopedSchemas(scope: CoachScope) {
   const choiceList = ChoiceListSchema.extend({
     source: z.enum(scope.choiceSources as [string, ...string[]]).optional(),
   })
+  // #3896 step 5: the lift_preference variants join the union only when this scope offers the domain,
+  // so a client that never declares it sends the model the tool JSON it always did.
   const patch = CoachPatchSchema.extend({
     domain: z.enum(scope.patchDomains as [string, ...string[]]),
+    changes: z.array(patchChangeSchemaFor(scope.patchDomains.includes('lift_preference'))).min(1).max(8),
   })
   return {
     choiceList,
@@ -45,6 +48,26 @@ function scopedSchemas(scope: CoachScope) {
   }
 }
 
+/**
+ * #3896 step 5. What the model may say about a lift: which lift (an id) and which enumerated change.
+ * It never writes a weight, a percentage or a set count; the app works those out and shows them.
+ * Offered only when the client renders the domain.
+ */
+const LIFT_PREFERENCE_DESCRIPTION = [
+  '· "lift_preference" — how ONE lift is prescribed, in every session it is in. Use it when the user',
+  '  asks to change a lift\'s reps, weight, sets or rest. `targetId` is the session EXERCISE id (from',
+  '  the context the app gave you, getProgramStructure or getExerciseContext). Fields:',
+  '  "repRange" — `to` is the range the user said as "low-high" ("12-15"), or "more_reps" /',
+  '  "fewer_reps" when they gave no numbers (the app works the range out; "higher reps, lower weight"',
+  '  is "more_reps"). Lasts until changed.',
+  '  "restSec" — `to` is the rest the user said, in whole seconds. Lasts until changed.',
+  '  "nextLoadStep" — `to` "lighter" or "heavier": one plate, for the next workout of this lift only.',
+  '  "setsDelta" — `to` 1 or -1: one set more or fewer, for the next workout only.',
+  '  `from` is the current value from getExerciseContext\'s `preference` (null when none).',
+  '  Never put a weight, a percentage or a number of sets in a change: the app computes the new',
+  '  weight and shows it on the card. Propose one only when the user asked for it.',
+]
+
 export function buildWidgetTools(
   repo: WorkoutRepository,
   userId: string,
@@ -52,6 +75,9 @@ export function buildWidgetTools(
   tz: string = DEFAULT_TZ,
 ) {
   const scoped = scopedSchemas(scope)
+  // #3896 step 5: only for a client that renders it (`withClientDomains`). Without it, every
+  // description below is exactly what it was.
+  const liftPreference = scope.patchDomains.includes('lift_preference')
   const all = {
     /**
      * Why this exists: without it the model has no source of real ids and **invents them**.
@@ -218,7 +244,7 @@ export function buildWidgetTools(
         // Not a uuid cannot be a row, and Postgres would throw on the cast rather than match nothing.
         if (!z.uuid().safeParse(sessionExerciseId).success) return missing
         await ensureSchema()
-        const exercise = await readExerciseContext(getDb(), repo, userId, sessionExerciseId, tz)
+        const exercise = await readExerciseContext(getDb(), repo, userId, sessionExerciseId, tz, undefined, { preference: liftPreference })
         return exercise ? { found: true as const, exercise: ExerciseContextSchema.parse(exercise) } : missing
       },
     }),
@@ -311,8 +337,11 @@ export function buildWidgetTools(
         '',
         'Pick the `domain` and use only its fields:',
         '· "session_exercise" — fields "exerciseName", "styleId", "position", "removed".',
-        '  `targetId` is the session EXERCISE id from getProgramStructure. There is NO field for',
-        '  sets, reps, percentage or rest — those are not stored on the exercise.',
+        ...(liftPreference
+          ? ['  `targetId` is the session EXERCISE id from getProgramStructure. Reps, sets, load and rest',
+             '  are changed through "lift_preference" below, never here.']
+          : ['  `targetId` is the session EXERCISE id from getProgramStructure. There is NO field for',
+             '  sets, reps, percentage or rest — those are not stored on the exercise.']),
         '  Never propose "styleId" when getProgramStructure gives phaseMode "ai_dynamic": the AI plan',
         '  replaces the progression style there, and the app refuses the change.',
         '  If the user names a replacement that findSwapCandidates did NOT return and that is not',
@@ -338,6 +367,7 @@ export function buildWidgetTools(
         '  getGoalsAndInjuries. You do NOT choose the date — the app stamps today in the user\'s own',
         '  timezone. Use this when they say they are beaten up, need a lighter week, or ask to',
         '  deload now.',
+        ...(liftPreference ? LIFT_PREFERENCE_DESCRIPTION : []),
         '· "program_phase" — fields "phaseSetId", "sessionsPerCycle", "phaseMode". `targetId` is',
         '  null. This one is heavier than the others: it can move the user backwards through a',
         '  block they have already earned, so it gets its own confirmation screen. Propose it only',

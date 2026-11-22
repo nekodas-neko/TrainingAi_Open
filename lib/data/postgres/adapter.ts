@@ -126,7 +126,7 @@ import * as social from './slices/social'
 import * as prog from './slices/programs'
 import * as period from './slices/periodization'
 import { getSessionReadLogs } from './slices/session-read'
-import { listExercisePreferences, consumeLiftOneShot } from './slices/exercise-preferences'
+import { listExercisePreferences, consumeLiftOneShot, type ClearedOneShot } from './slices/exercise-preferences'
 import * as userStatsSlice from './slices/user-stats'
 import * as oura from './slices/oura'
 import { readRawFrames, readRecentRawFrames, DS_BUCKET_SPAN } from './slices/oura-raw-frames'
@@ -8722,8 +8722,35 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async getRecentSessionsOfType(userId: string, programSessionId: string, limit: number) { return period.getRecentSessionsOfType(this.db, userId, programSessionId, limit) }
   async getSetLogsForSessions(workoutSessionIds: string[]) { return period.getSetLogsForSessions(this.db, workoutSessionIds) }
   async getSessionReadLogs(userId: string, from: Date, to: Date) { return getSessionReadLogs(this.db, userId, from, to) }
-  async listExercisePreferences(userId: string, exerciseNames: string[]) { return listExercisePreferences(this.db, userId, exerciseNames) }
-  async consumeLiftOneShot(userId: string, exerciseName: string, servedSetAt: Date) { return consumeLiftOneShot(this.db, userId, exerciseName, servedSetAt) }
+  async listExercisePreferences(userId: string, exerciseNames: string[]) {
+    const cleared: ClearedOneShot[] = []
+    const out = await listExercisePreferences(this.db, userId, exerciseNames, cleared)
+    // An expired one-shot is still stamped on the lift's stored plans (#4007): take it out, right after
+    // the clear. A failure is logged and never fails the read.
+    for (const c of cleared) await this.restateSpentOneShot(this.db, userId, c.exerciseName, new Date(c.setAtMs))
+    return out
+  }
+
+  /** Restate the stored plans that still carry a spent one-shot (#4007). Runs in its own savepoint when
+   *  given a transaction, and never throws: the log or read that spent the step must not fail on it. */
+  private async restateSpentOneShot(db: typeof this.db, userId: string, exerciseName: string, spentAt: Date) {
+    try {
+      const { restateSpentOneShot } = await import('@/lib/coach/domains/lift-preference')
+      await db.transaction(async sp => { await restateSpentOneShot(sp as unknown as typeof this.db, this, userId, exerciseName, spentAt) })
+    } catch (err) {
+      console.error('[lift-preference] restating stored plans after a spent one-shot failed:', err)
+    }
+  }
+  // The consume and the restate of the lift's other stored plans commit together; the restate runs in a
+  // savepoint, so a failure there is logged and the consume still stands (#4007).
+  async consumeLiftOneShot(userId: string, exerciseName: string, servedSetAt: Date) {
+    return this.db.transaction(async tx => {
+      const t = tx as unknown as typeof this.db
+      const took = await consumeLiftOneShot(t, userId, exerciseName, servedSetAt)
+      if (took) await this.restateSpentOneShot(t, userId, exerciseName, servedSetAt)
+      return took
+    })
+  }
   async getSetTimingRows(userId: string, exerciseNames: string[]) { return period.getSetTimingRows(this.db, userId, exerciseNames) }
   async getExercise1rmHistory(userId: string, exerciseNames: string[], tz: string, windowDays?: number) { return period.getExercise1rmHistory(this.db, userId, exerciseNames, tz, windowDays) }
   async getWeeklySetsByMuscleGroup(userId: string, programId: string, weekStart: string, weekEnd: string, tz: string) { return period.getWeeklySetsByMuscleGroup(this.db, userId, programId, weekStart, weekEnd, tz) }

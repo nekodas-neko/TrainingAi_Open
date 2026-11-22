@@ -25,20 +25,38 @@ interface PreferenceSqlRow {
 }
 
 /** The user's live preferences for these lifts, keyed by the name the caller passed. One query. */
-export async function listExercisePreferences(db: Db, userId: string, exerciseNames: string[]): Promise<Map<string, LiftPreferenceRow>> {
+/** A one-shot the expiry clear just took off a row: the lift, and the `one_shot_set_at` it carried (ms). */
+export interface ClearedOneShot { exerciseName: string; setAtMs: number }
+
+export async function listExercisePreferences(
+  db: Db, userId: string, exerciseNames: string[], cleared?: ClearedOneShot[],
+): Promise<Map<string, LiftPreferenceRow>> {
   const out = new Map<string, LiftPreferenceRow>()
   if (exerciseNames.length === 0) return out
   // An expired one-shot (`ONE_SHOT_TTL_DAYS`, database clock) is cleared the moment a read sees it, by a
   // conditional write that only touches rows still past the limit. If the clear fails the read below
   // still treats it as expired, so a failure never lets an old one-shot apply.
-  await db.execute(sql`
-    UPDATE exercise_preferences
+  // The cleared rows' old times come back (a CTE reads them before the update nulls them), so the caller
+  // can take the spent step out of the stored plans that still carry it (#4007).
+  const expired = await db.execute(sql`
+    WITH old AS (
+      SELECT id, exercise_name, (extract(epoch FROM one_shot_set_at) * 1000)::float8 AS set_ms
+        FROM exercise_preferences
+       WHERE user_id = ${userId}
+         AND deleted_at IS NULL
+         AND one_shot_set_at IS NOT NULL
+         AND one_shot_set_at < now() - make_interval(days => ${ONE_SHOT_TTL_DAYS})
+         FOR UPDATE
+    )
+    UPDATE exercise_preferences p
        SET next_load_step = NULL, sets_delta = NULL, one_shot_set_at = NULL, updated_at = now()
-     WHERE user_id = ${userId}
-       AND deleted_at IS NULL
-       AND one_shot_set_at IS NOT NULL
-       AND one_shot_set_at < now() - make_interval(days => ${ONE_SHOT_TTL_DAYS})
-  `).catch(err => console.error('[exercise-preferences] clearing an expired one-shot failed:', err))
+      FROM old
+     WHERE p.id = old.id AND p.user_id = ${userId}
+    RETURNING old.exercise_name, old.set_ms
+  `).catch(err => { console.error('[exercise-preferences] clearing an expired one-shot failed:', err); return null })
+  for (const r of (expired?.rows ?? []) as { exercise_name: string; set_ms: number }[]) {
+    cleared?.push({ exerciseName: r.exercise_name, setAtMs: Number(r.set_ms) })
+  }
   const res = await db.execute(sql`
     WITH lifts AS (
       SELECT n.name AS lift, l.id AS lib_id

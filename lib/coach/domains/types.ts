@@ -22,6 +22,12 @@ export interface PreviewResult {
   drift: Drift[]
   /** Null when the target is gone or is not the caller's. */
   target: { id: string | null; label: string } | null
+  /** #3896: the change cannot be made as asked (a rep range or rest outside the limits), in plain
+   *  words. The card shows it and offers no Apply. Absent for every domain that cannot refuse. */
+  refusal?: string
+  /** #3896 F1: each relative request the preview worked out (`more_reps` → `"12-15"`). Apply carries
+   *  these instead of the word, so what is stored is what the card showed. */
+  resolved?: { changeId: string; to: string }[]
 }
 
 export type ApplyOutcome =
@@ -41,6 +47,13 @@ export type ApplyOutcome =
  * later would read a row that may already have moved.
  */
 export interface DomainHandler {
+  /**
+   * #3896 step 5: apply and undo run in one transaction with the `coach_changes` write, so the
+   * domain's own writes and the record of them commit together. The handler receives the
+   * transaction as its `db`, and may throw `StaleLiftPreference`-style errors carrying `drift` to
+   * roll everything back as stale. Domains without it keep their existing, untransacted path.
+   */
+  transactional?: boolean
   preview(db: Db, userId: string, patch: CoachPatch): Promise<PreviewResult>
   apply(
     db: Db,

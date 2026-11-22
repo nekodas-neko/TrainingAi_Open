@@ -1,5 +1,5 @@
 import { CHOICE_SOURCES, WIDGET_TOOL_NAMES, type ChoiceSource, type WidgetToolName } from './widgets'
-import { COACH_PATCH_DOMAINS, type CoachPatchDomain } from './patch'
+import { COACH_PATCH_DOMAINS, GATED_PATCH_DOMAINS, type CoachPatchDomain } from './patch'
 
 /**
  * A named Coach scope — what this conversation is about, expressed as what it can reach (LA-47).
@@ -29,6 +29,10 @@ export interface CoachScope {
   /** Patch domains this scope may propose against. The apply path already refuses a field outside
    *  its domain; this refuses the domain itself. */
   patchDomains: readonly CoachPatchDomain[]
+  /** #3896 step 5: gated domains (`GATED_PATCH_DOMAINS`) this scope may offer, only to a client that
+   *  names them (`withClientDomains`). Not in `patchDomains` until then, so a caller that never
+   *  declares anything — an older build, the web app, a test — cannot be offered one. */
+  gatedPatchDomains?: readonly CoachPatchDomain[]
   /** Appended to the system prompt. Says what this conversation is for, never what it may not do —
    *  the fields above already answer that, and a list of prohibitions reads as a challenge. */
   systemSection: string
@@ -56,7 +60,8 @@ export const COACH_SCOPES = {
     readTools: null,
     widgetTools: Object.keys(WIDGET_TOOL_NAMES) as WidgetToolName[],
     choiceSources: CHOICE_SOURCES,
-    patchDomains: COACH_PATCH_DOMAINS,
+    patchDomains: COACH_PATCH_DOMAINS.filter(d => !GATED_PATCH_DOMAINS.includes(d)),
+    gatedPatchDomains: GATED_PATCH_DOMAINS,
     systemSection: '',
   },
   nutrition: {
@@ -102,4 +107,17 @@ export function pickTools<T extends Record<string, unknown>>(
   if (allowed == null) return tools
   const set = new Set(allowed)
   return Object.fromEntries(Object.entries(tools).filter(([name]) => set.has(name))) as Partial<T>
+}
+
+/**
+ * #3896 step 5: the scope with only the patch domains this client can render. A gated domain
+ * (`GATED_PATCH_DOMAINS`) is withheld unless the client named it in the request's `patchDomains`, so
+ * an older Preview build or the web app, which parse proposals against their own copy of the patch
+ * schema, never receive a proposal they would fail to parse. Withholding, as for every other scope
+ * boundary: the domain leaves the `proposeChange` enum, so the model cannot name it.
+ */
+export function withClientDomains(scope: CoachScope, declared: readonly string[] | undefined): CoachScope {
+  const named = new Set(declared ?? [])
+  const offered = (scope.gatedPatchDomains ?? []).filter(d => named.has(d) && !scope.patchDomains.includes(d))
+  return offered.length === 0 ? scope : { ...scope, patchDomains: [...scope.patchDomains, ...offered] }
 }

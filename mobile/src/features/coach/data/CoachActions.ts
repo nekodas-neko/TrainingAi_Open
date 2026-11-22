@@ -4,6 +4,7 @@ import {
   CoachPatchSchema,
   fieldsMatchDomain,
   hasUniqueChangeIds,
+  REP_RANGE_REQUESTS,
   type CoachPatch,
 } from './patch.ts';
 import { applySchema, coachPaths, historySpec, previewSchema } from './models.ts';
@@ -37,6 +38,17 @@ export class CoachActions {
       !acceptedChangeIds.length ||
       new Set(acceptedChangeIds).size !== acceptedChangeIds.length ||
       acceptedChangeIds.some((id) => !valid.changes.some((change) => change.id === id))
+    ) {
+      throw new Error('Ask Coach for a fresh suggestion.');
+    }
+    // A relative rep request is only ever applied as the range the preview worked out (#3896).
+    if (
+      valid.changes.some(
+        (change) =>
+          acceptedChangeIds.includes(change.id) &&
+          change.field === 'repRange' &&
+          (REP_RANGE_REQUESTS as readonly string[]).includes(change.to),
+      )
     ) {
       throw new Error('Ask Coach for a fresh suggestion.');
     }

@@ -38,6 +38,22 @@ test('native patch and widget contracts match backend validation including numer
       targetId: id(9),
       changes: [{ id: 'cycle', field: 'sessionsPerCycle', from: 6, to: 8 }],
     },
+    // #3896 step 5: valid, a model-added weight, and a range the schema cannot even read.
+    {
+      domain: 'lift_preference',
+      targetId: id(3),
+      changes: [{ id: 'r', field: 'repRange', from: null, to: 'more_reps' }, { id: 's', field: 'setsDelta', from: null, to: -1 }],
+    },
+    {
+      domain: 'lift_preference',
+      targetId: id(3),
+      changes: [{ id: 'l', field: 'nextLoadStep', from: null, to: 'lighter', weightKg: 40 }],
+    },
+    {
+      domain: 'lift_preference',
+      targetId: id(3),
+      changes: [{ id: 'r', field: 'repRange', from: null, to: 'twelve' }],
+    },
   ];
   for (const patch of proposals) {
     assert.equal(

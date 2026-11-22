@@ -47,6 +47,12 @@ export type ExercisePreview = {
   loggedDate?: string | null;
   preDeloadStyle?: SetPreview[] | null;
   preDeloadSets?: number | null;
+  /**
+   * #3896 step 5: the time of the lift's one-shot ("lighter / heavier next time", ±1 set) this plan
+   * carried (`liftPreference.oneShotSetAt` on the served exercise). Echoed in the log, so the server
+   * consumes exactly that one-shot; without it a one-shot set for this lift only ends by expiry.
+   */
+  liftOneShotSetAt?: string | null;
 };
 export type SessionPreview = {
   id: string;
@@ -151,6 +157,11 @@ function optionalText(value: unknown) {
     return null;
   }
   return text(value);
+}
+/** An ISO time the server stamped, or null. Never throws: an unknown value only means no echo. */
+export function oneShotTime(value: unknown): string | null {
+  if (typeof value !== 'string' || value.length > 40) return null;
+  return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/.test(value) && !Number.isNaN(Date.parse(value)) ? value : null;
 }
 function optionalDate(value: unknown) {
   const date = optionalText(value);
@@ -280,6 +291,10 @@ function exercise(value: unknown, dataDate: string | null = null): ExercisePrevi
           },
     loggedDate: row.loggedTodayInSession === true ? dataDate : null,
     preDeloadSets: row.preDeloadSets == null ? null : count(row.preDeloadSets),
+    liftOneShotSetAt:
+      row.liftPreference != null && typeof row.liftPreference === 'object'
+        ? oneShotTime((row.liftPreference as Record<string, unknown>).oneShotSetAt)
+        : null,
     preDeloadStyle:
       row.preDeloadStyle == null
         ? null
@@ -556,6 +571,7 @@ export function readSavedCatalog(
             row.supersetGroup = row.supersetGroup == null ? null : count(row.supersetGroup);
             row.loggedDate = optionalDate(row.loggedDate);
             row.preDeloadSets = row.preDeloadSets == null ? null : count(row.preDeloadSets);
+            row.liftOneShotSetAt = oneShotTime(row.liftOneShotSetAt);
             if (row.preDeloadStyle != null) {
               array(row.preDeloadStyle).forEach((value) => {
                 const set = object(value);

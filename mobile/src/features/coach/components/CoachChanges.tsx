@@ -9,8 +9,12 @@ import { useCoach } from '../CoachProvider';
 import { coachError, type previewSchema } from '../data/models';
 import {
   DOMAIN_TIER,
+  DURATION_LABEL,
   FIELD_LABEL,
   FIELD_UNIT,
+  LIFT_PREFERENCE_DURATION,
+  liftPreferenceValueLabel,
+  withResolvedChanges,
   type CoachPatch,
   type PatchChange,
 } from '../data/patch';
@@ -18,6 +22,8 @@ import type { CoachWidget as Widget, WidgetResult } from '../data/widgets';
 import { failureNotice } from '../../../core/reporting/index.ts';
 export function patchValue(value: unknown, field: PatchChange['field']) {
   if (value === null || value === undefined || value === '') return '—';
+  const lift = liftPreferenceValueLabel(field, value);
+  if (lift) return lift;
   if (typeof value === 'boolean') return value ? 'Yes' : 'No';
   return `${typeof value === 'number' ? formatCount(value) : value}${FIELD_UNIT[field] ?? ''}`;
 }
@@ -122,14 +128,15 @@ export function ChangeCard({
     DOMAIN_TIER[args.patch.domain] === 1 &&
     typeof change.to === 'number';
   async function apply() {
-    if (!coach || guard.current || !live.current || !preview || preview.drift.length) return;
+    if (!coach || guard.current || !live.current || !preview || preview.drift.length || preview.refusal) return;
     guard.current = true;
     setBusy(true);
     setError(null);
     try {
       const patch = dial
         ? ({ ...args.patch, changes: [{ ...change, to: value }] } as CoachPatch)
-        : args.patch;
+        : // The range the card showed, never the relative word (#3896).
+          withResolvedChanges(args.patch, preview.resolved);
       const result = await coach.actions.apply(patch, dial ? [change.id] : accepted);
       if (result) onResult?.({ status: 'applied', summary: result.summary });
     } catch (cause) {
@@ -173,6 +180,9 @@ export function ChangeCard({
             />
             <AppText variant="caption" tone="muted">
               {patchValue(change.from, change.field)} → {patchValue(change.to, change.field)}
+              {change.field in LIFT_PREFERENCE_DURATION
+                ? ` · ${DURATION_LABEL[LIFT_PREFERENCE_DURATION[change.field as keyof typeof LIFT_PREFERENCE_DURATION]]}`
+                : ''}
             </AppText>
           </Stack>
         ))
@@ -215,6 +225,7 @@ export function ChangeCard({
             disabled={
               !preview ||
               !!preview.drift.length ||
+              !!preview.refusal ||
               !accepted.length ||
               (dial && (value === change.from || !Number.isFinite(value)))
             }

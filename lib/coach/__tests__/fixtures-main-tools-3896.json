@@ -1,0 +1,3720 @@
+{
+ "general": {
+  "getProgramStructure": {
+   "description": "The user's active program: every session and every exercise in it, each with the database id needed to reference it. Call this before showing any list of sessions or exercises, or before proposing a change to one. Never invent an id.",
+   "inputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+   }
+  },
+  "getGoalsAndInjuries": {
+   "description": "The user's current goals (steps, calories, water), macro targets, any active injuries with their ids, and whether a deload week is currently running. Call this before proposing a change to any of them — every `from` value must come from here, and marking an injury recovered needs its id as targetId.",
+   "inputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+   }
+  },
+  "findSwapCandidates": {
+   "description": "Exercises the user could swap an exercise FOR. Pass the session exercise id from getProgramStructure. Returns catalogue exercises training the same main muscles, excluding anything that loads an injured area. Call this before showing a list of replacements — without it you have no real exercise names or ids and must not invent them. Optional `query` narrows by name when the user asked for something specific (\"something with dumbbells\").",
+   "inputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+     "exerciseId": {
+      "type": "string",
+      "minLength": 1
+     },
+     "query": {
+      "type": "string",
+      "maxLength": 60
+     }
+    },
+    "required": [
+     "exerciseId"
+    ],
+    "additionalProperties": false
+   }
+  },
+  "getExerciseContext": {
+   "description": "One exercise in the user's program: its stored next plan (sets, reps, % of 1RM, rest, and the bar weight that gives), and its last two logs with what was planned against what was done and the rest before each set. Pass the session exercise id from getProgramStructure or from the context the app gave you. Call this before discussing whether a lift is too heavy or too light, or before proposing a change to one. Read-only.",
+   "inputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+     "sessionExerciseId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+     }
+    },
+    "required": [
+     "sessionExerciseId"
+    ],
+    "additionalProperties": false
+   }
+  },
+  "renderChoiceList": {
+   "description": "Show the user a list to pick from instead of asking them to type a name.  **Prefer `source` and write NO options.** The app fills the rows from the database itself, which is faster for the user and cannot go wrong: · source \"sessions\" — every session in the program. No sourceId. · source \"exercises\" — exercises to choose between. sourceId = a session id to limit it to   that session; omit sourceId for every exercise in the program, which is what you want   when the user said \"change an exercise\" without naming a day. Add `query` with the words   the user used (\"pulldown\") to show only the exercises whose name contains them — use it   when the name they gave matches more than one. · source \"swap_candidates\" — replacements for an exercise. sourceId = the session exercise   id. Same matching as findSwapCandidates, so you do NOT need to call that tool first when you are only going to show the list.  Write `options` yourself ONLY for a list the app cannot derive — a chart legend, a set of judgement calls. Then every id must come from a tool result; an invented one produces a list the user cannot act on.  Do not use this at all when the user has already been specific enough to act on.",
+   "inputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "const": "choice_list"
+     },
+     "prompt": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160
+     },
+     "source": {
+      "type": "string",
+      "enum": [
+       "sessions",
+       "exercises",
+       "swap_candidates",
+       "grocery_stores",
+       "proteins",
+       "carbs",
+       "fats",
+       "vegetables",
+       "dietary_restrictions"
+      ]
+     },
+     "sourceId": {
+      "type": "string"
+     },
+     "query": {
+      "type": "string",
+      "maxLength": 60
+     },
+     "multi": {
+      "type": "boolean"
+     },
+     "selectAll": {
+      "type": "boolean"
+     },
+     "options": {
+      "minItems": 1,
+      "maxItems": 24,
+      "type": "array",
+      "items": {
+       "type": "object",
+       "properties": {
+        "id": {
+         "type": "string",
+         "minLength": 1
+        },
+        "title": {
+         "type": "string",
+         "minLength": 1,
+         "maxLength": 80
+        },
+        "subtitle": {
+         "type": "string",
+         "maxLength": 140
+        },
+        "colorKey": {
+         "type": "string",
+         "enum": [
+          "cyan",
+          "green",
+          "amber",
+          "purple",
+          "destructive"
+         ]
+        }
+       },
+       "required": [
+        "id",
+        "title"
+       ],
+       "additionalProperties": false
+      }
+     }
+    },
+    "required": [
+     "kind",
+     "prompt"
+    ],
+    "additionalProperties": false
+   }
+  },
+  "renderChart": {
+   "description": "Draw a chart in the conversation. Use it when the answer is a series the user asked to see — a trend over time, a comparison between a handful of things — instead of listing the numbers in prose. If they said \"on a chart\", \"show me\", or \"graph\", they want this.  Every number must come from a tool result. `labels` are the x-axis categories (dates, exercise names) and each dataset's `data` lines up with them one for one. \"line\" for anything over time, \"bar\" to compare separate things, \"pie\" only for parts of a whole.  It shows something; it does not ask anything, so you can keep talking straight after it — one short sentence naming what the picture shows. Do NOT also list the same numbers in text, and do NOT follow it with a choice list of the same items unless the user actually has to pick one of them.",
+   "inputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "const": "chart"
+     },
+     "chartType": {
+      "type": "string",
+      "enum": [
+       "line",
+       "bar",
+       "pie"
+      ]
+     },
+     "title": {
+      "type": "string",
+      "maxLength": 60
+     },
+     "labels": {
+      "minItems": 2,
+      "maxItems": 40,
+      "type": "array",
+      "items": {
+       "type": "string",
+       "maxLength": 40
+      }
+     },
+     "datasets": {
+      "minItems": 1,
+      "maxItems": 4,
+      "type": "array",
+      "items": {
+       "type": "object",
+       "properties": {
+        "label": {
+         "type": "string",
+         "minLength": 1,
+         "maxLength": 40
+        },
+        "data": {
+         "minItems": 2,
+         "maxItems": 40,
+         "type": "array",
+         "items": {
+          "type": "number"
+         }
+        },
+        "colorKey": {
+         "type": "string",
+         "enum": [
+          "cyan",
+          "green",
+          "amber",
+          "purple",
+          "destructive"
+         ]
+        }
+       },
+       "required": [
+        "label",
+        "data"
+       ],
+       "additionalProperties": false
+      }
+     }
+    },
+    "required": [
+     "kind",
+     "chartType",
+     "labels",
+     "datasets"
+    ],
+    "additionalProperties": false
+   }
+  },
+  "showMealPlan": {
+   "description": "Show the user their meal plan as a card, with a button that copies every meal into My Foods. Use it when they ask what is on their plan, after you have helped them change it, and whenever a planning conversation reaches its end — the plan is disposable and the saved meals are what survives it, so this is how a meal-plan conversation finishes.  Call getMealPlan first: if it returns available:false there is nothing to show, so say so and offer to help them build one instead of calling this.  Do NOT write the meals out. This tool takes a title and nothing else — the app fills in every meal, its calories and its ingredient count from the plan it already holds, which is faster than you typing them and cannot disagree with what is stored. Omit planId for their active plan, which is what \"my plan\" means; pass one only when they asked about a different plan you read from getMealPlan.",
+   "inputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "const": "plan_card"
+     },
+     "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 60
+     },
+     "planId": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "kind",
+     "title"
+    ],
+    "additionalProperties": false
+   }
+  },
+  "handOff": {
+   "description": "Point the user at the screen that does something you cannot. Use for building a whole new program (program_builder), logging a run or activity (log_activity), account and profile settings (profile), or logging food (nutrition). Say in one sentence why it is not something you do, then hand off — do not apologise, and offer the nearest thing you CAN do afterwards.",
+   "inputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "const": "handoff"
+     },
+     "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 60
+     },
+     "subtitle": {
+      "type": "string",
+      "maxLength": 100
+     },
+     "destination": {
+      "type": "string",
+      "enum": [
+       "program_builder",
+       "log_activity",
+       "profile",
+       "nutrition"
+      ]
+     }
+    },
+    "required": [
+     "kind",
+     "title",
+     "destination"
+    ],
+    "additionalProperties": false
+   }
+  },
+  "askForNumber": {
+   "description": "Let the user set a single number on a dial instead of typing it. Use when they asked for a change without saying how much — \"bump my calories a bit\" has no number in it. If they DID give a number, skip this and use proposeChange. One change only, and `from` must be the current value from getGoalsAndInjuries.",
+   "inputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "const": "number_dial"
+     },
+     "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 60
+     },
+     "patch": {
+      "type": "object",
+      "properties": {
+       "domain": {
+        "type": "string",
+        "enum": [
+         "session_exercise",
+         "nutrition_targets",
+         "user_goals",
+         "injury",
+         "program_phase",
+         "early_deload"
+        ]
+       },
+       "targetId": {
+        "anyOf": [
+         {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+         },
+         {
+          "type": "null"
+         }
+        ]
+       },
+       "changes": {
+        "minItems": 1,
+        "maxItems": 8,
+        "type": "array",
+        "items": {
+         "oneOf": [
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "exerciseName"
+            },
+            "from": {
+             "type": "string",
+             "minLength": 1
+            },
+            "to": {
+             "type": "string",
+             "minLength": 1
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "styleId"
+            },
+            "from": {
+             "anyOf": [
+              {
+               "type": "string",
+               "format": "uuid",
+               "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              {
+               "type": "null"
+              }
+             ]
+            },
+            "to": {
+             "anyOf": [
+              {
+               "type": "string",
+               "format": "uuid",
+               "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              {
+               "type": "null"
+              }
+             ]
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "newExerciseMuscles"
+            },
+            "from": {
+             "type": [
+              "string",
+              "null"
+             ]
+            },
+            "to": {
+             "type": "string",
+             "minLength": 1,
+             "maxLength": 200
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "newExerciseEquipment"
+            },
+            "from": {
+             "type": [
+              "string",
+              "null"
+             ]
+            },
+            "to": {
+             "type": "string",
+             "maxLength": 120
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "position"
+            },
+            "from": {
+             "type": "integer",
+             "minimum": 0,
+             "maximum": 9007199254740991
+            },
+            "to": {
+             "type": "integer",
+             "minimum": 0,
+             "maximum": 9007199254740991
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "removed"
+            },
+            "from": {
+             "type": "boolean"
+            },
+            "to": {
+             "type": "boolean"
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "calories"
+            },
+            "from": {
+             "anyOf": [
+              {
+               "type": "number",
+               "minimum": 0,
+               "maximum": 20000
+              },
+              {
+               "type": "null"
+              }
+             ]
+            },
+            "to": {
+             "type": "number",
+             "minimum": 0,
+             "maximum": 20000
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "proteinG"
+            },
+            "from": {
+             "anyOf": [
+              {
+               "type": "number",
+               "minimum": 0,
+               "maximum": 2000
+              },
+              {
+               "type": "null"
+              }
+             ]
+            },
+            "to": {
+             "type": "number",
+             "minimum": 0,
+             "maximum": 2000
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "carbsG"
+            },
+            "from": {
+             "anyOf": [
+              {
+               "type": "number",
+               "minimum": 0,
+               "maximum": 2000
+              },
+              {
+               "type": "null"
+              }
+             ]
+            },
+            "to": {
+             "type": "number",
+             "minimum": 0,
+             "maximum": 2000
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "fatG"
+            },
+            "from": {
+             "anyOf": [
+              {
+               "type": "number",
+               "minimum": 0,
+               "maximum": 2000
+              },
+              {
+               "type": "null"
+              }
+             ]
+            },
+            "to": {
+             "type": "number",
+             "minimum": 0,
+             "maximum": 2000
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "stepsGoal"
+            },
+            "from": {
+             "anyOf": [
+              {
+               "type": "integer",
+               "minimum": 0,
+               "maximum": 200000
+              },
+              {
+               "type": "null"
+              }
+             ]
+            },
+            "to": {
+             "type": "integer",
+             "minimum": 0,
+             "maximum": 200000
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "waterGoalMl"
+            },
+            "from": {
+             "anyOf": [
+              {
+               "type": "number",
+               "minimum": 0,
+               "maximum": 20000
+              },
+              {
+               "type": "null"
+              }
+             ]
+            },
+            "to": {
+             "type": "number",
+             "minimum": 0,
+             "maximum": 20000
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "calorieGoal"
+            },
+            "from": {
+             "anyOf": [
+              {
+               "type": "number",
+               "minimum": 0,
+               "maximum": 30000
+              },
+              {
+               "type": "null"
+              }
+             ]
+            },
+            "to": {
+             "anyOf": [
+              {
+               "type": "number",
+               "minimum": 0,
+               "maximum": 30000
+              },
+              {
+               "type": "null"
+              }
+             ]
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "phaseSetId"
+            },
+            "from": {
+             "anyOf": [
+              {
+               "type": "string",
+               "format": "uuid",
+               "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              {
+               "type": "null"
+              }
+             ]
+            },
+            "to": {
+             "anyOf": [
+              {
+               "type": "string",
+               "format": "uuid",
+               "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              {
+               "type": "null"
+              }
+             ]
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "sessionsPerCycle"
+            },
+            "from": {
+             "anyOf": [
+              {
+               "type": "integer",
+               "minimum": 1,
+               "maximum": 60
+              },
+              {
+               "type": "null"
+              }
+             ]
+            },
+            "to": {
+             "type": "integer",
+             "minimum": 1,
+             "maximum": 60
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "phaseMode"
+            },
+            "from": {
+             "anyOf": [
+              {
+               "type": "string",
+               "enum": [
+                "manual",
+                "automatic",
+                "ai_dynamic"
+               ]
+              },
+              {
+               "type": "null"
+              }
+             ]
+            },
+            "to": {
+             "type": "string",
+             "enum": [
+              "manual",
+              "automatic",
+              "ai_dynamic"
+             ]
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "muscleName"
+            },
+            "from": {
+             "type": [
+              "string",
+              "null"
+             ]
+            },
+            "to": {
+             "type": "string",
+             "minLength": 1,
+             "maxLength": 60
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "severity"
+            },
+            "from": {
+             "anyOf": [
+              {
+               "type": "string",
+               "enum": [
+                "mild",
+                "moderate",
+                "severe"
+               ]
+              },
+              {
+               "type": "null"
+              }
+             ]
+            },
+            "to": {
+             "type": "string",
+             "enum": [
+              "mild",
+              "moderate",
+              "severe"
+             ]
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "notes"
+            },
+            "from": {
+             "type": [
+              "string",
+              "null"
+             ]
+            },
+            "to": {
+             "type": "string",
+             "maxLength": 300
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "resolved"
+            },
+            "from": {
+             "type": "boolean"
+            },
+            "to": {
+             "type": "boolean"
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "deloadNow"
+            },
+            "from": {
+             "type": "boolean"
+            },
+            "to": {
+             "type": "boolean"
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          }
+         ]
+        }
+       }
+      },
+      "required": [
+       "domain",
+       "targetId",
+       "changes"
+      ],
+      "additionalProperties": false
+     }
+    },
+    "required": [
+     "kind",
+     "title",
+     "patch"
+    ],
+    "additionalProperties": false
+   }
+  },
+  "proposeChange": {
+   "description": "Propose a change to the user's program and show it for confirmation. Nothing is written until the user confirms — you are proposing, not applying.  Each change needs exactly four keys: `id` (any short unique string of your own), `field`, `from` (the CURRENT value, read from a tool result — never remembered), and `to`.  Pick the `domain` and use only its fields: · \"session_exercise\" — fields \"exerciseName\", \"styleId\", \"position\", \"removed\".   `targetId` is the session EXERCISE id from getProgramStructure. There is NO field for   sets, reps, percentage or rest — those are not stored on the exercise.   Never propose \"styleId\" when getProgramStructure gives phaseMode \"ai_dynamic\": the AI plan   replaces the progression style there, and the app refuses the change.   If the user names a replacement that findSwapCandidates did NOT return and that is not   in the catalogue at all (say \"Jefferson curl\"), you can still swap to it: add a second   change with field \"newExerciseMuscles\" whose `to` is the MAIN muscles it trains, comma   separated (\"Hamstrings, Lower back\"), and optionally \"newExerciseEquipment\"   (\"Barbell\"). That creates the exercise and swaps to it in one confirmation. Those   muscles drive deload and recovery, so give the real ones and let the user check them. · \"nutrition_targets\" — fields \"calories\", \"proteinG\", \"carbsG\", \"fatG\". `targetId` is null.   \"calories\" here is the rest-day figure the macro grams are fitted to; it does NOT change the   calorie budget the app shows. To change that budget, use user_goals \"calorieGoal\". · \"user_goals\" — fields \"stepsGoal\", \"calorieGoal\", \"waterGoalMl\". `targetId` is null.   \"calorieGoal\" is the user's OWN daily calorie target (800-10,000 kcal): while it is set it IS   the calorie budget on every screen, in place of the worked-out one. `from` is the current own   target from getGoalsAndInjuries, or null when none is set; `to` null clears it back to the   worked-out budget. Propose it only when the user asks to set or change their own target.   Never use it to \"fix\" the budget: that follows their goal, weight and movement. · \"injury\" — fields \"muscleName\", \"severity\" (\"mild\"/\"moderate\"/\"severe\"), \"notes\",   \"resolved\". `targetId` is null when logging a new one, and the injury id from   getGoalsAndInjuries when marking one recovered. · \"early_deload\" — one field, \"deloadNow\". `targetId` is null. `to` true starts a deload   week today, false cancels one already running; `from` is `deloadRunning` from   getGoalsAndInjuries. You do NOT choose the date — the app stamps today in the user's own   timezone. Use this when they say they are beaten up, need a lighter week, or ask to   deload now. · \"program_phase\" — fields \"phaseSetId\", \"sessionsPerCycle\", \"phaseMode\". `targetId` is   null. This one is heavier than the others: it can move the user backwards through a   block they have already earned, so it gets its own confirmation screen. Propose it only   when the user clearly asked to change their periodisation, never as a suggestion.  Example: {\"kind\":\"change_preview\",\"title\":\"Swap Deadlift\",\"patch\":{\"domain\":\"session_exercise\", \"targetId\":\"<exercise id>\",\"changes\":[{\"id\":\"c1\",\"field\":\"exerciseName\", \"from\":\"Barbell Deadlift\",\"to\":\"Romanian Deadlift\"}]}}  Logging an injury records it and nothing else — the app already works injuries into what it prescribes. Do not offer to remove or swap exercises because of one.  Do not describe what the change will cost; the app measures that itself and shows it.",
+   "inputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "const": "change_preview"
+     },
+     "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80
+     },
+     "patch": {
+      "type": "object",
+      "properties": {
+       "domain": {
+        "type": "string",
+        "enum": [
+         "session_exercise",
+         "nutrition_targets",
+         "user_goals",
+         "injury",
+         "program_phase",
+         "early_deload"
+        ]
+       },
+       "targetId": {
+        "anyOf": [
+         {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+         },
+         {
+          "type": "null"
+         }
+        ]
+       },
+       "changes": {
+        "minItems": 1,
+        "maxItems": 8,
+        "type": "array",
+        "items": {
+         "oneOf": [
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "exerciseName"
+            },
+            "from": {
+             "type": "string",
+             "minLength": 1
+            },
+            "to": {
+             "type": "string",
+             "minLength": 1
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "styleId"
+            },
+            "from": {
+             "anyOf": [
+              {
+               "type": "string",
+               "format": "uuid",
+               "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              {
+               "type": "null"
+              }
+             ]
+            },
+            "to": {
+             "anyOf": [
+              {
+               "type": "string",
+               "format": "uuid",
+               "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              {
+               "type": "null"
+              }
+             ]
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "newExerciseMuscles"
+            },
+            "from": {
+             "type": [
+              "string",
+              "null"
+             ]
+            },
+            "to": {
+             "type": "string",
+             "minLength": 1,
+             "maxLength": 200
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "newExerciseEquipment"
+            },
+            "from": {
+             "type": [
+              "string",
+              "null"
+             ]
+            },
+            "to": {
+             "type": "string",
+             "maxLength": 120
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "position"
+            },
+            "from": {
+             "type": "integer",
+             "minimum": 0,
+             "maximum": 9007199254740991
+            },
+            "to": {
+             "type": "integer",
+             "minimum": 0,
+             "maximum": 9007199254740991
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "removed"
+            },
+            "from": {
+             "type": "boolean"
+            },
+            "to": {
+             "type": "boolean"
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "calories"
+            },
+            "from": {
+             "anyOf": [
+              {
+               "type": "number",
+               "minimum": 0,
+               "maximum": 20000
+              },
+              {
+               "type": "null"
+              }
+             ]
+            },
+            "to": {
+             "type": "number",
+             "minimum": 0,
+             "maximum": 20000
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "proteinG"
+            },
+            "from": {
+             "anyOf": [
+              {
+               "type": "number",
+               "minimum": 0,
+               "maximum": 2000
+              },
+              {
+               "type": "null"
+              }
+             ]
+            },
+            "to": {
+             "type": "number",
+             "minimum": 0,
+             "maximum": 2000
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "carbsG"
+            },
+            "from": {
+             "anyOf": [
+              {
+               "type": "number",
+               "minimum": 0,
+               "maximum": 2000
+              },
+              {
+               "type": "null"
+              }
+             ]
+            },
+            "to": {
+             "type": "number",
+             "minimum": 0,
+             "maximum": 2000
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "fatG"
+            },
+            "from": {
+             "anyOf": [
+              {
+               "type": "number",
+               "minimum": 0,
+               "maximum": 2000
+              },
+              {
+               "type": "null"
+              }
+             ]
+            },
+            "to": {
+             "type": "number",
+             "minimum": 0,
+             "maximum": 2000
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "stepsGoal"
+            },
+            "from": {
+             "anyOf": [
+              {
+               "type": "integer",
+               "minimum": 0,
+               "maximum": 200000
+              },
+              {
+               "type": "null"
+              }
+             ]
+            },
+            "to": {
+             "type": "integer",
+             "minimum": 0,
+             "maximum": 200000
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "waterGoalMl"
+            },
+            "from": {
+             "anyOf": [
+              {
+               "type": "number",
+               "minimum": 0,
+               "maximum": 20000
+              },
+              {
+               "type": "null"
+              }
+             ]
+            },
+            "to": {
+             "type": "number",
+             "minimum": 0,
+             "maximum": 20000
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "calorieGoal"
+            },
+            "from": {
+             "anyOf": [
+              {
+               "type": "number",
+               "minimum": 0,
+               "maximum": 30000
+              },
+              {
+               "type": "null"
+              }
+             ]
+            },
+            "to": {
+             "anyOf": [
+              {
+               "type": "number",
+               "minimum": 0,
+               "maximum": 30000
+              },
+              {
+               "type": "null"
+              }
+             ]
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "phaseSetId"
+            },
+            "from": {
+             "anyOf": [
+              {
+               "type": "string",
+               "format": "uuid",
+               "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              {
+               "type": "null"
+              }
+             ]
+            },
+            "to": {
+             "anyOf": [
+              {
+               "type": "string",
+               "format": "uuid",
+               "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              {
+               "type": "null"
+              }
+             ]
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "sessionsPerCycle"
+            },
+            "from": {
+             "anyOf": [
+              {
+               "type": "integer",
+               "minimum": 1,
+               "maximum": 60
+              },
+              {
+               "type": "null"
+              }
+             ]
+            },
+            "to": {
+             "type": "integer",
+             "minimum": 1,
+             "maximum": 60
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "phaseMode"
+            },
+            "from": {
+             "anyOf": [
+              {
+               "type": "string",
+               "enum": [
+                "manual",
+                "automatic",
+                "ai_dynamic"
+               ]
+              },
+              {
+               "type": "null"
+              }
+             ]
+            },
+            "to": {
+             "type": "string",
+             "enum": [
+              "manual",
+              "automatic",
+              "ai_dynamic"
+             ]
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "muscleName"
+            },
+            "from": {
+             "type": [
+              "string",
+              "null"
+             ]
+            },
+            "to": {
+             "type": "string",
+             "minLength": 1,
+             "maxLength": 60
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "severity"
+            },
+            "from": {
+             "anyOf": [
+              {
+               "type": "string",
+               "enum": [
+                "mild",
+                "moderate",
+                "severe"
+               ]
+              },
+              {
+               "type": "null"
+              }
+             ]
+            },
+            "to": {
+             "type": "string",
+             "enum": [
+              "mild",
+              "moderate",
+              "severe"
+             ]
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "notes"
+            },
+            "from": {
+             "type": [
+              "string",
+              "null"
+             ]
+            },
+            "to": {
+             "type": "string",
+             "maxLength": 300
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "resolved"
+            },
+            "from": {
+             "type": "boolean"
+            },
+            "to": {
+             "type": "boolean"
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "deloadNow"
+            },
+            "from": {
+             "type": "boolean"
+            },
+            "to": {
+             "type": "boolean"
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          }
+         ]
+        }
+       }
+      },
+      "required": [
+       "domain",
+       "targetId",
+       "changes"
+      ],
+      "additionalProperties": false
+     }
+    },
+    "required": [
+     "kind",
+     "title",
+     "patch"
+    ],
+    "additionalProperties": false
+   }
+  }
+ },
+ "nutrition": {
+  "renderChoiceList": {
+   "description": "Show the user a list to pick from instead of asking them to type a name.  **Prefer `source` and write NO options.** The app fills the rows from the database itself, which is faster for the user and cannot go wrong: · source \"sessions\" — every session in the program. No sourceId. · source \"exercises\" — exercises to choose between. sourceId = a session id to limit it to   that session; omit sourceId for every exercise in the program, which is what you want   when the user said \"change an exercise\" without naming a day. Add `query` with the words   the user used (\"pulldown\") to show only the exercises whose name contains them — use it   when the name they gave matches more than one. · source \"swap_candidates\" — replacements for an exercise. sourceId = the session exercise   id. Same matching as findSwapCandidates, so you do NOT need to call that tool first when you are only going to show the list.  Write `options` yourself ONLY for a list the app cannot derive — a chart legend, a set of judgement calls. Then every id must come from a tool result; an invented one produces a list the user cannot act on.  Do not use this at all when the user has already been specific enough to act on.",
+   "inputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "const": "choice_list"
+     },
+     "prompt": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160
+     },
+     "source": {
+      "type": "string",
+      "enum": [
+       "grocery_stores",
+       "proteins",
+       "carbs",
+       "fats",
+       "vegetables",
+       "dietary_restrictions"
+      ]
+     },
+     "sourceId": {
+      "type": "string"
+     },
+     "query": {
+      "type": "string",
+      "maxLength": 60
+     },
+     "multi": {
+      "type": "boolean"
+     },
+     "selectAll": {
+      "type": "boolean"
+     },
+     "options": {
+      "minItems": 1,
+      "maxItems": 24,
+      "type": "array",
+      "items": {
+       "type": "object",
+       "properties": {
+        "id": {
+         "type": "string",
+         "minLength": 1
+        },
+        "title": {
+         "type": "string",
+         "minLength": 1,
+         "maxLength": 80
+        },
+        "subtitle": {
+         "type": "string",
+         "maxLength": 140
+        },
+        "colorKey": {
+         "type": "string",
+         "enum": [
+          "cyan",
+          "green",
+          "amber",
+          "purple",
+          "destructive"
+         ]
+        }
+       },
+       "required": [
+        "id",
+        "title"
+       ],
+       "additionalProperties": false
+      }
+     }
+    },
+    "required": [
+     "kind",
+     "prompt"
+    ],
+    "additionalProperties": false
+   }
+  },
+  "renderChart": {
+   "description": "Draw a chart in the conversation. Use it when the answer is a series the user asked to see — a trend over time, a comparison between a handful of things — instead of listing the numbers in prose. If they said \"on a chart\", \"show me\", or \"graph\", they want this.  Every number must come from a tool result. `labels` are the x-axis categories (dates, exercise names) and each dataset's `data` lines up with them one for one. \"line\" for anything over time, \"bar\" to compare separate things, \"pie\" only for parts of a whole.  It shows something; it does not ask anything, so you can keep talking straight after it — one short sentence naming what the picture shows. Do NOT also list the same numbers in text, and do NOT follow it with a choice list of the same items unless the user actually has to pick one of them.",
+   "inputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "const": "chart"
+     },
+     "chartType": {
+      "type": "string",
+      "enum": [
+       "line",
+       "bar",
+       "pie"
+      ]
+     },
+     "title": {
+      "type": "string",
+      "maxLength": 60
+     },
+     "labels": {
+      "minItems": 2,
+      "maxItems": 40,
+      "type": "array",
+      "items": {
+       "type": "string",
+       "maxLength": 40
+      }
+     },
+     "datasets": {
+      "minItems": 1,
+      "maxItems": 4,
+      "type": "array",
+      "items": {
+       "type": "object",
+       "properties": {
+        "label": {
+         "type": "string",
+         "minLength": 1,
+         "maxLength": 40
+        },
+        "data": {
+         "minItems": 2,
+         "maxItems": 40,
+         "type": "array",
+         "items": {
+          "type": "number"
+         }
+        },
+        "colorKey": {
+         "type": "string",
+         "enum": [
+          "cyan",
+          "green",
+          "amber",
+          "purple",
+          "destructive"
+         ]
+        }
+       },
+       "required": [
+        "label",
+        "data"
+       ],
+       "additionalProperties": false
+      }
+     }
+    },
+    "required": [
+     "kind",
+     "chartType",
+     "labels",
+     "datasets"
+    ],
+    "additionalProperties": false
+   }
+  },
+  "showMealPlan": {
+   "description": "Show the user their meal plan as a card, with a button that copies every meal into My Foods. Use it when they ask what is on their plan, after you have helped them change it, and whenever a planning conversation reaches its end — the plan is disposable and the saved meals are what survives it, so this is how a meal-plan conversation finishes.  Call getMealPlan first: if it returns available:false there is nothing to show, so say so and offer to help them build one instead of calling this.  Do NOT write the meals out. This tool takes a title and nothing else — the app fills in every meal, its calories and its ingredient count from the plan it already holds, which is faster than you typing them and cannot disagree with what is stored. Omit planId for their active plan, which is what \"my plan\" means; pass one only when they asked about a different plan you read from getMealPlan.",
+   "inputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "const": "plan_card"
+     },
+     "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 60
+     },
+     "planId": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "kind",
+     "title"
+    ],
+    "additionalProperties": false
+   }
+  },
+  "handOff": {
+   "description": "Point the user at the screen that does something you cannot. Use for building a whole new program (program_builder), logging a run or activity (log_activity), account and profile settings (profile), or logging food (nutrition). Say in one sentence why it is not something you do, then hand off — do not apologise, and offer the nearest thing you CAN do afterwards.",
+   "inputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "const": "handoff"
+     },
+     "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 60
+     },
+     "subtitle": {
+      "type": "string",
+      "maxLength": 100
+     },
+     "destination": {
+      "type": "string",
+      "enum": [
+       "program_builder",
+       "log_activity",
+       "profile",
+       "nutrition"
+      ]
+     }
+    },
+    "required": [
+     "kind",
+     "title",
+     "destination"
+    ],
+    "additionalProperties": false
+   }
+  },
+  "askForNumber": {
+   "description": "Let the user set a single number on a dial instead of typing it. Use when they asked for a change without saying how much — \"bump my calories a bit\" has no number in it. If they DID give a number, skip this and use proposeChange. One change only, and `from` must be the current value from getGoalsAndInjuries.",
+   "inputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "const": "number_dial"
+     },
+     "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 60
+     },
+     "patch": {
+      "type": "object",
+      "properties": {
+       "domain": {
+        "type": "string",
+        "enum": [
+         "nutrition_targets",
+         "user_goals"
+        ]
+       },
+       "targetId": {
+        "anyOf": [
+         {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+         },
+         {
+          "type": "null"
+         }
+        ]
+       },
+       "changes": {
+        "minItems": 1,
+        "maxItems": 8,
+        "type": "array",
+        "items": {
+         "oneOf": [
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "exerciseName"
+            },
+            "from": {
+             "type": "string",
+             "minLength": 1
+            },
+            "to": {
+             "type": "string",
+             "minLength": 1
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "styleId"
+            },
+            "from": {
+             "anyOf": [
+              {
+               "type": "string",
+               "format": "uuid",
+               "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              {
+               "type": "null"
+              }
+             ]
+            },
+            "to": {
+             "anyOf": [
+              {
+               "type": "string",
+               "format": "uuid",
+               "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              {
+               "type": "null"
+              }
+             ]
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "newExerciseMuscles"
+            },
+            "from": {
+             "type": [
+              "string",
+              "null"
+             ]
+            },
+            "to": {
+             "type": "string",
+             "minLength": 1,
+             "maxLength": 200
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "newExerciseEquipment"
+            },
+            "from": {
+             "type": [
+              "string",
+              "null"
+             ]
+            },
+            "to": {
+             "type": "string",
+             "maxLength": 120
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "position"
+            },
+            "from": {
+             "type": "integer",
+             "minimum": 0,
+             "maximum": 9007199254740991
+            },
+            "to": {
+             "type": "integer",
+             "minimum": 0,
+             "maximum": 9007199254740991
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "removed"
+            },
+            "from": {
+             "type": "boolean"
+            },
+            "to": {
+             "type": "boolean"
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "calories"
+            },
+            "from": {
+             "anyOf": [
+              {
+               "type": "number",
+               "minimum": 0,
+               "maximum": 20000
+              },
+              {
+               "type": "null"
+              }
+             ]
+            },
+            "to": {
+             "type": "number",
+             "minimum": 0,
+             "maximum": 20000
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "proteinG"
+            },
+            "from": {
+             "anyOf": [
+              {
+               "type": "number",
+               "minimum": 0,
+               "maximum": 2000
+              },
+              {
+               "type": "null"
+              }
+             ]
+            },
+            "to": {
+             "type": "number",
+             "minimum": 0,
+             "maximum": 2000
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "carbsG"
+            },
+            "from": {
+             "anyOf": [
+              {
+               "type": "number",
+               "minimum": 0,
+               "maximum": 2000
+              },
+              {
+               "type": "null"
+              }
+             ]
+            },
+            "to": {
+             "type": "number",
+             "minimum": 0,
+             "maximum": 2000
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "fatG"
+            },
+            "from": {
+             "anyOf": [
+              {
+               "type": "number",
+               "minimum": 0,
+               "maximum": 2000
+              },
+              {
+               "type": "null"
+              }
+             ]
+            },
+            "to": {
+             "type": "number",
+             "minimum": 0,
+             "maximum": 2000
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "stepsGoal"
+            },
+            "from": {
+             "anyOf": [
+              {
+               "type": "integer",
+               "minimum": 0,
+               "maximum": 200000
+              },
+              {
+               "type": "null"
+              }
+             ]
+            },
+            "to": {
+             "type": "integer",
+             "minimum": 0,
+             "maximum": 200000
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "waterGoalMl"
+            },
+            "from": {
+             "anyOf": [
+              {
+               "type": "number",
+               "minimum": 0,
+               "maximum": 20000
+              },
+              {
+               "type": "null"
+              }
+             ]
+            },
+            "to": {
+             "type": "number",
+             "minimum": 0,
+             "maximum": 20000
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "calorieGoal"
+            },
+            "from": {
+             "anyOf": [
+              {
+               "type": "number",
+               "minimum": 0,
+               "maximum": 30000
+              },
+              {
+               "type": "null"
+              }
+             ]
+            },
+            "to": {
+             "anyOf": [
+              {
+               "type": "number",
+               "minimum": 0,
+               "maximum": 30000
+              },
+              {
+               "type": "null"
+              }
+             ]
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "phaseSetId"
+            },
+            "from": {
+             "anyOf": [
+              {
+               "type": "string",
+               "format": "uuid",
+               "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              {
+               "type": "null"
+              }
+             ]
+            },
+            "to": {
+             "anyOf": [
+              {
+               "type": "string",
+               "format": "uuid",
+               "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              {
+               "type": "null"
+              }
+             ]
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "sessionsPerCycle"
+            },
+            "from": {
+             "anyOf": [
+              {
+               "type": "integer",
+               "minimum": 1,
+               "maximum": 60
+              },
+              {
+               "type": "null"
+              }
+             ]
+            },
+            "to": {
+             "type": "integer",
+             "minimum": 1,
+             "maximum": 60
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "phaseMode"
+            },
+            "from": {
+             "anyOf": [
+              {
+               "type": "string",
+               "enum": [
+                "manual",
+                "automatic",
+                "ai_dynamic"
+               ]
+              },
+              {
+               "type": "null"
+              }
+             ]
+            },
+            "to": {
+             "type": "string",
+             "enum": [
+              "manual",
+              "automatic",
+              "ai_dynamic"
+             ]
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "muscleName"
+            },
+            "from": {
+             "type": [
+              "string",
+              "null"
+             ]
+            },
+            "to": {
+             "type": "string",
+             "minLength": 1,
+             "maxLength": 60
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "severity"
+            },
+            "from": {
+             "anyOf": [
+              {
+               "type": "string",
+               "enum": [
+                "mild",
+                "moderate",
+                "severe"
+               ]
+              },
+              {
+               "type": "null"
+              }
+             ]
+            },
+            "to": {
+             "type": "string",
+             "enum": [
+              "mild",
+              "moderate",
+              "severe"
+             ]
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "notes"
+            },
+            "from": {
+             "type": [
+              "string",
+              "null"
+             ]
+            },
+            "to": {
+             "type": "string",
+             "maxLength": 300
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "resolved"
+            },
+            "from": {
+             "type": "boolean"
+            },
+            "to": {
+             "type": "boolean"
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "deloadNow"
+            },
+            "from": {
+             "type": "boolean"
+            },
+            "to": {
+             "type": "boolean"
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          }
+         ]
+        }
+       }
+      },
+      "required": [
+       "domain",
+       "targetId",
+       "changes"
+      ],
+      "additionalProperties": false
+     }
+    },
+    "required": [
+     "kind",
+     "title",
+     "patch"
+    ],
+    "additionalProperties": false
+   }
+  },
+  "proposeChange": {
+   "description": "Propose a change to the user's program and show it for confirmation. Nothing is written until the user confirms — you are proposing, not applying.  Each change needs exactly four keys: `id` (any short unique string of your own), `field`, `from` (the CURRENT value, read from a tool result — never remembered), and `to`.  Pick the `domain` and use only its fields: · \"session_exercise\" — fields \"exerciseName\", \"styleId\", \"position\", \"removed\".   `targetId` is the session EXERCISE id from getProgramStructure. There is NO field for   sets, reps, percentage or rest — those are not stored on the exercise.   Never propose \"styleId\" when getProgramStructure gives phaseMode \"ai_dynamic\": the AI plan   replaces the progression style there, and the app refuses the change.   If the user names a replacement that findSwapCandidates did NOT return and that is not   in the catalogue at all (say \"Jefferson curl\"), you can still swap to it: add a second   change with field \"newExerciseMuscles\" whose `to` is the MAIN muscles it trains, comma   separated (\"Hamstrings, Lower back\"), and optionally \"newExerciseEquipment\"   (\"Barbell\"). That creates the exercise and swaps to it in one confirmation. Those   muscles drive deload and recovery, so give the real ones and let the user check them. · \"nutrition_targets\" — fields \"calories\", \"proteinG\", \"carbsG\", \"fatG\". `targetId` is null.   \"calories\" here is the rest-day figure the macro grams are fitted to; it does NOT change the   calorie budget the app shows. To change that budget, use user_goals \"calorieGoal\". · \"user_goals\" — fields \"stepsGoal\", \"calorieGoal\", \"waterGoalMl\". `targetId` is null.   \"calorieGoal\" is the user's OWN daily calorie target (800-10,000 kcal): while it is set it IS   the calorie budget on every screen, in place of the worked-out one. `from` is the current own   target from getGoalsAndInjuries, or null when none is set; `to` null clears it back to the   worked-out budget. Propose it only when the user asks to set or change their own target.   Never use it to \"fix\" the budget: that follows their goal, weight and movement. · \"injury\" — fields \"muscleName\", \"severity\" (\"mild\"/\"moderate\"/\"severe\"), \"notes\",   \"resolved\". `targetId` is null when logging a new one, and the injury id from   getGoalsAndInjuries when marking one recovered. · \"early_deload\" — one field, \"deloadNow\". `targetId` is null. `to` true starts a deload   week today, false cancels one already running; `from` is `deloadRunning` from   getGoalsAndInjuries. You do NOT choose the date — the app stamps today in the user's own   timezone. Use this when they say they are beaten up, need a lighter week, or ask to   deload now. · \"program_phase\" — fields \"phaseSetId\", \"sessionsPerCycle\", \"phaseMode\". `targetId` is   null. This one is heavier than the others: it can move the user backwards through a   block they have already earned, so it gets its own confirmation screen. Propose it only   when the user clearly asked to change their periodisation, never as a suggestion.  Example: {\"kind\":\"change_preview\",\"title\":\"Swap Deadlift\",\"patch\":{\"domain\":\"session_exercise\", \"targetId\":\"<exercise id>\",\"changes\":[{\"id\":\"c1\",\"field\":\"exerciseName\", \"from\":\"Barbell Deadlift\",\"to\":\"Romanian Deadlift\"}]}}  Logging an injury records it and nothing else — the app already works injuries into what it prescribes. Do not offer to remove or swap exercises because of one.  Do not describe what the change will cost; the app measures that itself and shows it.",
+   "inputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "const": "change_preview"
+     },
+     "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80
+     },
+     "patch": {
+      "type": "object",
+      "properties": {
+       "domain": {
+        "type": "string",
+        "enum": [
+         "nutrition_targets",
+         "user_goals"
+        ]
+       },
+       "targetId": {
+        "anyOf": [
+         {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+         },
+         {
+          "type": "null"
+         }
+        ]
+       },
+       "changes": {
+        "minItems": 1,
+        "maxItems": 8,
+        "type": "array",
+        "items": {
+         "oneOf": [
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "exerciseName"
+            },
+            "from": {
+             "type": "string",
+             "minLength": 1
+            },
+            "to": {
+             "type": "string",
+             "minLength": 1
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "styleId"
+            },
+            "from": {
+             "anyOf": [
+              {
+               "type": "string",
+               "format": "uuid",
+               "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              {
+               "type": "null"
+              }
+             ]
+            },
+            "to": {
+             "anyOf": [
+              {
+               "type": "string",
+               "format": "uuid",
+               "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              {
+               "type": "null"
+              }
+             ]
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "newExerciseMuscles"
+            },
+            "from": {
+             "type": [
+              "string",
+              "null"
+             ]
+            },
+            "to": {
+             "type": "string",
+             "minLength": 1,
+             "maxLength": 200
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "newExerciseEquipment"
+            },
+            "from": {
+             "type": [
+              "string",
+              "null"
+             ]
+            },
+            "to": {
+             "type": "string",
+             "maxLength": 120
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "position"
+            },
+            "from": {
+             "type": "integer",
+             "minimum": 0,
+             "maximum": 9007199254740991
+            },
+            "to": {
+             "type": "integer",
+             "minimum": 0,
+             "maximum": 9007199254740991
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "removed"
+            },
+            "from": {
+             "type": "boolean"
+            },
+            "to": {
+             "type": "boolean"
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "calories"
+            },
+            "from": {
+             "anyOf": [
+              {
+               "type": "number",
+               "minimum": 0,
+               "maximum": 20000
+              },
+              {
+               "type": "null"
+              }
+             ]
+            },
+            "to": {
+             "type": "number",
+             "minimum": 0,
+             "maximum": 20000
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "proteinG"
+            },
+            "from": {
+             "anyOf": [
+              {
+               "type": "number",
+               "minimum": 0,
+               "maximum": 2000
+              },
+              {
+               "type": "null"
+              }
+             ]
+            },
+            "to": {
+             "type": "number",
+             "minimum": 0,
+             "maximum": 2000
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "carbsG"
+            },
+            "from": {
+             "anyOf": [
+              {
+               "type": "number",
+               "minimum": 0,
+               "maximum": 2000
+              },
+              {
+               "type": "null"
+              }
+             ]
+            },
+            "to": {
+             "type": "number",
+             "minimum": 0,
+             "maximum": 2000
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "fatG"
+            },
+            "from": {
+             "anyOf": [
+              {
+               "type": "number",
+               "minimum": 0,
+               "maximum": 2000
+              },
+              {
+               "type": "null"
+              }
+             ]
+            },
+            "to": {
+             "type": "number",
+             "minimum": 0,
+             "maximum": 2000
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "stepsGoal"
+            },
+            "from": {
+             "anyOf": [
+              {
+               "type": "integer",
+               "minimum": 0,
+               "maximum": 200000
+              },
+              {
+               "type": "null"
+              }
+             ]
+            },
+            "to": {
+             "type": "integer",
+             "minimum": 0,
+             "maximum": 200000
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "waterGoalMl"
+            },
+            "from": {
+             "anyOf": [
+              {
+               "type": "number",
+               "minimum": 0,
+               "maximum": 20000
+              },
+              {
+               "type": "null"
+              }
+             ]
+            },
+            "to": {
+             "type": "number",
+             "minimum": 0,
+             "maximum": 20000
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "calorieGoal"
+            },
+            "from": {
+             "anyOf": [
+              {
+               "type": "number",
+               "minimum": 0,
+               "maximum": 30000
+              },
+              {
+               "type": "null"
+              }
+             ]
+            },
+            "to": {
+             "anyOf": [
+              {
+               "type": "number",
+               "minimum": 0,
+               "maximum": 30000
+              },
+              {
+               "type": "null"
+              }
+             ]
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "phaseSetId"
+            },
+            "from": {
+             "anyOf": [
+              {
+               "type": "string",
+               "format": "uuid",
+               "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              {
+               "type": "null"
+              }
+             ]
+            },
+            "to": {
+             "anyOf": [
+              {
+               "type": "string",
+               "format": "uuid",
+               "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              {
+               "type": "null"
+              }
+             ]
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "sessionsPerCycle"
+            },
+            "from": {
+             "anyOf": [
+              {
+               "type": "integer",
+               "minimum": 1,
+               "maximum": 60
+              },
+              {
+               "type": "null"
+              }
+             ]
+            },
+            "to": {
+             "type": "integer",
+             "minimum": 1,
+             "maximum": 60
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "phaseMode"
+            },
+            "from": {
+             "anyOf": [
+              {
+               "type": "string",
+               "enum": [
+                "manual",
+                "automatic",
+                "ai_dynamic"
+               ]
+              },
+              {
+               "type": "null"
+              }
+             ]
+            },
+            "to": {
+             "type": "string",
+             "enum": [
+              "manual",
+              "automatic",
+              "ai_dynamic"
+             ]
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "muscleName"
+            },
+            "from": {
+             "type": [
+              "string",
+              "null"
+             ]
+            },
+            "to": {
+             "type": "string",
+             "minLength": 1,
+             "maxLength": 60
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "severity"
+            },
+            "from": {
+             "anyOf": [
+              {
+               "type": "string",
+               "enum": [
+                "mild",
+                "moderate",
+                "severe"
+               ]
+              },
+              {
+               "type": "null"
+              }
+             ]
+            },
+            "to": {
+             "type": "string",
+             "enum": [
+              "mild",
+              "moderate",
+              "severe"
+             ]
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "notes"
+            },
+            "from": {
+             "type": [
+              "string",
+              "null"
+             ]
+            },
+            "to": {
+             "type": "string",
+             "maxLength": 300
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "resolved"
+            },
+            "from": {
+             "type": "boolean"
+            },
+            "to": {
+             "type": "boolean"
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          },
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "minLength": 1
+            },
+            "field": {
+             "type": "string",
+             "const": "deloadNow"
+            },
+            "from": {
+             "type": "boolean"
+            },
+            "to": {
+             "type": "boolean"
+            }
+           },
+           "required": [
+            "id",
+            "field",
+            "from",
+            "to"
+           ],
+           "additionalProperties": false
+          }
+         ]
+        }
+       }
+      },
+      "required": [
+       "domain",
+       "targetId",
+       "changes"
+      ],
+      "additionalProperties": false
+     }
+    },
+    "required": [
+     "kind",
+     "title",
+     "patch"
+    ],
+    "additionalProperties": false
+   }
+  }
+ }
+}
