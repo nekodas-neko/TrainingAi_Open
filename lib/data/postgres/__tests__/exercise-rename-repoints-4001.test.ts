@@ -131,7 +131,7 @@ describe.skipIf(!canRun)('rename repoints estimates, preferences and hr stats (#
   })
 
   describe('collisions: the target name already has a row for that user', () => {
-    it('estimates: the target row wins, the source row is neither deleted nor merged in', async () => {
+    it('estimates: the target row wins, and the leftover source row is removed (#4035, owner-approved)', async () => {
       const oldName = name('old'); const newName = name('new')
       const entry = await repo.createExercise({ name: oldName, muscles: [], equipment: [], createdBy: CREATOR })
       await estimate(CREATOR, oldName, 80)
@@ -139,7 +139,7 @@ describe.skipIf(!canRun)('rename repoints estimates, preferences and hr stats (#
       await estimate(OTHER, oldName, 40) // no collision for this user: moves
       await repo.renameExercise(CREATOR, entry.id, newName)
       expect(await estimatesOf(CREATOR, newName)).toEqual([120])
-      expect(await estimatesOf(CREATOR, oldName)).toEqual([80])
+      expect(await estimatesOf(CREATOR, oldName)).toEqual([]) // was [80] before #4035 (the leftover stayed)
       expect(await estimatesOf(OTHER, newName)).toEqual([40])
     })
 
