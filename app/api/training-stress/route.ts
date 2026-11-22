@@ -10,9 +10,9 @@ import {
   ageFromDob,
   dateStrMidnightInTz,
   shiftDateStr,
-  localClockTimeToDate,
 } from '@trainingai/shared/date-utils';
 import { rateLimit } from '@/lib/rate-limit';
+import { activityLogWindow } from '@trainingai/shared/running/heart-health';
 import {
   computeTrainingStress,
   metGridFromDaytimeSamples,
@@ -282,21 +282,15 @@ function activityWindow(
   a: ActivityLog,
   tz: string,
 ): { startMs: number; endMs: number; met: number | null; source: string }[] {
-  const start = localClockTimeToDate(a.date, a.startTime, tz);
-  let end = localClockTimeToDate(a.date, a.endTime, tz);
-  if (!start) return [];
-  if (!end && a.durationMin != null && a.durationMin > 0)
-    end = new Date(start.getTime() + a.durationMin * 60_000);
-  if (!end) return [];
-  // An end before the start crossed midnight: the same clock time on the next local day, not +24 h,
-  // which is an hour off across a daylight-saving change (#3406).
-  const endMs = end.getTime() <= start.getTime()
-    ? (localClockTimeToDate(shiftDateStr(a.date, 1), a.endTime, tz) ?? end).getTime()
-    : end.getTime();
+  // The one rule for placing a log (`activityLogWindow`): an end before the start crossed midnight,
+  // an end equal to the start is not a 24-hour interval, a duration-substituted span must be
+  // plausible. The old copy here turned a 15:50-15:50 log into a day-long movement interval.
+  const w = activityLogWindow(a, tz);
+  if (!w) return [];
   return [
     {
-      startMs: start.getTime(),
-      endMs,
+      startMs: w.from.getTime(),
+      endMs: w.to.getTime(),
       met: metForActivity(ouraIdForActivityType(a.activityType), intensityFromRpe(null)),
       source: 'activity_log',
     },

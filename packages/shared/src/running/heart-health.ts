@@ -1,6 +1,7 @@
 import { fromZonedTime } from 'date-fns-tz'
 import { shiftDateStr } from '../date-utils'
 import { moderateIntensityBpm } from '../health/hr-zones'
+import { isPlausibleSessionDuration } from '../health/session-plausibility'
 import { forEachCreditedInterval, type GapOptions, type HrReading } from '../health/zone-minutes'
 
 /**
@@ -138,10 +139,20 @@ export function completedAsForActivity(activityType: string | null): 'run' | 'wa
 const ROLLED_SPAN_TOLERANCE_MS = 60 * 60_000
 
 /**
- * The instant window an activity log covers, from its local date and "HH:MM[:SS]" clock times.
+ * The instant window an activity log covers, from its local date and "HH:MM[:SS]" clock times. The
+ * ONE place a log's clock times become a window (heart-health, walking plan, stress day, the
+ * training-stress input, detected walks, the energy budget, the phone's recorded spans).
+ *
  * Null without a start time: a log with only a duration cannot be placed against the heart-rate
- * series, so its minutes are unknown rather than guessed. An end before the start crossed
- * midnight; an end equal to the start is a zero-length log and gives no window.
+ * series, so its minutes are unknown rather than guessed. Then:
+ * - end after start: that span, as stored.
+ * - end equal to start: a zero-length entry (a 12-second treadmill log), never a 24-hour one. With a
+ *   plausible `durationMin` the window is start + duration; without one, no window.
+ * - end before start: crossed midnight, the next local day's clock time. If `durationMin` is more
+ *   than an hour off that span, the end was mistyped and start + duration is used, but only when
+ *   the duration is plausible (`MAX_PLAUSIBLE_SESSION_MIN`, 4 h); otherwise no window. With no
+ *   duration to confirm it, a rolled span is accepted only up to that same bound.
+ * - no end: start + `durationMin`.
  */
 export function activityLogWindow(
   log: { date: string; startTime?: string | null; endTime?: string | null; durationMin?: number | null },
@@ -150,27 +161,29 @@ export function activityLogWindow(
   if (!log.startTime) return null
   const from = fromZonedTime(`${log.date}T${log.startTime.slice(0, 5)}:00`, tz)
   if (!Number.isFinite(from.getTime())) return null
-  let to: Date | null = null
-  if (log.endTime) {
-    const hhmm = log.endTime.slice(0, 5)
-    let end = fromZonedTime(`${log.date}T${hhmm}:00`, tz)
-    // Only an end strictly before the start crossed midnight. An end equal to the start is a
-    // zero-length log (a 12-second treadmill entry), not a 24-hour one: reading it as the next day
-    // credited a whole day's heart-rate readings to it.
-    if (end.getTime() < from.getTime()) {
-      // The next local day's clock time, not +24 h: a DST night is not 24 hours long.
-      end = fromZonedTime(`${shiftDateStr(log.date, 1)}T${hhmm}:00`, tz)
-      // A rolled span that is more than an hour off the stored duration was a mistyped end time,
-      // not an overnight activity: the duration is the better witness.
-      if (log.durationMin != null && log.durationMin > 0
-        && Math.abs(end.getTime() - from.getTime() - log.durationMin * 60_000) > ROLLED_SPAN_TOLERANCE_MS) {
-        end = new Date(from.getTime() + log.durationMin * 60_000)
-      }
-    }
-    if (Number.isFinite(end.getTime())) to = end
+  const hasDuration = log.durationMin != null && log.durationMin > 0
+  const byDuration = () =>
+    hasDuration && isPlausibleSessionDuration(log.durationMin)
+      ? { from, to: new Date(from.getTime() + log.durationMin! * 60_000) }
+      : null
+  if (!log.endTime) {
+    const to = hasDuration ? new Date(from.getTime() + log.durationMin! * 60_000) : null
+    return to != null && Number.isFinite(to.getTime()) ? { from, to } : null
   }
-  if (to == null && log.durationMin != null && log.durationMin > 0) {
-    to = new Date(from.getTime() + log.durationMin * 60_000)
+  const hhmm = log.endTime.slice(0, 5)
+  let end = fromZonedTime(`${log.date}T${hhmm}:00`, tz)
+  if (!Number.isFinite(end.getTime())) return byDuration()
+  if (end.getTime() === from.getTime()) return byDuration()
+  if (end.getTime() > from.getTime()) return { from, to: end }
+  // Only an end strictly before the start crossed midnight. The next local day's clock time, not
+  // +24 h: a DST night is not 24 hours long.
+  end = fromZonedTime(`${shiftDateStr(log.date, 1)}T${hhmm}:00`, tz)
+  if (!Number.isFinite(end.getTime())) return byDuration()
+  const spanMs = end.getTime() - from.getTime()
+  if (hasDuration) {
+    // More than an hour off the stored duration: a mistyped end, the duration is the better witness.
+    return Math.abs(spanMs - log.durationMin! * 60_000) > ROLLED_SPAN_TOLERANCE_MS ? byDuration() : { from, to: end }
   }
-  return to != null && to.getTime() > from.getTime() ? { from, to } : null
+  // Nothing confirms the rolled span: believe it only as far as one session can be.
+  return isPlausibleSessionDuration(spanMs / 60_000) ? { from, to: end } : null
 }
