@@ -1,6 +1,6 @@
 // #3890: the week in three lines, from numbers code worked out (no model). Fake lift names.
 import { describe, it, expect } from 'vitest'
-import { directionOf, missedRepInWeek, summarizeWeek } from '../summary'
+import { directionOf, logHasMissedRep, missedRepInWeek, summarizeWeek } from '../summary'
 import type { SessionRead, SessionReadSetResult } from '../../ai-periodization/session-read'
 
 const set = (cls: SessionReadSetResult['cls'], missReps = 0): SessionReadSetResult => ({ setNumber: 1, cls, missReps, excusedReps: 0, restBeforeRatio: null })
@@ -26,16 +26,20 @@ describe('directionOf: what the session read says, in words the card can show', 
   })
 })
 
-describe('missedRepInWeek (decision 9\'s "missed rep")', () => {
-  it('a set short of its planned reps in any session of the week', () => {
-    expect(missedRepInWeek([{ day: 'd1', read: read({}) }, { day: 'd2', read: read({ sets: [set('met'), set('miss', 1)] }) }])).toBe(true)
+describe('the missed rep comes from the logged sets, not the shadow read (decision 9)', () => {
+  it('a set short of its planned reps', () => {
+    expect(logHasMissedRep([{ reps: 5, plannedReps: 5 }, { reps: 4, plannedReps: 5 }])).toBe(true)
   })
-  it('a heavier set the lifter chose, or none missed, is not a miss', () => {
-    expect(missedRepInWeek([{ day: 'd1', read: read({ sets: [set('miss-self-heavier', 2), set('beat')] }) }])).toBe(false)
+  it('met, beaten, or with no planned reps is not a miss', () => {
+    expect(logHasMissedRep([{ reps: 5, plannedReps: 5 }, { reps: 7, plannedReps: 5 }, { reps: 2, plannedReps: null }])).toBe(false)
   })
-  it('no readable session is no answer, not "no miss"', () => {
+  it('any log of the week; no log is no answer, not "no miss"', () => {
+    expect(missedRepInWeek([{ day: 'd1', read: read({}), missedRep: false }, { day: 'd2', read: read({}), missedRep: true }])).toBe(true)
+    expect(missedRepInWeek([{ day: 'd1', read: read({}), missedRep: false }])).toBe(false)
     expect(missedRepInWeek([])).toBeNull()
-    expect(missedRepInWeek([{ day: 'd1', read: read({ verdict: 'too-little-data', sets: [] }) }])).toBeNull()
+  })
+  it('a read that says nothing was missed does not hide a short set', () => {
+    expect(missedRepInWeek([{ day: 'd1', read: read({ verdict: 'progress-load', sets: [set('met')] }), missedRep: true }])).toBe(true)
   })
 })
 
@@ -44,12 +48,12 @@ describe('summarizeWeek', () => {
     const s = summarizeWeek({
       sessionsDone: 3, sessionsPlanned: 4,
       lifts: [
-        { exerciseName: 'Lift A', exerciseId: 'id-a', reads: [{ day: '2026-11-16', read: read({ verdict: 'progress-load' }) }] },
+        { exerciseName: 'Lift A', exerciseId: 'id-a', reads: [{ day: '2026-11-16', read: read({ verdict: 'progress-load' }), missedRep: false }] },
         { exerciseName: 'Lift B', exerciseId: null, reads: [
-          { day: '2026-11-16', read: read({ verdict: 'hold-rest-more', nextLoad: 'hold', band: 'none', sets: [set('met'), set('miss', 1)] }) },
-          { day: '2026-11-18', read: read({ verdict: 'hold-rest-more', nextLoad: 'hold', band: 'none' }) },
+          { day: '2026-11-16', read: read({ verdict: 'hold-rest-more', nextLoad: 'hold', band: 'none', sets: [set('met'), set('miss', 1)] }), missedRep: true },
+          { day: '2026-11-18', read: read({ verdict: 'hold-rest-more', nextLoad: 'hold', band: 'none' }), missedRep: false },
         ] },
-        { exerciseName: 'Lift C', exerciseId: null, reads: [{ day: '2026-11-18', read: read({ verdict: 'reduce', nextLoad: 'down-1', band: 'clear', sets: [set('miss', 3), set('met')] }) }] },
+        { exerciseName: 'Lift C', exerciseId: null, reads: [{ day: '2026-11-18', read: read({ verdict: 'reduce', nextLoad: 'down-1', band: 'clear', sets: [set('miss', 3), set('met')] }), missedRep: true }] },
         { exerciseName: 'Lift D', exerciseId: null, reads: [] },
       ],
     })
@@ -66,9 +70,9 @@ describe('summarizeWeek', () => {
 
   it('the latest judged read wins over an older one, and a later unreadable one does not hide it', () => {
     const s = summarizeWeek({ sessionsDone: 2, sessionsPlanned: 2, lifts: [{ exerciseName: 'Lift A', exerciseId: null, reads: [
-      { day: 'd1', read: read({ verdict: 'reduce', nextLoad: 'down-1', band: 'clear' }) },
-      { day: 'd2', read: read({ verdict: 'progress-load' }) },
-      { day: 'd3', read: read({ verdict: 'too-little-data', sets: [] }) },
+      { day: 'd1', read: read({ verdict: 'reduce', nextLoad: 'down-1', band: 'clear' }), missedRep: false },
+      { day: 'd2', read: read({ verdict: 'progress-load' }), missedRep: false },
+      { day: 'd3', read: read({ verdict: 'too-little-data', sets: [] }), missedRep: false },
     ] }] })
     expect(s.lifts[0].direction).toBe('up')
   })

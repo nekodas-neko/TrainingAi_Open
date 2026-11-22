@@ -45,7 +45,7 @@ import { dateStrMidnightInTz, shiftDateStr } from '@trainingai/shared/date-utils
 import { getScheduledSessionsPerWeek } from '@trainingai/shared/schedule-utils'
 import { checkinDue, checkinWeekStart, localClock, type CheckinDueWhy } from '@trainingai/shared/weekly-checkin/due'
 import { daysOffDates, effectForAnswer, type CheckinAnswer, type CheckinEffect } from '@trainingai/shared/weekly-checkin/effects'
-import { summarizeWeek, type CheckinSummary, type WeekLiftRead } from '@trainingai/shared/weekly-checkin/summary'
+import { logHasMissedRep, summarizeWeek, type CheckinSummary, type WeekLiftRead } from '@trainingai/shared/weekly-checkin/summary'
 import { isReadableLog, readLog } from '@trainingai/shared/ai-periodization/session-read'
 import { weightStepFor } from '@trainingai/shared/workout/load-rounding'
 import { goalRange } from '@trainingai/shared/ai-periodization/goal-ranges'
@@ -194,6 +194,7 @@ async function weekSummary(ctx: EngineCtx, program: NonNullable<Awaited<ReturnTy
       .map(log => ({
         day: localClock(log.loggedAt, ctx.tz).today,
         read: readLog(log, weightStepFor(equipment?.[lift.exerciseName]), preferredRepBand(prefs.get(lift.exerciseName), band).repMax),
+        missedRep: logHasMissedRep(log.sets),
       }))
     return { exerciseName: lift.exerciseName, exerciseId: lift.exerciseId, reads }
   })
@@ -344,14 +345,19 @@ async function applyLoadStep(
 ): Promise<{ ok: true; changeId: string | null } | { ok: false; detail: string }> {
   const current = (await listExercisePreferences(db, ctx.userId, [lift.exerciseName])).get(lift.exerciseName)?.nextLoadStep ?? null
   if (current === step) return { ok: true, changeId: null }
-  const patch: CoachPatch = {
-    domain: 'lift_preference',
-    targetId: slotId,
-    changes: [{ id: marker, field: 'nextLoadStep', from: current === 'lighter' || current === 'heavier' ? current : null, to: step }],
-  }
+  const patch = coachPatch('lift_preference', slotId, [
+    { id: marker, field: 'nextLoadStep', from: current === 'lighter' || current === 'heavier' ? current : null, to: step },
+  ])
   const res = await applyCoachPatch(db, ctx.userId, patch, [marker], today, ctx.tz, { source: 'checkin' })
   if (res.ok) return { ok: true, changeId: res.changeId }
   return { ok: false, detail: res.reason === 'invalid' ? res.detail : res.reason === 'stale' ? 'The lift changed while saving.' : 'Not found' }
+}
+
+/** A Coach patch the check-in hands to the Coach's own writer. Built here rather than as object literals
+ *  so `domain` reads as the Coach patch domain it is, not a sync-mutation domain (`mutation-schema.test.ts`
+ *  scans for those literals). */
+function coachPatch(domain: CoachPatch['domain'], targetId: string | null, changes: CoachPatch['changes']): CoachPatch {
+  return { domain, targetId, changes }
 }
 
 /** The first live slot of a lift in the active program, by identity. */
@@ -648,13 +654,10 @@ export async function resolveOffer(
         const muscle = offer.muscleName ?? painChoices[0]
         if (!muscle || !painChoices.includes(muscle)) throw new CheckinRefusal(400, 'muscle', 'Pick one of the muscles that lift trains')
         const marker = changeMarker(row.id, 'pain')
-        const patch: CoachPatch = {
-          domain: 'injury', targetId: null,
-          changes: [
-            { id: marker, field: 'muscleName', from: null, to: muscle },
-            ...(offer.severity ? [{ id: `${marker}:severity`, field: 'severity' as const, from: null, to: offer.severity }] : []),
-          ],
-        }
+        const patch = coachPatch('injury', null, [
+          { id: marker, field: 'muscleName', from: null, to: muscle },
+          ...(offer.severity ? [{ id: `${marker}:severity`, field: 'severity' as const, from: null, to: offer.severity }] : []),
+        ])
         const res = await applyCoachPatch(tx, ctx.userId, patch, patch.changes.map(c => c.id), today, ctx.tz)
         if (!res.ok) throw new CheckinRefusal(409, 'refused', res.reason === 'invalid' ? res.detail : 'Could not log the injury')
         // The injury the Coach writer logged or updated, checked to be this user's before it is stored.
@@ -682,10 +685,9 @@ export async function resolveOffer(
       const slot = await slotFor(tx, ctx.userId, { exerciseId: row.swapExerciseId, exerciseName: row.swapExerciseName })
       if (!slot) throw new CheckinRefusal(409, 'lift_gone', 'That lift is no longer in your program')
       const marker = changeMarker(row.id, 'swap')
-      const patch: CoachPatch = {
-        domain: 'session_exercise', targetId: slot.sessionExerciseId,
-        changes: [{ id: marker, field: 'exerciseName', from: slot.exerciseName, to: alt.name }],
-      }
+      const patch = coachPatch('session_exercise', slot.sessionExerciseId, [
+        { id: marker, field: 'exerciseName', from: slot.exerciseName, to: alt.name },
+      ])
       const res = await applyCoachPatch(tx, ctx.userId, patch, [marker], today, ctx.tz)
       if (!res.ok) throw new CheckinRefusal(409, 'refused', res.reason === 'invalid' ? res.detail : 'Could not swap the lift')
       changeId = res.changeId

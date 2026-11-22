@@ -130,6 +130,13 @@ const SESSION_READ_IMPORTERS = [
   'lib/data/repository.ts',
   'packages/shared/src/ai-periodization/session-read-plan.ts',
   'packages/shared/src/types/ai-periodization.ts',
+  // #3890: the weekly check-in SHOWS the read (the summary's words) and lets "Heavy" hold a stored
+  // read (`holdUnderCheckin`, applied inside session-read-plan.ts); neither builds a prescription. The
+  // check-in's one load effect, Heavy plus a missed rep, reads the logged sets (`logHasMissedRep`),
+  // not a verdict, so nothing it writes hangs on the shadow read.
+  'lib/weekly-checkin/engine.ts',
+  'packages/shared/src/weekly-checkin/effects.ts',
+  'packages/shared/src/weekly-checkin/summary.ts',
 ]
 
 const isTest = (path: string) =>

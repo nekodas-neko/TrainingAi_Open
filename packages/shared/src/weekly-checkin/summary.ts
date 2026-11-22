@@ -18,7 +18,12 @@ export type LiftWhy = 'more_load' | 'more_reps' | 'short_rest' | 'heart_rate' | 
 /** One read of one main lift this week, with the local day of the workout it judged. */
 export interface WeekLiftRead {
   day: string
+  /** Shown only: the session read is in shadow (#3889), so the summary's words come from it but no
+   *  effect does. */
   read: SessionRead
+  /** A set short of its planned reps in this log, from the logged sets themselves (`logHasMissedRep`),
+   *  NOT from the read: decision 9's lowering acts on it, and an effect must not hang on a shadow verdict. */
+  missedRep: boolean
 }
 
 export interface WeekLiftInput {
@@ -49,16 +54,16 @@ export interface CheckinSummary {
   lines: [string, string, string]
 }
 
-/** A set short of its planned reps, excluding a set the lifter chose to lift heavier than planned. */
-export function readHasMissedRep(read: SessionRead): boolean {
-  return read.sets.some(s => s.cls === 'miss' && s.missReps > 0)
+/** A logged set short of the reps the app asked for (`set_logs.planned_reps`). A set with no planned
+ *  reps (a freeform or extra set) is not a miss. */
+export function logHasMissedRep(sets: readonly { reps: number; plannedReps: number | null }[]): boolean {
+  return sets.some(s => s.plannedReps != null && s.plannedReps > 0 && s.reps < s.plannedReps)
 }
 
-/** Whether a missed rep was seen in the week's reads of a lift: null when none could be read. */
+/** Whether a missed rep was seen in the week's logs of a lift: null when there was no readable log. */
 export function missedRepInWeek(reads: readonly WeekLiftRead[]): boolean | null {
-  const judged = reads.filter(r => r.read.sets.length > 0)
-  if (judged.length === 0) return null
-  return judged.some(r => readHasMissedRep(r.read))
+  if (reads.length === 0) return null
+  return reads.some(r => r.missedRep)
 }
 
 export function directionOf(read: SessionRead | null): { direction: LiftDirection; why: LiftWhy } {
