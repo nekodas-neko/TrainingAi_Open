@@ -31,6 +31,7 @@ import { generatePrescriptionForSession } from "@trainingai/shared/ai-periodizat
 import { fitStoredPlanToCheckinBudget } from "@trainingai/shared/ai-periodization/checkin-plan-budget";
 import { regeneratePrescriptionInBackground as regeneratePrescriptionSingleFlight } from "@trainingai/shared/ai-periodization/regenerate-in-background";
 import { loadLiftPreferences } from "@trainingai/shared/ai-periodization/lift-preference-read";
+import { readSessionFromStoredState } from "@trainingai/shared/workout/read-session";
 import { rehold } from "@trainingai/shared/ai-periodization/checkin-plan-hold";
 import { resolveWorkingBasis } from "@trainingai/shared/1rm";
 
@@ -193,14 +194,6 @@ async function handleWorkoutData(req: NextRequest) {
     ])
     const estimateMap = new Map(estimates.map(e => [e.exerciseName, e.estimated1rm]))
 
-    const totalPerWeek = getScheduledSessionsPerWeek(program)
-    const numSessions = Math.max(1, program.sessions.length)
-    const sessionPerWeek = totalPerWeek / numSessions
-
-    // A confirmed early-deload week is the only deload signal this batch path can see — it takes no
-    // `aiDeload` query param — and for ai_dynamic programs it reached nothing at all until Q-175.
-    const earlyDeloadWeek = isEarlyDeloadWeek(program, todayStr)
-
     // Per-session AI periodization state (ai_dynamic only) fetched in parallel.
     const periodizationBySession = new Map(
       await Promise.all(program.sessions.map(async (sess) =>
@@ -227,117 +220,31 @@ async function handleWorkoutData(req: NextRequest) {
     for (const programSession of program.sessions) {
       const aiPeriodizationState = periodizationBySession.get(programSession.id) ?? null
 
-      const loggedTodayInThisSession = new Set(
-        todayExercises
-          .filter(e => e.sessionId === programSession.id)
-          .map(e => e.exerciseName),
-      )
-
-      // Phase resolution — per-session count (same sessionCounts map the single-tab path derives).
-      let currentPhase: ProgramPhase | null = null
-      let sessionPhaseStatus: PhaseStatus | null = null
-      if (isAutomatic && allPhases.length > 0) {
-        const thisSessionCount = sessionCounts.get(programSession.id) ?? 0
-        sessionPhaseStatus = buildAutomaticPhaseStatus(allPhases, thisSessionCount, program, todayStr, sessionPerWeek)
-        currentPhase = sessionPhaseStatus.phase
-      }
-
-      // BF-148 — same two-term condition as the single-session path below; see the comment there
-      // for why the name-keyed `hasAnyPriorLog` term was removed rather than repaired.
-      const isAiDynamicBaseline = isAiDynamic
-        && aiPeriodizationState?.phase === 'baseline'
-        && !aiPeriodizationState?.baselineComplete
-
-      const isBaselinePhase = currentPhase?.phaseType === 'baseline' || isAiDynamicBaseline
-
-      if (isAiDynamicBaseline && !sessionPhaseStatus) {
-        sessionPhaseStatus = {
-          phase: { id: '', phaseSetId: '', position: 0, name: 'Baseline', durationCycles: 1, phaseType: 'baseline' } as ProgramPhase,
-          cycleInPhase: 1,
-          totalPhaseCycles: 1,
-          completedCycles: 0,
-          totalProgramCycles: 0,
-          sessionsPerCycle: 1,
-          sessionsInCurrentCycle: 0,
-          blockComplete: false,
-          approxWeeksRemaining: null,
-          isDeloadActive: false,
-          isBaseline: true,
-          openEnded: true,
-          phaseSessionNumber: 1,
-        }
-      }
-
-      if (earlyDeloadWeek && isAiDynamic && !sessionPhaseStatus) {
-        sessionPhaseStatus = {
-          phase: { id: '', phaseSetId: '', position: 0, name: 'Deload', durationCycles: 1, phaseType: 'deload' } as ProgramPhase,
-          cycleInPhase: 1,
-          totalPhaseCycles: 1,
-          completedCycles: 0,
-          totalProgramCycles: 0,
-          sessionsPerCycle: 1,
-          sessionsInCurrentCycle: 0,
-          blockComplete: false,
-          approxWeeksRemaining: null,
-          isDeloadActive: true,
-          isBaseline: false,
-          openEnded: true,
-          phaseSessionNumber: 1,
-        }
-      } else if (earlyDeloadWeek && isAiDynamic && sessionPhaseStatus) {
-        sessionPhaseStatus = { ...sessionPhaseStatus, isDeloadActive: true }
-      }
-
-      if (isAiDynamic && !sessionPhaseStatus && aiPeriodizationState) {
-        sessionPhaseStatus = aiDynamicFallbackPhaseStatus(aiPeriodizationState)
-      }
-
-      const aiPrescription = isAiDynamic && !isBaselinePhase && aiPeriodizationState?.prescription
-        ? normalizeStoredPrescription(
-            aiPeriodizationState.prescription, aiPeriodizationState.phase,
-            new Map(programSession.exercises.map(ex => [ex.id, ex.exerciseRole])),
-          )
-        : null
-      const aiPrescriptionPending = isAiPrescriptionPending(aiPeriodizationState, { isAiDynamic, isBaselinePhase, programDeload })
-      // An aged-out prescription is pending regeneration, not the plan (#3700).
-      const aiDrivesLoad = aiPrescription != null && aiPeriodizationState != null && !aiPrescriptionPending
-        && prescriptionDrivesLoad(aiPrescription.phaseAction, aiPeriodizationState.prescriptionStatus)
-
-      const aiPhaseLabel = aiPrescription ? capitalize(aiPrescription.phase) : ''
-      const droppedThisCycle = new Set(aiDrivesLoad ? (aiPrescription!.droppedExerciseIds ?? []) : [])
-
-      const exercises = buildWorkoutExercises(programSession, {
-        lastLogs,
-        lastRealOneRm,
-        prMap,
-        estimateMap,
-        styleById,
-        styleByName,
-        styles,
-        libByName,
-        currentPhase,
+      // The one read of a session from stored state, shared with the Next workout card (#4019).
+      const read = readSessionFromStoredState({
+        program,
+        programSession,
+        todayStr,
         allPhases,
-        isDeloadActive: sessionPhaseStatus?.isDeloadActive ?? false,
-        isBaselinePhase,
-        aiDrivesLoad,
-        aiPrescription,
-        aiPhaseLabel,
-        isAiDynamic,
-        aiDeload: false,
-        droppedThisCycle,
-        loggedTodayInThisSession,
-        trainingGoal: program.trainingGoal,
-        liftPreferences,
+        thisSessionCount: sessionCounts.get(programSession.id) ?? 0,
+        periodization: aiPeriodizationState,
+        programDeload,
+        loggedTodayInThisSession: new Set(
+          todayExercises
+            .filter(e => e.sessionId === programSession.id)
+            .map(e => e.exerciseName),
+        ),
+        shared: { lastLogs, lastRealOneRm, prMap, estimateMap, styleById, styleByName, styles, libByName, liftPreferences },
       })
 
       perSession[programSession.id] = {
-        exercises,
+        exercises: read.exercises,
         program,
         session: programSession,
-        phaseStatus: sessionPhaseStatus,
+        phaseStatus: read.phaseStatus,
         dataDate: todayStr,
-        aiPrescriptionPending,
-        prescriptionSource: aiDrivesLoad ? aiPrescription!.source : undefined,
+        aiPrescriptionPending: read.aiPrescriptionPending,
+        prescriptionSource: read.aiDrivesLoad ? read.aiPrescription!.source : undefined,
       }
     }
 

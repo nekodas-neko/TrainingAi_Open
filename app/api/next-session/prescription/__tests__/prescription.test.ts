@@ -29,13 +29,20 @@ vi.mock('@/lib/data', () => ({
   getRepository: async () => ({
     getNextSession,
     getActiveProgram,
+    listProgramPhases: async () => [],
+    countAllSessionsSinceStart: async () => new Map(),
+    listExercisePreferences: async () => new Map(),
     listProgressionStyles,
     listExerciseLibrary,
     getLastExerciseLogsBatch,
     getLastRealOneRmBatch,
     listPersonalRecords,
     getExerciseEstimates,
-    getSessionPeriodization,
+    // A stored row always has a phase (the screen's reader labels it); these cases only vary the plan.
+    getSessionPeriodization: async (...a: []) => {
+      const st = await getSessionPeriodization(...a)
+      return st ? { phase: 'accumulation', sessionsInPhase: 0, baselineComplete: true, ...st } : st
+    },
     updatePrescriptionStatus,
     updatePrescriptionExercisesCache,
   }),
@@ -80,7 +87,7 @@ describe('GET /api/next-session/prescription', () => {
     listProgressionStyles.mockResolvedValue([
       { id: 'style-1', name: 'Standard', sets: [{ pct: 80, reps: 8, restSec: 90, useFor1rm: true }] },
     ])
-    getLastExerciseLogsBatch.mockResolvedValue(new Map([['Bench Press', { estimated1rm: 100 }]]))
+    getLastExerciseLogsBatch.mockResolvedValue(new Map([['Bench Press', { estimated1rm: 100, sets: [] }]]))
     getLastRealOneRmBatch.mockResolvedValue(new Map([['Bench Press', { estimated1rm: 100, target80: 80 }]]))
 
     const res = await GET()
@@ -151,7 +158,7 @@ describe('GET /api/next-session/prescription', () => {
     const prog = { id: 'prog-1', phaseMode: 'ai_dynamic', sessions: [sess] }
     getNextSession.mockResolvedValue({ isRestDay: false, session: sess, reason: '', program: prog })
     getActiveProgram.mockResolvedValue(prog)
-    getLastExerciseLogsBatch.mockResolvedValue(new Map([['Bench Press', { estimated1rm: 100 }]]))
+    getLastExerciseLogsBatch.mockResolvedValue(new Map([['Bench Press', { estimated1rm: 100, sets: [] }]]))
     getLastRealOneRmBatch.mockResolvedValue(new Map([['Bench Press', { estimated1rm: 100, target80: 80 }]]))
     getSessionPeriodization.mockResolvedValue({
       prescriptionStatus: 'accepted',
@@ -182,7 +189,7 @@ describe('GET /api/next-session/prescription', () => {
     listProgressionStyles.mockResolvedValue([
       { id: 'style-1', name: 'Standard', sets: [{ pct: 80, reps: 8, restSec: 90, useFor1rm: true }] },
     ])
-    getLastExerciseLogsBatch.mockResolvedValue(new Map([['Bench Press', { estimated1rm: 100 }]]))
+    getLastExerciseLogsBatch.mockResolvedValue(new Map([['Bench Press', { estimated1rm: 100, sets: [] }]]))
     getLastRealOneRmBatch.mockResolvedValue(new Map([['Bench Press', { estimated1rm: 100, target80: 80 }]]))
     getSessionPeriodization.mockResolvedValue({
       prescriptionStatus: 'accepted',
@@ -212,7 +219,7 @@ describe('GET /api/next-session/prescription', () => {
     listProgressionStyles.mockResolvedValue([
       { id: 'style-1', name: 'Standard', sets: [{ pct: 80, reps: 8, restSec: 90, useFor1rm: true }] },
     ])
-    getLastExerciseLogsBatch.mockResolvedValue(new Map([['Bench Press', { estimated1rm: 100 }]]))
+    getLastExerciseLogsBatch.mockResolvedValue(new Map([['Bench Press', { estimated1rm: 100, sets: [] }]]))
     getLastRealOneRmBatch.mockResolvedValue(new Map([['Bench Press', { estimated1rm: 100, target80: 80 }]]))
     getSessionPeriodization.mockResolvedValue({
       prescriptionStatus: 'pending',
