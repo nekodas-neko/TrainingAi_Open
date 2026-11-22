@@ -138,13 +138,55 @@ jobs:
       - run: pnpm exec expo prebuild --platform android --no-install
       - name: Android NDK
         uses: ./.github/actions/android-ndk
+      # Gradle set-up, after prebuild (which writes android/gradle.properties with a 2 GiB heap
+      # that D8 ran out of in :app:mergeExtDexRelease, #4025). The user-level gradle.properties wins
+      # over the project's, so prebuild cannot overwrite it. The runner has 16 GB. The init script
+      # logs the heap the build JVM really got. The helper retries a Gradle run once, and only when
+      # its log shows a dependency download failure (Maven Central answered 429, #4025), never on a
+      # compile or test failure.
+      - name: Gradle heap and retry helper
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.gradle/init.d"
+          echo 'org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g' >> "$HOME/.gradle/gradle.properties"
+          cat > "$HOME/.gradle/init.d/log-heap.gradle" <<'EOF'
+          gradle.projectsLoaded {
+            println "CI heap check: Gradle JVM max heap ${Runtime.runtime.maxMemory().intdiv(1048576)} MiB, args ${java.lang.management.ManagementFactory.runtimeMXBean.inputArguments}"
+          }
+          EOF
+          cat > "$RUNNER_TEMP/gradle-retry.sh" <<'EOF'
+          #!/usr/bin/env bash
+          log="$(mktemp)"
+          "$@" 2>&1 | tee "$log"
+          rc=${PIPESTATUS[0]}
+          if [ "$rc" -ne 0 ] && grep -qE 'Could not (GET|HEAD) |Received status code (429|5[0-9]{2}) from server' "$log"; then
+            echo "::warning::A dependency download failed; trying once more in 60 seconds."
+            sleep 60
+            "$@"
+            rc=$?
+          fi
+          exit "$rc"
+          EOF
+          chmod +x "$RUNNER_TEMP/gradle-retry.sh"
+          free -g | head -2
+
+      - name: Restore the Gradle cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-compile-${{ hashFiles('mobile/pnpm-lock.yaml', 'mobile/android/**/*.gradle', 'mobile/android/gradle/wrapper/gradle-wrapper.properties', 'mobile/modules/*/android/build.gradle') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-compile-
+
       - name: Compile unpublished development APK
-        run: ./gradlew :app:assembleDebug --no-daemon
+        run: $RUNNER_TEMP/gradle-retry.sh ./gradlew :app:assembleDebug --no-daemon
         working-directory: mobile/android
       # The local modules' JVM unit tests (PipStateTest and any that follow). Every module under
       # mobile/modules is listed, so a module that adds tests is covered without editing this.
       - name: Native module unit tests
         run: |
           tasks=$(for dir in ../modules/*/android; do echo ":$(basename "$(dirname "$dir")"):testDebugUnitTest"; done)
-          ./gradlew $tasks --no-daemon
+          "$RUNNER_TEMP/gradle-retry.sh" ./gradlew $tasks --no-daemon
         working-directory: mobile/android
