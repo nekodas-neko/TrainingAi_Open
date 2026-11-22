@@ -14,6 +14,7 @@
 const fs = require('fs');
 const path = require('path');
 const { stripComments } = require('./lib/strip-comments');
+const { isSkippedFixtureDir } = require('./lib/fixture-dirs');
 
 const root = path.join(__dirname, '..');
 const SKIP_DIRS = new Set(['node_modules', '.next', '.git', 'dist', 'build', 'coverage', 'android', 'ios']);
@@ -34,7 +35,7 @@ const DELETE = /DELETE\s+FROM\s+(?:ONLY\s+)?(?:public\.)?"?exercise_library\b|\b
 function walk(dir, out = []) {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
     if (e.isDirectory()) {
-      if (!SKIP_DIRS.has(e.name)) walk(path.join(dir, e.name), out);
+      if (!SKIP_DIRS.has(e.name) && !isSkippedFixtureDir(e.name)) walk(path.join(dir, e.name), out);
     } else if (TEST_FILE.test(e.name)) out.push(path.join(dir, e.name));
   }
   return out;
