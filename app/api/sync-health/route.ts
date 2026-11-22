@@ -416,7 +416,7 @@ export async function POST(req: NextRequest) {
   const recent = await repo.listActivityLogs(userId, from3d, todayInTz(tz));
   const enrichmentCandidates = recent
     .filter(a => a.avgHr == null && a.distanceKm == null && a.caloriesBurned == null && a.startTime && a.endTime)
-    .map(a => ({ id: a.id, date: a.date, startTime: a.startTime, endTime: a.endTime }));
+    .map(a => ({ id: a.id, date: a.date, startTime: a.startTime, endTime: a.endTime, ...(a.durationMin != null ? { durationMin: a.durationMin } : {}) }));
 
   // #3779: Health Connect's steps, workouts and heart rate may finish a walking-plan day.
   settleWalkingPlanSoon(repo, userId, tz);
