@@ -1,4 +1,5 @@
 import type { SessionExplainData } from './build-explain-data'
+import { REST_SIGNAL_CAUSE } from '@trainingai/shared/ai-periodization/deload-reasons'
 import { scoreBand } from '@trainingai/shared/health/score-band'
 
 export type ChipTone = 'warn' | 'ok'
@@ -109,6 +110,12 @@ export function groupSignals(data: SessionExplainData): SignalGroup[] {
       value: deloadStrength === 'strong' ? 'Strong deload advised' : 'Deload recommended',
       chip: { text: deloadStrength ?? 'recommended', tone: 'warn' },
     })
+  }
+
+  // #3718: a rest day from the AI rule's readiness, sleep-and-HRV or blood-oxygen signal names it
+  // here, with the same line Home gives, so "Deload recommended" is never unexplained.
+  for (const r of data.restSignalReasons ?? []) {
+    recovery.push({ label: REST_SIGNAL_CAUSE[r.signal], value: r.text })
   }
 
   const body: SignalRow[] = [

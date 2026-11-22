@@ -1,4 +1,5 @@
 import type { NextSessionRecommendation } from '@trainingai/shared/types/program'
+import { restSignalReasons } from '@trainingai/shared/ai-periodization/deload-reasons'
 
 export interface WeightedComponents {
   recovery:  { score: number; weight: number }
@@ -40,6 +41,8 @@ export interface SessionExplainData {
   deloadOrRestRecommended: boolean
   deloadStrength: 'soft' | 'recommended' | 'strong' | null
   hrvWarning: boolean
+  /** #3718: the reason line for each AI-rule rest signal that fired, from `deloadReasons`. Empty when none did. */
+  restSignalReasons?: ReturnType<typeof restSignalReasons>
   alternatives: ExplainAlternative[]
 }
 
@@ -98,6 +101,7 @@ export function buildSessionExplainData(
     deloadOrRestRecommended: recommendation.deloadOrRestRecommended ?? false,
     deloadStrength: recommendation.deloadStrength ?? null,
     hrvWarning: recommendation.hrvWarning ?? false,
+    restSignalReasons: restSignalReasons(recommendation),
     alternatives,
   }
 }
