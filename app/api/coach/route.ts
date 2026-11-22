@@ -1,4 +1,5 @@
-import { convertToModelMessages, stepCountIs, type UIMessage } from 'ai'
+import { convertToModelMessages, createUIMessageStream, createUIMessageStreamResponse, stepCountIs, type UIMessage } from 'ai'
+import { randomUUID } from 'node:crypto'
 import { google } from '@ai-sdk/google'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
@@ -22,6 +23,7 @@ import { getDb, ensureSchema } from '@/lib/data/postgres/client'
 import { resolveCoachContext } from '@/lib/coach/context'
 import { CoachIntentSchema, intentAllowed } from '@trainingai/shared/coach/chips'
 import { intentBlock } from '@/lib/coach/intents'
+import { whyThisWeightFor } from '@/lib/coach/about'
 
 /**
  * Sized from production, not guessed. The schema caps a conversation at 60 messages but each is
@@ -220,6 +222,24 @@ ${PROSE_GUARDS}
 Today's date: TODAY_ISO.
 `.trim()
 
+/** A reply the app writes itself, streamed in the same UI message protocol as a model reply so the
+ *  client shows it in the conversation like any other assistant message. */
+function codeReply(text: string) {
+  const id = randomUUID()
+  return createUIMessageStreamResponse({
+    headers: { 'Cache-Control': 'private, no-store' },
+    stream: createUIMessageStream({
+      execute: ({ writer }) => {
+        writer.write({ type: 'start' })
+        writer.write({ type: 'text-start', id })
+        writer.write({ type: 'text-delta', id, delta: text })
+        writer.write({ type: 'text-end', id })
+        writer.write({ type: 'finish' })
+      },
+    }),
+  })
+}
+
 /**
  * AI Coach's chat route.
  *
@@ -290,6 +310,16 @@ export async function POST(req: Request) {
       )
       if (!resolved.ok) return NextResponse.json({ error: 'Not found' }, { status: 404 })
       contextBlock = resolved.block
+    }
+
+    // #3896 review, the Orchestrator's call: "Why this weight?" is answered by code, with no model
+    // call, so every number in the answer is one the app worked out (no model-reported number is shown
+    // as fact). The intent gate above has already required a lift context, and the context was just
+    // checked as the user's; `whyThisWeightFor` checks the slot again before it reads by it.
+    if (intent === 'lift_why_weight' && parsed.data.context?.sessionExerciseId) {
+      const text = await whyThisWeightFor(getDb(), repo, userId, parsed.data.context.sessionExerciseId, tz, todayIso)
+      if (text === null) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+      return codeReply(text)
     }
 
     const modelMessages = await convertToModelMessages(

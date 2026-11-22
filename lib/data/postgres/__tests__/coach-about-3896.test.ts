@@ -6,11 +6,21 @@
 //   - The program editor's "Rep range" writes through the Coach's apply path; "Use the program's
 //     default" clears the range; an out-of-range value is refused.
 // Runs only against a real Postgres (DATABASE_URL). Made-up names and numbers only. No model call.
-import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest'
 import { prescribedBar } from '@trainingai/shared/workout/load-rounding'
 
 const authUser = { id: '' }
 vi.mock('@/auth', () => ({ auth: async () => ({ user: { id: authUser.id, timezone: 'Australia/Brisbane' } }) }))
+// #3896 review: "Why this weight?" is code's answer. The model wrapper is a counter, so a test can
+// assert it is never reached.
+const model = vi.hoisted(() => ({ calls: 0 }))
+vi.mock('@/lib/ai/instrument', () => ({
+  loggedStreamText: () => {
+    model.calls++
+    return { toUIMessageStreamResponse: () => new Response('model') }
+  },
+}))
+vi.mock('@/lib/rate-limit', () => ({ rateLimit: () => true }))
 
 const canRun = !!process.env.DATABASE_URL
 const TZ = 'Australia/Brisbane'
@@ -19,11 +29,12 @@ const B = '00000000-0000-4000-8000-0000038966b2' // another account
 const C = '00000000-0000-4000-8000-0000038966c3' // manual
 const LIFT = 'About Line Pulldown 3896'
 const OTHER = 'About Line Row 3896'
+const DIP = 'About Line Dip 3896'
 
 describe.skipIf(!canRun)('the Coach\'s context line, buttons and the editor\'s rep range (#3896 steps 6-7)', () => {
   let pool: import('pg').Pool
   let libId: string
-  const ids = {} as { aProgram: string; aUpper: string; aLift: string; aOther: string; bLift: string; cSession: string; cLift: string; workout: string }
+  const ids = {} as { aProgram: string; aUpper: string; aLift: string; aOther: string; bLift: string; cSession: string; cLift: string; cDip: string; workout: string }
 
   async function about(user: string, query: Record<string, string>) {
     authUser.id = user
@@ -73,7 +84,10 @@ describe.skipIf(!canRun)('the Coach\'s context line, buttons and the editor\'s r
     const plan = {
       phase: 'accumulation', phaseAction: 'stay', deload: false, reasoning: '', confidence: 1,
       estimatedSessionDurationMin: 45, weeklyVolumeContribution: {},
-      exercises: [{ sessionExerciseId: ids.aLift, name: LIFT, sets: 3, reps: 8, pct: 70, restSec: 120 }],
+      exercises: [
+        { sessionExerciseId: ids.aLift, name: LIFT, sets: 3, reps: 8, pct: 70, restSec: 120 },
+        { sessionExerciseId: ids.aOther, name: OTHER, sets: 2, reps: 10, pct: 60, restSec: 90, deloaded: true },
+      ],
     }
     await pool.query(
       `INSERT INTO session_periodization (user_id, program_session_id, phase, prescription, prescription_status, baseline_complete,
@@ -83,6 +97,13 @@ describe.skipIf(!canRun)('the Coach\'s context line, buttons and the editor\'s r
     ids.workout = (await pool.query(
       `INSERT INTO workout_sessions (user_id, session_name, program_session_id, started_at, completed_at) VALUES ($1,'Upper',$2,'2026-11-20T01:00:00Z','2026-11-20T02:00:00Z') RETURNING id`,
       [A, ids.aUpper])).rows[0].id
+    // What was planned against what was done, for "Why this weight?"'s last-time sentence.
+    const log = (await pool.query(
+      `INSERT INTO exercise_logs (workout_session_id, exercise_name, logged_at) VALUES ($1,$2,'2026-11-20T01:30:00Z') RETURNING id`,
+      [ids.workout, LIFT])).rows[0].id
+    for (const [n, reps] of [[1, 8], [2, 8], [3, 6]]) {
+      await pool.query(`INSERT INTO set_logs (exercise_log_id, set_number, weight_kg, reps, planned_reps, planned_weight_kg) VALUES ($1,$2,70,$3,8,70)`, [log, n, reps])
+    }
 
     const bProgram = (await pool.query(`INSERT INTO programs (user_id, name, phase_mode, is_active) VALUES ($1,'About B','ai_dynamic',true) RETURNING id`, [B])).rows[0].id
     const bSession = (await pool.query(`INSERT INTO program_sessions (program_id, name, position) VALUES ($1,'B day',0) RETURNING id`, [bProgram])).rows[0].id
@@ -94,6 +115,9 @@ describe.skipIf(!canRun)('the Coach\'s context line, buttons and the editor\'s r
     ids.cSession = (await pool.query(`INSERT INTO program_sessions (program_id, name, position) VALUES ($1,'Manual day',0) RETURNING id`, [cProgram])).rows[0].id
     ids.cLift = await ex(ids.cSession, LIFT, 0, libId, cStyle)
     await pool.query(`INSERT INTO exercise_estimates (user_id, exercise_name, exercise_id, estimated_1rm) VALUES ($1,$2,$3,80)`, [C, LIFT, libId])
+    const dipId = (await pool.query(
+      `INSERT INTO exercise_library (name, exercise_type) VALUES ($1, 'bodyweight') ON CONFLICT (name) DO UPDATE SET exercise_type = EXCLUDED.exercise_type RETURNING id`, [DIP])).rows[0].id
+    ids.cDip = await ex(ids.cSession, DIP, 1, dipId, cStyle)
   })
 
   beforeEach(async () => {
@@ -104,6 +128,26 @@ describe.skipIf(!canRun)('the Coach\'s context line, buttons and the editor\'s r
   afterAll(async () => {
     await pool?.query(`DELETE FROM users WHERE id = ANY($1)`, [[A, B, C]])
   })
+
+  /** "Why this weight?" through the chat route, as the app sends it; the reply's text parts joined. */
+  async function whyWeight(user: string, sessionExerciseId: string) {
+    authUser.id = user
+    const { POST } = await import('@/app/api/coach/route')
+    const res = await POST(new Request('http://localhost/api/coach', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        messages: [{ id: 'm1', role: 'user', parts: [{ type: 'text', text: 'Why is this the weight for this lift?' }] }],
+        context: { origin: 'exercise', sessionExerciseId },
+        patchDomains: ['lift_preference'],
+        intent: 'lift_why_weight',
+      }),
+    }))
+    const raw = await res.text()
+    const text = raw.split('\n').filter(l => l.startsWith('data: ') && l !== 'data: [DONE]')
+      .map(l => JSON.parse(l.slice(6))).filter(c => c.type === 'text-delta').map(c => c.delta).join('')
+    return { status: res.status, text }
+  }
 
   const DOMAINS = { scope: 'general', patchDomains: 'lift_preference' }
 
@@ -176,5 +220,67 @@ describe.skipIf(!canRun)('the Coach\'s context line, buttons and the editor\'s r
     for (const q of ['', '?names=notjson', `?names=${encodeURIComponent(JSON.stringify([]))}`, `?names=${encodeURIComponent(JSON.stringify(['x'.repeat(201)]))}`]) {
       expect((await GET(new Request(`http://localhost/api/coach/lift-preferences${q}`))).status).toBe(400)
     }
+  })
+
+  describe('"Why this weight?" is written by code, with no model call (#3896 review)', () => {
+    beforeEach(() => { model.calls = 0 })
+    afterEach(() => { expect(model.calls).toBe(0) })
+
+    it('an AI plan: its sets, reps, weight, percentage and rest, and last time planned against done', async () => {
+      // The stored row as it stands: the editor test above restates it through the apply path.
+      const row = (await pool.query(`SELECT prescription FROM session_periodization WHERE user_id = $1`, [A])).rows[0].prescription.exercises[0]
+      const w = prescribedBar(100, row.pct, ['Cable'])
+      expect(await whyWeight(A, ids.aLift)).toEqual({
+        status: 200,
+        text: `The AI plan has ${LIFT} at ${row.sets} × ${row.reps} @ ${w} kg next time. The weight is ${row.pct}% of your working 1RM, rounded up to a weight you can load. Rest 120 s between sets. Last time, on 20 Nov: planned 3 × 8 @ 70 kg, did 8, 8, 6 @ 70 kg.`,
+      })
+    })
+
+    it('a program that sets its own weights: says so, with the program\'s numbers', async () => {
+      const w = prescribedBar(80, 75, ['Cable'])
+      expect((await whyWeight(C, ids.cLift)).text).toBe(
+        `Your program sets this weight: ${LIFT} at 3 × 8 @ ${w} kg next time, which is 75% of your estimated 1RM of 80 kg, rounded up to a weight you can load.`,
+      )
+    })
+
+    it('a deload: says so, and no numbers the session screen could contradict', async () => {
+      const { text } = await whyWeight(A, ids.aOther)
+      expect(text).toBe(`${OTHER}'s next session is a deload, so the app lightens the plan when you start. The workout screen shows the weight.`)
+      expect(text.replace(OTHER, '')).not.toMatch(/\d/)
+    })
+
+    it('a bodyweight lift: no weight, the program\'s sets and reps', async () => {
+      expect((await whyWeight(C, ids.cDip)).text).toBe(
+        `${DIP} is a bodyweight lift, so there is no weight to set. Your program has it at 3 × 8 next time.`,
+      )
+    })
+
+    it('no plan yet: says when it is made, with no numbers', async () => {
+      expect((await whyWeight(B, ids.bLift)).text).toBe(
+        `${LIFT} has no plan for next time yet. The app makes it when you start the session, and the workout screen shows the weight then.`,
+      )
+    })
+
+    it('another user\'s lift is a 404, with nothing read and no model call', async () => {
+      expect((await whyWeight(B, ids.aLift)).status).toBe(404)
+    })
+  })
+
+  it('the context line on a deload in the AI plan: the lift and "deload", no stored numbers (#3896 review)', async () => {
+    const { body } = await about(A, { ...DOMAINS, origin: 'exercise', sessionExerciseId: ids.aOther })
+    expect(body.about.line).toBe(`${OTHER} · next session is a deload`)
+  })
+
+  it('a client that does not declare lift_preference: the lift buttons without the three that propose a lift card', async () => {
+    const { body } = await about(A, { scope: 'general', origin: 'exercise', sessionExerciseId: ids.aLift })
+    expect(body.chips.map((c: { id: string }) => c.id)).toEqual(['swap', 'hurt', 'why_weight'])
+  })
+
+  it('"Use the program\'s default" with no range to clear is refused, and writes no row and no history (#3896 review)', async () => {
+    const res = await editorApply(A, ids.aLift, null, 'program_default')
+    expect(res.status).toBe(400)
+    expect(res.body.error).toMatch(/nothing to clear/)
+    expect((await pool.query(`SELECT count(*)::int AS n FROM exercise_preferences WHERE user_id = $1`, [A])).rows[0].n).toBe(0)
+    expect((await pool.query(`SELECT count(*)::int AS n FROM coach_changes WHERE user_id = $1`, [A])).rows[0].n).toBe(0)
   })
 })

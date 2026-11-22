@@ -269,6 +269,9 @@ const REFUSE_RANGE = `A rep range has to be two whole numbers from ${PREFERENCE_
 const SPENT_ONE_SHOT = 'This was a one-time change and it has already been used or has expired, so there is nothing left to undo.'
 const REFUSE_UNPREVIEWED = 'This change was not previewed, so the range was not worked out. Ask the Coach again.'
 const REFUSE_TWICE = 'A change can set each thing once. Ask for one value for each.'
+/** #3896 review: "Use the program's default" on a lift with no range of its own is refused rather
+ *  than written, so a tampered client cannot create an all-empty row and a history entry for nothing. */
+export const REFUSE_NOTHING_TO_CLEAR = 'This lift has no rep range of its own, so there is nothing to clear.'
 const REFUSE_REST = `Rest between sets has to be from ${PREFERENCE_REST_MIN_SEC} seconds to ${PREFERENCE_REST_MAX_SEC / 60} minutes.`
 
 /**
@@ -291,7 +294,8 @@ export function workOutChange(current: PrefColumns, accepted: LiftChange[], next
       let range: { min: number; max: number } | null
       if (c.to === REP_RANGE_DEFAULT) {
         // The program editor's "Use the program's default" (#3896 step 7): the range is cleared, and
-        // the plan goes back to the reps the program sets.
+        // the plan goes back to the reps the program sets. Nothing to clear is refused, not written.
+        if (current.repMin == null && current.repMax == null) return { ok: false, refusal: REFUSE_NOTHING_TO_CLEAR }
         next.repMin = null
         next.repMax = null
         continue
