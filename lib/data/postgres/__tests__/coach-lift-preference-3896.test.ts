@@ -543,6 +543,261 @@ describe.skipIf(!canRun)('Coach lift_preference domain (#3896 step 5)', () => {
       expect(await prefRow()).toMatchObject({ next_load_step: null, one_shot_set_at: null })
     })
 
+    // #4007 items 3 and 4: a restate that failed is retried by the next preferences read, and no path
+    // holds one pooled connection while it waits for another.
+    describe('the retry and the connection', () => {
+      const failBasis = () => {
+        vi.spyOn(console, 'error').mockImplementation(() => {})
+        return vi.spyOn(repo, 'getLastRealOneRmBatch').mockRejectedValue(new Error('basis read failed'))
+      }
+      const xmins = async () => (await pool.query(
+        `SELECT program_session_id, xmin::text AS x FROM session_periodization WHERE user_id = $1 ORDER BY program_session_id`, [A])).rows
+      const prefXmin = async () => (await pool.query(`SELECT xmin::text AS x FROM exercise_preferences WHERE user_id = $1`, [A])).rows
+
+      it('a restate that throws leaves the step on the plans; the next preferences read removes it', async () => {
+        await doApply([lighter])
+        const stamp = (await stepOf(ids.upper)).liftPreference.oneShotSetAt as string
+        const basis = failBasis()
+        try {
+          await expect(log('Upper', stamp)).resolves.toBeDefined()
+        } finally { basis.mockRestore() }
+        // The consume stands; the plans still carry the spent step.
+        expect(await prefRow()).toMatchObject({ next_load_step: null, one_shot_set_at: null })
+        for (const session of [ids.upper, ids.lower]) expect((await stepOf(session)).liftPreference).toMatchObject({ loadStep: 'lighter', oneShotSetAt: stamp })
+
+        const prefs = await repo.listExercisePreferences(A, [LIFT])
+        expect(prefs.get(LIFT)?.oneShotSetAt).toBeNull()
+        for (const session of [ids.upper, ids.lower]) {
+          const row = await stepOf(session)
+          expect(row.liftPreference).toBeUndefined()
+          expect(row).toMatchObject({ sets: 3, reps: 8, pct: 70 })
+        }
+        expect((await storedPlan(ids.upper)).exercises[0]).toEqual(upperPlan().exercises[0])
+      })
+
+      it('a read that cannot restate still returns the preferences, and the next read retries', async () => {
+        await doApply([lighter])
+        const stamp = (await stepOf(ids.upper)).liftPreference.oneShotSetAt as string
+        const basis = failBasis()
+        try {
+          await log('Upper', stamp)
+          await expect(repo.listExercisePreferences(A, [LIFT])).resolves.toBeInstanceOf(Map)
+          expect((await stepOf(ids.lower)).liftPreference).toMatchObject({ loadStep: 'lighter' })
+        } finally { basis.mockRestore() }
+        await repo.listExercisePreferences(A, [LIFT])
+        expect((await stepOf(ids.lower)).liftPreference).toBeUndefined()
+      })
+
+      it('writes nothing when nothing is stale: no step, a live step, a lasting preference only', async () => {
+        const reads = async () => { await repo.listExercisePreferences(A, [LIFT, ANCHOR]); await repo.listExercisePreferences(A, [LIFT]) }
+        // No preference row at all.
+        let before = [await xmins(), await prefXmin()]
+        await reads()
+        expect([await xmins(), await prefXmin()]).toEqual(before)
+        // A live one-shot: the plans carry exactly the row's own time.
+        await doApply([lighter])
+        before = [await xmins(), await prefXmin()]
+        await reads()
+        expect([await xmins(), await prefXmin()]).toEqual(before)
+        expect((await stepOf(ids.lower)).liftPreference).toMatchObject({ loadStep: 'lighter' })
+        // A lasting preference with no one-shot.
+        await pool.query(`DELETE FROM exercise_preferences WHERE user_id = $1`, [A])
+        await seedPlans()
+        await doApply([{ id: 'r', field: 'repRange', from: null, to: '12-15' }])
+        before = [await xmins(), await prefXmin()]
+        await reads()
+        expect([await xmins(), await prefXmin()]).toEqual(before)
+      })
+
+      it('another user\'s stored plans are never touched, even with the same lift and a stale step', async () => {
+        const bSession = (await pool.query(`SELECT session_id AS id FROM session_exercises WHERE id = $1`, [ids.bLift])).rows[0].id
+        const stale = '2026-11-01T00:00:00.000Z'
+        const bPlan = planOf([{ sessionExerciseId: ids.bLift, name: LIFT, sets: 3, reps: 8, pct: 60, restSec: 120,
+          liftPreference: { loadStep: 'lighter', oneShotSetAt: stale } }])
+        await pool.query(
+          `INSERT INTO session_periodization (user_id, program_session_id, phase, prescription, prescription_status, baseline_complete,
+                                              prescription_generated_at, prescription_expires_at)
+           VALUES ($1,$2,'accumulation',$3,'accepted',true, now(), now() + interval '3 days')
+           ON CONFLICT (user_id, program_session_id) DO UPDATE SET prescription = EXCLUDED.prescription`,
+          [B, bSession, JSON.stringify(bPlan)])
+        // A's own plans carry a stale step too, so the retry has real work to do for A. A's row is spent
+        // (its one-off columns empty, written just now), as a consume leaves it.
+        await pool.query(`INSERT INTO exercise_preferences (user_id, exercise_id, exercise_name, rest_sec, source) VALUES ($1,$2,$3,90,'coach')`, [A, libId, LIFT])
+        for (const session of [ids.upper, ids.lower]) {
+          const plan = await storedPlan(session)
+          plan.exercises.find((e: { name: string }) => e.name === LIFT).liftPreference = { loadStep: 'lighter', oneShotSetAt: stale }
+          await pool.query(`UPDATE session_periodization SET prescription = $3 WHERE user_id = $1 AND program_session_id = $2`, [A, session, JSON.stringify(plan)])
+        }
+        const bBefore = (await pool.query(`SELECT prescription, xmin::text AS x FROM session_periodization WHERE user_id = $1`, [B])).rows
+        await repo.listExercisePreferences(A, [LIFT])
+        for (const session of [ids.upper, ids.lower]) expect((await stepOf(session)).liftPreference?.oneShotSetAt).toBeUndefined()
+        expect((await pool.query(`SELECT prescription, xmin::text AS x FROM session_periodization WHERE user_id = $1`, [B])).rows).toEqual(bBefore)
+        await pool.query(`DELETE FROM session_periodization WHERE user_id = $1`, [B])
+      })
+
+      it('two logs at the same moment still consume once, and a failed restate is mended by the read', async () => {
+        await doApply([lighter])
+        const stamp = (await stepOf(ids.upper)).liftPreference.oneShotSetAt as string
+        const spy = vi.spyOn(repo, 'consumeLiftOneShot')
+        const basis = failBasis()
+        try {
+          const done = await Promise.all([log('Upper', stamp), log('Lower', stamp)])
+          expect(done.every(Boolean)).toBe(true)
+          const took = await Promise.all(spy.mock.results.map(r => r.value as Promise<boolean>))
+          expect(took.filter(Boolean)).toHaveLength(1)
+        } finally { basis.mockRestore(); spy.mockRestore() }
+        await repo.listExercisePreferences(A, [LIFT])
+        for (const session of [ids.upper, ids.lower]) expect((await stepOf(session)).liftPreference).toBeUndefined()
+      })
+
+      it('the consume and the restate never hold one pooled connection while another is awaited', async () => {
+        await doApply([lighter])
+        const stamp = (await stepOf(ids.upper)).liftPreference.oneShotSetAt as string
+        const real = repo.getLastRealOneRmBatch.bind(repo)
+        const checkedOut: number[] = []
+        const spy = vi.spyOn(repo, 'getLastRealOneRmBatch').mockImplementation(async (...a: Parameters<typeof real>) => {
+          checkedOut.push(pool.totalCount - pool.idleCount)
+          return real(...a)
+        })
+        try { await log('Upper', stamp) } finally { spy.mockRestore() }
+        expect(checkedOut.length).toBeGreaterThan(0)
+        // Nothing else of this test is running, so a nonzero count is a connection held by the consume.
+        expect(checkedOut.every(n => n === 0)).toBe(true)
+      })
+    })
+
+    // #4007 / #4018 review: a stamp the restate cannot remove must not be retried on every read, and a read
+    // with nothing stale must cost what it cost before the retry existed (2 queries: the expiry clear and
+    // the one preferences select).
+    describe('stale stamps: cleared once, never retried forever; query counts', () => {
+      const queries = async (fn: () => Promise<unknown>) => {
+        const spy = vi.spyOn(pool, 'query')
+        try { await fn(); return spy.mock.calls.length } finally { spy.mockRestore() }
+      }
+      const read = () => repo.listExercisePreferences(A, [LIFT, ANCHOR])
+      // A one-off used up by a log whose restate failed: the row is spent, both plans keep the stamp.
+      const strand = async () => {
+        await doApply([lighter])
+        const at = (await stepOf(ids.upper)).liftPreference.oneShotSetAt as string
+        vi.spyOn(console, 'error').mockImplementation(() => {})
+        const basis = vi.spyOn(repo, 'getLastRealOneRmBatch').mockRejectedValue(new Error('basis read failed'))
+        try { await log('Upper', at) } finally { basis.mockRestore() }
+        for (const session of [ids.upper, ids.lower]) expect((await stepOf(session)).liftPreference?.oneShotSetAt).toBe(at)
+        return at
+      }
+      const setRow = async (session: string, row: Record<string, unknown>) => {
+        const plan = await storedPlan(session)
+        plan.exercises = plan.exercises.map((e: { name: string }) => (e.name === LIFT ? { ...e, ...row } : e))
+        await pool.query(`UPDATE session_periodization SET prescription = $3 WHERE user_id = $1 AND program_session_id = $2`, [A, session, JSON.stringify(plan)])
+      }
+      const without = (row: Record<string, unknown>, ...keys: string[]) => {
+        const out = { ...row }
+        for (const k of keys) delete out[k]
+        return out
+      }
+
+      it('(a) no preferences: a read costs 2 queries', async () => {
+        expect(await queries(read)).toBe(2)
+      })
+      it('(b) a live one-off: 2 queries, nothing written', async () => {
+        await doApply([lighter])
+        const before = (await pool.query(`SELECT xmin::text AS x FROM session_periodization WHERE user_id = $1`, [A])).rows
+        expect(await queries(read)).toBe(2)
+        expect((await pool.query(`SELECT xmin::text AS x FROM session_periodization WHERE user_id = $1`, [A])).rows).toEqual(before)
+        expect((await stepOf(ids.lower)).liftPreference).toMatchObject({ loadStep: 'lighter' })
+      })
+      it('(c) lasting preferences only: 2 queries, nothing written', async () => {
+        await doApply([{ id: 'r', field: 'repRange', from: null, to: '12-15' }])
+        const before = (await pool.query(`SELECT xmin::text AS x FROM session_periodization WHERE user_id = $1`, [A])).rows
+        expect(await queries(read)).toBe(2)
+        expect((await pool.query(`SELECT xmin::text AS x FROM session_periodization WHERE user_id = $1`, [A])).rows).toEqual(before)
+      })
+      it('(d) a stale stamp on a normal row: one retry, then 2 queries and no write', async () => {
+        await strand()
+        expect(await queries(read)).toBeGreaterThan(2)
+        for (const session of [ids.upper, ids.lower]) expect((await stepOf(session)).liftPreference).toBeUndefined()
+        const before = (await pool.query(`SELECT xmin::text AS x FROM session_periodization WHERE user_id = $1`, [A])).rows
+        expect(await queries(read)).toBe(2)
+        expect((await pool.query(`SELECT xmin::text AS x FROM session_periodization WHERE user_id = $1`, [A])).rows).toEqual(before)
+      })
+      it('(e) a stale stamp on a deloaded row: the marker goes, sets, reps, rest and load do not move; then 2 queries', async () => {
+        const at = await strand()
+        await setRow(ids.upper, { deloaded: true, sets: 2, reps: 8, pct: 55, restSec: 90 })
+        const before = await stepOf(ids.upper)
+        expect(before.liftPreference).toMatchObject({ loadStep: 'lighter', oneShotSetAt: at })
+        await queries(read)
+        const after = await stepOf(ids.upper)
+        expect(after).toEqual(without(before, 'liftPreference'))
+        expect(after).toMatchObject({ deloaded: true, sets: 2, reps: 8, pct: 55, restSec: 90 })
+        expect((await stepOf(ids.lower)).liftPreference).toBeUndefined()
+        expect(await queries(read)).toBe(2)
+      })
+      it('(e2) a deloaded row keeps its lasting record: only the one-off part and the marker are stripped', async () => {
+        const at = await strand()
+        await setRow(ids.upper, { deloaded: true, sets: 2, pct: 55, restSec: 90, liftPreference: { repRange: { min: 12, max: 15 }, loadStep: 'lighter', setsDelta: -1, oneShotSetAt: at } })
+        await queries(read)
+        expect((await stepOf(ids.upper)).liftPreference).toEqual({ repRange: { min: 12, max: 15 } })
+        expect(await queries(read)).toBe(2)
+      })
+      it('(f) a stale stamp whose session no longer has the lift: the marker goes, the row is unchanged; then 2 queries', async () => {
+        const at = await strand()
+        await pool.query(`UPDATE session_exercises SET deleted_at = now() WHERE id = $1`, [ids.liftLower])
+        try {
+          const before = await stepOf(ids.lower)
+          expect(before.liftPreference.oneShotSetAt).toBe(at)
+          await queries(read)
+          expect(await stepOf(ids.lower)).toEqual(without(before, 'liftPreference'))
+          expect((await stepOf(ids.upper)).liftPreference).toBeUndefined()
+          expect(await queries(read)).toBe(2)
+        } finally { await pool.query(`UPDATE session_exercises SET deleted_at = NULL WHERE id = $1`, [ids.liftLower]) }
+      })
+      it('a LIVE one-off is never stripped by repeated reads', async () => {
+        await doApply([lighter])
+        const live = (await stepOf(ids.upper)).liftPreference.oneShotSetAt as string
+        await read()
+        await read()
+        for (const session of [ids.upper, ids.lower]) expect((await stepOf(session)).liftPreference).toMatchObject({ loadStep: 'lighter', oneShotSetAt: live })
+      })
+      it('handles a bounded number of stale stamps per read; the rest wait for the next read, and the read still returns', async () => {
+        const stampsPer = 5
+        const names = Array.from({ length: stampsPer }, (_, i) => `${ANCHOR} bound ${i}`)
+        const rows = names.map((name, i) => ({ sessionExerciseId: crypto.randomUUID(), name, sets: 3, reps: 8, pct: 70, restSec: 120,
+          liftPreference: { loadStep: 'lighter', oneShotSetAt: `2026-11-0${i + 1}T00:00:00.000Z` } }))
+        await pool.query(`UPDATE session_periodization SET prescription = $3 WHERE user_id = $1 AND program_session_id = $2`, [A, ids.lower, JSON.stringify(planOf(rows))])
+        for (const name of names) await pool.query(`INSERT INTO exercise_preferences (user_id, exercise_name, rest_sec, source) VALUES ($1,$2,90,'coach')`, [A, name])
+        const calls = vi.spyOn(repo as unknown as { restateSpentOneShot: () => Promise<void> }, 'restateSpentOneShot')
+        try {
+          await expect(repo.listExercisePreferences(A, names)).resolves.toBeInstanceOf(Map)
+          expect(calls.mock.calls.length).toBeGreaterThan(0)
+          expect(calls.mock.calls.length).toBeLessThanOrEqual(3)
+        } finally { calls.mockRestore() }
+      })
+    })
+
+    // #4018 review: the Coach's apply opens a transaction; the bar's basis reads go through the pool, so
+    // they must not run while it is open.
+    it('a Coach apply holds no second connection: the basis reads run before the transaction opens', async () => {
+      const real = repo.getLastRealOneRmBatch.bind(repo)
+      const checkedOut: number[] = []
+      const spy = vi.spyOn(repo, 'getLastRealOneRmBatch').mockImplementation(async (...a: Parameters<typeof real>) => {
+        checkedOut.push(pool.totalCount - pool.idleCount)
+        return real(...a)
+      })
+      try { expect(await doApply([lighter])).toMatchObject({ ok: true }) } finally { spy.mockRestore() }
+      expect(checkedOut.length).toBeGreaterThan(0)
+      expect(checkedOut.every(n => n === 0)).toBe(true)
+      // And the apply is unchanged: both plans carry the step on the bar that read produced.
+      expect((await stepOf(ids.lower)).liftPreference).toMatchObject({ loadStep: 'lighter' })
+    })
+    it('a Coach apply still refuses as stale when the lift\'s state moved after the reads, and writes nothing', async () => {
+      await pool.query(`INSERT INTO exercise_preferences (user_id, exercise_id, exercise_name, rest_sec, source) VALUES ($1,$2,$3,90,'coach')`, [A, libId, LIFT])
+      const before = await storedPlan(ids.upper)
+      const done = await doApply([{ id: 'r', field: 'restSec', from: null, to: 75 }]) // from says "no rest set"; the row holds 90
+      expect(done).toMatchObject({ ok: false, reason: 'stale' })
+      expect(await storedPlan(ids.upper)).toEqual(before)
+      expect((await prefRow()).rest_sec).toBe(90)
+    })
+
     it('undo of a used-up one-shot says so, instead of "undo the later change first"', async () => {
       const done = await doApply([lighter]) as { changeId: string }
       await log('Upper', (await stepOf(ids.upper)).liftPreference.oneShotSetAt)

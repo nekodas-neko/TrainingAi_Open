@@ -34,6 +34,8 @@ import { inSequence } from './in-sequence'
 import { pageWithTies } from './sync-page'
 
 /** Q-481 — at most one `applied_mutations` prune per day per process. */
+/** Spent one-offs whose stored plans one preferences read restates; the rest wait for the next read (#4007). */
+const MAX_RESTATES_PER_READ = 3
 const APPLIED_MUTATIONS_PRUNE_THROTTLE_MS = 24 * 60 * 60 * 1000
 import { measuredAtMs, cadenceSecFromDs, decodeEventBody, hexToBytes, eventName, motionLowIntensity } from '@/lib/oura-ble/decode'
 
@@ -8715,32 +8717,43 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async getSessionReadLogs(userId: string, from: Date, to: Date) { return getSessionReadLogs(this.db, userId, from, to) }
   async listExercisePreferences(userId: string, exerciseNames: string[]) {
     const cleared: ClearedOneShot[] = []
-    const out = await listExercisePreferences(this.db, userId, exerciseNames, cleared)
-    // An expired one-shot is still stamped on the lift's stored plans (#4007): take it out, right after
-    // the clear. A failure is logged and never fails the read.
-    for (const c of cleared) await this.restateSpentOneShot(this.db, userId, c.exerciseName, new Date(c.setAtMs))
+    const stale: ClearedOneShot[] = []
+    const out = await listExercisePreferences(this.db, userId, exerciseNames, cleared, stale)
+    // A one-shot the row no longer holds can still be stamped on stored plans (#4007): one just expired
+    // (cleared above), or one used up whose restate failed (`stale`, found by the same select). Take it
+    // out. At most MAX_RESTATES_PER_READ per read keeps this off the request path; the rest wait for the
+    // next read. Nothing here can change or fail the read's result.
+    try {
+      const seen = new Set<string>()
+      const work = [...cleared, ...stale].filter(c => {
+        const key = `${c.exerciseName}\u0000${Math.round(c.setAtMs)}`
+        return seen.has(key) ? false : (seen.add(key), true)
+      }).slice(0, MAX_RESTATES_PER_READ)
+      for (const c of work) await this.restateSpentOneShot(userId, c.exerciseName, new Date(c.setAtMs))
+    } catch (err) {
+      console.error('[lift-preference] restating stored plans with a spent one-shot failed:', err)
+    }
     return out
   }
 
-  /** Restate the stored plans that still carry a spent one-shot (#4007). Runs in its own savepoint when
-   *  given a transaction, and never throws: the log or read that spent the step must not fail on it. */
-  private async restateSpentOneShot(db: typeof this.db, userId: string, exerciseName: string, spentAt: Date) {
+  /** Restate the stored plans that still carry a spent one-shot (#4007). Never throws: the log or read
+   *  that spent the step must not fail on it. It runs on no transaction of its own, so no path holds one
+   *  pooled connection while another is awaited: each read and each guarded plan update is a short
+   *  statement on the pool, and a plan changed since it was read is left alone by its own guard. */
+  private async restateSpentOneShot(userId: string, exerciseName: string, spentAt: Date) {
     try {
       const { restateSpentOneShot } = await import('@/lib/coach/domains/lift-preference')
-      await db.transaction(async sp => { await restateSpentOneShot(sp as unknown as typeof this.db, this, userId, exerciseName, spentAt) })
+      await restateSpentOneShot(this.db, this, userId, exerciseName, spentAt)
     } catch (err) {
       console.error('[lift-preference] restating stored plans after a spent one-shot failed:', err)
     }
   }
-  // The consume and the restate of the lift's other stored plans commit together; the restate runs in a
-  // savepoint, so a failure there is logged and the consume still stands (#4007).
+  // The consume is one conditional UPDATE, atomic on its own, so it needs no transaction. The restate runs
+  // after it has committed; if that fails, the next preferences read retries it (#4007).
   async consumeLiftOneShot(userId: string, exerciseName: string, servedSetAt: Date) {
-    return this.db.transaction(async tx => {
-      const t = tx as unknown as typeof this.db
-      const took = await consumeLiftOneShot(t, userId, exerciseName, servedSetAt)
-      if (took) await this.restateSpentOneShot(t, userId, exerciseName, servedSetAt)
-      return took
-    })
+    const took = await consumeLiftOneShot(this.db, userId, exerciseName, servedSetAt)
+    if (took) await this.restateSpentOneShot(userId, exerciseName, servedSetAt)
+    return took
   }
   async getSetTimingRows(userId: string, exerciseNames: string[]) { return period.getSetTimingRows(this.db, userId, exerciseNames) }
   async getExercise1rmHistory(userId: string, exerciseNames: string[], tz: string, windowDays?: number) { return period.getExercise1rmHistory(this.db, userId, exerciseNames, tz, windowDays) }

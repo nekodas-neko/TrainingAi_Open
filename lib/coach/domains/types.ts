@@ -55,11 +55,19 @@ export interface DomainHandler {
    */
   transactional?: boolean
   preview(db: Db, userId: string, patch: CoachPatch): Promise<PreviewResult>
+  /**
+   * Reads a transactional `apply` needs that go through the connection pool, run BEFORE the
+   * transaction opens so that `apply` never holds one connection while waiting on another. Its result
+   * is passed to `apply` as `prepared`. Anything that must be checked against the rows the change
+   * writes (a `from` value) stays in `apply`, inside the transaction.
+   */
+  prepare?(db: Db, userId: string, patch: CoachPatch): Promise<unknown>
   apply(
     db: Db,
     userId: string,
     patch: CoachPatch,
     accepted: PatchChange[],
+    prepared?: unknown,
   ): Promise<
     | { ok: true; summary: string; beforeState: Record<string, unknown>; targetId: string }
     | Exclude<ApplyOutcome, { ok: true }>
