@@ -3,7 +3,7 @@
 // Every query is scoped to the user passed in, which the route takes from the session. Lift identity
 // is the `exercise_preferences` rule (migration 202611221206's header): the library id first, the name
 // only when an id is missing, and never a name row whose own id names a different library lift.
-import { and, eq, inArray, isNotNull, isNull, sql } from 'drizzle-orm'
+import { and, eq, inArray, isNotNull, isNull, sql, type SQL } from 'drizzle-orm'
 import type { getDb } from '../client'
 import * as s from '../schema'
 
@@ -88,6 +88,27 @@ const namesArray = (names: readonly string[]) =>
   sql`${sql.raw('ARRAY[')}${sql.join(names.map(n => sql`${n}`), sql`, `)}${sql.raw(']::text[]')}`
 
 /**
+ * #3890: whether the saved check-in for the week starting `weekStart` (its `applies_week_start`) answered
+ * "Heavy" for the lift `lift` (a name) whose library row is `libId`, and the app held or lowered it. A
+ * SQL condition over the caller's own `lift` and `lib_id` columns, matched the `exercise_preferences`
+ * way: the library id first, the name only when an id is missing, never a name row whose own id names a
+ * different library lift. One definition, read by `listCheckinHeldLifts` (the session read) and by the
+ * per-lift preference read (`listExercisePreferences`), so the plan and the read cannot disagree.
+ */
+export function checkinHeldCondition(userId: string, weekStart: string, lift: SQL, libId: SQL): SQL {
+  return sql`EXISTS (
+    SELECT 1
+      FROM weekly_checkins c
+      JOIN weekly_checkin_exercises e
+        ON e.checkin_id = c.id AND e.user_id = ${userId} AND e.deleted_at IS NULL
+       AND e.answer = 'heavy' AND e.effect IN ('held', 'lowered_one_step')
+     WHERE c.user_id = ${userId} AND c.applies_week_start = ${weekStart}::date
+       AND c.status = 'saved' AND c.deleted_at IS NULL
+       AND ((${libId} IS NOT NULL AND e.exercise_id = ${libId})
+            OR (e.exercise_name = ${lift} AND (e.exercise_id IS NULL OR ${libId} IS NULL OR e.exercise_id = ${libId}))))`
+}
+
+/**
  * Of `exerciseNames` (a session's lifts), those the saved check-in for the week starting `weekStart`
  * (its `applies_week_start`) answered "Heavy" for, and that the app held or lowered. One query.
  */
@@ -102,14 +123,7 @@ export async function listCheckinHeldLifts(db: Db, userId: string, weekStart: st
     )
     SELECT DISTINCT lifts.lift
       FROM lifts
-      JOIN weekly_checkins c
-        ON c.user_id = ${userId} AND c.applies_week_start = ${weekStart}::date
-       AND c.status = 'saved' AND c.deleted_at IS NULL
-      JOIN weekly_checkin_exercises e
-        ON e.checkin_id = c.id AND e.user_id = ${userId} AND e.deleted_at IS NULL
-       AND e.answer = 'heavy' AND e.effect IN ('held', 'lowered_one_step')
-       AND ((lifts.lib_id IS NOT NULL AND e.exercise_id = lifts.lib_id)
-            OR (e.exercise_name = lifts.lift AND (e.exercise_id IS NULL OR lifts.lib_id IS NULL OR e.exercise_id = lifts.lib_id)))
+     WHERE ${checkinHeldCondition(userId, weekStart, sql`lifts.lift`, sql`lifts.lib_id`)}
   `)
   for (const r of res.rows as { lift: string }[]) out.add(r.lift)
   return out

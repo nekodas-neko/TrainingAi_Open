@@ -189,10 +189,10 @@ describe.skipIf(!canRun)('weekly check-in engine (#3890 step 2)', () => {
       .rejects.toMatchObject({ status: 409, code: 'cannot_undo' })
   })
 
-  it('undo of the lowering restores the preference exactly, and leaves the Heavy answer\'s hold (noted)', async () => {
+  it('undo of the lowering restores the preference exactly, and leaves the Heavy answer\'s hold (live)', async () => {
     const { state } = await fullSave()
     const after = await engine.undoCheckinEffect(ctxFor(A), state.checkin!.id, { kind: 'lift', liftId: liftOf(state, SQ).liftId })
-    expect(liftOf(after, SQ)).toMatchObject({ effect: 'held', appliedChangeId: null, holdLive: false })
+    expect(liftOf(after, SQ)).toMatchObject({ effect: 'held', appliedChangeId: null, holdLive: true })
     expect(await pref(SQ)).toMatchObject({ next_load_step: null })
     expect((await coachChanges())[0].undone_at).not.toBeNull()
   })
@@ -317,7 +317,7 @@ describe.skipIf(!canRun)('weekly check-in engine (#3890 step 2)', () => {
     const state = await engine.readCheckinState(ctxFor(A))
     expect(state.lifts.find(l => l.exerciseName === SQ)!.missedRep).toBe(false)
     const { state: saved } = await heavySq()
-    expect(liftOf(saved, SQ)).toMatchObject({ missedRep: false, effect: 'held', holdLive: false })
+    expect(liftOf(saved, SQ)).toMatchObject({ missedRep: false, effect: 'held', holdLive: true })
     expect(await coachChanges()).toEqual([])
   })
 
@@ -392,10 +392,11 @@ describe.skipIf(!canRun)('weekly check-in engine (#3890 step 2)', () => {
     expect(await pref(BP)).toMatchObject({ next_load_step: 'heavier' })
   })
 
-  it('C4: a held lift says its hold is not live yet', async () => {
+  it('C4: a held lift says its hold is live (the plan holds it), and no summary line claims the app acted', async () => {
     const { state } = await fullSave({ ...heavyOnly, lifts: [{ sessionExerciseId: ids['a:bp'], answer: 'heavy' }] })
-    expect(liftOf(state, BP)).toMatchObject({ effect: 'held', holdLive: false })
-    expect(JSON.stringify(state)).not.toMatch(/is held|weight held|holding/i)
+    expect(liftOf(state, BP)).toMatchObject({ effect: 'held', holdLive: true })
+    // The summary still states only what the logs show; the hold is carried by `holdLive`, not by text.
+    expect(JSON.stringify(state.summary)).not.toMatch(/is held|weight held|holding/i)
   })
 
   it('C3: an ad-hoc workout and one of another program do not count toward the week', async () => {

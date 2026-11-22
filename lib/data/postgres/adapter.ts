@@ -8716,6 +8716,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async updatePrescriptionStatus(userId: string, programSessionId: string, status: PrescriptionStatus) { return period.updatePrescriptionStatus(this.db, userId, programSessionId, status) }
   async voidSessionPrescription(userId: string, programSessionId: string) { return period.voidSessionPrescription(this.db, userId, programSessionId) }
   async updatePrescriptionExercisesCache(userId: string, programSessionId: string, prescription: AiPrescription) { return period.updatePrescriptionExercisesCache(this.db, userId, programSessionId, prescription) }
+  async replacePrescriptionIfUnchanged(userId: string, programSessionId: string, before: AiPrescription, after: AiPrescription) { return period.replacePrescriptionIfUnchanged(this.db, userId, programSessionId, before, after) }
   async storePendingTransition(userId: string, programSessionId: string, transition: PendingTransition | null) { return period.storePendingTransition(this.db, userId, programSessionId, transition) }
   async incrementSessionsInPhase(userId: string, programSessionId: string, completedAt?: Date) { return period.incrementSessionsInPhase(this.db, userId, programSessionId, completedAt) }
   async setLastSessionRanPrescription(userId: string, programSessionId: string, ranPrescription: boolean) { return period.setLastSessionRanPrescription(this.db, userId, programSessionId, ranPrescription) }
@@ -8731,10 +8732,10 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async getSessionReadLogs(userId: string, from: Date, to: Date) { return getSessionReadLogs(this.db, userId, from, to) }
   async listCheckinHeldLifts(userId: string, weekStart: string, exerciseNames: string[]) { return listCheckinHeldLifts(this.db, userId, weekStart, exerciseNames) }
   async getCheckinSessionBudgetMin(userId: string, weekStart: string) { return getCheckinSessionBudgetMin(this.db, userId, weekStart) }
-  async listExercisePreferences(userId: string, exerciseNames: string[]) {
+  async listExercisePreferences(userId: string, exerciseNames: string[], opts?: { checkinWeekStart?: string }) {
     const cleared: ClearedOneShot[] = []
     const stale: ClearedOneShot[] = []
-    const out = await listExercisePreferences(this.db, userId, exerciseNames, cleared, stale)
+    const out = await listExercisePreferences(this.db, userId, exerciseNames, cleared, stale, opts?.checkinWeekStart)
     // A one-shot the row no longer holds can still be stamped on stored plans (#4007): one just expired
     // (cleared above), or one used up whose restate failed (`stale`, found by the same select). Take it
     // out. At most MAX_RESTATES_PER_READ per read keeps this off the request path; the rest wait for the

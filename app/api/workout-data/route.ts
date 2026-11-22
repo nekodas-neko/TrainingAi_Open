@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { getRepository } from "@/lib/data";
 import type { ProgramPhase } from "@trainingai/shared/types/program";
-import { todayInTz, shiftDateStr, DEFAULT_TZ } from "@trainingai/shared/date-utils";
+import { todayInTz, shiftDateStr, startOfWeekInTz, DEFAULT_TZ } from "@trainingai/shared/date-utils";
 import { buildAutomaticPhaseStatus, isEarlyDeloadWeek } from "@trainingai/shared/phase-engine";
 import { getScheduledSessionsPerWeek } from "@trainingai/shared/schedule-utils";
 import { prescriptionDrivesLoad } from "@trainingai/shared/ai-periodization/apply-prescription";
@@ -180,8 +180,9 @@ async function handleWorkoutData(req: NextRequest) {
       repo.getLastExerciseLogsBatch(userId, unionNames),
       repo.getLastRealOneRmBatch(userId, unionNames),
       repo.getExerciseEstimates(userId).catch(() => []),
-      // #3896: the user's lift preferences, for a static style the AI plan is not driving.
-      loadLiftPreferences(repo, userId, unionNames),
+      // #3896: the user's lift preferences, for a static style the AI plan is not driving, with this
+      // week's check-in hold (#3890) in the same read.
+      loadLiftPreferences(repo, userId, unionNames, { checkinWeekStart: startOfWeekInTz(tz) }),
       // Heals the stored sessions_in_phase before the periodization read below turns it into
       // completedCycles / phaseSessionNumber (SYNC-T2). Batched here rather than awaited
       // separately so it costs no extra round-trip; advisory, so a failure must not take the
@@ -377,8 +378,9 @@ async function handleWorkoutData(req: NextRequest) {
       : Promise.resolve(null),
     repo.listPersonalRecords(userId),
     repo.getExerciseEstimates(userId).catch(() => []),
-    // #3896: the user's lift preferences, for a static style the AI plan is not driving.
-    loadLiftPreferences(repo, userId, exerciseNames),
+    // #3896: the user's lift preferences, for a static style the AI plan is not driving, with this
+    // week's check-in hold (#3890) in the same read.
+    loadLiftPreferences(repo, userId, exerciseNames, { checkinWeekStart: startOfWeekInTz(tz) }),
   ]);
   const estimateMap = new Map(estimates.map(e => [e.exerciseName, e.estimated1rm]));
 

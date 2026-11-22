@@ -1479,6 +1479,9 @@ export interface WorkoutRepository {
   /** #3766: void one session's stored plan so the next open regenerates it. */
   voidSessionPrescription(userId: string, programSessionId: string): Promise<void>
   updatePrescriptionExercisesCache(userId: string, programSessionId: string, prescription: AiPrescription): Promise<void>
+  /** #3890: replace the stored plan only while it is still exactly `before`. True when it wrote.
+   *  Optional: a repository without it serves stored plans as they are (no check-in hold). */
+  replacePrescriptionIfUnchanged?(userId: string, programSessionId: string, before: AiPrescription, after: AiPrescription): Promise<boolean>
   storePendingTransition(userId: string, programSessionId: string, transition: PendingTransition | null): Promise<void>
   /** #3799: `completedAt` set, the row is counted only when the phase began at or before it. */
   incrementSessionsInPhase(userId: string, programSessionId: string, completedAt?: Date): Promise<void>
@@ -1513,8 +1516,10 @@ export interface WorkoutRepository {
    *  asked for, or null. Optional: a repository without it changes no budget. */
   getCheckinSessionBudgetMin?(userId: string, weekStart: string): Promise<number | null>
   /** #3896: the user's live lift preferences for these lifts, keyed by the name passed; id match first,
-   *  then the name. One query, owner-scoped. Clears an expired one-shot (`ONE_SHOT_TTL_DAYS`) as it reads. */
-  listExercisePreferences(userId: string, exerciseNames: string[]): Promise<Map<string, import('@trainingai/shared/ai-periodization/lift-preference').LiftPreferenceRow>>
+   *  then the name. One query, owner-scoped. Clears an expired one-shot (`ONE_SHOT_TTL_DAYS`) as it reads.
+   *  #3890: with `checkinWeekStart`, a lift the saved weekly check-in for that week answered "Heavy" for
+   *  is returned with `checkinHeld: true` (a row of its own, if it has no preference), in the same query. */
+  listExercisePreferences(userId: string, exerciseNames: string[], opts?: { checkinWeekStart?: string }): Promise<Map<string, import('@trainingai/shared/ai-periodization/lift-preference').LiftPreferenceRow>>
   /** #3896: consume a lift's one-shot in one conditional write, only while the row's `one_shot_set_at`
    *  is the value the log's plan carried (`servedSetAt`). True only for the call that cleared it. */
   consumeLiftOneShot(userId: string, exerciseName: string, servedSetAt: Date): Promise<boolean>

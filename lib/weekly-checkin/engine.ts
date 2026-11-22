@@ -30,7 +30,7 @@
  * is compared by the slot (the swap's `coach_changes` target), not by the lift now in it.
  *
  * **An undo is remembered.** Undo steps back one level: a lowering is taken off and Heavy's own hold
- * (noted) stays; undoing the hold clears the lift; an undone step up is an open offer again. A save with
+ * stays; undoing the hold clears the lift; an undone step up is an open offer again. A save with
  * the SAME answer does not re-apply what the person undid (`notApplied` reason `undone`); changing the
  * answer away and back is the explicit way to ask for it again.
  *
@@ -141,8 +141,8 @@ export interface CheckinView {
   lifts: {
     liftId: string; exerciseName: string; exerciseId: string | null; answer: CheckinAnswer; missedRep: boolean | null
     effect: CheckinEffect; offerStatus: string | null; appliedChangeId: string | null
-    /** For `held`: whether the plan enforces the hold yet. False in this step (the hold is recorded and
-     *  feeds the shadow session read only), so the card says "noted", never "held". Null otherwise. */
+    /** For `held`: whether the plan enforces the hold (`CHECKIN_HOLD_LIVE`). True since the plan holds
+     *  the lift for the applies-to week (`checkin-plan-hold.ts`), so the card may say "held". Null otherwise. */
     holdLive: boolean | null
   }[]
   daysOff: number[] | null
@@ -415,7 +415,7 @@ export interface SaveOutcome {
   /** Lifts whose earlier change could not be taken back and so stays as it was (never doubled). */
   kept: { exerciseName: string; detail: string }[]
   /**
-   * Lifts whose lowering was not applied, so they are `held` (noted) instead:
+   * Lifts whose lowering was not applied, so they are `held` instead:
    *   - `refused`: the writer refused it (the detail says why);
    *   - `undone`: the person undid this check-in's lowering, and saving the same answer again does not
    *     redo it. Changing the answer away and back is the way to ask for it again;
@@ -829,7 +829,7 @@ export async function undoCheckinEffect(ctx: EngineCtx, checkinId: string, targe
           throw new CheckinRefusal(409, 'nothing_to_undo', 'Nothing to undo for that lift')
         }
         await undoChange(lift.appliedChangeId)
-        // One step back per undo: a lowering is taken off and the Heavy answer's own hold (noted) stays,
+        // One step back per undo: a lowering is taken off and the Heavy answer's own hold stays,
         // so a later save with the same answer neither lowers again nor drops the hold the person kept;
         // undoing the hold clears the lift. An undone step up is an open offer again (a tap re-applies it).
         const res = await tx.update(s.weeklyCheckinExercises)

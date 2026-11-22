@@ -5,6 +5,7 @@ import { formatInTimeZone } from 'date-fns-tz'
 import { weekStartForDay } from '@trainingai/shared/date-utils'
 import { NO_TIME_LIMIT } from '@trainingai/shared/workout/duration-model'
 import { refitPrescriptionToBudget } from '@trainingai/shared/ai-periodization/refit-prescription'
+import { holdStoredPlanUnderCheckin } from '@trainingai/shared/ai-periodization/checkin-plan-hold'
 import type { SessionPeriodization } from '@trainingai/shared/types/ai-periodization'
 import type { WorkoutRepository } from '@/lib/data/repository'
 
@@ -18,7 +19,8 @@ export function checkinBudgetApplies(min: number | null | undefined, sessionBudg
 }
 
 /**
- * #3890: a stored plan as it is served on `now`'s local date. A save or an undo of the weekly check-in
+ * #3890: a stored plan as it is served on `now`'s local date, fitted to the week's check-in: its shorter
+ * session (below) and its "Heavy" hold (`holdStoredPlanUnderCheckin`). A save or an undo of the weekly check-in
  * touches no stored plan; the shorter session reaches one here instead, where it is read:
  *  - on a date in the check-in's applies-to week (the user's local Monday to Sunday), with a shorter
  *    session saved, the person having picked no length for the plan, and the plan not already fitted
@@ -36,6 +38,22 @@ export async function fitStoredPlanToCheckinBudget<T extends SessionPeriodizatio
   tz: string,
   state: T,
   now = new Date(),
+): Promise<T> {
+  // Then the week's "Heavy" hold on the plan as fitted (`holdStoredPlanUnderCheckin`), with the same
+  // no-query rule for a person with no check-in. The two touch different fields (the fit sets and rests,
+  // the hold the load of a held lift) and each keeps what it needs to undo itself, so either order on
+  // the same stored plan gives the same plan.
+  const fitted = await fitStoredPlanToBudget(userId, programSessionId, repo, tz, state, now)
+  return holdStoredPlanUnderCheckin(userId, programSessionId, repo, tz, fitted, now)
+}
+
+async function fitStoredPlanToBudget<T extends SessionPeriodization>(
+  userId: string,
+  programSessionId: string,
+  repo: WorkoutRepository,
+  tz: string,
+  state: T,
+  now: Date,
 ): Promise<T> {
   const stored = state.prescription
   if (!stored) return state

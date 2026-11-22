@@ -11,7 +11,7 @@ import { pctForExpectedRpe } from "@trainingai/shared/ai-periodization/expected-
 import { resolveBodyweightStyle, resolveWorkingBasis, resolveWorkingBasisWithSource } from "@trainingai/shared/1rm";
 import { toAestDateStr } from "@trainingai/shared/date-utils";
 import { UNCLASSIFIED_EXERCISE_ROLE } from './exercise-role';
-import { applyLiftPreferenceToStyle, type LiftPreference } from "@trainingai/shared/ai-periodization/lift-preference";
+import { applyLiftPreferenceToStyle, checkinHoldBar, pctUnderBar, type LiftPreference } from "@trainingai/shared/ai-periodization/lift-preference";
 import type { AppliedLiftPreference } from "@trainingai/shared/types/ai-periodization";
 
 export interface PerSessionPhaseStatus {
@@ -398,7 +398,27 @@ export function buildWorkoutExercises(
         if (applied) {
           progressionStyle = applied.style
           defaultSets = applied.style.length
-          liftPreference = applied.applied
+          // #3890: a hold alone changes the bars and records nothing (the record is what a log consumes).
+          if (Object.keys(applied.applied).length > 0) liftPreference = applied.applied
+        }
+      }
+
+      // #3890: an AI-driven lift the week's check-in holds ("Heavy"): its bar no heavier than the last
+      // one. The stored plan is held where it is served (`holdStoredPlanUnderCheckin`); this applies the
+      // same ceiling to the rows built here, so a path that reads stored plans without that step (the
+      // read-only all-sessions view) shows the same bar. Idempotent on a plan already held. Never on a
+      // deload, a baseline or a bodyweight lift.
+      if (
+        aiStyleApplied && pref?.checkinHold && !deloaded && !isBaselinePhase && !aiDeload && !isDeloadActive &&
+        !aiPrescription?.deload && progressionStyle && progressionStyle.length > 0
+      ) {
+        const bar = checkinHoldBar(pref, { bodyweight: bwType === 'bodyweight' })
+        if (bar != null) {
+          const held = progressionStyle.map(s => {
+            const pct = pctUnderBar(s.pct, workingBasis.kg, libEntry?.equipment, bar)
+            return pct === s.pct ? s : { ...s, pct }
+          })
+          if (held.some((s, i) => s !== progressionStyle![i])) progressionStyle = held
         }
       }
 
