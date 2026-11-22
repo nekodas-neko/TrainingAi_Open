@@ -202,7 +202,7 @@ class PipWindowView(context: Context, private val frameAt: (Long) -> PipFrame) :
     load.visibility = if (frame.load == null) GONE else VISIBLE
     loadLabel.text = frame.loadLabel ?: ""
     loadLabel.visibility = if (frame.loadLabel == null || frame.load == null) GONE else VISIBLE
-    segments.set(frame.sets, frame.setsDone, frame.current, frame.setColors, color)
+    segments.set(frame.sets, frame.setsDone, frame.current, frame.accent)
     bindHeart(frame.hr)
 
     targetSec = frame.targetSec
@@ -324,45 +324,34 @@ class PipWindowView(context: Context, private val frameAt: (Long) -> PipFrame) :
   }
 
   /**
-   * One 5 dp bar per set: done sets in their set colours, the current or next one in the state's
-   * colour (pulsing while it runs), the rest dim.
+   * One 5 dp bar per set, in one colour: done sets and the current or next one (pulsing while it
+   * runs) in the app's accent, the sets still to come in the muted track colour.
    */
   private inner class SegmentsView(context: Context) : View(context) {
     var pulseAlpha = 1f
-    private var sets = 0
-    private var done = 0
     private var current: Int? = null
     // Parsed once per state, not per segment per frame: the pulse redraws this many times a second.
-    private var colors: List<Int?> = emptyList()
-    private var stateColor = Color.WHITE
+    private var colors: List<Int> = emptyList()
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val rect = RectF()
-    private var parsedFrom: List<String>? = null
 
-    fun set(sets: Int, done: Int, current: Int?, colors: List<String>, stateColor: Int) {
-      this.sets = sets
-      this.done = done
+    fun set(sets: Int, done: Int, current: Int?, accent: String) {
       this.current = current
-      if (colors != parsedFrom) {
-        parsedFrom = colors
-        this.colors = colors.map { parse(it) }
+      val fill = parse(accent) ?: Color.parseColor(PipPresenter.DEFAULT_ACCENT)
+      colors = List(minOf(sets, MAX_SEGMENTS)) { index ->
+        PipPresenter.segmentColor(index, done, current, accent)?.let { fill } ?: SEGMENT_OFF
       }
-      this.stateColor = stateColor
       invalidate()
     }
 
     override fun onDraw(canvas: Canvas) {
-      val count = minOf(sets, MAX_SEGMENTS)
+      val count = colors.size
       if (count <= 0) return
       val gap = 3f * density
       val each = (width - gap * (count - 1)) / count
       val radius = height / 2f
       for (index in 0 until count) {
-        paint.color = when {
-          index == current -> stateColor
-          index < done -> colors.getOrNull(index) ?: stateColor
-          else -> SEGMENT_OFF
-        }
+        paint.color = colors[index]
         if (index == current) paint.alpha = (pulseAlpha * 255).toInt()
         val left = index * (each + gap)
         rect.set(left, 0f, left + each, height.toFloat())

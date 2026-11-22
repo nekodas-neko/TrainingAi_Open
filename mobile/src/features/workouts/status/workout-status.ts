@@ -59,7 +59,6 @@ function statusWhileRunning(workout: WorkoutRecord | null): WorkoutStatusPayload
     setsDone: 0,
     nextUp: null,
     pausedAt: null,
-    setColors: null,
     hr: null,
     exerciseIndex: 0,
     exerciseCount: 0,

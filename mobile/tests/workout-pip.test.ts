@@ -5,7 +5,6 @@ import {
   allowsPip,
   pipCommand,
   pipPhaseFor,
-  pipSetColor,
 } from '../src/features/workouts/pip/pip.ts';
 import { workoutStatusFor } from '../src/features/workouts/status/workout-status.ts';
 import type { WorkoutRecord } from '../src/features/workouts/logging/workout.ts';
@@ -48,7 +47,6 @@ function workout(extra: Partial<WorkoutRecord> = {}): WorkoutRecord {
     id: ids.workout,
     status: 'active',
     startedAt: T0,
-    restAdjustmentSeconds: 0,
     restAnchor: null,
     rest: null,
     runningSet: null,
@@ -115,7 +113,6 @@ test('resting sends the rest start, its end and the sets done, from the shared s
     [status.restStartedAt, status.restEndsAt, status.setStartedAt, status.hr],
     [T0 + 90_000, T0 + 180_000, null, null],
   );
-  assert.equal(pipSetColor(recorded(2)), null, 'only a set has an arc colour');
   // No rest timed: the window counts up from the last set with no target.
   const anchored = statusOf(
     recorded(1, { restAnchor: { exerciseId: ids.bench, setId: ids.set(1), startedAt: T0 + 30_000 } }),
@@ -124,7 +121,7 @@ test('resting sends the rest start, its end and the sets done, from the shared s
   assert.deepEqual([statusOf(recorded(1)).restStartedAt, statusOf(recorded(1)).restEndsAt], [null, null]);
 });
 
-test('a running set sends its start, the known load and the set colour', () => {
+test('a running set sends its start and the known load', () => {
   const base = recorded(1, { runningSet: { exerciseId: ids.bench, setId: ids.set(2) } });
   base.exercises[0].sets[1] = {
     ...base.exercises[0].sets[1],
@@ -134,15 +131,9 @@ test('a running set sends its start, the known load and the set colour', () => {
   };
   const status = statusOf(base);
   assert.deepEqual(
-    [status.phase, status.setsDone, status.setStartedAt, status.load, pipSetColor(base)],
-    ['working', 1, T0 + 100_000, '62.5 kg × 6', '#a78bfa'],
+    [status.phase, status.setsDone, status.setStartedAt, status.load],
+    ['working', 1, T0 + 100_000, '62.5 kg × 6'],
   );
-  // Past the six-colour table the shared palette turns oklch, which Android cannot parse.
-  const many = recorded(7, { runningSet: { exerciseId: ids.bench, setId: ids.set(1) } });
-  many.exercises[0].sets = [...Array(8)].map((_, i) =>
-    i < 7 ? { ...set(i + 1), completedAt: T0 + i } : set(i + 1),
-  );
-  assert.match(pipSetColor(many) ?? '', /^#[\da-f]{6}$/i);
 });
 
 test('the exercise summary names what Next moves to, and the review the session (#3111, #3133)', () => {

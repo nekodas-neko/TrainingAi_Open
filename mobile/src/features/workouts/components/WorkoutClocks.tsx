@@ -2,7 +2,7 @@ import { View } from 'react-native';
 import { Pressable } from '../../../shared/ui/Pressable';
 import { slopTo } from '../../../shared/ui/touchSlop';
 import { transitionSecForEquipment } from '@trainingai/shared/workout/duration-model';
-import { AppButton, AppText, Icon, ProgressBar, Stack } from '../../../shared/ui';
+import { AppText, Icon, ProgressBar, Stack } from '../../../shared/ui';
 import { useClock, formatDuration } from '../../../shared/hooks/useClock';
 import { useWorkoutJournal } from '../logging/WorkoutJournalProvider';
 import { workoutFlow } from '../logging/flow';
@@ -198,7 +198,6 @@ export function RestCard({
   const paused = workout.pausedAt !== null;
   // Under a pause the rest stands where it was stopped; resuming moves its anchors on.
   const now = workout.pausedAt ?? clock;
-  const journal = useWorkoutJournal();
   const { theme } = useTheme();
   if (!workout.rest) {
     return null;
@@ -273,30 +272,10 @@ export function RestCard({
         </AppText>
       )}
       {controls && (
-        <>
-          <AppText variant="micro" tone="muted">
-            Actual rest {formatDuration(Math.max(0, (now - workout.rest.startedAt) / 1000))} ·
-            adjusted target {formatDuration(total)}
-          </AppText>
-          <Stack direction="row">
-            <AppButton
-              title="−30s"
-              variant="surface"
-              disabled={journal.busy || paused || total < 30}
-              onPress={() => {
-                void journal.controller?.adjustRest(workout.id, -30);
-              }}
-            />
-            <AppButton
-              title="+30s"
-              variant="surface"
-              disabled={journal.busy || paused || total > 86370}
-              onPress={() => {
-                void journal.controller?.adjustRest(workout.id, 30);
-              }}
-            />
-          </Stack>
-        </>
+        <AppText variant="micro" tone="muted">
+          Actual rest {formatDuration(Math.max(0, (now - workout.rest.startedAt) / 1000))} ·
+          adjusted target {formatDuration(total)}
+        </AppText>
       )}
     </Stack>
   );

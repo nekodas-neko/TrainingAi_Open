@@ -525,28 +525,6 @@ export class WorkoutJournalStore {
       ),
     );
 
-  adjustRest = (workoutId: string, seconds: number) =>
-    this.action((data) =>
-      replaceWorkout(data, workoutId, (workout) => {
-        if (!workout.rest || workout.status !== 'active' || !Number.isInteger(seconds)) {
-          throw new Error('There is no timed rest to adjust.');
-        }
-        running(workout);
-        const endsAt = workout.rest.endsAt + seconds * 1000;
-        if (
-          endsAt < workout.rest.startedAt ||
-          endsAt - workout.rest.startedAt > 86_400_000
-        ) {
-          throw new Error('Rest must be between 0 and 24 hours.');
-        }
-        return {
-          ...workout,
-          rest: { ...workout.rest, endsAt },
-          restAdjustmentSeconds: workout.restAdjustmentSeconds + seconds,
-        };
-      }),
-    );
-
   /** #3745: the lifter's answer on the rest card or in the window, marked `tapped`. */
   answerEffort = (workoutId: string, exerciseId: string, vsPlan: EffortVsPlan) =>
     this.edit((data) =>
@@ -691,12 +669,8 @@ export class WorkoutJournalStore {
           next.exercises
             .find((x) => x.id === exerciseId)!
             .sets.every((x) => x.completedAt !== null);
-        // Every set's rest falls back to the current app's 90 s when its style sets none, then the
-        // workout's rest adjustment applies.
-        restSeconds = Math.max(
-          0,
-          effectiveRestSec(restSeconds) + workout.restAdjustmentSeconds,
-        );
+        // Every set's rest falls back to the current app's 90 s when its style sets none.
+        restSeconds = effectiveRestSec(restSeconds);
         const recorded: WorkoutRecord = {
           ...next,
           flow: {

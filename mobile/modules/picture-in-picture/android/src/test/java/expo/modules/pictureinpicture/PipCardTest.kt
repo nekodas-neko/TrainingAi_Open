@@ -15,10 +15,10 @@ class PipCardTest {
   private val base = PipStatus(
     exerciseName = "Incline press", phase = "ready", sets = 2, setsDone = 0, load = "27.5 kg × 7",
     sessionName = "Push A", exerciseIndex = 2, exerciseCount = 5, workoutFrom = t0 - 600_000,
-    setColors = listOf("#60a5fa", "#f472b6"), accent = accent,
+    accent = accent,
   )
   private fun card(phase: String, status: PipStatus, now: Long = t0) =
-    PipPresenter.present(phase, status, null, now) as PipFrame.Card
+    PipPresenter.present(phase, status, now) as PipFrame.Card
 
   @Test fun `the window is 3 to 4 in every state`() {
     for (phase in listOf("ready", "set", "rest", "complete", "summary", "paused", "pre", "done", PipPolicy.IDLE, null)) {
@@ -56,6 +56,27 @@ class PipCardTest {
     val untimed = card("set", base.copy(phase = "working"))
     assertEquals(t0 - 600_000, untimed.countsFrom)
     assertEquals("workout time", untimed.clockLabel)
+  }
+
+  @Test fun `the set bar is one colour at five sets with four done`() {
+    val five = base.copy(phase = "resting", sets = 5, setsDone = 4, restStartedAt = t0, restEndsAt = t0 + 90_000)
+    val c = card("rest", five, t0)
+    assertEquals(accent, c.accent)
+    // Four done and the next set in the accent, nothing past it: no per-set hue.
+    val colors = (0 until 5).map { PipPresenter.segmentColor(it, c.setsDone, c.current, c.accent) }
+    assertEquals(listOf(accent, accent, accent, accent, accent), colors)
+    // At the same five sets with two done, the sets still to come are the muted track (null).
+    val early = card("rest", five.copy(setsDone = 2), t0)
+    assertEquals(
+      listOf(accent, accent, accent, null, null),
+      (0 until 5).map { PipPresenter.segmentColor(it, early.setsDone, early.current, early.accent) },
+    )
+    // An app that sends no accent draws the window's own green.
+    assertEquals(PipPresenter.DEFAULT_ACCENT, card("rest", five.copy(accent = null), t0).accent)
+    // The lifting card keeps the accent for its running set rather than the lime state colour.
+    val lifting = card("set", five.copy(phase = "working", setStartedAt = t0), t0)
+    assertEquals(accent, lifting.accent)
+    assertEquals(true, lifting.pulse)
   }
 
   @Test fun `Resting counts the rest down in the accent and the bar drains`() {
@@ -163,9 +184,9 @@ class PipCardTest {
   }
 
   @Test fun `the warm-up, the review and no data show the placeholder, never a blank window`() {
-    assertEquals(PipFrame.Placeholder("Upper body", false), PipPresenter.present("done", PipStatus("Upper body", "ready"), null, t0))
-    assertEquals(PipFrame.Placeholder("Upper body", false), PipPresenter.present("pre", PipStatus("Upper body", "ready"), null, t0))
-    assertEquals(PipFrame.Placeholder("", false), PipPresenter.present("rest", null, null, t0))
+    assertEquals(PipFrame.Placeholder("Upper body", false), PipPresenter.present("done", PipStatus("Upper body", "ready"), t0))
+    assertEquals(PipFrame.Placeholder("Upper body", false), PipPresenter.present("pre", PipStatus("Upper body", "ready"), t0))
+    assertEquals(PipFrame.Placeholder("", false), PipPresenter.present("rest", null, t0))
   }
 
   @Test fun `for the first seconds after the last set the buttons answer how it felt, then go back`() {
@@ -184,7 +205,7 @@ class PipCardTest {
     assertEquals(listOf("log"), actions("summary", t0 + 20_000))
     assertNull(PipPresenter.subtitle("summary", asked, t0 + 20_000))
     // Only after the last set: no other phase asks, whatever the payload says.
-    assertEquals(listOf("restPlus", "log", "pause"), actions("rest", t0 + 1_000))
+    assertEquals(listOf("log", "pause"), actions("rest", t0 + 1_000))
     assertEquals(listOf("log"), PipPresenter.buttons("summary", asked.copy(effortUntil = null), t0).map { it.action })
     assertTrue(PipPresenter.EFFORT_BUTTONS.size <= PipPolicy.MAX_ACTIONS)
   }

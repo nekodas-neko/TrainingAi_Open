@@ -74,8 +74,6 @@ data class PipStatus(
   val nextUp: String? = null,
   /** The strap's reading; null with no strap, in which case the window shows no heart rate. */
   val hr: PipHeartRate? = null,
-  /** `#rrggbb` per set of this exercise, in order, for the set segments. */
-  val setColors: List<String> = emptyList(),
   // #3734: where the lifter is, and the clock when nothing else runs.
   val sessionName: String? = null,
   /** 1-based place among the session's exercises, and how many; 0 when unknown. */
@@ -115,7 +113,7 @@ sealed class PipFrame {
    */
   data class Card(
     val state: PipCardState,
-    /** `#rrggbb`: the band, the state word, the bar and the current set's segment. */
+    /** `#rrggbb`: the band, the state word and the bar. */
     val color: String,
     /** "READY", "LIFTING", "RESTING", "REST OVER", "EXERCISE DONE", "PAUSED". */
     val stateWord: String,
@@ -136,11 +134,12 @@ sealed class PipFrame {
     /** "first set", "next set", or null. */
     val loadLabel: String?,
     val sets: Int,
-    /** Segments drawn in their set colours. */
+    /** Segments drawn in the app's accent. */
     val setsDone: Int,
-    /** The segment drawn in the state colour; null for none. */
+    /** The next set's segment, also in the accent; it pulses while the set runs. Null for none. */
     val current: Int?,
-    val setColors: List<String>,
+    /** `#rrggbb`: the app's accent, the one colour of every filled segment. */
+    val accent: String,
     /** The lifting segment pulses. */
     val pulse: Boolean,
     val hr: PipHeartView?,
@@ -164,12 +163,12 @@ object PipPresenter {
    * (`pipPhaseFor`); `status` the workout status payload. The warm-up, the review and a missing
    * status show the placeholder, never a blank window.
    */
-  fun present(phase: String, status: PipStatus?, setColor: String?, nowMs: Long): PipFrame {
+  fun present(phase: String, status: PipStatus?, nowMs: Long): PipFrame {
     if (status == null) return PipFrame.Placeholder("", false)
     val accent = status.accent ?: DEFAULT_ACCENT
     return when (phase) {
       "paused" -> paused(status, accent, nowMs)
-      "set" -> lifting(status, setColor, nowMs)
+      "set" -> lifting(status, nowMs)
       "ready" -> ready(status, nowMs)
       "rest", "complete" ->
         if (status.sets > 0 && status.setsDone >= status.sets) exerciseDone(status, accent, nowMs, false)
@@ -200,7 +199,7 @@ object PipPresenter {
     name = status.exerciseName, where = where(status.exerciseIndex, status),
     load = status.load, loadLabel = loadLabel.takeIf { status.load != null },
     sets = status.sets, setsDone = status.setsDone, current = current,
-    setColors = status.setColors, pulse = pulse, hr = heartView(status.hr, nowMs),
+    accent = status.accent ?: DEFAULT_ACCENT, pulse = pulse, hr = heartView(status.hr, nowMs),
   )
 
   private fun ready(status: PipStatus, nowMs: Long) = card(
@@ -210,10 +209,7 @@ object PipPresenter {
     loadLabel = "first set", current = status.setsDone,
   )
 
-  // The running set's own colour (`setColor`) is no longer drawn: the card's current segment takes
-  // the state's colour, as every state's does (#3734).
-  @Suppress("UNUSED_PARAMETER")
-  private fun lifting(status: PipStatus, setColor: String?, nowMs: Long): PipFrame.Card {
+  private fun lifting(status: PipStatus, nowMs: Long): PipFrame.Card {
     val timed = status.setStartedAt != null
     return card(
       PipCardState.LIFTING, LIFT_COLOR, "LIFTING", status, nowMs,
@@ -374,6 +370,13 @@ object PipPresenter {
     return phase == "summary" && nowMs < until
   }
 
+  /**
+   * One segment's colour: the accent for a done set and for the next one, null for a set still to
+   * come (the view draws that in its muted track colour). No per-set hues.
+   */
+  fun segmentColor(index: Int, setsDone: Int, current: Int?, accent: String): String? =
+    if (index < setsDone || index == current) accent else null
+
   /** The buttons for a phase, at most `PipPolicy.MAX_ACTIONS`; the middle one is the main one. */
   fun buttons(phase: String, status: PipStatus?, nowMs: Long = System.currentTimeMillis()): List<PipButton> {
     if (asksEffort(phase, status, nowMs)) return effortButtons(status?.effortAnswer)
@@ -383,9 +386,7 @@ object PipPresenter {
         PipButton("log", "Log set", "log"),
         PipButton("repsUp", "Reps +", "plus"),
       )
-      "rest" -> listOfNotNull(
-        // +30 s moves a timed rest's end; an untimed rest has none to move.
-        if (status?.restEndsAt != null) PipButton("restPlus", "+30 s", "plus30") else null,
+      "rest" -> listOf(
         PipButton("log", "Start set", "start"),
         PipButton("pause", "Pause", "pause"),
       )
@@ -456,7 +457,6 @@ object PipPresenter {
       pausedAt = long("pausedAt"),
       nextUp = (map["nextUp"] as? String)?.takeIf { it.isNotBlank() },
       hr = heartRate(map["hr"]),
-      setColors = (map["setColors"] as? List<*>)?.mapNotNull { color(it) } ?: emptyList(),
       sessionName = (map["sessionName"] as? String)?.takeIf { it.isNotBlank() },
       exerciseIndex = int("exerciseIndex"),
       exerciseCount = int("exerciseCount"),

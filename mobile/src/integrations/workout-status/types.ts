@@ -28,8 +28,6 @@ export type WorkoutStatusPayload = {
   setsDone: number;
   /** The exercise Next moves to, from the exercise summary; null when Next ends the workout. */
   nextUp: string | null;
-  /** `#rrggbb` per set of this exercise, for the window's dots; the window's copy alone, like `hr`. */
-  setColors: string[] | null;
   /** When the current pause began; null unless `phase` is "paused". */
   pausedAt: number | null;
   // #3734: where the lifter is in the session, and the clock when nothing else runs.

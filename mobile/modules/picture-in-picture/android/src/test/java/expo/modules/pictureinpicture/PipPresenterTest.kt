@@ -16,7 +16,6 @@ class PipPresenterTest {
   private val working = PipStatus(
     exerciseName = "Bench press", phase = "working", sets = 4, setsDone = 2,
     load = "80 kg × 8", setStartedAt = t0,
-    setColors = listOf("#60a5fa", "#f472b6", "#34d399", "#fbbf24"),
   )
   private val reading = PipHeartRate(128, "Aerobic", "#eab308", t0)
 
@@ -46,7 +45,7 @@ class PipPresenterTest {
   @Test fun `the buttons per phase are at most three, the main one in the middle`() {
     fun actions(phase: String, status: PipStatus? = null) = PipPresenter.buttons(phase, status, t0).map { it.action }
     assertEquals(listOf("repsDown", "log", "repsUp"), actions("set"))
-    assertEquals(listOf("restPlus", "log", "pause"), actions("rest", resting))
+    assertEquals(listOf("log", "pause"), actions("rest", resting))
     assertEquals(listOf("log", "pause"), actions("rest", resting.copy(restEndsAt = null)))
     assertEquals(listOf("log", "pause"), actions("ready", resting.copy(restStartedAt = null, restEndsAt = null)))
     assertEquals(listOf("resume"), actions("paused"))
@@ -95,7 +94,6 @@ class PipPresenterTest {
         "restEndsAt" to null, "label" to null, "startedAt" to t0.toDouble(), "setStartedAt" to t0.toDouble(),
         "restStartedAt" to null, "nextUp" to null, "pausedAt" to null,
         "hr" to mapOf("bpm" to 128.0, "zoneName" to "Aerobic", "zoneColor" to "#eab308", "at" to t0.toDouble()),
-        "setColors" to listOf("#60a5fa", "oklch(1 0 0)", "#34d399"),
         // #3734 and #3745.
         "exerciseIndex" to 2.0, "exerciseCount" to 5.0, "workoutFrom" to (t0 - 600_000).toDouble(),
         "nextUpIndex" to 3.0, "nextUpSets" to 3.0, "nextUpLoad" to "20 kg × 12",
@@ -106,7 +104,6 @@ class PipPresenterTest {
     assertEquals(
       PipStatus(
         "Bench press", "working", 4, 2, "80 kg × 8", t0, null, null, null, null, reading,
-        listOf("#60a5fa", "#34d399"),
         sessionName = "Upper body", exerciseIndex = 2, exerciseCount = 5, workoutFrom = t0 - 600_000,
         nextUpIndex = 3, nextUpSets = 3, nextUpLoad = "20 kg × 12", effortUntil = t0 + 20_000,
         effortAnswer = 0, accent = "#00c84e",

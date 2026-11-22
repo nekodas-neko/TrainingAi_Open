@@ -52,7 +52,6 @@ function workout(extra: Partial<WorkoutRecord> = {}): WorkoutRecord {
     startedAt: T0,
     pausedAt: null,
     pausedMs: 30_000,
-    restAdjustmentSeconds: 0,
     restAnchor: null,
     rest: null,
     runningSet: null,
@@ -84,7 +83,6 @@ test('before an exercise\'s first set is Ready, not a rest of 0:00 (#3734)', () 
   // Ready's buttons are a rest's: Start set and Pause.
   assert.deepEqual(pipCommand(ready, 'log'), { type: 'start', exerciseId: ids.row, setId: id(102) });
   assert.deepEqual(pipCommand(ready, 'pause'), { type: 'pause' });
-  assert.equal(pipCommand(ready, 'restPlus'), null);
   // One set in, it is a rest.
   const resting = workout();
   resting.exercises[1].sets[0] = { ...resting.exercises[1].sets[0], startedAt: T0, completedAt: T0 + 500 };
