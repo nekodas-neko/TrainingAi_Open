@@ -195,7 +195,13 @@ export function reevaluatePrescriptionForToday(
   const deloadIsPrescribed = prescription.deload === true || state.phase === 'deload'
   // #3713: a revert puts back the recorded full numbers, capped to the phase the plan's loads were
   // written for. A plan stored before the cap reached `preDeload` recorded the model's raw count.
-  const revertSetsCap = phaseSetsMax(signals.trainingGoal, phaseOfLoads(prescription, state.phase)) ?? Infinity
+  // The cap is for a count the MODEL chose. A rules plan (the model was unavailable, #2110) carries the
+  // program's own set counts, which the engine does not cap anywhere else, so reverting a deload must
+  // give them back as written. Only `source: 'rules'` is recorded: a model plan has no source, so a plan
+  // with none keeps the cap, as before.
+  const revertSetsCap = prescription.source === 'rules'
+    ? Infinity
+    : phaseSetsMax(signals.trainingGoal, phaseOfLoads(prescription, state.phase)) ?? Infinity
   let changed = false
   const exercises: AiPrescriptionExercise[] = prescription.exercises.map(ex => {
     const wasDeloaded = ex.deloaded === true

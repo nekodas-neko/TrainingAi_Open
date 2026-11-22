@@ -166,3 +166,43 @@ describe('the revert caps a plan stored before the fix', () => {
     expect(r.prescription.exercises.find(e => e.sessionExerciseId === 'squat')!.sets).toBe(STRENGTH_ACCUMULATION_MAX)
   })
 })
+
+// #3767 (owner, 22 Nov): the cap on a revert is for a count the model chose. A plan the rules built
+// because the model was unavailable carries the program's own sets, so a deload round trip gives them
+// back as written.
+describe('the revert cap does not trim a rules plan (#3767)', () => {
+  const PROGRAM_SETS = 6 // above strength accumulation's 5: the program wrote it
+  const plan = (source?: 'model' | 'rules'): AiPrescription => ({
+    phase: 'accumulation', phaseAction: 'stay', deload: false, reasoning: 'r', confidence: 0.8,
+    estimatedSessionDurationMin: 50, weeklyVolumeContribution: {},
+    ...(source && { source }),
+    exercises: [
+      { sessionExerciseId: 'bench', name: 'Bench', sets: 5, reps: 5, pct: 75, restSec: 150 },
+      { sessionExerciseId: 'squat', name: 'Squat', sets: PROGRAM_SETS, reps: 5, pct: 75, restSec: 120 },
+    ],
+  })
+  const squatOf = (p: AiPrescription) => p.exercises.find(e => e.sessionExerciseId === 'squat')!
+  const SORE = { ...reevalSignals(), soreMusclesInSession: ['quadriceps'] }
+  const sorenessThenCleared = (p: AiPrescription) => {
+    const sore = reevaluatePrescriptionForToday(p, SORE, { ...reevalState }, NOW)
+    expect(squatOf(sore.prescription)).toMatchObject({ deloaded: true })
+    expect(squatOf(sore.prescription).preDeload!.sets).toBe(PROGRAM_SETS)
+    return reevaluatePrescriptionForToday(sore.prescription, reevalSignals(), { ...reevalState }, NOW).prescription
+  }
+
+  it('a rules plan comes back from the round trip with the sets the program wrote', () => {
+    const back = sorenessThenCleared(plan('rules'))
+    expect(squatOf(back)).toMatchObject({ deloaded: false, sets: PROGRAM_SETS })
+  })
+
+  it('a model plan is capped on the way back exactly as before', () => {
+    const back = sorenessThenCleared(plan('model'))
+    expect(squatOf(back)).toMatchObject({ deloaded: false, sets: STRENGTH_ACCUMULATION_MAX })
+  })
+
+  it('a plan with no source recorded is treated as a model plan: capped as before', () => {
+    // Model plans never record a source (only the rules fallback does), so none means model.
+    const back = sorenessThenCleared(plan())
+    expect(squatOf(back)).toMatchObject({ deloaded: false, sets: STRENGTH_ACCUMULATION_MAX })
+  })
+})

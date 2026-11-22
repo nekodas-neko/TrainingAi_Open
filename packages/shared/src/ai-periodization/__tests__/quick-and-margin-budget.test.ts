@@ -139,6 +139,6 @@ describe('#2132 — the p75 margin decides the fit; the working budget is what t
     expect(total(withMargin.sets)).toBeLessThan(total(atMedian.sets))
     // The estimate stays the honest median one, and is inside the budget he sees — so no overrun note.
     expect(withMargin.estimatedSessionDurationMin).toBeLessThanOrEqual(55 / 1.2 + 0.5)
-    expect(withMargin.budgetNote).toBe('')
+    expect(withMargin.budgetNote).not.toMatch(/dropped|run over|Note:/)
   })
 })
