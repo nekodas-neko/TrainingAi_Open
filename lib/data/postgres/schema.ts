@@ -2610,6 +2610,13 @@ export const weeklyCheckins = pgTable('weekly_checkins', {
   savedAt:           timestamp('saved_at', { withTimezone: true }),
   dismissedAt:       timestamp('dismissed_at', { withTimezone: true }),
   daysOffWeekdays:   smallint('days_off_weekdays').array(),
+  /**
+   * The dates the check-in ITSELF made rest days when it applied `daysOffWeekdays`: dates that were not
+   * already a live rest day at that moment (migration 202611221523). NULL = it wrote none. Undo and redo
+   * withdraw only these, so a rest day the person set themselves is never removed. At most 7 entries and
+   * all inside the applies-to week (CHECKs). The engine fills it in the same transaction as the rest_days writes.
+   */
+  daysOffWritten:    date('days_off_written', { mode: 'string' }).array(),
   shorterSessionMin: smallint('shorter_session_min'),
   painRaised:        boolean('pain_raised'),
   painExerciseName:  text('pain_exercise_name'),
@@ -2636,6 +2643,8 @@ export const weeklyCheckins = pgTable('weekly_checkins', {
   check('weekly_checkins_status_check', sql`${t.status} IN ('offered', 'saved', 'dismissed')`),
   check('weekly_checkins_status_times_check', sql`(${t.status} = 'offered' AND ${t.savedAt} IS NULL AND ${t.dismissedAt} IS NULL) OR (${t.status} = 'saved' AND ${t.savedAt} IS NOT NULL AND ${t.dismissedAt} IS NULL) OR (${t.status} = 'dismissed' AND ${t.savedAt} IS NULL AND ${t.dismissedAt} IS NOT NULL)`),
   check('weekly_checkins_days_off_check', sql`${t.daysOffWeekdays} IS NULL OR (${t.daysOffWeekdays} <@ ARRAY[1, 2, 3, 4, 5, 6, 7]::smallint[] AND cardinality(${t.daysOffWeekdays}) <= 7)`),
+  check('weekly_checkins_days_off_written_count_check', sql`${t.daysOffWritten} IS NULL OR cardinality(${t.daysOffWritten}) <= 7`),
+  check('weekly_checkins_days_off_written_week_check', sql`${t.daysOffWritten} IS NULL OR ${t.daysOffWritten} <@ ARRAY[${t.appliesWeekStart}, ${t.appliesWeekStart} + 1, ${t.appliesWeekStart} + 2, ${t.appliesWeekStart} + 3, ${t.appliesWeekStart} + 4, ${t.appliesWeekStart} + 5, ${t.appliesWeekStart} + 6]`),
   check('weekly_checkins_shorter_session_check', sql`${t.shorterSessionMin} IS NULL OR (${t.shorterSessionMin} >= 1 AND ${t.shorterSessionMin} <= 240)`),
   check('weekly_checkins_pain_detail_check', sql`${t.painRaised} IS TRUE OR (${t.painExerciseName} IS NULL AND ${t.painExerciseId} IS NULL AND ${t.painWhere} IS NULL AND ${t.painOfferStatus} IS NULL)`),
   check('weekly_checkins_pain_lift_check', sql`(${t.painExerciseName} IS NULL OR ${t.painExerciseName} <> '') AND (${t.painExerciseId} IS NULL OR ${t.painExerciseName} IS NOT NULL) AND (${t.painWhere} IS NULL OR ${t.painExerciseName} IS NOT NULL)`),
