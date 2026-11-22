@@ -26,6 +26,10 @@ const SUB = (id: string) => `google-sub-${id.slice(-4)}`
 type Pool = import('pg').Pool
 
 const liveOverrides = () => ({
+  // #3890: the fixture fills pain_injury_id (allowed only when pain_raised is true), and its generic
+  // date is a Tuesday (week_start must be a Monday).
+  weekly_checkin_exercises: { effect: 'lowered_one_step' }, // applied_change_id is filled; only a lowering or an accepted offer may hold one
+  weekly_checkins: { week_start: '2026-09-14', applies_week_start: '2026-09-21', pain_raised: true, pain_exercise_name: 'Squat', pain_offer_status: 'accepted', swap_exercise_name: 'Squat', swap_offer_status: 'accepted' },
   apple_health_samples: {
     start_at: new Date('2026-09-15T00:00:00Z'), end_at: new Date('2026-09-15T00:01:00Z'),
     source_bundle_id: 'com.example', quantity_value: 1, quantity_unit: 'count',
