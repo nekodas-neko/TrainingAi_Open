@@ -43,7 +43,7 @@ import {
   PREFERENCE_REST_MAX_SEC, PREFERENCE_REST_MIN_SEC, type LiftPreference,
 } from '@trainingai/shared/ai-periodization/lift-preference'
 import { restatePlanRow, repRangeForRequest } from '@trainingai/shared/ai-periodization/lift-preference-restate'
-import { rewriteHeldRow } from '@trainingai/shared/ai-periodization/checkin-plan-hold'
+import { rewriteHeldRow, sameHoldRecord } from '@trainingai/shared/ai-periodization/checkin-plan-hold'
 import { normalizeStoredPrescription } from '@trainingai/shared/ai-periodization/reconcile-prescription'
 import { prescriptionDrivesLoad } from '@trainingai/shared/ai-periodization/apply-prescription'
 import { isAiPrescriptionPending } from '@trainingai/shared/ai-periodization/prescription-pending'
@@ -390,7 +390,7 @@ export function restatePlan(ctx: RestateInputs, plan: Pick<StoredPlan, 'programS
     if (out !== ex) changed = true
     return out
   })
-  if (hold && JSON.stringify(heldRows) !== JSON.stringify(hold.rows)) changed = true
+  if (hold && !sameHoldRecord({ ...hold, rows: heldRows }, hold)) changed = true
   if (!changed) return plan.prescription
   const { checkinHold: _hold, ...rest } = plan.prescription
   return { ...rest, exercises, ...(hold && Object.keys(heldRows).length > 0 && { checkinHold: { ...hold, rows: heldRows } }) }

@@ -56,6 +56,14 @@ export function holdPlanRows(
   return weekStart ? { pct, record: { weekStart, rows: recorded } } : { pct }
 }
 
+/** Two hold records alike, whatever their key order (a stored plan comes back from `jsonb` reordered). */
+export function sameHoldRecord(a: CheckinHoldRecord | undefined, b: CheckinHoldRecord | undefined): boolean {
+  if (!a || !b) return !a && !b
+  const ids = Object.keys(a.rows)
+  return a.weekStart === b.weekStart && ids.length === Object.keys(b.rows).length
+    && ids.every(id => b.rows[id] != null && b.rows[id].pct === a.rows[id].pct && b.rows[id].heldPct === a.rows[id].heldPct)
+}
+
 /**
  * Pure: a stored plan as served in the week starting `weekStart`, with `ctxFor` giving each row's hold
  * for that week (absent: not held). A row the hold lowered before starts again from the pct it had (a
@@ -83,7 +91,7 @@ export function holdStoredPrescription(
     return { ...ex, pct: next }
   })
   const record = Object.keys(recorded).length > 0 ? { weekStart, rows: recorded } : undefined
-  if (!changed && JSON.stringify(record ?? null) === JSON.stringify(marker ?? null)) return stored
+  if (!changed && sameHoldRecord(record, marker)) return stored
   const { checkinHold: _previous, ...rest } = stored
   return { ...rest, exercises, ...(record && { checkinHold: record }) }
 }
