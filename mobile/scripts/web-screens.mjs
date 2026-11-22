@@ -30,7 +30,11 @@
  * Options:
  *   --out DIR         output folder (default: $TMPDIR/trainingai-web-screens)
  *   --screens a,b     only these screens (see --list)
- *   --click FILE      a JSON click script, run after the screens (format below)
+ *   --click FILE      a JSON click script, run after the screens (format below). Besides the
+ *                     steps below: {"tapLabel": "More for Row"} taps by accessible label,
+ *                     "index": N on a tap picks the Nth visible match (from 0), and
+ *                     {"fulfill": {"path": "/api/coach", "file": "reply.txt"}} answers that path
+ *                     from a file (relative to the script) from then on, so no model is called.
  *   --server URL      the Next server (default http://localhost:3000)
  *   --port N          the proxy's port (default 8099)
  *   --height N        viewport height in px (default 832). A taller one shows more of a long screen.
@@ -683,9 +687,23 @@ async function main() {
           await settle(page, options.settle);
         } else if (step.tap) {
           const target = page.getByText(step.tap, { exact: step.exact !== false });
-          const visible = target.filter({ visible: true }).first();
+          const visible = target.filter({ visible: true }).nth(step.index ?? 0);
           await visible.click({ timeout: 15_000 });
           await settle(page, options.settle);
+        } else if (step.tapLabel) {
+          // An icon-only control ("…") has no text: tap it by its accessible label.
+          const target = page.getByLabel(step.tapLabel, { exact: step.exact !== false });
+          await target.filter({ visible: true }).first().click({ timeout: 15_000 });
+          await settle(page, options.settle);
+        } else if (step.fulfill) {
+          // Answer one path from a file instead of the server, e.g. the Coach chat's stream, so a
+          // flow after a model reply can be captured with no model call. Every later request to it.
+          const body = fs.readFileSync(path.resolve(path.dirname(options.click), step.fulfill.file), 'utf8');
+          await page.route(`**${step.fulfill.path}`, (route) =>
+            route.request().method() === (step.fulfill.method ?? 'POST')
+              ? route.fulfill({ status: 200, contentType: step.fulfill.contentType ?? 'text/event-stream', body })
+              : route.fallback(),
+          );
         } else if (typeof step.scroll === 'number') {
           await scrollBy(page, step.scroll);
           await page.waitForTimeout(400);

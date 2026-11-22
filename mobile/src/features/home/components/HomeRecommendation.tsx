@@ -33,6 +33,7 @@ import { soreChipColor } from '../data/recommendation-presentation';
 import { homeRecommendationModel } from '../data/recommendation-model';
 import { SessionGlyph } from '../../workouts/components/SessionGlyph';
 import { failureNotice } from '../../../core/reporting/index.ts';
+import { ChangeTodayButton } from './ChangeTodayButton';
 
 export function HomeRecommendation({
   trained,
@@ -239,27 +240,32 @@ export function HomeRecommendation({
         <Stack style={{ flex: 1 }}>
           <AppText variant="hero">{model.name}</AppText>
           {!done && (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Why this session?"
-              // One 20 dp line. The reach goes over the session name above and the gap below;
-              // neither is tappable (#3759).
-              hitSlop={{
-                top: slopTo(theme.sizes.touchTarget, theme.sizes.iconSmall),
-                bottom: slopTo(theme.sizes.touchTarget, theme.sizes.iconSmall),
-                left: theme.spacing.sm,
-                right: theme.spacing.sm,
-              }}
-              onPress={() => openExplanation(session.id)}
-              style={{ alignSelf: 'flex-start' }}
-            >
-              <Stack direction="row" align="center" gap="xs">
-                <AppText variant="caption" tone="muted">
-                  Why this?
-                </AppText>
-                <Icon name="forward" size={theme.sizes.iconSmall} tone="muted" />
-              </Stack>
-            </Pressable>
+            <Stack direction="row" align="center" wrap gap="lg">
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Why this session?"
+                // One 20 dp line. The reach goes over the session name above and the gap below;
+                // neither is tappable (#3759).
+                hitSlop={{
+                  top: slopTo(theme.sizes.touchTarget, theme.sizes.iconSmall),
+                  bottom: slopTo(theme.sizes.touchTarget, theme.sizes.iconSmall),
+                  left: theme.spacing.sm,
+                  right: theme.spacing.sm,
+                }}
+                onPress={() => openExplanation(session.id)}
+                style={{ alignSelf: 'flex-start' }}
+              >
+                <Stack direction="row" align="center" gap="xs">
+                  <AppText variant="caption" tone="muted">
+                    Why this?
+                  </AppText>
+                  <Icon name="forward" size={theme.sizes.iconSmall} tone="muted" />
+                </Stack>
+              </Pressable>
+              {model.action !== 'resume' && model.action !== 'completed' && (
+                <ChangeTodayButton programSessionId={session.id} />
+              )}
+            </Stack>
           )}
         </Stack>
       </Stack>

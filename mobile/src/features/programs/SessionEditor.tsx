@@ -23,6 +23,7 @@ import type { LibraryExercise, SavedStyle } from '../workouts/data/models';
 import { selectExercise, normalizeSupersets, progressionSetLabel, type ProgramDraft } from './editor-model';
 import { exerciseBlocks, reorderExerciseBlocks, reorderSupersetMembers } from './reorder-model';
 import { defaultStyleIdForSlot } from '@trainingai/shared/workout/default-style';
+import { RepRangeRow } from './RepRangeRow';
 
 export function SessionEditor({
   draft,
@@ -34,6 +35,7 @@ export function SessionEditor({
   handle,
   disabled = false,
   onRemove,
+  savedLifts,
 }: {
   draft: ProgramDraft;
   index: number;
@@ -44,6 +46,8 @@ export function SessionEditor({
   handle?: ReactNode;
   disabled?: boolean;
   onRemove?: () => void;
+  /** The saved program's lifts, slot id → name: only a saved lift can hold a rep range (#3896). */
+  savedLifts?: ReadonlyMap<string, string>;
 }) {
   const { theme } = useTheme();
   const [choosing, setChoosing] = useState<string | null>(null);
@@ -93,15 +97,32 @@ export function SessionEditor({
           variant="surface"
           onPress={() => setChoosing(item.id!)}
         />
-        <Picker
-          label={progressionSetLabel(draft.phaseMode)}
-          value={item.styleId ?? ''}
-          options={[
-            { value: '', label: 'Default' },
-            ...styles.map((style) => ({ value: style.id, label: style.name })),
-          ]}
-          onChange={(styleId) => exercise(at, { styleId: styleId || null })}
-        />
+        {/* #3896 D7 / 8c A: under the AI plan the "Progression set" picker becomes "Rep range". A
+            lift that already has a set keeps the picker ("Used when the AI plan is off"), so it can
+            still be changed or cleared there (#3896 review). */}
+        {(draft.phaseMode !== 'ai_dynamic' || !!item.styleId) && (
+          <Picker
+            label={progressionSetLabel(draft.phaseMode)}
+            value={item.styleId ?? ''}
+            options={[
+              { value: '', label: 'Default' },
+              ...styles.map((style) => ({ value: style.id, label: style.name })),
+            ]}
+            onChange={(styleId) => exercise(at, { styleId: styleId || null })}
+          />
+        )}
+        {savedLifts && item.id && item.exerciseName && savedLifts.get(item.id) === item.exerciseName ? (
+          <RepRangeRow
+            sessionExerciseId={item.id}
+            name={item.exerciseName}
+            names={[...savedLifts.values()]}
+            disabled={disabled}
+          />
+        ) : savedLifts && item.exerciseName ? (
+          <AppText variant="caption" tone="muted">
+            Save the program to set this lift’s rep range.
+          </AppText>
+        ) : null}
         <Picker
           label="Exercise role"
           value={item.exerciseRole ?? 'accessory'}

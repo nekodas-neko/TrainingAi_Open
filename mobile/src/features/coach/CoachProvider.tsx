@@ -1,11 +1,19 @@
-import { createContext, useContext, useEffect, useMemo, type PropsWithChildren } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  type PropsWithChildren,
+} from 'react';
 import { AppState } from 'react-native';
 import { randomUUID } from 'expo-crypto';
 import { useWorkoutResources } from '../workouts/data/WorkoutDataProvider';
 import { useWorkoutContext } from '../workouts/WorkoutProvider';
 import { useNutrition } from '../nutrition/data/NutritionProvider';
 import { useHome } from '../home/data/HomeProvider';
-import { CoachConversation } from './data/CoachConversation';
+import { CoachConversation, type CoachOpenRequest } from './data/CoachConversation';
 import { CoachActions } from './data/CoachActions';
 import { scopes, type CoachScope } from './data/models';
 import { todayInTz } from '@trainingai/shared/date-utils';
@@ -15,6 +23,16 @@ export type Coach = {
   actions: CoachActions;
 };
 const Context = createContext<Coach | null>(null);
+type Launch = {
+  /** Opens the Coach, about a lift, session or workout when the request names one (#3896 steps 6-7). */
+  launch: (request?: CoachOpenRequest, scope?: CoachScope) => void;
+  /** The app shell's way to show the Coach screen. */
+  navigator: { current: ((scope: CoachScope) => void) | null };
+};
+const LaunchContext = createContext<Launch>({
+  launch: () => {},
+  navigator: { current: null },
+});
 export function CoachProvider({ children }: PropsWithChildren) {
   const resources = useWorkoutResources(),
     workouts = useWorkoutContext(),
@@ -66,7 +84,35 @@ export function CoachProvider({ children }: PropsWithChildren) {
       conversations.forEach((conversation) => conversation.dispose());
     };
   }, [coach]);
-  return <Context.Provider value={coach}>{children}</Context.Provider>;
+  const navigator = useRef<((scope: CoachScope) => void) | null>(null);
+  const launch = useCallback(
+    (request: CoachOpenRequest = {}, scope: CoachScope = 'general') => {
+      const prepared = coach?.conversations[scope].prepare(request);
+      const show = () => navigator.current?.(scope);
+      // Opened about something: show the Coach once the fresh conversation is in place, so the one
+      // it replaced does not flash first. Otherwise at once.
+      if (request.context && prepared) void prepared.finally(show);
+      else show();
+    },
+    [coach],
+  );
+  const launcher = useMemo(() => ({ launch, navigator }), [launch]);
+  return (
+    <Context.Provider value={coach}>
+      <LaunchContext.Provider value={launcher}>{children}</LaunchContext.Provider>
+    </Context.Provider>
+  );
+}
+/** Opens the Coach from anywhere in the app, optionally about one lift, session or workout. */
+export function useCoachLaunch() {
+  return useContext(LaunchContext).launch;
+}
+/** The app shell registers how the Coach screen is shown. */
+export function useCoachNavigator(show: (scope: CoachScope) => void) {
+  const { navigator } = useContext(LaunchContext);
+  useEffect(() => {
+    navigator.current = show;
+  });
 }
 export function useCoach() {
   return useContext(Context);

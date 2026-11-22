@@ -1,4 +1,5 @@
-import { convertToModelMessages, stepCountIs, type UIMessage } from 'ai'
+import { convertToModelMessages, createUIMessageStream, createUIMessageStreamResponse, stepCountIs, type UIMessage } from 'ai'
+import { randomUUID } from 'node:crypto'
 import { google } from '@ai-sdk/google'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
@@ -20,6 +21,9 @@ import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 import { CoachContextSchema } from '@trainingai/shared/coach/context'
 import { getDb, ensureSchema } from '@/lib/data/postgres/client'
 import { resolveCoachContext } from '@/lib/coach/context'
+import { CoachIntentSchema, intentAllowed } from '@trainingai/shared/coach/chips'
+import { intentBlock } from '@/lib/coach/intents'
+import { whyThisWeightFor } from '@/lib/coach/about'
 
 /**
  * Sized from production, not guessed. The schema caps a conversation at 60 messages but each is
@@ -60,6 +64,12 @@ const BodySchema = z.object({
    * domain this server has not shipped still gets a working Coach; only known gated names count.
    */
   patchDomains: z.array(z.string().max(40)).max(20).optional(),
+  /**
+   * #3896 steps 6 and 7: the Coach button this message came from. An enum only: the instruction it
+   * stands for is the server's (`lib/coach/intents.ts`), and it is refused (400, no model call) unless
+   * it fits the checked context and what the client renders (`intentAllowed`).
+   */
+  intent: CoachIntentSchema.optional(),
 })
 
 // RV-173: the guards belong here for the same reason they belong on every other prose route —
@@ -212,6 +222,24 @@ ${PROSE_GUARDS}
 Today's date: TODAY_ISO.
 `.trim()
 
+/** A reply the app writes itself, streamed in the same UI message protocol as a model reply so the
+ *  client shows it in the conversation like any other assistant message. */
+function codeReply(text: string) {
+  const id = randomUUID()
+  return createUIMessageStreamResponse({
+    headers: { 'Cache-Control': 'private, no-store' },
+    stream: createUIMessageStream({
+      execute: ({ writer }) => {
+        writer.write({ type: 'start' })
+        writer.write({ type: 'text-start', id })
+        writer.write({ type: 'text-delta', id, delta: text })
+        writer.write({ type: 'text-end', id })
+        writer.write({ type: 'finish' })
+      },
+    }),
+  })
+}
+
 /**
  * AI Coach's chat route.
  *
@@ -263,6 +291,15 @@ export async function POST(req: Request) {
 
     // Before the model is called, and refusing rather than dropping: a context id that is not the
     // user's answers the same 404 the apply path gives a foreign target, and nothing is streamed.
+    const intent = parsed.data.intent
+    if (intent && !intentAllowed(intent, {
+      lift: parsed.data.context?.origin === 'exercise' && !!parsed.data.context.sessionExerciseId,
+      liftPreference: scope.patchDomains.includes('lift_preference'),
+      training: scope.readTools === null,
+    })) {
+      return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
+    }
+
     let contextBlock = ''
     if (parsed.data.context) {
       await ensureSchema()
@@ -274,6 +311,23 @@ export async function POST(req: Request) {
       if (!resolved.ok) return NextResponse.json({ error: 'Not found' }, { status: 404 })
       contextBlock = resolved.block
     }
+
+    // #3896 review, the Orchestrator's call: "Why this weight?" is answered by code, with no model
+    // call, so every number in the answer is one the app worked out (no model-reported number is shown
+    // as fact). The intent gate above has already required a lift context, and the context was just
+    // checked as the user's; `whyThisWeightFor` checks the slot again before it reads by it.
+    // Only the button's own turn is answered this way. The app keeps sending the intent until the
+    // person types or taps another button, so a tool-result request that follows (an earlier choice
+    // list reopened and answered) can still carry it: that request is a continuation for the model,
+    // and answering it with the "why" text again would swallow the person's pick. There the stale
+    // intent is dropped instead.
+    const buttonTurn = (parsed.data.messages.at(-1) as { role?: unknown } | undefined)?.role === 'user'
+    if (intent === 'lift_why_weight' && buttonTurn && parsed.data.context?.sessionExerciseId) {
+      const text = await whyThisWeightFor(getDb(), repo, userId, parsed.data.context.sessionExerciseId, tz, todayIso)
+      if (text === null) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+      return codeReply(text)
+    }
+    const modelIntent = intent === 'lift_why_weight' ? undefined : intent
 
     const modelMessages = await convertToModelMessages(
       resolveDanglingWidgetCalls(parsed.data.messages as UIMessage[]),
@@ -287,6 +341,7 @@ export async function POST(req: Request) {
       scope.systemSection,
       injuryLine,
       contextBlock,
+      modelIntent ? intentBlock(modelIntent) : '',
     ].filter(Boolean).join('\n\n')
 
     const result = loggedStreamText(

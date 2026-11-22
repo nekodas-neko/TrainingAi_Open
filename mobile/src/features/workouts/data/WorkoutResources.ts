@@ -2,7 +2,7 @@ import type { ZodType } from 'zod';
 import type { ScopedStorage } from '../../../core/storage/LocalStorage.ts';
 import { RefreshPolicy } from '../../../core/sync/RefreshPolicy.ts';
 import type { AccountConnection } from '../../account/session.ts';
-import { aiFailureText, isAuthRefusal } from '../../account/api/client.ts';
+import { ApiError, aiFailureText, isAuthRefusal } from '../../account/api/client.ts';
 import { overlayHistory, type HistoryOperation } from './HistoryOutbox.ts';
 import { TrainingStore } from './TrainingStore.ts';
 import { failureNotice, reportError } from '../../../core/reporting/index.ts';
@@ -24,6 +24,8 @@ export type ResourceState<T = unknown> = {
   refreshing: boolean;
   saved: boolean;
   error: string | null;
+  /** The last load was our own server's 404: the thing this view reads no longer exists. */
+  notFound?: boolean;
 };
 const empty: ResourceState = {
   data: null,
@@ -338,6 +340,7 @@ export class WorkoutResources {
         loading: false,
         refreshing: false,
         saved: entry.state.data !== null,
+        notFound: error instanceof ApiError && error.status === 404 && error.validation,
         error: denied
           ? // `deniedMessage` names a 403 (e.g. "Owner only."); a 401 is an expired sign-in, never that.
             ((error.status === 403 ? entry.spec.deniedMessage : undefined) ??

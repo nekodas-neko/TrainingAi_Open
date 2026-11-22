@@ -23,6 +23,7 @@ import { useWorkoutResource } from '../data/WorkoutDataProvider';
 import { injurySpec } from '../data/models';
 import { activeInjuredMuscles } from '@trainingai/shared/workout/injury-context';
 import { normalizeMuscle } from '@trainingai/shared/muscles';
+import { LiftCoachMenu } from '../../coach/components/LiftCoachMenu';
 
 export function SessionScreen({
   sessionId,
@@ -147,6 +148,9 @@ export function SessionScreen({
             completedIds={done}
             injuredMuscles={injuredMuscles}
             onSelect={(exercise) => setSelectedId(exercise.id)}
+            trailing={(exercise) => (
+              <LiftCoachMenu sessionExerciseId={exercise.id} name={exercise.name} />
+            )}
           />
           <Sheet
             visible={!!selected}

@@ -2,6 +2,8 @@ import { z } from 'zod';
 import type { UIMessage } from 'ai';
 import type { ResourceSpec } from '../../workouts/data/WorkoutResources.ts';
 import { aiFailureText } from '../../account/api/client.ts';
+import { CoachContextSchema, type CoachContext } from '@trainingai/shared/coach/context';
+import { CoachAboutSchema, CoachIntentSchema } from '@trainingai/shared/coach/chips';
 
 export const scopes = ['general', 'nutrition'] as const;
 export type CoachScope = (typeof scopes)[number];
@@ -18,6 +20,12 @@ export const conversationSchema = z.object({
   input: z.string().max(12000),
   threadId: z.uuid().nullable(),
   messages: z.array(messageSchema).max(120),
+  // #3896 steps 6-7: what the conversation was opened about, sent with every request. A saved
+  // context that no longer reads is dropped rather than failing the whole conversation.
+  context: CoachContextSchema.nullable().optional().catch(null),
+  // #3896 review: the button that started the exchange under way, sent with each of its requests
+  // until the user types or taps another button.
+  intent: CoachIntentSchema.nullable().optional().catch(null),
 });
 export const archiveSchema = z
   .array(
@@ -71,9 +79,24 @@ export const previewSchema = z.object({
   ),
   target: z.object({ id: z.string().nullable(), label: z.string() }).nullable(),
 });
+/** The Coach's context line and buttons (#3896 steps 6-7), chosen by the server from `context`. */
+export function aboutSpec(
+  scope: CoachScope,
+  context: CoachContext | null,
+  patchDomains: readonly string[],
+): ResourceSpec<z.infer<typeof CoachAboutSchema>> {
+  const query: Record<string, string> = { scope, patchDomains: patchDomains.join(',') };
+  for (const [key, value] of Object.entries(context ?? {})) {
+    if (typeof value === 'string') query[key] = value;
+  }
+  return { path: '/api/coach/about', query, schema: CoachAboutSchema, ttl: 300000 };
+}
 export const applySchema = z.object({ changeId: z.uuid(), summary: z.string() });
 export const coachPaths = [
   '/api/coach/threads',
+  '/api/coach/about',
+  '/api/coach/lift-preferences',
+  '/api/next-session/prescription',
   '/api/coach/options',
   '/api/user/goals',
   '/api/user/profile',
@@ -107,6 +130,8 @@ export function coachError(error: unknown, action = 'get a reply') {
     return 'Check your sign-in and account access to use Coach.';
   if (status === 429) return 'Coach is busy. Wait a moment, then retry.';
   if (status === 400) return 'Coach could not use this suggestion. Ask for a fresh one.';
+  if (status === 404)
+    return 'What this chat was opened about is no longer in your program. Start a new conversation.';
   return aiFailureText(error, `Could not ${action}. Check your connection and retry.`);
 }
 export function when(iso: string, timezone: string) {

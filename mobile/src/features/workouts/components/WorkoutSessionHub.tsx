@@ -7,6 +7,7 @@ import { WorkoutLayout } from './WorkoutLayout';
 import { SessionExerciseList } from './SessionExerciseList';
 import { ExercisePreviewCard } from './ExercisePreviewCard';
 import { WorkoutSaveNotice } from './WorkoutSaveNotice';
+import { LiftCoachMenu } from '../../coach/components/LiftCoachMenu';
 
 export function WorkoutSessionHub({
   workout,
@@ -85,6 +86,9 @@ export function WorkoutSessionHub({
         exercises={exercises}
         completedIds={doneIds}
         onSelect={(exercise) => setSelectedId(exercise.id)}
+        trailing={(exercise) => (
+          <LiftCoachMenu sessionExerciseId={exercise.id} name={exercise.name} />
+        )}
       />
       <Sheet
         visible={!!selected}

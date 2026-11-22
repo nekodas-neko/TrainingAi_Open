@@ -2,7 +2,7 @@ import { deviceHealthName } from '../integrations/device-health/platform';
 import { UndoProvider } from '../shared/ui/undo/UndoProvider';
 import { ProfileDetailsScreen } from '../features/settings/screens/ProfileDetailsScreen';
 import { SessionExplainScreen } from '../features/workouts/screens/SessionExplainScreen';
-import { CoachProvider } from '../features/coach/CoachProvider';
+import { CoachProvider, useCoachLaunch, useCoachNavigator } from '../features/coach/CoachProvider';
 import { CoachScreen } from '../features/coach/screens/CoachScreen';
 import type { CoachScope } from '../features/coach/data/models';
 import type { Destination } from '../features/coach/components/CoachWidget';
@@ -112,7 +112,10 @@ function AppShell() {
     count: 0,
   });
   const [sleepRequest, setSleepRequest] = useState({ scope: '', date: '', count: 0 });
-  const openCoach = (scope: CoachScope = 'general') => open({ screen: 'coach', scope });
+  // #3896 steps 6-7: every way in goes through the launcher, so the Coach knows what it was opened about.
+  useCoachNavigator((scope) => open({ screen: 'coach', scope }));
+  const launchCoach = useCoachLaunch();
+  const openCoach = (scope: CoachScope = 'general') => launchCoach({}, scope);
   // The Coach stays under what it opens, so Back from Programs or the recorder returns to it.
   function coachDestination(destination: Destination) {
     if (destination === 'program_builder') open({ screen: 'programs' });

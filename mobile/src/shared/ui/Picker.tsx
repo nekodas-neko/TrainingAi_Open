@@ -15,6 +15,7 @@ export function Picker({
   disabled = false,
   searchable = false,
   compact = false,
+  display,
 }: {
   label: string;
   value: string;
@@ -23,6 +24,8 @@ export function Picker({
   disabled?: boolean;
   searchable?: boolean;
   compact?: boolean;
+  /** What the row shows instead of the chosen option's label (a value no option holds, say). */
+  display?: string;
 }) {
   const { theme } = useTheme();
   const [open, setOpen] = useState(false);
@@ -38,7 +41,9 @@ export function Picker({
         )}
         <AppButton
           title={
-            compact ? (selected?.label ?? 'Choose') : `${label}: ${selected?.label ?? 'Choose'}`
+            compact
+              ? (display ?? selected?.label ?? 'Choose')
+              : `${label}: ${display ?? selected?.label ?? 'Choose'}`
           }
           style={
             compact

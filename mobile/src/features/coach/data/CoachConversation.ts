@@ -15,6 +15,12 @@ import { WidgetResultSchema, type WidgetResult } from './widgets.ts';
 import { CoachTransport } from './CoachTransport.ts';
 import { RENDERED_PATCH_DOMAINS } from './patch.ts';
 import { failureNotice } from '../../../core/reporting/index.ts';
+import type { CoachContext } from '@trainingai/shared/coach/context';
+import { INTENT_NEEDS, type CoachIntent } from '@trainingai/shared/coach/chips';
+
+/** How an entry point opens the Coach (#3896 steps 6-7): about one lift, session or workout, and
+ *  optionally straight into one of its buttons (the action menu's shortcuts). */
+export type CoachOpenRequest = { context?: CoachContext; chip?: string };
 
 type State = {
   ready: boolean;
@@ -26,6 +32,19 @@ type State = {
   opening: boolean;
   localThreads: LocalThread[];
   stopped: boolean;
+  /** What this conversation was opened about; sent with every request, persisted with it. */
+  context: CoachContext | null;
+  /** A button an entry point asked to tap once the Coach's buttons have loaded. */
+  pendingChip: string | null;
+  /**
+   * The button that started the exchange under way (#3896 review). Sent with every request of that
+   * exchange — the button's own turn and each tool-result turn after it (`addToolResult`,
+   * `sendAutomaticallyWhen`), which the SDK sends with no body of their own — until the user types a
+   * message or taps another button. The server checks it on each request as on the first.
+   */
+  intent: CoachIntent | null;
+  /** The lift this conversation was opened about no longer reads (a 404 from about): it was dropped. */
+  contextGone: boolean;
 };
 export class CoachConversation {
   readonly chat: Chat<UIMessage>;
@@ -39,6 +58,10 @@ export class CoachConversation {
     opening: false,
     localThreads: [],
     stopped: false,
+    context: null,
+    pendingChip: null,
+    intent: null,
+    contextGone: false,
   };
   private listeners = new Set<() => void>();
   private localWrites: Promise<unknown> = Promise.resolve();
@@ -65,7 +88,13 @@ export class CoachConversation {
       transport: new CoachTransport({
         api: '/api/coach',
         // #3896 step 5: the gated patch domains this build renders, so the server offers them.
-        body: { scope, patchDomains: RENDERED_PATCH_DOMAINS },
+        // #3896 steps 6-7: and the context it was opened about, read at send time.
+        body: () => ({
+          scope,
+          patchDomains: RENDERED_PATCH_DOMAINS,
+          ...(this.current.context && { context: this.current.context }),
+          ...(this.current.intent && { intent: this.current.intent }),
+        }),
         fetch: async (_url, init) => {
           if (this.disposed || !resources.connection.coachStream)
             throw new Error('Coach is unavailable.');
@@ -126,7 +155,16 @@ export class CoachConversation {
       this.listeners.forEach((listener) => listener());
     }
   }
-  async initialize() {
+  private initializing: Promise<void> | null = null;
+  /** One read at a time: the provider and `prepare` may both ask, and a second read finishing late
+   *  must not put back a context `prepare` has just replaced. */
+  initialize() {
+    this.initializing ??= this.load().finally(() => {
+      this.initializing = null;
+    });
+    return this.initializing;
+  }
+  private async load() {
     try {
       const [saved, archived] = await Promise.all([
         this.resources.draft(this.key, conversationSchema),
@@ -140,6 +178,8 @@ export class CoachConversation {
         ready: true,
         input: saved?.input ?? '',
         threadId: saved?.threadId ?? null,
+        context: saved?.context ?? this.current.context,
+        intent: usableIntent(saved?.intent, saved?.context ?? this.current.context),
       });
       this.saved = JSON.stringify(this.chat.messages);
     } catch (failure) {
@@ -169,6 +209,8 @@ export class CoachConversation {
       input: this.current.input,
       threadId: this.current.threadId,
       messages: this.chat.messages,
+      context: this.current.context,
+      intent: this.current.intent,
     };
     this.localWrites = this.localWrites
       .catch(() => {})
@@ -189,7 +231,7 @@ export class CoachConversation {
       });
     return this.localWrites;
   }
-  async send(text = this.current.input) {
+  async send(text = this.current.input, intent?: CoachIntent | null) {
     if (
       !this.current.ready ||
       this.busy ||
@@ -201,7 +243,9 @@ export class CoachConversation {
     )
       return;
     if (this.chat.messages.length >= 60) return;
-    this.update({ input: '', stopped: false });
+    // A button sets its intent for the exchange it starts; a typed message clears it. The transport's
+    // `body` reads it at send time, so the tool-result turns that follow carry it too.
+    this.update({ input: '', stopped: false, intent: intent ?? null });
     const result = this.chat.sendMessage({ text: text.trim() });
     this.checkpoint();
     await result;
@@ -302,6 +346,10 @@ export class CoachConversation {
         input: archived.frame.input,
         opening: false,
         stopped: archived.frame.stopped,
+        context: archived.frame.context ?? null,
+        intent: usableIntent(archived.frame.intent, archived.frame.context ?? null),
+        pendingChip: null,
+        contextGone: false,
       });
       await this.checkpoint();
       return true;
@@ -331,7 +379,16 @@ export class CoachConversation {
       this.localId = this.uuid();
       this.saved = JSON.stringify(this.chat.messages);
       this.chat.clearError();
-      this.update({ threadId: id, input: '', historyError: null, stopped: false });
+      this.update({
+        threadId: id,
+        input: '',
+        historyError: null,
+        stopped: false,
+        context: null,
+        intent: null,
+        pendingChip: null,
+        contextGone: false,
+      });
       this.checkpoint();
       return true;
     } catch (failure) {
@@ -355,6 +412,8 @@ export class CoachConversation {
       input: this.current.input,
       threadId: this.current.threadId,
       messages: this.chat.messages,
+      context: this.current.context,
+      intent: this.current.intent,
     };
     if (frame.messages.length || frame.input.trim()) {
       const title = frame.messages
@@ -398,9 +457,63 @@ export class CoachConversation {
       openError: null,
       opening: false,
       stopped: false,
+      context: null,
+      intent: null,
+      pendingChip: null,
+      contextGone: false,
     });
     this.checkpoint();
     return true;
+  }
+  /**
+   * Called by every way into the Coach before it shows (#3896 steps 6-7). With a context: a
+   * conversation already under way is kept in history and a fresh one starts about that lift,
+   * session or workout, so its buttons show. Without one (the Coach button): an empty conversation
+   * drops any context it was left with, and one under way is left as it is.
+   */
+  async prepare(request: CoachOpenRequest = {}) {
+    if (this.disposed) return false;
+    if (!this.current.ready) await this.initialize();
+    const empty = !this.chat.messages.length && !this.current.input.trim();
+    if (!request.context) {
+      if (empty && (this.current.context || this.current.contextGone)) {
+        this.update({ context: null, intent: null, pendingChip: null, contextGone: false });
+        this.checkpoint();
+      }
+      return true;
+    }
+    const same = JSON.stringify(request.context) === JSON.stringify(this.current.context);
+    if (!(empty && same)) {
+      if (this.busy) {
+        await this.chat.stop();
+        this.stop();
+      }
+      if (!empty && !(await this.newConversation())) return false;
+    }
+    this.update({
+      context: request.context,
+      intent: null,
+      pendingChip: request.chip ?? null,
+      contextGone: false,
+    });
+    this.checkpoint();
+    return true;
+  }
+  /**
+   * The about read answered 404 for this conversation's context (#3896 review): an old recap's lift
+   * that the program has since replaced. The context is dropped, so later requests do not 404 too,
+   * and the screen shows the general buttons with a line saying the lift has changed.
+   */
+  dropContext() {
+    if (this.disposed || !this.current.context) return;
+    this.update({ context: null, intent: null, pendingChip: null, contextGone: true });
+    this.checkpoint();
+  }
+  /** The entry point's button was tapped (or can't be): it is not tapped again. */
+  takePendingChip = () => {
+    const chip = this.current.pendingChip;
+    if (chip) this.update({ pendingChip: null });
+    return chip;
   }
   saveHistory(force = false) {
     const epoch = this.epoch,
@@ -446,4 +559,11 @@ export class CoachConversation {
     this.epoch++;
     this.listeners.clear();
   }
+}
+/** A saved intent that still fits its saved context; a lift button without its lift is dropped, as the
+ *  server would refuse it. */
+function usableIntent(intent: CoachIntent | null | undefined, context: CoachContext | null) {
+  if (!intent) return null;
+  const lift = context?.origin === 'exercise' && !!context.sessionExerciseId;
+  return INTENT_NEEDS[intent].lift === lift ? intent : null;
 }
