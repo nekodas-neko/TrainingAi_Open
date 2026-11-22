@@ -1,5 +1,10 @@
 # Measured Time Model + Budget Margins Implementation Plan
 
+> **Superseded in part, 22 Nov 2026 (#3767).** The plan below is kept as written. These statements no longer describe the code:
+> - **"15% warmup + 10% finish-early margin = 25% overhead; working time = 75% of the budget"** (Locked decisions, Task 2, the `workingBudgetMin(60) = 45` test, and the `FINISH_EARLY_FRACTION` tuning note). Working time is now **85%** of the budget (`WARMUP_FRACTION` = 0.15, so 60 min → 51), with no margin carved out of it. The margin is applied when a plan is *fitted*, sized to the lifter's own p75 pace (#2132): `planningBudgetMin(working, factor)` divides the working budget by that ratio, capped at `MAX_PLANNING_MARGIN` = 1.5. There is no `FINISH_EARLY_FRACTION`.
+> - **Where it lives:** `packages/shared/src/workout/duration-model.ts` (`WARMUP_FRACTION`, `workingBudgetMin`, `planningBudgetMin`, `MAX_PLANNING_MARGIN`, `fitBudgetMin`). The paths under `lib/workout/` in this plan moved to `packages/shared/src/workout/`. The module-map rows "Session/exercise duration model" and "Session time-budget fitting" are the current description.
+> - **Still true:** rest by %1RM band, work by reps, and the `MIN_PROFILE_SAMPLES` = 10 gate (`packages/shared/src/workout/time-profile.ts`).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Session-duration planning uses the user's *measured* per-set times — work time keyed by reps, rest time keyed by %1RM band — instead of fixed constants, and the time budget reserves percentage-based warmup + finish-early margins so on-time execution lands ~10% under the configured budget.
