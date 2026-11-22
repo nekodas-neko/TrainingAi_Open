@@ -1,7 +1,6 @@
 import { and, eq, isNull, sql } from 'drizzle-orm'
 import * as s from '@/lib/data/postgres/schema'
 import { normalizeMuscle } from '@trainingai/shared/muscles'
-import { todayInTz, DEFAULT_TZ } from '@trainingai/shared/date-utils'
 import type { Consequence, DomainHandler, Db, PreviewResult } from './types'
 import { driftAgainst } from './types'
 
@@ -80,7 +79,8 @@ async function affectedExercises(db: Db, userId: string, muscleName: string): Pr
   return rows.filter(r => (r.muscles ?? []).some(m => injuryMuscleKey(m) === target)).map(r => r.name)
 }
 
-export const injuryHandler: DomainHandler = {
+// `today` is the person's day in their own zone (see `handlerFor`), never computed here.
+export const injuryHandler = (today: string): DomainHandler => ({
   // Keyed by row id, not by muscle: undo addresses the injury the change created or updated, and
   // `activeInjury` looks one up by muscle — which is the wrong question on the way back, because
   // the muscle may since have a different active injury.
@@ -158,7 +158,6 @@ export const injuryHandler: DomainHandler = {
         .limit(1)
       if (!row) return { ok: false, reason: 'not_found' }
 
-      const today = todayInTz(DEFAULT_TZ)
       await db.update(s.injuries).set({ resolvedDate: today, updatedAt: new Date() })
         .where(and(eq(s.injuries.id, id), eq(s.injuries.userId, userId)))
       return {
@@ -194,7 +193,7 @@ export const injuryHandler: DomainHandler = {
         muscleName,
         severity: severity ?? ASSUMED_SEVERITY,
         notes: notes ?? null,
-        startedDate: todayInTz(DEFAULT_TZ),
+        startedDate: today,
       })
       .returning({ id: s.injuries.id })
 
@@ -224,4 +223,4 @@ export const injuryHandler: DomainHandler = {
       .where(and(eq(s.injuries.id, targetId), eq(s.injuries.userId, userId)))
     return { ok: true }
   },
-}
+})

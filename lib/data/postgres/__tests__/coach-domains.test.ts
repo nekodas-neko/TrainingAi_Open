@@ -5,7 +5,7 @@
 // everywhere (domain/field agreement, staleness, the coach_changes record, undo).
 //
 // Runs only against a real local dev Postgres — skips in CI.
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest'
+import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest'
 import type { CoachPatch } from '@/lib/coach/patch'
 
 const canRun = !!process.env.DATABASE_URL
@@ -224,6 +224,36 @@ describe.skipIf(!canRun)('AI Coach — phase 3 write domains', () => {
     await undoCoachChange(db, OWNER, applied.changeId)
     ;({ rows } = await pool.query(`SELECT resolved_date FROM injuries WHERE id = $1`, [inj.id]))
     expect(rows[0].resolved_date).toBeNull()
+  })
+
+  // #4023: the injury is dated by the person's day, not the default zone's. Kiritimati is UTC+14 all
+  // year (no DST), so at this instant it is already the next calendar day there while Brisbane is not.
+  // The test is about the day boundary, so the instant sits near Brisbane's midnight on purpose.
+  it("dates a logged and a recovered injury by the person's day, not the default zone's", async () => {
+    const TZ = 'Pacific/Kiritimati'
+    vi.useFakeTimers({ toFake: ['Date'] })
+    try {
+      vi.setSystemTime(new Date('2026-03-10T12:00:00Z'))
+      const { todayInTz, DEFAULT_TZ } = await import('@trainingai/shared/date-utils')
+      const theirDay = todayInTz(TZ)
+      expect(theirDay).not.toBe(todayInTz(DEFAULT_TZ)) // the fixture really is a day apart
+
+      const created = await applyCoachPatch(db, OWNER, injuryPatch(), ['i1', 'i2'], theirDay, TZ)
+      if (!created.ok) throw new Error('setup failed')
+      const { rows: [inj] } = await pool.query(`SELECT id, started_date::text AS d FROM injuries WHERE user_id = $1`, [OWNER])
+      expect(inj.d).toBe(theirDay)
+
+      const resolve: CoachPatch = {
+        domain: 'injury',
+        targetId: inj.id,
+        changes: [{ id: 'r1', field: 'resolved', from: false, to: true }],
+      }
+      expect((await applyCoachPatch(db, OWNER, resolve, ['r1'], theirDay, TZ)).ok).toBe(true)
+      const { rows: [done] } = await pool.query(`SELECT resolved_date::text AS d FROM injuries WHERE id = $1`, [inj.id])
+      expect(done.d).toBe(theirDay)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it("refuses to resolve another user's injury", async () => {
