@@ -81,7 +81,7 @@ describe.skipIf(!canRun)('Coach context ownership (#3896)', () => {
       `INSERT INTO exercise_logs (workout_session_id, exercise_name, logged_at, estimated_1rm) VALUES ($1,'Leg Press',$2,200) RETURNING id`,
       [aWorkout, LOGGED_AT])).rows[0].id
     await pool.query(
-      `INSERT INTO set_logs (exercise_log_id, set_number, weight_kg, reps) VALUES ($1,1,333,3)`, [aLog])
+      `INSERT INTO set_logs (exercise_log_id, set_number, weight_kg, reps) VALUES ($1,1,987.5,3)`, [aLog])
   })
   afterAll(async () => {
     await pool?.query(`DELETE FROM users WHERE id = ANY($1)`, [[A, B]])
@@ -145,10 +145,10 @@ describe.skipIf(!canRun)('Coach context ownership (#3896)', () => {
     // Neither A's workout on the same day nor A's sets under the same exercise name reach B.
     for (const b of [session, recap, dayBlock]) {
       expect((b as { block: string }).block).not.toContain('A private day')
-      expect((b as { block: string }).block).not.toContain('333')
+      expect((b as { block: string }).block).not.toContain('987.5')
     }
     const exBlock = await resolve(B, { origin: 'exercise', sessionExerciseId: ids.b.exercise })
-    expect((exBlock as { block: string }).block).not.toContain('333')
+    expect((exBlock as { block: string }).block).not.toContain('987.5')
   })
 
   it('a quote inside a stored name cannot close the name\'s quotes', async () => {
@@ -180,9 +180,9 @@ describe.skipIf(!canRun)('Coach context ownership (#3896)', () => {
     expect(own.found).toBe(true)
     expect(own.exercise!.storedPlan).toMatchObject({ sets: 3, reps: 8, pct: 70, restSec: 90, drivesLoad: true })
     expect(own.exercise!.recentLogs[0].sets.map(s => s.reps)).toEqual([8, 7, 6])
-    // B's own lift: A's log under the same name ("Leg Press", 333 kg) is not among B's.
+    // B's own lift: A's log under the same name ("Leg Press", 987.5 kg) is not among B's.
     const bOwn = await run(B, ids.b.exercise)
-    expect(bOwn.exercise!.recentLogs.flatMap(l => l.sets.map(s => s.weightKg))).not.toContain(333)
+    expect(bOwn.exercise!.recentLogs.flatMap(l => l.sets.map(s => s.weightKg))).not.toContain(987.5)
 
     expect(await run(B, ids.a.exercise)).toEqual({ found: false, note: expect.any(String) })
     expect(await run(A, 'not-a-uuid')).toEqual({ found: false, note: expect.any(String) })

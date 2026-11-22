@@ -127,6 +127,7 @@ describe.skipIf(!canRun)('the Coach\'s context line, buttons and the editor\'s r
 
   afterAll(async () => {
     await pool?.query(`DELETE FROM users WHERE id = ANY($1)`, [[A, B, C]])
+    await pool?.query(`DELETE FROM exercise_library WHERE name = ANY($1)`, [[LIFT, DIP]])
   })
 
   /** "Why this weight?" through the chat route, as the app sends it; the reply's text parts joined. */
