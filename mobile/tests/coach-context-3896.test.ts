@@ -13,6 +13,7 @@ import {
   repRangePatch,
 } from '../src/features/programs/rep-range.ts';
 import type { AccountConnection } from '../src/features/account/session.ts';
+import { ApiError } from '../src/features/account/api/client.ts';
 
 // #3896 steps 6-7: the Coach carries what it was opened about, a button sends its own intent, and the
 // editor's rep range writes through the Coach's apply path.
@@ -35,6 +36,33 @@ function reply() {
     }),
   });
 }
+/** A reply that ends on a choice list, as the swap button's first turn does. */
+function choiceReply() {
+  const chunks: UIMessageChunk[] = [
+    { type: 'start', messageId: id(30) },
+    { type: 'start-step' },
+    {
+      type: 'tool-input-available',
+      toolName: 'renderChoiceList',
+      toolCallId: 'pick',
+      input: { kind: 'choice_list', prompt: 'Swap for which?', source: 'swap_candidates', sourceId: LIFT },
+    },
+    { type: 'finish-step' },
+    { type: 'finish', finishReason: 'tool-calls' },
+  ];
+  return createUIMessageStreamResponse({
+    stream: new ReadableStream({
+      start(c) {
+        chunks.forEach((x) => c.enqueue(x));
+        c.close();
+      },
+    }),
+  });
+}
+const settle = async (until: () => boolean) => {
+  for (let attempt = 0; attempt < 50 && !until(); attempt++)
+    await new Promise((resolve) => setImmediate(resolve));
+};
 function fixture() {
   const values = new Map<string, string>(),
     writes: { path: string; body: unknown }[] = [],
@@ -199,4 +227,90 @@ test('the rep range row: four ranges and the default, read by name, written thro
       .success,
     false,
   );
+});
+
+test('a button\'s intent goes with every request of its exchange, the tool-result turn too, until a typed message (#3896 review)', async () => {
+  const f = fixture(),
+    normal = f.resources.connection.coachStream!;
+  let first = true;
+  f.resources.connection.coachStream = async (body, signal) => {
+    if (!first) return normal(body, signal);
+    first = false;
+    f.requests.push(body as Record<string, unknown>);
+    return choiceReply();
+  };
+  const chat = new CoachConversation(f.resources, 'general', f.uuid);
+  await chat.initialize();
+  await chat.prepare({ context: lift });
+  await chat.send('I want to swap this lift for another.', 'lift_swap');
+  assert.equal(chat.getSnapshot().intent, 'lift_swap');
+  // The pick is sent by the SDK (`addToolResult` → `sendAutomaticallyWhen`), with no body of its own.
+  chat.resolve('pick', { status: 'chose', id: id(8), label: 'Seated row' });
+  await settle(() => f.requests.length === 2 && !chat.busy);
+  assert.equal(f.requests.length, 2, 'the pick was sent');
+  assert.equal(f.requests[0].intent, 'lift_swap');
+  assert.equal(f.requests[1].intent, 'lift_swap', 'the second request of the exchange still carries it');
+  assert.deepEqual(f.requests[1].context, lift);
+  // Kept with the conversation, so a reopened Coach finishes the exchange the same way.
+  await chat.checkpoint();
+  const reopened = new CoachConversation(f.resources, 'general', f.uuid);
+  await reopened.initialize();
+  assert.equal(reopened.getSnapshot().intent, 'lift_swap');
+  reopened.dispose();
+  // A typed message ends it.
+  await chat.send('Actually, never mind');
+  assert.equal(chat.getSnapshot().intent, null);
+  assert.equal('intent' in f.requests[2], false);
+  chat.dispose();
+});
+
+test('another button replaces the intent, and a new conversation or another lift clears it', async () => {
+  const f = fixture(),
+    chat = new CoachConversation(f.resources, 'general', f.uuid);
+  await chat.initialize();
+  await chat.send('I want to change an exercise.', 'change_exercise');
+  await chat.send('Something hurts.', 'something_hurts');
+  assert.equal(f.requests[1].intent, 'something_hurts');
+  await chat.prepare({ context: lift });
+  assert.equal(chat.getSnapshot().intent, null);
+  await chat.send('Hello');
+  assert.equal('intent' in f.requests[2], false);
+  chat.dispose();
+});
+
+test('an old recap\'s lift that no longer reads: the context is dropped, later sends carry none, and the screen says why (#3896 review)', async () => {
+  const f = fixture();
+  // The server's own 404 for the about read, as the client sees it.
+  f.resources.connection.get = async (path) => {
+    if (path === '/api/coach/about') throw new ApiError(404, undefined, undefined, path, true, 'Not found');
+    return { threads: [], changes: [] };
+  };
+  const chat = new CoachConversation(f.resources, 'general', f.uuid);
+  await chat.initialize();
+  await chat.prepare({ context: lift });
+  const spec = aboutSpec('general', lift, ['lift_preference']);
+  await f.resources.load(spec, true);
+  assert.equal(f.resources.state(spec).notFound, true, 'a 404 from our server is told apart from other failures');
+  chat.dropContext();
+  assert.equal(chat.getSnapshot().context, null);
+  assert.equal(chat.getSnapshot().contextGone, true);
+  // The general buttons are what the screen now asks for.
+  assert.deepEqual(aboutSpec('general', chat.getSnapshot().context, ['lift_preference']).query, {
+    scope: 'general',
+    patchDomains: 'lift_preference',
+  });
+  await chat.send('Can I still ask about my training?');
+  assert.equal('context' in f.requests[0], false, 'the chat no longer 404s on the old id');
+  // Opening the Coach about something else clears the notice.
+  await chat.prepare({ context: { origin: 'session', programSessionId: id(9) } });
+  assert.equal(chat.getSnapshot().contextGone, false);
+  chat.dispose();
+
+  // A 404 that is not our server's (a gateway page) is not taken as "gone".
+  f.resources.connection.get = async (path) => {
+    throw new ApiError(404, undefined, undefined, path, false);
+  };
+  const other = aboutSpec('general', { origin: 'exercise', sessionExerciseId: id(10) }, ['lift_preference']);
+  await f.resources.load(other, true);
+  assert.equal(f.resources.state(other).notFound, false);
 });

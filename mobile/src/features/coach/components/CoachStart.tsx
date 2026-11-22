@@ -6,6 +6,7 @@ import { AppButton, AppText, Card, Skeleton, Stack } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { aboutSpec, type CoachScope } from '../data/models';
+import type { CoachConversation } from '../data/CoachConversation';
 import { RENDERED_PATCH_DOMAINS } from '../data/patch';
 
 /**
@@ -104,4 +105,30 @@ export function usePendingChip(
     const chip = chips.find((c) => c.id === id);
     if (chip) send(chip);
   }, [chips, pending, ready, take, send]);
+}
+
+/**
+ * #3896 review: an old recap's "Adjust" after the program was saved names a lift that no longer
+ * reads, and about answers 404. The context is dropped, so the chat still works and the general
+ * buttons show, and `CoachContextGone` says why.
+ */
+export function useDropGoneContext(
+  conversation: Pick<CoachConversation, 'dropContext'>,
+  notFound: boolean,
+  context: CoachContext | null,
+) {
+  useEffect(() => {
+    if (notFound && context) conversation.dropContext();
+  }, [conversation, notFound, context]);
+}
+
+export const CONTEXT_GONE_TEXT =
+  'This lift has changed in your program since that workout. You can still ask the Coach anything.';
+
+export function CoachContextGone() {
+  return (
+    <AppText variant="caption" tone="muted">
+      {CONTEXT_GONE_TEXT}
+    </AppText>
+  );
 }

@@ -23,7 +23,14 @@ import { ChangeRows, Consequences } from '../components/CoachChanges';
 import type { Destination } from '../components/CoachWidget';
 import type { CoachConversation } from '../data/CoachConversation';
 import { failureNotice } from '../../../core/reporting/index.ts';
-import { CoachAboutLine, CoachChips, useCoachAbout, usePendingChip } from '../components/CoachStart';
+import {
+  CoachAboutLine,
+  CoachChips,
+  CoachContextGone,
+  useCoachAbout,
+  useDropGoneContext,
+  usePendingChip,
+} from '../components/CoachStart';
 export function CoachScreen({
   scope,
   onBack,
@@ -77,6 +84,7 @@ function Conversation({
   // #3896 steps 6-7: the context line and the buttons, chosen by the server for this context.
   const about = useCoachAbout(scope, state.context);
   const chips = about.data?.chips;
+  useDropGoneContext(conversation, about.notFound === true, state.context);
   usePendingChip(
     chips,
     state.pendingChip,
@@ -170,6 +178,7 @@ function Conversation({
             {state.context && (
               <CoachAboutLine line={about.data?.about?.line} loading={!about.data && !about.error} />
             )}
+            {state.contextGone && <CoachContextGone />}
             {chat.messages.length === 0 && (
               <Stack align="center" gap="md" style={{ paddingTop: theme.spacing.xl * 2 }}>
                 <Icon name="coach" color={theme.tones.sleep.foreground} />

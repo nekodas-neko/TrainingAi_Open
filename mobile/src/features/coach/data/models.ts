@@ -3,7 +3,7 @@ import type { UIMessage } from 'ai';
 import type { ResourceSpec } from '../../workouts/data/WorkoutResources.ts';
 import { aiFailureText } from '../../account/api/client.ts';
 import { CoachContextSchema, type CoachContext } from '@trainingai/shared/coach/context';
-import { CoachAboutSchema } from '@trainingai/shared/coach/chips';
+import { CoachAboutSchema, CoachIntentSchema } from '@trainingai/shared/coach/chips';
 
 export const scopes = ['general', 'nutrition'] as const;
 export type CoachScope = (typeof scopes)[number];
@@ -23,6 +23,9 @@ export const conversationSchema = z.object({
   // #3896 steps 6-7: what the conversation was opened about, sent with every request. A saved
   // context that no longer reads is dropped rather than failing the whole conversation.
   context: CoachContextSchema.nullable().optional().catch(null),
+  // #3896 review: the button that started the exchange under way, sent with each of its requests
+  // until the user types or taps another button.
+  intent: CoachIntentSchema.nullable().optional().catch(null),
 });
 export const archiveSchema = z
   .array(
