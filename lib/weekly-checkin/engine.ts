@@ -70,7 +70,7 @@ import {
 import { summarizeWeek, type CheckinSummary, type LastSessionAgainstPlan, type WeekLiftLog } from '@trainingai/shared/weekly-checkin/summary'
 import { weightStepFor } from '@trainingai/shared/workout/load-rounding'
 import { goalRange } from '@trainingai/shared/ai-periodization/goal-ranges'
-import { preferredRepBand } from '@trainingai/shared/ai-periodization/lift-preference'
+import { checkinHoldBar, preferredRepBand } from '@trainingai/shared/ai-periodization/lift-preference'
 import { loadLiftPreferences } from '@trainingai/shared/ai-periodization/lift-preference-read'
 import { injurySafeAlternatives } from '@trainingai/shared/workout/injury-substitution'
 import { listExercisePreferences } from '@/lib/data/postgres/slices/exercise-preferences'
@@ -141,9 +141,14 @@ export interface CheckinView {
   lifts: {
     liftId: string; exerciseName: string; exerciseId: string | null; answer: CheckinAnswer; missedRep: boolean | null
     effect: CheckinEffect; offerStatus: string | null; appliedChangeId: string | null
-    /** For `held`: whether the plan enforces the hold (`CHECKIN_HOLD_LIVE`). True since the plan holds
-     *  the lift for the applies-to week (`checkin-plan-hold.ts`), so the card may say "held". Null otherwise. */
+    /** For `held`: whether the plan's hold caps this lift (`liftsTheHoldCaps`): it has a last bar and
+     *  carries a load. False for a lift never logged, last logged in a deload, or bodyweight: the card
+     *  then says "noted", never "held". Null for every other effect. */
     holdLive: boolean | null
+    /** For `held` and `lowered_one_step`: whether the plan caps the lift at its last bar this week (the
+     *  same test as `holdLive`). A lowered lift gets the lower of one step under the plan and its last bar.
+     *  Null for every other effect. */
+    capped: boolean | null
   }[]
   daysOff: number[] | null
   /** The dates the check-in itself made rest days (A1): a date already resting when it applied is not here. */
@@ -264,6 +269,30 @@ async function painMuscles(ctx: EngineCtx, lift: LiftId): Promise<string[]> {
   return [...new Set(mainMuscles)]
 }
 
+/**
+ * #3890: of a saved check-in's held and lowered lifts, those the plan's hold can actually cap in the
+ * applies-to week: the one per-lift reader's answer for that week (`loadLiftPreferences`, the read the
+ * plan uses) gives the lift a last bar, and the hold's own test (`checkinHoldBar`) takes it as a loaded
+ * lift. A lift never logged, whose last log was a deload, or that is bodyweight is not capped. Read only
+ * here, for the check-in's own view, and only when some lift is held or lowered.
+ */
+async function liftsTheHoldCaps(
+  ctx: EngineCtx, appliesWeekStart: string, lifts: readonly { exerciseName: string; effect: CheckinEffect }[],
+): Promise<Set<string>> {
+  const names = [...new Set(lifts.filter(l => l.effect === 'held' || l.effect === 'lowered_one_step').map(l => l.exerciseName))]
+  const out = new Set<string>()
+  if (names.length === 0) return out
+  const [prefs, types] = await Promise.all([
+    loadLiftPreferences(ctx.repo, ctx.userId, names, { checkinWeekStart: appliesWeekStart }),
+    ctx.repo.getExerciseTypes(names).catch(() => null),
+  ])
+  for (const name of names) {
+    // A failed type read claims nothing: the card says "noted" rather than "held" it cannot vouch for.
+    if (types && checkinHoldBar(prefs.get(name), { bodyweight: types[name] === 'bodyweight' }) != null) out.add(name)
+  }
+  return out
+}
+
 async function viewOf(ctx: EngineCtx, row: CheckinRow): Promise<CheckinView> {
   const lifts = await listCheckinLifts(ctx.db, ctx.userId, row.id)
   const offers: CheckinOffer[] = []
@@ -288,6 +317,7 @@ async function viewOf(ctx: EngineCtx, row: CheckinRow): Promise<CheckinView> {
       })
     }
   }
+  const capped = row.status === 'saved' ? await liftsTheHoldCaps(ctx, row.appliesWeekStart, lifts) : new Set<string>()
   return {
     id: row.id,
     weekStart: row.weekStart,
@@ -298,7 +328,8 @@ async function viewOf(ctx: EngineCtx, row: CheckinRow): Promise<CheckinView> {
     lifts: lifts.map(l => ({
       liftId: l.id, exerciseName: l.exerciseName, exerciseId: l.exerciseId, answer: l.answer, missedRep: l.missedRep,
       effect: l.effect, offerStatus: l.offerStatus, appliedChangeId: l.appliedChangeId,
-      holdLive: l.effect === 'held' ? CHECKIN_HOLD_LIVE : null,
+      holdLive: l.effect === 'held' ? CHECKIN_HOLD_LIVE && capped.has(l.exerciseName) : null,
+      capped: l.effect === 'held' || l.effect === 'lowered_one_step' ? CHECKIN_HOLD_LIVE && capped.has(l.exerciseName) : null,
     })),
     daysOff: row.daysOffWeekdays ?? null,
     daysOffWritten: row.daysOffWritten ?? null,

@@ -58,7 +58,7 @@ describe.skipIf(!canRun)('the weekly check-in\'s Heavy hold in the live plan (#3
     for (const day of [0, 2, 4]) await pool.query(`INSERT INTO schedule_days (schedule_id, day_of_week, session_id) VALUES ($1,$2,$3)`, [schedule, day, session])
     const ex = async (name: string, pos: number) =>
       (await pool.query(`INSERT INTO session_exercises (session_id, exercise_name, exercise_id, position, exercise_role, muscle_groups) VALUES ($1,$2,$3,$4,'primary',$5) RETURNING id`,
-        [session, name, ids[`lib:${name}`], pos, [pos === 0 ? 'quadriceps' : 'chest']])).rows[0].id as string
+        [session, name, ids[`lib:${name}`], pos, [pos === 0 ? 'quads' : 'chest']])).rows[0].id as string
     const sq = await ex(SQ, 0)
     const bp = await ex(BP, 1)
     for (const d of [0, 2, 4]) {
@@ -126,13 +126,20 @@ describe.skipIf(!canRun)('the weekly check-in\'s Heavy hold in the live plan (#3
     ;({ fitStoredPlanToCheckinBudget: serve } = await import('@trainingai/shared/ai-periodization/checkin-plan-budget'))
     ;({ generatePrescriptionForSession: generate } = await import('@trainingai/shared/ai-periodization/generate-prescription'))
     ctxFor = (user, now = new Date()) => ({ db: client.getDb(), repo, userId: user, tz: TZ, now })
-    for (const [name, muscle] of [[SQ, 'quadriceps'], [BP, 'chest']]) {
+    // A killed earlier run may have left these rows behind; every key referencing them is ON DELETE SET NULL.
+    await removeLibraryRows()
+    // Muscle and equipment names the real library already uses and the home-gym coverage scan
+    // (home-gym-exercise-gaps-migration) counts as home-reachable: lower-case "barbell", and "quads" not
+    // "quadriceps" (#4039). So these rows cannot strand a muscle group in that scan while this file runs.
+    for (const [name, muscle] of [[SQ, 'quads'], [BP, 'chest']]) {
       ids[`lib:${name}`] = (await pool.query(
-        `INSERT INTO exercise_library (name, equipment, muscles) VALUES ($1, ARRAY['Barbell'], $2::jsonb)
+        `INSERT INTO exercise_library (name, equipment, muscles) VALUES ($1, ARRAY['barbell'], $2::jsonb)
          ON CONFLICT (name) DO UPDATE SET equipment = EXCLUDED.equipment, muscles = EXCLUDED.muscles RETURNING id`,
         [name, JSON.stringify([{ muscle, role: 'main' }])])).rows[0].id
     }
   })
+
+  const removeLibraryRows = () => pool.query(`DELETE FROM exercise_library WHERE name = ANY($1)`, [[SQ, BP]])
 
   beforeEach(async () => {
     model.calls = 0
@@ -146,7 +153,10 @@ describe.skipIf(!canRun)('the weekly check-in\'s Heavy hold in the live plan (#3
   })
 
   afterAll(async () => {
-    await pool.query(`DELETE FROM users WHERE id = ANY($1)`, [[A, NONE]])
+    // Users first: their session exercises, logs and check-ins go with them; the rest of the keys to a
+    // library row are ON DELETE SET NULL.
+    await pool?.query(`DELETE FROM users WHERE id = ANY($1)`, [[A, NONE]])
+    await pool?.query(`DELETE FROM exercise_library WHERE name = ANY($1)`, [[SQ, BP]])
   })
 
   it('generation in the applies-to week caps the held press at its last bar and leaves the squat alone', async () => {
@@ -202,5 +212,32 @@ describe.skipIf(!canRun)('the weekly check-in\'s Heavy hold in the live plan (#3
     spy.mockRestore()
     expect(n).toBe(1)
     expect(served.prescription).toEqual(storedPlan(NONE))
+  })
+
+  it('five reads at once in the held week all serve the press at its last bar, and exactly one stores it', async () => {
+    await store(A, storedPlan(A))
+    await saveHeavy()
+    const swap = vi.spyOn(repo, 'replacePrescriptionIfUnchanged')
+    const served = await Promise.all(Array.from({ length: 5 }, () => read()))
+    const won = (await Promise.all(swap.mock.results.map(r => r.value as Promise<boolean>))).filter(Boolean).length
+    swap.mockRestore()
+    for (const s of served) expect(bar(s.prescription, ids['A:bp'])).toBe(LAST_BAR)
+    expect(won).toBe(1)
+    expect(bar(JSON.parse((await rawRow()).raw), ids['A:bp'])).toBe(LAST_BAR)
+  })
+
+  it('the check-in view says the press is capped only when the hold can cap it', async () => {
+    const { state } = await saveHeavy()
+    const press = () => state.checkin!.lifts.find(l => l.exerciseName === BP)!
+    expect(press()).toMatchObject({ effect: 'held', holdLive: true, capped: true })
+    expect(state.checkin!.lifts.find(l => l.exerciseName === SQ)).toMatchObject({ holdLive: null, capped: null })
+    // Its last log a deload (estimate stored as 0): no last bar, so nothing is capped and the card says so.
+    await pool.query(
+      `UPDATE exercise_logs SET estimated_1rm = 0 WHERE exercise_id = $1
+          AND workout_session_id IN (SELECT id FROM workout_sessions WHERE user_id = $2)
+          AND logged_at = (SELECT max(logged_at) FROM exercise_logs l JOIN workout_sessions w ON w.id = l.workout_session_id
+                            WHERE w.user_id = $2 AND l.exercise_id = $1)`, [ids[`lib:${BP}`], A])
+    const after = await engine.readCheckinState(ctxFor(A, SAVE_AT))
+    expect(after.checkin!.lifts.find(l => l.exerciseName === BP)).toMatchObject({ effect: 'held', holdLive: false, capped: false })
   })
 })
