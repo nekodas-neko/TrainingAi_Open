@@ -13,6 +13,7 @@ import {
   liftsChangedMessage,
   LATER_PREFIX,
   liftOf,
+  prepareSave,
   reconcileAnswers,
   withoutNotesFor,
   defaultAnswers,
@@ -514,6 +515,29 @@ test('#4043 (3): a pain or swap pick whose lift is no longer listed is never sen
   assert.deepEqual(kept.swap, { sessionExerciseId: ID.bench });
   // "No" is still "nothing hurt".
   assert.equal(saveBody(due.weekStart!, due, defaultAnswers(due)).pain, false);
+});
+
+test('a Save tap with a stale pain or swap pick sends nothing, resets the pick and says the lifts changed', () => {
+  const without = (id: string) => ({ ...due, lifts: due.lifts.filter((l) => l.sessionExerciseId !== id) });
+  const pain = { ...defaultAnswers(due), pain: 'yes' as const, painLift: ID.squat, painWhere: 'knee' };
+  const stalePain = prepareSave(due.weekStart!, without(ID.squat), pain);
+  assert.equal(stalePain.send, false);
+  if (!stalePain.send) {
+    assert.equal(stalePain.message, LIFTS_CHANGED_MESSAGE);
+    assert.equal(stalePain.answers.painLift, null);
+  }
+  const swap = { ...defaultAnswers(due), swap: 'yes' as const, swapLift: ID.bench };
+  const staleSwap = prepareSave(due.weekStart!, without(ID.bench), swap);
+  assert.equal(staleSwap.send, false);
+  if (!staleSwap.send) {
+    assert.equal(staleSwap.message, LIFTS_CHANGED_MESSAGE);
+    assert.equal(staleSwap.answers.swapLift, null);
+  }
+  // Nothing stale: one tap, one body, the same one saveBody builds.
+  const fresh = { ...pain, swap: 'yes' as const, swapLift: ID.bench };
+  const ok = prepareSave(due.weekStart!, due, fresh);
+  assert.equal(ok.send, true);
+  if (ok.send) assert.deepEqual(ok.body, saveBody(due.weekStart!, due, fresh));
 });
 
 test('#4043 (4): a cached state for last week is accepted only on the Monday after', () => {

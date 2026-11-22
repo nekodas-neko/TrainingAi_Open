@@ -270,7 +270,8 @@ async function viewOf(ctx: EngineCtx, row: CheckinRow): Promise<CheckinView> {
     status: row.status,
     savedAt: row.savedAt?.toISOString() ?? null,
     dismissedAt: row.dismissedAt?.toISOString() ?? null,
-    lifts: lifts.map(l => ({
+    // Annotated, so a field returned here that the shared shape lacks is a compile error.
+    lifts: lifts.map((l): CheckinView['lifts'][number] => ({
       liftId: l.id, exerciseName: l.exerciseName, exerciseId: l.exerciseId, answer: l.answer, missedRep: l.missedRep,
       effect: l.effect, offerStatus: l.offerStatus, appliedChangeId: l.appliedChangeId,
       holdLive: l.effect === 'held' ? CHECKIN_HOLD_LIVE && capped.has(l.exerciseName) : null,

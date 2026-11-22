@@ -13,7 +13,7 @@ import {
   laterKey,
   liftOf,
   reconcileAnswers,
-  saveBody,
+  prepareSave,
   withoutNotesFor,
   weeklyCheckinSpec,
   type CheckinAnswers,
@@ -157,7 +157,14 @@ export function WeeklyCheckin() {
           notice={notice}
           onSave={() => {
             if (!actions || !state || !weekStart || !current) return;
-            void send('save', () => actions.save(saveBody(weekStart, state, current)));
+            const prepared = prepareSave(weekStart, state, current);
+            if (!prepared.send) {
+              setAnswers(prepared.answers);
+              setNotice(null);
+              setMessage(prepared.message);
+              return;
+            }
+            void send('save', () => actions.save(prepared.body));
           }}
           onOffer={(row: string, offer: OfferAction, decision: 'accept' | 'decline') => {
             const id = state?.checkin?.id;

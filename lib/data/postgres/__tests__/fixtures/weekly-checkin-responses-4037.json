@@ -324,5 +324,178 @@
     },
     "kept": [],
     "notApplied": []
+  },
+  "neverLogged": {
+    "state": {
+      "due": false,
+      "why": null,
+      "weekStart": "<week+0d>",
+      "summary": {
+        "sessionsDone": 3,
+        "sessionsPlanned": 3,
+        "lifts": [
+          {
+            "exerciseName": "Shape Squat 4037",
+            "exerciseId": "<id 1>",
+            "sessions": 0,
+            "lastSession": null,
+            "notComparedWhy": null,
+            "missedRep": null,
+            "shadow": null
+          },
+          {
+            "exerciseName": "Shape Press 4037",
+            "exerciseId": "<id 2>",
+            "sessions": 3,
+            "lastSession": "met",
+            "notComparedWhy": null,
+            "missedRep": false,
+            "shadow": {
+              "verdict": "hold",
+              "direction": "steady",
+              "why": null
+            }
+          }
+        ],
+        "shortRestDays": 0,
+        "lines": [
+          "3 of 3 planned sessions done.",
+          "Last session: Shape Press 4037 met the plan.",
+          "Short rest cost no reps."
+        ]
+      },
+      "lifts": [
+        {
+          "sessionExerciseId": "<id 3>",
+          "exerciseName": "Shape Squat 4037",
+          "exerciseId": "<id 1>",
+          "missedRep": null,
+          "lastSession": null
+        },
+        {
+          "sessionExerciseId": "<id 4>",
+          "exerciseName": "Shape Press 4037",
+          "exerciseId": "<id 2>",
+          "missedRep": false,
+          "lastSession": "met"
+        }
+      ],
+      "checkin": {
+        "id": "<id 5>",
+        "weekStart": "<week+0d>",
+        "appliesWeekStart": "<week+7d>",
+        "status": "saved",
+        "savedAt": "<time>",
+        "dismissedAt": null,
+        "lifts": [
+          {
+            "liftId": "<id 6>",
+            "exerciseName": "Shape Press 4037",
+            "exerciseId": "<id 2>",
+            "answer": "about_right",
+            "missedRep": false,
+            "effect": "none",
+            "offerStatus": null,
+            "appliedChangeId": null,
+            "holdLive": null,
+            "capped": null
+          },
+          {
+            "liftId": "<id 7>",
+            "exerciseName": "Shape Squat 4037",
+            "exerciseId": "<id 1>",
+            "answer": "heavy",
+            "missedRep": null,
+            "effect": "held",
+            "offerStatus": null,
+            "appliedChangeId": null,
+            "holdLive": false,
+            "capped": false
+          }
+        ],
+        "daysOff": null,
+        "daysOffWritten": null,
+        "shorterSessionMin": null,
+        "pain": false,
+        "swap": null,
+        "offers": []
+      }
+    },
+    "kept": [],
+    "notApplied": []
+  },
+  "dismissed": {
+    "due": false,
+    "why": null,
+    "weekStart": "<week+0d>",
+    "summary": {
+      "sessionsDone": 3,
+      "sessionsPlanned": 3,
+      "lifts": [
+        {
+          "exerciseName": "Shape Squat 4037",
+          "exerciseId": "<id 1>",
+          "sessions": 3,
+          "lastSession": "met",
+          "notComparedWhy": null,
+          "missedRep": false,
+          "shadow": {
+            "verdict": "hold",
+            "direction": "steady",
+            "why": null
+          }
+        },
+        {
+          "exerciseName": "Shape Press 4037",
+          "exerciseId": "<id 2>",
+          "sessions": 3,
+          "lastSession": "met",
+          "notComparedWhy": null,
+          "missedRep": false,
+          "shadow": {
+            "verdict": "hold",
+            "direction": "steady",
+            "why": null
+          }
+        }
+      ],
+      "shortRestDays": 0,
+      "lines": [
+        "3 of 3 planned sessions done.",
+        "Last session: Shape Squat 4037 met the plan, Shape Press 4037 met the plan.",
+        "Short rest cost no reps."
+      ]
+    },
+    "lifts": [
+      {
+        "sessionExerciseId": "<id 3>",
+        "exerciseName": "Shape Squat 4037",
+        "exerciseId": "<id 1>",
+        "missedRep": false,
+        "lastSession": "met"
+      },
+      {
+        "sessionExerciseId": "<id 4>",
+        "exerciseName": "Shape Press 4037",
+        "exerciseId": "<id 2>",
+        "missedRep": false,
+        "lastSession": "met"
+      }
+    ],
+    "checkin": {
+      "id": "<id 5>",
+      "weekStart": "<week+0d>",
+      "appliesWeekStart": "<week+7d>",
+      "status": "dismissed",
+      "savedAt": null,
+      "dismissedAt": "<time>",
+      "lifts": [],
+      "daysOff": null,
+      "daysOffWritten": null,
+      "shorterSessionMin": null,
+      "pain": null,
+      "swap": null,
+      "offers": []
+    }
   }
 }

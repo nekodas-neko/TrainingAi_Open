@@ -386,6 +386,17 @@ export function liftsChangedMessage(reset: boolean, sheetOpen: boolean): string 
   return reset && sheetOpen ? LIFTS_CHANGED_MESSAGE : null;
 }
 
+/**
+ * What a Save tap does. If the answers name a lift the state no longer lists, nothing is sent: the
+ * answers are reconciled and the person is told, then looks and taps Save again. (Sending a null pain or
+ * swap instead would save without the answer they gave and say nothing.) Otherwise the body to send.
+ */
+export function prepareSave(weekStart: string, state: CheckinState, answers: CheckinAnswers) {
+  const next = reconcileAnswers(answers, state);
+  if (next.reset) return { send: false as const, answers: next.answers, message: LIFTS_CHANGED_MESSAGE };
+  return { send: true as const, body: saveBody(weekStart, state, answers) };
+}
+
 /** The server's reasons for one lift, dropped once that lift's row changes or is undone. */
 export function withoutNotesFor(notes: SaveNotes | null, exerciseName: string): SaveNotes | null {
   if (!notes) return notes;

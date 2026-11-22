@@ -5,6 +5,10 @@
 //     everything else is compared to the committed JSON, so a field renamed, added or dropped by the engine
 //     fails here, not on the phone. The committed JSON was recorded on `main` BEFORE the response types
 //     moved into packages/shared, so it is the proof that no response changed.
+//   - Two more states cover the branches those leave out: a held lift the plan's hold cannot act on (a lift
+//     never logged: `holdLive: false`, `capped: false`) and a dismissed check-in. They were recorded on `main`
+//     the same way. (The lowered lift, `holdLive: null`, `capped: true`, and an open offer of each kind are in
+//     the second response.)
 //   - The raw responses are then parsed by the shared schema, which must give back exactly what the engine
 //     sent: a field the schema does not name, or names with another shape, fails.
 // No model is called. Runs only with DATABASE_URL. Fake users and lifts; the library rows it adds are
@@ -17,6 +21,8 @@ const canRun = !!process.env.DATABASE_URL
 const TZ = 'Australia/Brisbane'
 const A = '00000000-0000-4000-8000-0000004037a1'
 const B = '00000000-0000-4000-8000-0000004037b2'
+const C = '00000000-0000-4000-8000-0000004037c3'
+const D = '00000000-0000-4000-8000-0000004037d4'
 const SQ = 'Shape Squat 4037'
 const BP = 'Shape Press 4037'
 const ALT = 'Shape Alt Press 4037'
@@ -77,9 +83,9 @@ describe.skipIf(!canRun)('the weekly check-in response shapes (#4037)', () => {
   let engine: typeof import('@/lib/weekly-checkin/engine')
   let ctxFor: (user: string) => import('@/lib/weekly-checkin/engine').EngineCtx
   const ids = {} as Record<string, string>
-  const raw = {} as { due: unknown; full: unknown; held: unknown }
+  const raw = {} as { due: unknown; full: unknown; held: unknown; neverLogged: unknown; dismissed: unknown }
 
-  const seedUser = async (user: string, withMiss: boolean) => {
+  const seedUser = async (user: string, withMiss: boolean, neverLogged: string[] = []) => {
     await pool.query(`INSERT INTO users (id, email, password_hash, timezone) VALUES ($1,$2,'x',$3)`, [user, `weekly-checkin-shape-${user}@example.com`, TZ])
     const program = (await pool.query(
       `INSERT INTO programs (user_id, name, phase_mode, is_active, training_goal, created_at) VALUES ($1,'Shape test','ai_dynamic',true,'strength', now() - interval '90 days') RETURNING id`, [user])).rows[0].id
@@ -98,7 +104,7 @@ describe.skipIf(!canRun)('the weekly check-in response shapes (#4037)', () => {
       const ws = (await pool.query(
         `INSERT INTO workout_sessions (user_id, session_id, session_name, started_at, completed_at) VALUES ($1,$2,'Day 4037',$3,$4) RETURNING id`,
         [user, session, local(d, 12), local(d, 13)])).rows[0].id
-      for (const name of [SQ, BP]) {
+      for (const name of [SQ, BP].filter(n => !neverLogged.includes(n))) {
         const el = (await pool.query(
           `INSERT INTO exercise_logs (workout_session_id, exercise_name, exercise_id, estimated_1rm, logged_at) VALUES ($1,$2,$3,100,$4) RETURNING id`,
           [ws, name, ids[`lib:${name}`], local(d, 12.5)])).rows[0].id
@@ -114,7 +120,7 @@ describe.skipIf(!canRun)('the weekly check-in response shapes (#4037)', () => {
   }
 
   const removeLibraryRows = () => pool.query(`DELETE FROM exercise_library WHERE name = ANY($1)`, [NAMES])
-  const removeUsers = () => pool.query(`DELETE FROM users WHERE id = ANY($1)`, [[A, B]])
+  const removeUsers = () => pool.query(`DELETE FROM users WHERE id = ANY($1)`, [[A, B, C, D]])
 
   beforeAll(async () => {
     const client = await import('@/lib/data/postgres/client')
@@ -133,6 +139,8 @@ describe.skipIf(!canRun)('the weekly check-in response shapes (#4037)', () => {
     }
     const a = await seedUser(A, true)
     const b = await seedUser(B, false)
+    const c = await seedUser(C, false, [SQ])
+    await seedUser(D, false)
     raw.due = await engine.readCheckinState(ctxFor(A))
     raw.full = await engine.saveCheckin(ctxFor(A), {
       weekStart: W0,
@@ -147,6 +155,13 @@ describe.skipIf(!canRun)('the weekly check-in response shapes (#4037)', () => {
       lifts: [{ sessionExerciseId: b.sq, answer: 'heavy' }, { sessionExerciseId: b.bp, answer: 'about_right' }],
       pain: false, swap: null, daysOff: null, shorterSessionMin: null,
     })
+    // C never logged the squat: "heavy" holds it, but the plan's hold has no last bar to cap it at.
+    raw.neverLogged = await engine.saveCheckin(ctxFor(C), {
+      weekStart: W0,
+      lifts: [{ sessionExerciseId: c.sq, answer: 'heavy' }, { sessionExerciseId: c.bp, answer: 'about_right' }],
+      pain: false, swap: null, daysOff: null, shorterSessionMin: null,
+    })
+    raw.dismissed = await engine.dismissCheckin(ctxFor(D), W0)
   })
 
   afterAll(async () => {
@@ -158,6 +173,8 @@ describe.skipIf(!canRun)('the weekly check-in response shapes (#4037)', () => {
     due: normalise(pinAlternatives(sortedLifts(raw.due))),
     full: normalise(pinAlternatives(sortedLifts(raw.full))),
     held: normalise(pinAlternatives(sortedLifts(raw.held))),
+    neverLogged: normalise(pinAlternatives(sortedLifts(raw.neverLogged))),
+    dismissed: normalise(pinAlternatives(sortedLifts(raw.dismissed))),
   })
 
   it('each response is byte for byte what the engine sent before the types moved (normalised)', () => {
@@ -172,15 +189,22 @@ describe.skipIf(!canRun)('the weekly check-in response shapes (#4037)', () => {
     expect(checkinStateSchema.parse(wire(raw.due))).toEqual(wire(raw.due))
     expect(saveOutcomeSchema.parse(wire(raw.full))).toEqual(wire(raw.full))
     expect(saveOutcomeSchema.parse(wire(raw.held))).toEqual(wire(raw.held))
+    expect(saveOutcomeSchema.parse(wire(raw.neverLogged))).toEqual(wire(raw.neverLogged))
+    expect(checkinStateSchema.parse(wire(raw.dismissed))).toEqual(wire(raw.dismissed))
   })
 
   it('the phone\'s lenient reading keeps what the screens use, and both flags of a lifted row come through', async () => {
-    const { lenientSaveOutcomeSchema } = await import('@trainingai/shared/weekly-checkin/responses')
+    const { lenientSaveOutcomeSchema, lenientCheckinStateSchema } = await import('@trainingai/shared/weekly-checkin/responses')
     const wire = (v: unknown) => JSON.parse(JSON.stringify(v))
     const full = lenientSaveOutcomeSchema.parse(wire(raw.full)).state.checkin!
     expect(full.lifts.map(l => [l.effect, l.holdLive, l.capped]).sort()).toEqual([['lowered_one_step', null, true], ['offered_step_up', null, null]])
-    expect(full.offers.map(o => o.kind)).toEqual(['step_up', 'pain', 'swap'])
+    expect(full.offers.map(o => [o.kind, o.status])).toEqual([['step_up', 'open'], ['pain', 'open'], ['swap', 'open']])
     const held = lenientSaveOutcomeSchema.parse(wire(raw.held)).state.checkin!
     expect(held.lifts.find(l => l.effect === 'held')).toMatchObject({ holdLive: true, capped: true })
+    // A held lift the hold cannot act on: not live, not capped.
+    const never = lenientSaveOutcomeSchema.parse(wire(raw.neverLogged)).state.checkin!
+    expect(never.lifts.find(l => l.effect === 'held')).toMatchObject({ holdLive: false, capped: false })
+    const dismissed = lenientCheckinStateSchema.parse(wire(raw.dismissed)).checkin!
+    expect(dismissed).toMatchObject({ status: 'dismissed', lifts: [], offers: [] })
   })
 })
