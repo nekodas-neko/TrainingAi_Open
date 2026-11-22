@@ -116,6 +116,10 @@ export function applyBudgetStage(
   fullShapeById?: ReadonlyMap<string, { sets: number; reps: number; pct: number; restSec: number }>,
 
   phase?: string | null,
+  /** #3896: a lift's one-shot ±1 set, applied to the FITTED count so the budget's trim cannot undo
+   *  it, and before the figures below so the session is costed for the set it carries. Returns the
+   *  new count, or null to leave it. Not called for a dropped exercise. */
+  adjustFittedSets?: (sessionExerciseId: string, sets: number) => number | null,
 ): BudgetStageResult {
   // Time-budget enforcement — the AI is asked to fit the budget, but trim deterministically
   // so the session is guaranteed to fit the allocated time. Sets are cut by muscle-overage
@@ -196,6 +200,13 @@ export function applyBudgetStage(
         ?? ex.sets,
     ]),
   )
+  if (adjustFittedSets) {
+    for (const [id, n] of sets) {
+      if (droppedIds.has(id)) continue
+      const next = adjustFittedSets(id, n)
+      if (next != null) sets.set(id, next)
+    }
+  }
 
   // Dropped exercises keep their prescription entry (the Workout Review "drop this cycle"
   // convention — droppedExerciseIds filters at render), so every derived total below must

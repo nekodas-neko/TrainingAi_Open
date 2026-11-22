@@ -48,6 +48,20 @@ export interface AiPrescriptionExercise {
   deloaded?: boolean
   deloadNote?: string
   preDeload?: { sets: number; reps: number; pct: number; restSec: number }
+  /** #3896: what the lift's stored preference changed on this row (`ai-periodization/lift-preference.ts`).
+   *  Only the fields that moved the plan are present; absent on a row no preference touched. Optional,
+   *  so a reader that does not know it parses the row as before. */
+  liftPreference?: AppliedLiftPreference
+}
+
+/** #3896: the part of a lift's preference a plan applied. */
+export interface AppliedLiftPreference {
+  repRange?: { min: number; max: number }
+  restSec?: number
+  loadStep?: 'lighter' | 'heavier'
+  setsDelta?: -1 | 1
+  /** ISO time of the one-shot this plan applied, so a later writer can tell which one it was. */
+  oneShotSetAt?: string
 }
 
 export interface PendingTransition {

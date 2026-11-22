@@ -126,6 +126,7 @@ import * as social from './slices/social'
 import * as prog from './slices/programs'
 import * as period from './slices/periodization'
 import { getSessionReadLogs } from './slices/session-read'
+import { listExercisePreferences, consumeLiftOneShot } from './slices/exercise-preferences'
 import * as userStatsSlice from './slices/user-stats'
 import * as oura from './slices/oura'
 import { readRawFrames, readRecentRawFrames, DS_BUCKET_SPAN } from './slices/oura-raw-frames'
@@ -1369,7 +1370,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     log: Omit<ExerciseLog, 'id' | 'sets'> & { exerciseLogId?: string },
     sets: (Omit<SetLog, 'id' | 'exerciseLogId'> & { id?: string })[],
     stamp: EditStamp = { kind: 'server' },
-  ): Promise<{ exerciseLog: ExerciseLog; setLogs: SetLog[]; superseded?: true }> {
+  ): Promise<{ exerciseLog: ExerciseLog; setLogs: SetLog[]; superseded?: true; inserted?: boolean }> {
     return this.db.transaction(async tx => {
       // Resolve exercise_id from library (best-effort; NULL for custom exercises)
       const [libRow] = await tx.select({ id: s.exerciseLibrary.id })
@@ -1472,7 +1473,9 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         .returning()
       const exerciseLogId = r.id
       const exerciseLog: ExerciseLog = { ...log, id: exerciseLogId, sets: [] }
-      if (sets.length === 0) return { exerciseLog, setLogs: [] }
+      // #3896: a log this write created, not a re-push of one already stored. Only a new log may
+      // consume a lift's one-shot, so a retry after a newer one-shot was set cannot take it.
+      if (sets.length === 0) return { exerciseLog, setLogs: [], inserted: !isReplay }
       // Collapsed once and reused: `.returning()` is zipped against this array by index below, and
       // `total_sets` is counted from it — collapsing inline would misalign the first and inflate
       // the second whenever a payload repeats a set id.
@@ -1548,7 +1551,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         `)
       }
 
-      return { exerciseLog, setLogs }
+      return { exerciseLog, setLogs, inserted: !isReplay }
     })
   }
 
@@ -8709,6 +8712,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async getRecentSessionsOfType(userId: string, programSessionId: string, limit: number) { return period.getRecentSessionsOfType(this.db, userId, programSessionId, limit) }
   async getSetLogsForSessions(workoutSessionIds: string[]) { return period.getSetLogsForSessions(this.db, workoutSessionIds) }
   async getSessionReadLogs(userId: string, from: Date, to: Date) { return getSessionReadLogs(this.db, userId, from, to) }
+  async listExercisePreferences(userId: string, exerciseNames: string[]) { return listExercisePreferences(this.db, userId, exerciseNames) }
+  async consumeLiftOneShot(userId: string, exerciseName: string, servedSetAt: Date) { return consumeLiftOneShot(this.db, userId, exerciseName, servedSetAt) }
   async getSetTimingRows(userId: string, exerciseNames: string[]) { return period.getSetTimingRows(this.db, userId, exerciseNames) }
   async getExercise1rmHistory(userId: string, exerciseNames: string[], tz: string, windowDays?: number) { return period.getExercise1rmHistory(this.db, userId, exerciseNames, tz, windowDays) }
   async getWeeklySetsByMuscleGroup(userId: string, programId: string, weekStart: string, weekEnd: string, tz: string) { return period.getWeeklySetsByMuscleGroup(this.db, userId, programId, weekStart, weekEnd, tz) }

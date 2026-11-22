@@ -1263,6 +1263,7 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
       progressionStyle: ex.progressionStyle ?? undefined,
       plannedWeights: plannedWeightsPayload(ex, snapWeights.length), // #2445
       prescriptionBasisKg: prescriptionBasisPayload(ex, snapWeights.length), // issue 2200
+      liftOneShotSetAt: ex.liftPreference?.oneShotSetAt, // #3896: which one-shot this plan carried
       styleName: ex.styleName ?? undefined,
       styleId: ex.styleId,
       muscleGroups: ex.muscleGroups?.length ? ex.muscleGroups : undefined,
