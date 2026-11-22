@@ -233,6 +233,19 @@ export class HomeStore {
     this.guard();
     await this.write((state) => ({ markers: { ...state.markers, [key]: marked } }));
   }
+  /**
+   * Sets `key` and removes every other marker that starts with `prefix`, so a per-day marker does not
+   * pile up. `marked = false` takes `key` back out entirely.
+   */
+  async markOnly(prefix: string, key: string, marked = true) {
+    this.guard();
+    await this.write((state) => {
+      const markers = Object.fromEntries(
+        Object.entries(state.markers).filter(([k]) => !k.startsWith(prefix) && k !== key),
+      );
+      return { markers: marked ? { ...markers, [key]: true } : markers };
+    });
+  }
   /** A detected walk was saved or dismissed; `answered = false` takes it back (an undone dismissal). */
   async answerWalk(startMs: number, answered = true) {
     this.guard();
