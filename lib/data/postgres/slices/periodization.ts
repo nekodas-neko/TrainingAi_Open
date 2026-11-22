@@ -58,6 +58,16 @@ export async function getSessionPeriodization(db: Db, userId: string, programSes
          WHERE c.user_id = ${userId} AND c.status = 'saved' AND c.deleted_at IS NULL
            AND c.shorter_session_min IS NOT NULL
            AND c.applies_week_start BETWEEN CURRENT_DATE - 8 AND CURRENT_DATE + 2)`,
+      // #3890: the weeks around today whose saved check-in holds a lift ("Heavy"), for the same reason.
+      // Which lifts, and which week is the user's, the caller works out only when one is listed.
+      checkinHeldWeeks: sql<string[] | null>`(
+        SELECT array_agg(DISTINCT c.applies_week_start::text)
+          FROM weekly_checkins c
+         WHERE c.user_id = ${userId} AND c.status = 'saved' AND c.deleted_at IS NULL
+           AND c.applies_week_start BETWEEN CURRENT_DATE - 8 AND CURRENT_DATE + 2
+           AND EXISTS (SELECT 1 FROM weekly_checkin_exercises e
+                        WHERE e.checkin_id = c.id AND e.user_id = ${userId} AND e.deleted_at IS NULL
+                          AND e.answer = 'heavy' AND e.effect IN ('held', 'lowered_one_step')))`,
     })
     .from(s.sessionPeriodization)
     .where(and(
@@ -67,7 +77,11 @@ export async function getSessionPeriodization(db: Db, userId: string, programSes
     .limit(1)
   if (!row) return null
   const state = mapPeriodization(row.sp)
-  return row.checkinBudgets?.length ? { ...state, checkinSessionBudgets: row.checkinBudgets } : state
+  return {
+    ...state,
+    ...(row.checkinBudgets?.length ? { checkinSessionBudgets: row.checkinBudgets } : {}),
+    ...(row.checkinHeldWeeks?.length ? { checkinHeldWeeks: row.checkinHeldWeeks } : {}),
+  }
 }
 
 export async function ensureSessionPeriodization(db: Db, userId: string, programSessionId: string): Promise<SessionPeriodization> {
@@ -617,6 +631,24 @@ export async function updatePrescriptionExercisesCache(db: Db, userId: string, p
       eq(s.sessionPeriodization.userId, userId),
       eq(s.sessionPeriodization.programSessionId, programSessionId),
     ))
+}
+
+/**
+ * #3890: replace the stored plan with `after`, only while it is still exactly `before` (the plan the
+ * caller read). Status, expiry and generation time are left as they are. True when it wrote. A plan
+ * remade or rewritten meanwhile is left alone.
+ */
+export async function replacePrescriptionIfUnchanged(db: Db, userId: string, programSessionId: string, before: AiPrescription, after: AiPrescription): Promise<boolean> {
+  const rows = await db
+    .update(s.sessionPeriodization)
+    .set({ prescription: after as unknown as Record<string, unknown>, updatedAt: new Date() })
+    .where(and(
+      eq(s.sessionPeriodization.userId, userId),
+      eq(s.sessionPeriodization.programSessionId, programSessionId),
+      sql`${s.sessionPeriodization.prescription} = ${JSON.stringify(before)}::jsonb`,
+    ))
+    .returning({ id: s.sessionPeriodization.id })
+  return rows.length === 1
 }
 
 export async function storePendingTransition(db: Db, userId: string, programSessionId: string, transition: PendingTransition | null): Promise<void> {

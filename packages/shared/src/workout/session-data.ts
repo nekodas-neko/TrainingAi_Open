@@ -11,7 +11,7 @@ import { pctForExpectedRpe } from "@trainingai/shared/ai-periodization/expected-
 import { resolveBodyweightStyle, resolveWorkingBasis, resolveWorkingBasisWithSource } from "@trainingai/shared/1rm";
 import { toAestDateStr } from "@trainingai/shared/date-utils";
 import { UNCLASSIFIED_EXERCISE_ROLE } from './exercise-role';
-import { applyLiftPreferenceToStyle, type LiftPreference } from "@trainingai/shared/ai-periodization/lift-preference";
+import { applyLiftPreferenceToStyle, checkinHoldBar, pctUnderBar, type LiftPreference } from "@trainingai/shared/ai-periodization/lift-preference";
 import type { AppliedLiftPreference } from "@trainingai/shared/types/ai-periodization";
 
 export interface PerSessionPhaseStatus {
@@ -182,6 +182,49 @@ export interface BuildWorkoutExercisesCtx {
 
 /** #3896: `automatic` phase types a lift preference never applies in. */
 const PHASES_WITHOUT_PREFERENCE: ReadonlySet<string> = new Set(['deload', 'baseline', 'testing'])
+
+/**
+ * #3896 / #3890: a lift's stored preference and the week's check-in hold on the style a session reader
+ * built for it. The one rule the session screen (`buildWorkoutExercises`) and the Next workout card
+ * (`/api/next-session/prescription`) both run, so the two show the same bar and reps. Null when it
+ * changes nothing.
+ *
+ *  - On a static style (an `automatic` phase style, a manual program's style, or an `ai_dynamic` lift
+ *    the AI plan is not driving): the preference (`applyLiftPreferenceToStyle`, which applies the hold
+ *    last). Never in a baseline or any deload (`reduced`), nor in a phase a preference never applies in.
+ *  - On an AI-driven row: the hold alone (the plan applied the preference when it was made; the stored
+ *    plan is held where it is served, so this is idempotent on it, and it covers a reader that serves a
+ *    stored plan without that step). Never in a deload, a baseline, a deload plan or on a bodyweight lift.
+ *
+ * `applied` is the record a log consumes: present only when the preference applied something (a hold
+ * alone changes the bars and records nothing).
+ */
+export function liftPreferenceOnStyle(
+  style: StyleSet[] | null,
+  pref: LiftPreference | undefined,
+  o: {
+    aiStyleApplied: boolean; reduced: boolean; noPreferencePhase: boolean; aiPlanDeload: boolean
+    role: string; bodyweight: boolean; basisKg: number | null; equipment?: string[] | null
+  },
+): { style: StyleSet[]; applied?: AppliedLiftPreference } | null {
+  if (!pref || o.reduced || !style || style.length === 0) return null
+  if (!o.aiStyleApplied) {
+    if (o.noPreferencePhase) return null
+    const applied = applyLiftPreferenceToStyle(style, pref, {
+      role: o.role, bodyweight: o.bodyweight, basisKg: o.basisKg, equipment: o.equipment,
+    })
+    if (!applied) return null
+    return Object.keys(applied.applied).length > 0 ? { style: applied.style, applied: applied.applied } : { style: applied.style }
+  }
+  if (!pref.checkinHold || o.aiPlanDeload) return null
+  const bar = checkinHoldBar(pref, { bodyweight: o.bodyweight })
+  if (bar == null) return null
+  const held = style.map(s => {
+    const pct = pctUnderBar(s.pct, o.basisKg, o.equipment, bar)
+    return pct === s.pct ? s : { ...s, pct }
+  })
+  return held.some((s, i) => s !== style[i]) ? { style: held } : null
+}
 
 // Pure mapping from a program session's exercises to the client-facing WorkoutExercise[].
 // No DB access, no side effects — every input arrives resolved in `ctx`. This is the exact
@@ -379,27 +422,32 @@ export function buildWorkoutExercises(
         }) ?? 0,
       });
 
-      // #3896: the lift's stored preference on a static style: an `automatic` phase style, or an
-      // `ai_dynamic` lift the AI plan is not driving (an AI plan applied it when it was made). Never in a
-      // baseline or any deload (the exercise's, the session's, or a deload phase's style), which stay
-      // exactly as before, nor in an `automatic` testing phase, whose reps are the test.
+      // #3896 / #3890: the lift's stored preference and the week's check-in hold (`liftPreferenceOnStyle`).
       const pref = liftPreferences?.get(ex.exerciseName)
-      if (
-        pref && !aiStyleApplied && !deloaded && !isBaselinePhase && !aiDeload && !isDeloadActive &&
-        !PHASES_WITHOUT_PREFERENCE.has(styleResolutionPhase?.phaseType ?? 'normal') &&
-        progressionStyle && progressionStyle.length > 0
-      ) {
-        const applied = applyLiftPreferenceToStyle(progressionStyle, pref, {
-          role: ex.exerciseRole ?? UNCLASSIFIED_EXERCISE_ROLE,
-          bodyweight: bwType === 'bodyweight',
-          basisKg: workingBasis.kg,
-          equipment: libEntry?.equipment,
+      const onStyle = liftPreferenceOnStyle(progressionStyle, pref, {
+        aiStyleApplied,
+        reduced: !!deloaded || isBaselinePhase || aiDeload || isDeloadActive,
+        noPreferencePhase: PHASES_WITHOUT_PREFERENCE.has(styleResolutionPhase?.phaseType ?? 'normal'),
+        aiPlanDeload: !!aiPrescription?.deload,
+        role: ex.exerciseRole ?? UNCLASSIFIED_EXERCISE_ROLE,
+        bodyweight: bwType === 'bodyweight',
+        basisKg: workingBasis.kg,
+        equipment: libEntry?.equipment,
+      })
+      if (onStyle) {
+        progressionStyle = onStyle.style
+        if (!aiStyleApplied) defaultSets = onStyle.style.length
+        if (onStyle.applied) liftPreference = onStyle.applied
+      }
+      // #3890: a deloaded lift's full numbers, which the screen puts back when the person reverts the
+      // deload, carry the week's hold too: a revert never brings a held lift back above its last bar.
+      if (deloaded && preDeloadStyle && pref?.checkinHold && !isBaselinePhase) {
+        const heldFull = liftPreferenceOnStyle(preDeloadStyle, pref, {
+          aiStyleApplied: true, reduced: false, noPreferencePhase: false, aiPlanDeload: !!aiPrescription?.deload,
+          role: ex.exerciseRole ?? UNCLASSIFIED_EXERCISE_ROLE, bodyweight: bwType === 'bodyweight',
+          basisKg: workingBasis.kg, equipment: libEntry?.equipment,
         })
-        if (applied) {
-          progressionStyle = applied.style
-          defaultSets = applied.style.length
-          liftPreference = applied.applied
-        }
+        if (heldFull) preDeloadStyle = heldFull.style
       }
 
       return {

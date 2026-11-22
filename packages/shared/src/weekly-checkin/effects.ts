@@ -2,9 +2,9 @@
  * #3890: what each weekly check-in answer does. One rule per answer, here and nowhere else
  * (decisions 8 and 9, the issue's "What the answers do" table):
  *
- *   Heavy                        → held: recorded by itself, and fed to the session read (in shadow).
- *                                  NOT yet enforced by the plan (`CHECKIN_HOLD_LIVE`): no text may say
- *                                  the weight "is held" until it is; "noted" until then.
+ *   Heavy                        → held: by itself. The plan holds the lift for the week the check-in
+ *                                  applies to: no heavier than last session's bar (`CHECKIN_HOLD_LIVE`,
+ *                                  `checkin-plan-hold.ts`). Also fed to the session read (in shadow).
  *   Heavy, and a missed rep      → lowered_one_step: one plate lighter next time, by itself, written
  *                                  through the Coach's lift-preference writer (`nextLoadStep: lighter`,
  *                                  the existing one-plate step), with a `coach_changes` row and undo.
@@ -22,12 +22,13 @@ import type { SessionRead } from '../ai-periodization/session-read'
 export const CHECKIN_ANSWERS = ['heavy', 'about_right', 'light'] as const
 
 /**
- * Whether a `held` lift's hold is enforced by the live plan. False in #3890 step 2: the hold is recorded
- * on the check-in row and feeds the shadow session read only, while the plan can still add load. The
- * follow-up PR that makes it live (no heavier than last session's bar, in the per-lift preference reader,
- * from `listCheckinHeldLifts`) flips this, and with it what the card may say.
+ * Whether a `held` lift's hold is enforced by the live plan. True since the hold was made live: during
+ * the week the check-in applies to, no prescribed bar of a held lift is heavier than the bar the person
+ * last used for it, on every path that sets a load (the per-lift preference reader's `checkinHold`,
+ * applied by `checkin-plan-hold.ts`, the static-style path and the stored-plan serve). The card may say
+ * the lift is held.
  */
-export const CHECKIN_HOLD_LIVE = false
+export const CHECKIN_HOLD_LIVE = true
 export type CheckinAnswer = (typeof CHECKIN_ANSWERS)[number]
 export type CheckinEffect = 'held' | 'lowered_one_step' | 'offered_step_up' | 'none'
 
@@ -62,8 +63,8 @@ export function daysOffDates(appliesWeekStart: string, weekdays: readonly number
  * never calls for more load. A read that would add load or reps (or keep today's rising basis) holds
  * the last session's bar instead; a read that already holds or lowers is left as it is, so a heavy
  * answer can only take load off, never add it. A read that cannot judge (`too-little-data`) has no
- * bar to hold to and is left alone. The session read is in shadow until #3889 step 4, so this changes
- * no plan yet; it is stored beside the plan with `checkinHeld`.
+ * bar to hold to and is left alone. The session read is in shadow until #3889 step 4; the plan's own
+ * hold is `checkin-plan-hold.ts`. The read is stored beside the plan with `checkinHeld`.
  */
 export function holdUnderCheckin<R extends SessionRead>(read: R): R & { checkinHeld?: true } {
   if (read.verdict === 'too-little-data') return read

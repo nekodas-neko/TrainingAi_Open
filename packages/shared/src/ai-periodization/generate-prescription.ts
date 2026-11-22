@@ -44,6 +44,7 @@ import { buildPrescriptionShadow } from '@trainingai/shared/ai-periodization/pre
 import { loadSessionReads } from '@trainingai/shared/ai-periodization/session-read-plan'
 import { checkinBudgetApplies } from '@trainingai/shared/ai-periodization/checkin-plan-budget'
 import { loadLiftPreferences } from '@trainingai/shared/ai-periodization/lift-preference-read'
+import { holdPlanRows } from '@trainingai/shared/ai-periodization/checkin-plan-hold'
 import { clampReps, preferenceAppliesIn, appliedAfterBudgetRest } from '@trainingai/shared/ai-periodization/lift-preference'
 import {
   applyLiftPreferenceToPlanRow, applyPlanSetsDelta, mergeApplied, secondaryTargetRpe,
@@ -238,6 +239,16 @@ export function buildProgramAsWrittenPrescription(
     if (Object.keys(applied).length > 0) appliedById.set(p.ex.sessionExerciseId, applied)
     return row
   })
+  // #3890: the week's check-in hold, as after the model: a ceiling on a held lift's bar, last on the load.
+  const held = holdPlanRows(
+    planned.map(p => ({ id: p.ex.sessionExerciseId, pct: p.pct })),
+    id => {
+      const ex = withBase.find(e => e.sessionExerciseId === id)
+      const lp = preferencesApply ? ex?.liftPreference : undefined
+      return lp && ex ? { preference: lp.preference, basisKg: lp.basisKg, equipment: ex.equipment, bodyweight: ex.exerciseType === 'bodyweight' } : undefined
+    },
+  )
+  for (const p of planned) p.pct = held.pct.get(p.ex.sessionExerciseId) ?? p.pct
 
   const fitted = new Map(
     fitToBudget(
@@ -295,6 +306,7 @@ export function buildProgramAsWrittenPrescription(
     sessionTimeBudgetMinutes: signals.sessionTimeBudgetMinutes,
     confidenceReasons: ['Built from your program\u2019s own sets — the AI coach could not be reached.'],
     source: 'rules',
+    ...(held.record && { checkinHold: held.record }),
   }
 }
 
@@ -437,7 +449,10 @@ async function runPrescriptionGeneration(
   // #3893: the session read of each exercise's last session, in shadow. It is stored beside the plan
   // and read by nothing that builds it; a failed read stores no read and the plan is unchanged.
   // #3896: the session's lift preferences, read once for the session read and the plan.
-  const liftPreferences = await loadLiftPreferences(repo, userId, (validSession.exercises ?? []).map(e => e.exerciseName))
+  // #3890: with this week's check-in hold ("Heavy") in the same read, for the week the plan is made in.
+  const liftPreferences = await loadLiftPreferences(
+    repo, userId, (validSession.exercises ?? []).map(e => e.exerciseName), { checkinWeekStart: startOfWeekInTz(tz) },
+  )
   const sessionReads = await loadSessionReads(repo, userId, activeProgram, validSession, tz, liftPreferences).catch(() => null)
   const storePrescription = (p: AiPrescription, expiresAt: Date, status: 'pending' | 'auto_applied', storeFor: PrescriptionGeneratedFor) =>
     repo.storePrescription(userId, programSessionId, {
@@ -863,6 +878,21 @@ async function runPrescriptionGeneration(
     ex.pct = cappedPct.get(ex.session_exercise_id) ?? ex.pct
   }
 
+  // #3890: the week's check-in hold ("Heavy"), last on the load and enforced in code: a held lift's bar
+  // is no heavier than the bar the person last used for it. A ceiling only, after every rule above
+  // (the model, autoregulation, the preference, the anchor cap), and before the time budget so the plan
+  // is costed at the load it carries. Never in a deload or baseline, nor on a row the deload cut
+  // (`preferenceFor`), nor on a bodyweight lift. Every other row is left exactly as it was.
+  const checkinHeld = holdPlanRows(
+    parsed.exercises.map(ex => ({ id: ex.session_exercise_id, pct: ex.pct })),
+    id => {
+      const lp = preferenceFor(id)
+      const sig = signalById.get(id)
+      return lp && sig ? { preference: lp.preference, basisKg: lp.basisKg, equipment: sig.equipment, bodyweight: sig.exerciseType === 'bodyweight' } : undefined
+    },
+  )
+  for (const ex of parsed.exercises) ex.pct = checkinHeld.pct.get(ex.session_exercise_id) ?? ex.pct
+
   // The deterministic tail — role plausibility, the budget passes and everything derived from
   // them — is shared with the no-model duration re-fit (budget-stage.ts).
   //
@@ -958,6 +988,7 @@ async function runPrescriptionGeneration(
     // #3890: recorded only when the check-in's budget shaped the plan, so a serve-time re-fit knows it
     // is already fitted (and an undo knows to give the length back). Absent for everyone else.
     ...(checkinFitMin != null && { checkinBudgetMin: checkinFitMin }),
+    ...(checkinHeld.record && { checkinHold: checkinHeld.record }),
     refitBaseline,
     ...(droppedIdSet.size > 0 && { droppedExerciseIds: [...droppedIdSet] }),
   }

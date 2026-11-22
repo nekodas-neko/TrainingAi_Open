@@ -21,6 +21,7 @@
  */
 import { expectedRpe, pctForExpectedRpe } from './expected-rpe'
 import { prescribedBar, weightStepFor } from '../workout/load-rounding'
+import type { ExerciseLog, SetLog } from '../types/log'
 import { roleCeiling } from './role-plausibility'
 import { roleFloor } from './time-budget'
 import { PCT_HARD_FLOOR } from './autoregulation'
@@ -45,6 +46,21 @@ export interface LiftPreferenceRow {
   nextLoadStep: string | null
   setsDelta: number | null
   oneShotSetAt: Date | null
+  /** #3890: the saved weekly check-in for the week being planned answered "Heavy" for this lift. Only
+   *  present when the read was asked about a week (`checkinWeekStart`). */
+  checkinHeld?: boolean
+}
+
+/**
+ * #3890 (decision 8, "Heavy holds the lift by itself"): the lift is held for the week the check-in
+ * applies to. A ceiling, never a floor: no prescribed set of the lift is heavier than `barKg`, the bar
+ * the person last used for it (`lastSessionBarKg`). Null `barKg` (never logged, or the last log was a
+ * deload) holds nothing. Sets and reps are not changed by it.
+ */
+export interface CheckinHold {
+  /** The local Monday of the week the check-in applies to (`applies_week_start`). */
+  weekStart: string
+  barKg: number | null
 }
 
 export interface LiftOneShot {
@@ -59,6 +75,8 @@ export interface LiftPreference {
   repRange: { min: number; max: number } | null
   restSec: number | null
   oneShot: LiftOneShot | null
+  /** #3890: present only for a lift the week's check-in holds. Absent: every rule as before. */
+  checkinHold?: CheckinHold
 }
 
 /** What a plan applied, stored on the prescribed exercise (`AiPrescriptionExercise.liftPreference`). */
@@ -172,6 +190,63 @@ export function setsWithDelta(sets: number, delta: -1 | 1, role: string, phaseSe
 }
 
 /**
+ * #3890: the heaviest working weight among logged sets: the largest `weightKg` of a set that carries a
+ * weight and at least one rep. A set with a zero or missing weight (bodyweight, an unlogged row) or no
+ * reps (nothing was lifted) is ignored. Null when no set qualifies.
+ */
+export function heaviestLoggedWeightKg(sets: readonly Pick<SetLog, 'weightKg' | 'reps'>[] | null | undefined): number | null {
+  let best: number | null = null
+  for (const s of sets ?? []) {
+    const w = s?.weightKg
+    if (typeof w !== 'number' || !(w > 0) || !(typeof s.reps === 'number' && s.reps > 0)) continue
+    if (best == null || w > best) best = w
+  }
+  return best
+}
+
+/**
+ * #3890: the "last bar" the check-in's hold caps a lift at: the HEAVIEST working weight logged in the
+ * lift's most recent session (`getLastExerciseLogsBatch`), by `heaviestLoggedWeightKg`. The hold is a
+ * ceiling on what was lifted last time, so it may only take off load above that: a pyramid or a
+ * back-off session is capped at its top set, never cut to its lightest. Null when there is no such set,
+ * and when that log was a deload (its estimate is stored as 0: a deload's bar is not a working weight,
+ * so it holds nothing).
+ */
+export function lastSessionBarKg(log: Pick<ExerciseLog, 'sets' | 'estimated1rm'> | null | undefined): number | null {
+  if (!log || !((log.estimated1rm ?? 0) > 0)) return null
+  return heaviestLoggedWeightKg(log.sets)
+}
+
+/** #3890: whether the check-in's hold caps this lift: a held lift with a last bar, carrying a load. */
+export function checkinHoldBar(pref: LiftPreference | null | undefined, ctx: { bodyweight: boolean }): number | null {
+  const bar = pref?.checkinHold?.barKg
+  return !ctx.bodyweight && typeof bar === 'number' && bar > 0 ? bar : null
+}
+
+/**
+ * #3890: `pct`, lowered only as far as needed so its bar (`prescribedBar`, rounded up to the plate step)
+ * is no heavier than `barKg`. A pct whose bar is already at or under it is returned as it is: the hold is
+ * a ceiling, never a floor. The new pct lands on the heaviest plate-step bar at or under `barKg`, at
+ * 0.5 % precision when that still gives it, else 0.1 %, else the exact quotient. With no basis there is
+ * no bar to compare and the pct is returned as it is; so is one the ceiling cannot express (a bar under
+ * the smallest the rounding allows).
+ */
+export function pctUnderBar(pct: number, basisKg: number | null | undefined, equipment: string[] | null | undefined, barKg: number): number {
+  if (!(typeof basisKg === 'number' && basisKg > 0) || !(pct > 0)) return pct
+  const now = prescribedBar(basisKg, pct, equipment)
+  if (now == null || now <= barKg) return pct
+  const plate = weightStepFor(equipment)
+  const target = Math.floor(barKg / plate + 1e-9) * plate
+  if (!(target > 0)) return pct
+  const mid = ((target - plate / 2) / basisKg) * 100
+  const candidates = [Math.round(mid * 2) / 2, Math.round(mid * 10) / 10, Math.floor((target / basisKg) * 1000) / 10]
+  for (const c of candidates) {
+    if (c > 0 && c < pct && (prescribedBar(basisKg, c, equipment) ?? Infinity) <= barKg) return c
+  }
+  return pct
+}
+
+/**
  * The record of what a plan applied, corrected for a rest the time budget then changed. The budget
  * wins over a preferred rest (it is the time the person has), so a row whose final rest is not the
  * preferred one must not say it used it: the record drops `restSec`, and the whole record when that
@@ -235,5 +310,16 @@ export function applyLiftPreferenceToStyle<T extends StyleLikeSet>(
     }
   }
   if (applied.loadStep || applied.setsDelta) applied.oneShotSetAt = shot!.setAt.toISOString()
-  return Object.keys(applied).length > 0 ? { style: out, applied } : null
+  // #3890: the week's check-in hold, last: a ceiling on every set's bar, after everything above.
+  const holdBar = checkinHoldBar(pref, ctx)
+  let held = false
+  if (holdBar != null) {
+    out = out.map(s => {
+      const pct = pctUnderBar(s.pct, ctx.basisKg, ctx.equipment, holdBar)
+      if (pct === s.pct) return s
+      held = true
+      return { ...s, pct }
+    })
+  }
+  return Object.keys(applied).length > 0 || held ? { style: out, applied } : null
 }

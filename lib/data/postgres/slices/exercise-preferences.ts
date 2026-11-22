@@ -9,6 +9,7 @@
 import { sql } from 'drizzle-orm'
 import type { getDb } from '../client'
 import { ONE_SHOT_TTL_DAYS, type LiftPreferenceRow } from '@trainingai/shared/ai-periodization/lift-preference'
+import { checkinHeldCondition } from './weekly-checkin'
 
 type Db = ReturnType<typeof getDb>
 
@@ -23,6 +24,7 @@ interface PreferenceSqlRow {
   one_shot_set_at: Date | string | null
   one_shot_expired: boolean
   stale_stamps: string[] | null
+  checkin_held?: boolean
 }
 
 /** The user's live preferences for these lifts, keyed by the name the caller passed. One query. */
@@ -43,9 +45,15 @@ export const STALE_STAMP_RETRY_DAYS = 7
  * `stale` (optional) receives the one-off times that a lift's stored plans still carry although its
  * row no longer holds one (#4007): found by the same single select that reads the preferences, so the
  * check adds no query. The caller restates those plans.
+ *
+ * `checkinWeekStart` (optional, #3890): the local Monday of the week being planned. With it, a lift the
+ * saved weekly check-in for that week (`applies_week_start`) answered "Heavy" for comes back with
+ * `checkinHeld: true`, with or without a preference row of its own, from the same single select
+ * (`checkinHeldCondition`). Without it the statement and the result are as before.
  */
 export async function listExercisePreferences(
   db: Db, userId: string, exerciseNames: string[], cleared?: ClearedOneShot[], stale?: ClearedOneShot[],
+  checkinWeekStart?: string,
 ): Promise<Map<string, LiftPreferenceRow>> {
   const out = new Map<string, LiftPreferenceRow>()
   if (exerciseNames.length === 0) return out
@@ -73,6 +81,7 @@ export async function listExercisePreferences(
   for (const r of (expired?.rows ?? []) as { exercise_name: string; set_ms: number }[]) {
     cleared?.push({ exerciseName: r.exercise_name, setAtMs: Number(r.set_ms) })
   }
+  const held = checkinWeekStart ? checkinHeldCondition(userId, checkinWeekStart, sql`lifts.lift`, sql`lifts.lib_id`) : null
   const res = await db.execute(sql`
     WITH lifts AS (
       SELECT n.name AS lift, l.id AS lib_id
@@ -96,14 +105,16 @@ export async function listExercisePreferences(
                      AND e->'liftPreference'->>'oneShotSetAt' IS NOT NULL)
                 ELSE ARRAY[]::text[]
            END AS stale_stamps
+           ${held ? sql`, ${held} AS checkin_held` : sql``}
     FROM lifts
-    JOIN exercise_preferences p
+    ${held ? sql`LEFT JOIN` : sql`JOIN`} exercise_preferences p
       ON p.user_id = ${userId}
      AND p.deleted_at IS NULL
      AND (
        (lifts.lib_id IS NOT NULL AND p.exercise_id = lifts.lib_id)
        OR (p.exercise_name = lifts.lift AND (p.exercise_id IS NULL OR lifts.lib_id IS NULL OR p.exercise_id = lifts.lib_id))
      )
+    ${held ? sql`WHERE p.id IS NOT NULL OR ${held}` : sql``}
     ORDER BY lifts.lift, by_id DESC
   `)
   for (const r of res.rows as unknown as PreferenceSqlRow[]) {
@@ -115,6 +126,7 @@ export async function listExercisePreferences(
       nextLoadStep: r.one_shot_expired ? null : r.next_load_step,
       setsDelta: r.one_shot_expired || r.sets_delta == null ? null : Number(r.sets_delta),
       oneShotSetAt: r.one_shot_expired || r.one_shot_set_at == null ? null : new Date(r.one_shot_set_at),
+      ...(r.checkin_held === true && { checkinHeld: true }),
     })
     for (const at of r.stale_stamps ?? []) {
       const ms = new Date(at).getTime()

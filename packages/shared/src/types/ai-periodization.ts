@@ -165,6 +165,12 @@ export interface AiPrescription {
    *  person picked a length over a check-in fit, so the check-in leaves this plan alone. Absent on
    *  every plan the check-in never touched. */
   checkinBudgetMin?: number | null
+  /** #3890: the weekly check-in's "Heavy" hold on this plan (decision 8). For each row the hold lowered,
+   *  the pct the plan had (`pct`) and the pct it was lowered to (`heldPct`), so the plan is given its own
+   *  load back when it is served outside that week, after an undo, or when the lift is no longer held
+   *  (`holdStoredPlanUnderCheckin`). A row whose pct is no longer `heldPct` was rewritten since and is
+   *  left as it is. Absent on every plan the hold never lowered. */
+  checkinHold?: { weekStart: string; rows: Record<string, { pct: number; heldPct: number }> }
   // What a no-model duration re-fit starts from (RV-202 ②). Changing the time budget used to
   // re-run the whole model call for work that is pure arithmetic — the budget stage is
   // deterministic — but it cannot re-run against the STORED plan, because the budget passes
@@ -234,6 +240,9 @@ export interface SessionPeriodization {
    *  today, read in the same query as the row (so a person with none costs no extra query). Absent when
    *  there are none. Which one applies is the caller's to decide in the user's timezone. */
   checkinSessionBudgets?: { weekStart: string; min: number }[]
+  /** #3890: the `applies_week_start` of the user's saved weekly check-ins around today that hold a lift
+   *  ("Heavy"), read in the same query as the row. Absent when there are none. */
+  checkinHeldWeeks?: string[]
 }
 
 export interface ProgramVolumeTarget {

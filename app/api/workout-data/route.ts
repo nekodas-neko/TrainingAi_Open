@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { getRepository } from "@/lib/data";
 import type { ProgramPhase } from "@trainingai/shared/types/program";
-import { todayInTz, shiftDateStr, DEFAULT_TZ } from "@trainingai/shared/date-utils";
+import { todayInTz, shiftDateStr, startOfWeekInTz, DEFAULT_TZ } from "@trainingai/shared/date-utils";
 import { buildAutomaticPhaseStatus, isEarlyDeloadWeek } from "@trainingai/shared/phase-engine";
 import { getScheduledSessionsPerWeek } from "@trainingai/shared/schedule-utils";
 import { prescriptionDrivesLoad } from "@trainingai/shared/ai-periodization/apply-prescription";
@@ -31,6 +31,8 @@ import { generatePrescriptionForSession } from "@trainingai/shared/ai-periodizat
 import { fitStoredPlanToCheckinBudget } from "@trainingai/shared/ai-periodization/checkin-plan-budget";
 import { regeneratePrescriptionInBackground as regeneratePrescriptionSingleFlight } from "@trainingai/shared/ai-periodization/regenerate-in-background";
 import { loadLiftPreferences } from "@trainingai/shared/ai-periodization/lift-preference-read";
+import { rehold } from "@trainingai/shared/ai-periodization/checkin-plan-hold";
+import { resolveWorkingBasis } from "@trainingai/shared/1rm";
 
 // Re-exported so existing type imports (e.g. `import('@/app/api/workout-data/route').PhaseStatus`)
 // keep resolving after the interfaces moved to lib/workout/session-data.ts.
@@ -180,8 +182,9 @@ async function handleWorkoutData(req: NextRequest) {
       repo.getLastExerciseLogsBatch(userId, unionNames),
       repo.getLastRealOneRmBatch(userId, unionNames),
       repo.getExerciseEstimates(userId).catch(() => []),
-      // #3896: the user's lift preferences, for a static style the AI plan is not driving.
-      loadLiftPreferences(repo, userId, unionNames),
+      // #3896: the user's lift preferences, for a static style the AI plan is not driving, with this
+      // week's check-in hold (#3890) in the same read.
+      loadLiftPreferences(repo, userId, unionNames, { checkinWeekStart: startOfWeekInTz(tz) }),
       // Heals the stored sessions_in_phase before the periodization read below turns it into
       // completedCycles / phaseSessionNumber (SYNC-T2). Batched here rather than awaited
       // separately so it costs no extra round-trip; advisory, so a failure must not take the
@@ -377,8 +380,9 @@ async function handleWorkoutData(req: NextRequest) {
       : Promise.resolve(null),
     repo.listPersonalRecords(userId),
     repo.getExerciseEstimates(userId).catch(() => []),
-    // #3896: the user's lift preferences, for a static style the AI plan is not driving.
-    loadLiftPreferences(repo, userId, exerciseNames),
+    // #3896: the user's lift preferences, for a static style the AI plan is not driving, with this
+    // week's check-in hold (#3890) in the same read.
+    loadLiftPreferences(repo, userId, exerciseNames, { checkinWeekStart: startOfWeekInTz(tz) }),
   ]);
   const estimateMap = new Map(estimates.map(e => [e.exerciseName, e.estimated1rm]));
 
@@ -603,7 +607,22 @@ async function handleWorkoutData(req: NextRequest) {
       if (reevalResult.needsRegenerate) {
         regeneratePrescriptionInBackground(userId, programSession.id, repo, tz)
       } else {
-        const stamped: AiPrescription = { ...reevalResult.prescription, reevaluatedInputsKey: inputsKey }
+        // #3890: the re-evaluation runs after the serve step held the plan, and its revert puts a
+        // deloaded row's pre-deload (unheld) load back. Hold the result again, from the preferences
+        // already read, so neither this response nor the cached plan carries a held lift above its bar.
+        const reheld = rehold(reevalResult.prescription, aiPeriodizationState.phase, startOfWeekInTz(tz), liftPreferences, name => {
+          const lib = libByName.get(name.toLowerCase())
+          return {
+            basisKg: resolveWorkingBasis({
+              lastNonDeload1rm: lastRealOneRm.get(name)?.estimated1rm,
+              seedEstimate: estimateMap.get(name),
+              allTimePr1rm: prMap.get(name),
+            }),
+            equipment: lib?.equipment ?? [],
+            bodyweight: lib?.exerciseType === 'bodyweight',
+          }
+        })
+        const stamped: AiPrescription = { ...reheld, reevaluatedInputsKey: inputsKey }
         aiPrescription = stamped
         repo.updatePrescriptionExercisesCache(userId, programSession.id, stamped).catch(() => {})
       }

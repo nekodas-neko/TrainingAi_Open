@@ -274,11 +274,17 @@ export function buildUserPrompt(
     // Not said in a deload or baseline, where a preference does not apply. Absent: the line is as before.
     const range = preferencesApply ? ex.liftPreference?.preference.repRange : null
     const rangeStr = range ? `, rep_range: ${range.min}-${range.max} (the lifter's choice for this lift; keep reps inside it)` : ''
+    // #3890: the week's check-in hold ("Heavy"), so the plan's text does not argue with the ceiling code
+    // applies after the answer. Code enforces it. Absent for every lift without a hold.
+    const holdBar = preferencesApply && ex.exerciseType !== 'bodyweight' ? ex.liftPreference?.preference.checkinHold?.barKg : null
+    const holdStr = holdBar != null && holdBar > 0
+      ? `, held_this_week: no heavier than ${holdBar} kg (the lifter called last week heavy; do not add load)`
+      : ''
     return `  - ${ex.name} (id: ${ex.sessionExerciseId}, role: ${ex.role}, muscles: ${musclesStr}, ` +
       `baseline_1rm: ${oneRm(ex.baseline1rm)} [anchor only — do not use for trend], ` +
       `current_1rm: ${oneRm(ex.current1rm)}, ` +
       `rm1_trend: ${ex.rm1Trend} ${rm1Change(ex)}, ` +
-      `avg_set_duration: ${ex.avgSetDurationSec}s, transition_sec: ${ex.transitionSec}${measuredStr}${rangeStr})` +
+      `avg_set_duration: ${ex.avgSetDurationSec}s, transition_sec: ${ex.transitionSec}${measuredStr}${rangeStr}${holdStr})` +
       (ex.plateau ? ' [1RM flat ≥3 weeks — consider a stimulus change]' : '')
   }).join('\n')
 

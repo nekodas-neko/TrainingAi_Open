@@ -5,7 +5,7 @@ import type { CoachContext } from '@trainingai/shared/coach/context'
 import { chipsFor, type CoachAbout } from '@trainingai/shared/coach/chips'
 import { loadLiftPreferences } from '@trainingai/shared/ai-periodization/lift-preference-read'
 import { prescribedBar } from '@trainingai/shared/workout/load-rounding'
-import { toAestDay } from '@trainingai/shared/date-utils'
+import { toAestDay, weekStartForDay } from '@trainingai/shared/date-utils'
 import { loadTarget, type TargetRow } from './domains/session-exercise'
 import { staticNextExercise, type StaticReads } from './domains/lift-preference'
 import { ownProgramSession, ownWorkout, readExerciseContext, type LoggedExercise } from './context'
@@ -95,7 +95,9 @@ export async function readNextPlan(
       restSec: plan.restSec,
     }
   }
-  const next = await staticNextExercise(repo, userId, target, today, await loadLiftPreferences(repo, userId, [target.exerciseName]))
+  // #3890: with this week's check-in hold, so the Coach describes the bar the session screen will show.
+  const next = await staticNextExercise(repo, userId, target, today,
+    await loadLiftPreferences(repo, userId, [target.exerciseName], { checkinWeekStart: weekStartForDay(today) }))
   if (!next) return { kind: 'none' }
   if (next.excluded) return { kind: 'deload', test: true }
   const ex = next.exercise
