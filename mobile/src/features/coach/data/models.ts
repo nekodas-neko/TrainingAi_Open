@@ -56,6 +56,8 @@ export const historySpec: ResourceSpec<z.infer<typeof historySchema>> = {
 };
 export const previewSchema = z.object({
   consequences: z.array(z.object({ kind: z.enum(['warn', 'info', 'good']), text: z.string() })),
+  // #3896 step 5: the change can't be made as asked; the card shows why and offers no Apply.
+  refusal: z.string().optional(),
   drift: z.array(
     z.object({
       changeId: z.string(),

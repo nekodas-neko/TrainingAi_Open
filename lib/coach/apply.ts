@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm'
+import { and, eq, isNull } from 'drizzle-orm'
 import * as s from '@/lib/data/postgres/schema'
 import { fieldsMatchDomain, type CoachPatch, type CoachPatchDomain } from './patch'
 import { driftAgainst } from './domains/types'
@@ -8,6 +8,7 @@ import { nutritionTargetsHandler, userGoalsHandler } from './domains/goals'
 import { injuryHandler } from './domains/injury'
 import { programPhaseHandler } from './domains/program-phase'
 import { earlyDeloadHandler } from './domains/early-deload'
+import { liftPreferenceHandler, StaleLiftPreference } from './domains/lift-preference'
 import { DEFAULT_TZ, todayInTz } from '@trainingai/shared/date-utils'
 
 export type { ApplyOutcome } from './domains/types'
@@ -30,6 +31,10 @@ export function handlerFor(
     injury: injuryHandler,
     program_phase: programPhaseHandler,
     early_deload: earlyDeloadHandler(today, timezone),
+    // The bar's basis reads (1RM, estimates, records) go through the repository, as every other
+    // reader of them does. Imported lazily so the Coach's apply path does not load the whole
+    // repository for the domains that never need it.
+    lift_preference: liftPreferenceHandler(async () => (await import('@/lib/data')).getRepository()),
   }
   return handlers[domain]
 }
@@ -61,7 +66,10 @@ export async function applyCoachPatch(
     return { ok: false, reason: 'invalid', detail: 'Those fields do not belong to that domain' }
   }
 
-  const result = await handlerFor(patch.domain, today, timezone).apply(db, userId, patch, accepted)
+  const handler = handlerFor(patch.domain, today, timezone)
+  if (handler.transactional) return applyInTransaction(db, userId, patch, accepted, handler)
+
+  const result = await handler.apply(db, userId, patch, accepted)
   if (!result.ok) return result
 
   const [inserted] = await db
@@ -78,6 +86,43 @@ export async function applyCoachPatch(
     .returning({ id: s.coachChanges.id })
 
   return { ok: true, changeId: inserted.id, summary: result.summary }
+}
+
+/** A refusal from inside a transaction: nothing the handler wrote survives it. */
+class Refused extends Error {
+  constructor(readonly outcome: Exclude<ApplyOutcome, { ok: true }>) { super(outcome.reason) }
+}
+
+/**
+ * #3896 step 5: the handler's writes and the `coach_changes` record in one transaction. A refusal the
+ * handler returns after it has written, or a stale row it throws on, rolls back everything, so the
+ * history never records a change the rows do not hold, nor the rows a change the history lacks.
+ */
+async function applyInTransaction(
+  db: Db, userId: string, patch: CoachPatch, accepted: CoachPatch['changes'], handler: DomainHandler,
+): Promise<ApplyOutcome> {
+  try {
+    return await db.transaction(async tx => {
+      const t = tx as unknown as Db
+      const result = await handler.apply(t, userId, patch, accepted)
+      if (!result.ok) throw new Refused(result)
+      const inserted = await t.insert(s.coachChanges).values({
+        userId,
+        domain: patch.domain,
+        targetId: result.targetId,
+        patch,
+        acceptedIds: accepted.map(c => c.id),
+        beforeState: result.beforeState,
+        summary: result.summary,
+      }).returning({ id: s.coachChanges.id })
+      if (inserted.length !== 1) throw new Error('coach_changes insert wrote no row')
+      return { ok: true as const, changeId: inserted[0].id, summary: result.summary }
+    })
+  } catch (err) {
+    if (err instanceof Refused) return err.outcome
+    if (err instanceof StaleLiftPreference) return { ok: false, reason: 'stale', drift: err.drift }
+    throw err
+  }
 }
 
 /**
@@ -123,6 +168,26 @@ export async function undoCoachChange(db: Db, userId: string, changeId: string):
       const stateful = applied.filter(c => c.field in current)
       const drift = driftAgainst(stateful, current, undefined, 'to')
       if (drift.length > 0) return { ok: false, reason: 'stale', drift }
+    }
+  }
+
+  if (handler.transactional) {
+    try {
+      return await db.transaction(async tx => {
+        const t = tx as unknown as Db
+        const restored = await handler.undo(t, userId, record.targetId, (record.beforeState ?? {}) as Record<string, unknown>)
+        if (!restored.ok) throw new Refused(restored)
+        // Conditional, so two undos racing each other cannot both restore.
+        const marked = await t.update(s.coachChanges).set({ undoneAt: new Date() })
+          .where(and(eq(s.coachChanges.id, changeId), eq(s.coachChanges.userId, userId), isNull(s.coachChanges.undoneAt)))
+          .returning({ id: s.coachChanges.id })
+        if (marked.length !== 1) throw new Refused({ ok: false, reason: 'invalid', detail: 'Already undone' })
+        return { ok: true as const, changeId, summary: `Undid: ${record.summary}` }
+      })
+    } catch (err) {
+      if (err instanceof Refused) return err.outcome
+      if (err instanceof StaleLiftPreference) return { ok: false, reason: 'stale', drift: err.drift }
+      throw err
     }
   }
 

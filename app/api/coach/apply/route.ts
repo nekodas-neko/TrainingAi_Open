@@ -45,6 +45,11 @@ export async function POST(req: Request) {
   if (!hasUniqueChangeIds(parsed.data.patch)) {
     return NextResponse.json({ error: 'Duplicate change ids' }, { status: 400 })
   }
+  // #3896 step 5: a lift preference also rewrites stored plans, so it gets its own, tighter limit on
+  // top of the route's. Born with the domain.
+  if (parsed.data.patch.domain === 'lift_preference' && !rateLimit(`${userId}:coach-apply-lift-preference`, 10, 60_000)) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+  }
 
   try {
     await ensureSchema()

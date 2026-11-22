@@ -7,6 +7,7 @@ export const COACH_PATCH_DOMAINS = [
   'injury',
   'program_phase',
   'early_deload',
+  'lift_preference',
 ] as const;
 export type CoachPatchDomain = (typeof COACH_PATCH_DOMAINS)[number];
 export const DOMAIN_FIELDS: Record<CoachPatchDomain, readonly string[]> = {
@@ -23,6 +24,7 @@ export const DOMAIN_FIELDS: Record<CoachPatchDomain, readonly string[]> = {
   injury: ['muscleName', 'severity', 'notes', 'resolved'],
   program_phase: ['phaseSetId', 'sessionsPerCycle', 'phaseMode'],
   early_deload: ['deloadNow'],
+  lift_preference: ['repRange', 'restSec', 'nextLoadStep', 'setsDelta'],
 };
 export const DOMAIN_TIER: Record<CoachPatchDomain, 1 | 2 | 3> = {
   user_goals: 1,
@@ -30,8 +32,36 @@ export const DOMAIN_TIER: Record<CoachPatchDomain, 1 | 2 | 3> = {
   session_exercise: 2,
   injury: 2,
   early_deload: 2,
+  lift_preference: 2,
   program_phase: 3,
 };
+
+/**
+ * #3896 step 5: patch domains a client must say it can render before the server offers them. An app
+ * build parses every proposal against its own copy of `CoachPatchSchema`, so a build from before a
+ * domain existed would fail that parse and show a broken card. The chat request names the gated
+ * domains the client renders (`patchDomains`); the server offers only those. A domain listed here is
+ * never offered to a client that does not name it.
+ */
+export const GATED_PATCH_DOMAINS: readonly CoachPatchDomain[] = ['lift_preference'];
+
+/** A lift's rep range as the patch carries it: `"12-15"`, low then high. The bounds (whole numbers,
+ *  1-30, low <= high) are checked by the handler, which refuses with a plain message rather than
+ *  letting the schema retry the model into a number the person never said. */
+export const REP_RANGE_TEXT = /^\d{1,2}-\d{1,2}$/;
+/** What the model may ask for instead of naming numbers: code works the range out. */
+export const REP_RANGE_REQUESTS = ['more_reps', 'fewer_reps'] as const;
+export type RepRangeRequest = (typeof REP_RANGE_REQUESTS)[number];
+
+/** How long each lift-preference change lasts. Rep range and rest stay until changed (D2); the load
+ *  step and the extra or missing set are the one-shot, for the next workout only. */
+export const LIFT_PREFERENCE_DURATION: Record<'repRange' | 'restSec' | 'nextLoadStep' | 'setsDelta', 'from_now_on' | 'next_time'> = {
+  repRange: 'from_now_on',
+  restSec: 'from_now_on',
+  nextLoadStep: 'next_time',
+  setsDelta: 'next_time',
+};
+export const DURATION_LABEL = { from_now_on: 'From now on', next_time: 'Just next time' } as const;
 export const PatchChangeSchema = z.discriminatedUnion('field', [
   z.object({
     id: z.string().min(1),
@@ -132,6 +162,33 @@ export const PatchChangeSchema = z.discriminatedUnion('field', [
     from: z.boolean(),
     to: z.boolean(),
   }),
+  // #3896 step 5, the lift_preference domain. Strict: a model that adds a weight, a % or a set count
+  // to one of these is refused, not ignored — no number the model wrote beyond these reaches the
+  // write. `from` is only ever compared with the stored row, never written.
+  z.object({
+    id: z.string().min(1),
+    field: z.literal('repRange'),
+    from: z.string().regex(REP_RANGE_TEXT).nullable(),
+    to: z.union([z.string().regex(REP_RANGE_TEXT), z.enum(REP_RANGE_REQUESTS)]),
+  }).strict(),
+  z.object({
+    id: z.string().min(1),
+    field: z.literal('restSec'),
+    from: z.number().int().min(0).max(3600).nullable(),
+    to: z.number().int().min(0).max(3600),
+  }).strict(),
+  z.object({
+    id: z.string().min(1),
+    field: z.literal('nextLoadStep'),
+    from: z.enum(['lighter', 'heavier']).nullable(),
+    to: z.enum(['lighter', 'heavier']),
+  }).strict(),
+  z.object({
+    id: z.string().min(1),
+    field: z.literal('setsDelta'),
+    from: z.union([z.literal(-1), z.literal(1)]).nullable(),
+    to: z.union([z.literal(-1), z.literal(1)]),
+  }).strict(),
 ]);
 export type PatchChange = z.infer<typeof PatchChangeSchema>;
 export const CoachPatchSchema = z.object({
@@ -162,6 +219,10 @@ export const FIELD_LABEL: Record<PatchChange['field'], string> = {
   sessionsPerCycle: 'Sessions per cycle',
   phaseMode: 'Phase mode',
   deloadNow: 'Deload week',
+  repRange: 'Rep range',
+  restSec: 'Rest between sets',
+  nextLoadStep: 'Weight next time',
+  setsDelta: 'Sets next time',
 };
 export const FIELD_UNIT: Partial<Record<PatchChange['field'], string>> = {
   calories: ' kcal',
@@ -171,6 +232,19 @@ export const FIELD_UNIT: Partial<Record<PatchChange['field'], string>> = {
   fatG: 'g',
   waterGoalMl: ' ml',
 };
+/** How a lift-preference value reads on the card: `"12-15"` → "12–15 reps", 90 → "90 s". */
+export function liftPreferenceValueLabel(field: PatchChange['field'], value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+  if (field === 'repRange') {
+    if (value === 'more_reps') return 'More reps';
+    if (value === 'fewer_reps') return 'Fewer reps';
+    return typeof value === 'string' ? `${value.replace('-', '–')} reps` : null;
+  }
+  if (field === 'restSec') return typeof value === 'number' ? `${value} s` : null;
+  if (field === 'nextLoadStep') return value === 'lighter' ? 'One plate lighter' : value === 'heavier' ? 'One plate heavier' : null;
+  if (field === 'setsDelta') return value === 1 ? 'One more set' : value === -1 ? 'One fewer set' : null;
+  return null;
+}
 export function fieldsMatchDomain(patch: CoachPatch): boolean {
   const allowed = DOMAIN_FIELDS[patch.domain];
   return patch.changes.every((c) => allowed.includes(c.field));

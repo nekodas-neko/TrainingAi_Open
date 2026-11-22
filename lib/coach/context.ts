@@ -12,6 +12,8 @@ import { normalizeStoredPrescription } from '@trainingai/shared/ai-periodization
 import { prescribedBar } from '@trainingai/shared/workout/load-rounding'
 import { resolveWorkingBasisWithSource } from '@trainingai/shared/1rm'
 import { promptSafeLine } from '@trainingai/shared/ai/untrusted-text'
+import { listExercisePreferences } from '@/lib/data/postgres/slices/exercise-preferences'
+import { liftPreferenceFromRow } from '@trainingai/shared/ai-periodization/lift-preference'
 import { dateStrMidnightInTz, normalizeDateParamIso, shiftDateStr, toAestDay } from '@trainingai/shared/date-utils'
 
 /**
@@ -78,6 +80,14 @@ export const ExerciseContextSchema = z.object({
   }).nullable(),
   recentLogs: z.array(LoggedExerciseSchema),
   notes: z.array(z.string()),
+  /** #3896 step 5: the lift's stored preference, the `from` of a lift_preference change. Present only
+   *  when that domain is offered to this client; null when the lift has none. */
+  preference: z.object({
+    repRange: z.string().nullable(),
+    restSec: z.number().int().nullable(),
+    nextLoadStep: z.enum(['lighter', 'heavier']).nullable(),
+    setsDelta: z.union([z.literal(-1), z.literal(1)]).nullable(),
+  }).nullable().optional(),
 })
 export type ExerciseContext = z.infer<typeof ExerciseContextSchema>
 
@@ -161,6 +171,7 @@ export async function readExerciseContext(
   sessionExerciseId: string,
   tz: string,
   now: Date = new Date(),
+  opts: { preference?: boolean } = {},
 ): Promise<ExerciseContext | null> {
   const target = await loadTarget(db, userId, sessionExerciseId)
   if (!target) return null
@@ -226,7 +237,22 @@ export async function readExerciseContext(
     notes.push('No AI plan is stored for this session yet.')
   }
 
+  let preference: ExerciseContext['preference']
+  if (opts.preference) {
+    const row = (await listExercisePreferences(db, userId, [name])).get(name)
+    const p = liftPreferenceFromRow(row)
+    preference = p
+      ? {
+          repRange: p.repRange ? `${p.repRange.min}-${p.repRange.max}` : null,
+          restSec: row?.restSec ?? null,
+          nextLoadStep: p.oneShot?.loadStep ?? null,
+          setsDelta: p.oneShot?.setsDelta ?? null,
+        }
+      : null
+  }
+
   return {
+    ...(opts.preference && { preference }),
     sessionExerciseId: target.id,
     exerciseName: name,
     sessionId: target.sessionId,
