@@ -67,3 +67,39 @@ describe('groupSignals', () => {
     expect(rows.find(r => r.label === 'Deload')!.value).toBe('Deload recommended')
   })
 })
+
+// #3718 F3: a rest day from one of the AI rule's signals names it on the "Why this?" page, with the
+// same line Home shows (`deloadReasons`).
+describe('groupSignals — rest signals (#3718)', () => {
+  it('on a day only blood oxygen fired, the page explains the deload', async () => {
+    const { buildSessionExplainData } = await import('../build-explain-data')
+    const rec = {
+      isRestDay: false, reason: '', reminderEnabled: false, reminderTime: null,
+      deloadOrRestRecommended: true, deloadStrength: 'recommended' as const, consecutiveTrainingDays: 0,
+      restSignals: ['spo2Low' as const],
+      scoredSessions: [{ session: { id: 'a', name: 'Pull' }, overallScore: 70, recoveryScore: 70, balanceScore: 70, freshnessScore: 70 }],
+      weightedComponents: base.weightedComponents,
+      signals: { ...base.signals, ouraReadiness: 72 },
+    } as unknown as Parameters<typeof buildSessionExplainData>[0]
+    const data = buildSessionExplainData(rec, 'a')!
+    const rows = groupSignals(data).flatMap(g => g.rows)
+    expect(rows.find(r => r.label === 'Deload')?.value).toBe('Deload recommended')
+    expect(rows.find(r => r.label === 'Blood oxygen low')?.value)
+      .toBe('Blood oxygen has been below your usual over the last 3 nights — often an early sign of illness or incomplete recovery.')
+  })
+
+  it('each of the three signals shows its reason', () => {
+    const reasons = [
+      { kind: 'readiness' as const, text: 'Readiness 38 — under 45, low enough that a rest day is the better call.', signal: 'readinessVeryLow' as const },
+      { kind: 'sleepAndHrv' as const, text: 'Sleep and HRV have both run well below your usual over the last 3 nights.', signal: 'sleepAndHrvLow' as const },
+      { kind: 'spo2' as const, text: 'Blood oxygen has been below your usual over the last 3 nights — often an early sign of illness or incomplete recovery.', signal: 'spo2Low' as const },
+    ]
+    const rows = groupSignals({ ...base, restSignalReasons: reasons }).flatMap(g => g.rows)
+    expect(rows.filter(r => ['Readiness very low', 'Sleep and HRV both low', 'Blood oxygen low'].includes(r.label)).map(r => r.value))
+      .toEqual(reasons.map(r => r.text))
+  })
+
+  it('no rest signal, no extra rows', () => {
+    expect(groupSignals({ ...base, restSignalReasons: [] })).toEqual(groupSignals(base))
+  })
+})

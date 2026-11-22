@@ -12,14 +12,14 @@ export type DeloadStrength = NonNullable<NextSessionRecommendation['deloadStreng
 export type DeloadReasonInput = Pick<
   NextSessionRecommendation,
   'deloadOrRestRecommended' | 'deloadStrength' | 'temperatureAlert' | 'consecutiveTrainingDays'
-  | 'consecutiveRestDays' | 'streakBroken'
+  | 'consecutiveRestDays' | 'streakBroken' | 'restSignals'
 > & {
   signals?: Partial<Pick<NonNullable<NextSessionRecommendation['signals']>,
     'ouraReadiness' | 'ouraReadinessModelVersion' | 'energyLevel' | 'temperatureDeviation'
     | 'temperatureBaselineDays' | 'temperatureAlertThresholdC'>> | null
 }
 
-export type DeloadReasonKind = 'temperature' | 'readiness' | 'streak' | 'energy'
+export type DeloadReasonKind = 'temperature' | 'readiness' | 'streak' | 'energy' | 'sleepAndHrv' | 'spo2'
 
 export interface DeloadReason {
   kind: DeloadReasonKind
@@ -31,7 +31,8 @@ export interface DeloadReason {
  * reads. There is no soreness line (#3804): sore ticks change which session is picked, not whether
  * to ease off, and the check-in pre-ticks recently trained muscles. There is no HRV or sleep-trend
  * line either (#3837): `hrvWarning` is computed after the decision and only returned, and the sleep
- * trend only shifts the session-scoring weights.
+ * trend only shifts the session-scoring weights. Since #3718 the AI rule's sleep-and-HRV and
+ * blood-oxygen signals do decide, so each has a line when it fired (`restSignals`).
  */
 export function deloadReasons(rec: DeloadReasonInput): DeloadReason[] {
   const out: DeloadReason[] = []
@@ -49,10 +50,27 @@ export function deloadReasons(rec: DeloadReasonInput): DeloadReason[] {
   // #3824: graded on the score's own scale, the same cut the deload decision used. A response from
   // before the version rode along is from the current server, so it is on the current scale.
   const softMin = cutFor('deloadSoft', s?.ouraReadinessModelVersion === undefined ? READINESS_MODEL_VERSION : s.ouraReadinessModelVersion)
-  if (s?.ouraReadiness != null && s.ouraReadiness < softMin) {
+  const rest = rec.restSignals ?? []
+  if (s?.ouraReadiness != null && rest.includes('readinessVeryLow')) {
+    // #3718: under the AI rule's rest cut, on the score's own scale, the same cut the check used.
+    const restBelow = cutFor('promptRestDay', s.ouraReadinessModelVersion === undefined ? READINESS_MODEL_VERSION : s.ouraReadinessModelVersion)
+    out.push({
+      kind: 'readiness',
+      text: `Readiness ${Math.round(s.ouraReadiness)} — under ${restBelow}, low enough that a rest day is the better call.`,
+    })
+  } else if (s?.ouraReadiness != null && s.ouraReadiness < softMin) {
     out.push({
       kind: 'readiness',
       text: `Readiness ${Math.round(s.ouraReadiness)} — below the ${softMin}+ range where hard training is well tolerated.`,
+    })
+  }
+  if (rest.includes('sleepAndHrvLow')) {
+    out.push({ kind: 'sleepAndHrv', text: 'Sleep and HRV have both run well below your usual over the last 3 nights.' })
+  }
+  if (rest.includes('spo2Low')) {
+    out.push({
+      kind: 'spo2',
+      text: 'Blood oxygen has been below your usual over the last 3 nights — often an early sign of illness or incomplete recovery.',
     })
   }
   if (rec.consecutiveTrainingDays != null && rec.consecutiveTrainingDays >= 3) {
@@ -68,6 +86,21 @@ export function deloadReasons(rec: DeloadReasonInput): DeloadReason[] {
     })
   }
   return out
+}
+
+/**
+ * The reasons behind the AI rule's rest signals that fired (#3718), for the "Why this?" page and its
+ * sentence. The same `deloadReasons` lines Home shows, so the three pages cannot word one differently.
+ */
+export function restSignalReasons(rec: DeloadReasonInput): Array<DeloadReason & { signal: NonNullable<DeloadReasonInput['restSignals']>[number] }> {
+  const fired = rec.restSignals ?? []
+  const signalOf: Partial<Record<DeloadReasonKind, NonNullable<DeloadReasonInput['restSignals']>[number]>> = {
+    readiness: 'readinessVeryLow', sleepAndHrv: 'sleepAndHrvLow', spo2: 'spo2Low',
+  }
+  return deloadReasons(rec).flatMap(r => {
+    const signal = signalOf[r.kind]
+    return signal && fired.includes(signal) ? [{ ...r, signal }] : []
+  })
 }
 
 export const DELOAD_STRENGTH_HEADLINE: Record<DeloadStrength, string> = {
@@ -92,11 +125,20 @@ export function deloadBannerMessage(rec: DeloadReasonInput): string {
   return `${rec.consecutiveTrainingDays ?? 0} sessions in a row${suffix}`
 }
 
+/** The short cause beside the two choices, for each of the AI rule's rest signals (#3718). */
+export const REST_SIGNAL_CAUSE: Record<NonNullable<DeloadReasonInput['restSignals']>[number], string> = {
+  readinessVeryLow: 'Readiness very low',
+  sleepAndHrvLow: 'Sleep and HRV both low',
+  spo2Low: 'Blood oxygen low',
+}
+
 /** The short cause under a suggested rest, beside the two choices. None for a soft nudge, and none
- *  when neither a raised temperature nor a streak is behind it: a drained or sick check-in with no
- *  streak used to read "0 sessions in a row" here. */
+ *  when no raised temperature, streak or rest signal is behind it: a drained or sick check-in with
+ *  no streak used to read "0 sessions in a row" here. */
 export function deloadCauseLine(rec: DeloadReasonInput): string | null {
   if (!rec.deloadOrRestRecommended || rec.deloadStrength === 'soft') return null
   if (rec.temperatureAlert) return 'Body temp elevated'
-  return (rec.consecutiveTrainingDays ?? 0) >= 3 ? `${rec.consecutiveTrainingDays} sessions in a row` : null
+  if ((rec.consecutiveTrainingDays ?? 0) >= 3) return `${rec.consecutiveTrainingDays} sessions in a row`
+  const first = rec.restSignals?.[0]
+  return first ? REST_SIGNAL_CAUSE[first] : null
 }

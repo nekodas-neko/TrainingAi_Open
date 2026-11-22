@@ -52,3 +52,13 @@ describe('buildSessionInsightText (#3286)', () => {
     expect(buildSessionInsightText(parts())).not.toContain('Oura')
   })
 })
+
+describe('buildSessionInsightText — rest signals (#3718)', () => {
+  it('adds the reason line of a rest signal that fired', () => {
+    const text = buildSessionInsightText({
+      ...parts({ deloadOrRestRecommended: true, deloadStrength: 'recommended' }),
+      restSignalReasons: [{ text: 'Sleep and HRV have both run well below your usual over the last 3 nights.' }],
+    })
+    expect(text).toContain('Sleep and HRV have both run well below your usual over the last 3 nights.')
+  })
+})

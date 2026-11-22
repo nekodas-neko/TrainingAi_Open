@@ -18,9 +18,9 @@ import { oneRmTrendStatus } from '@trainingai/shared/1rm'
 import { workingBudgetMin, planningBudgetMin } from '@trainingai/shared/workout/duration-model'
 import { buildTimeProfiles, type ExerciseTimeProfile } from '@trainingai/shared/workout/time-profile'
 import { robustAvgSetDurationsByExercise, buildMeasuredTimeBudget, resolveTransitionSec } from '@trainingai/shared/workout/time-audit'
-import { excludeLowWearDays, wearByDate } from '@trainingai/shared/health/wear-confidence'
+import { wearByDate } from '@trainingai/shared/health/wear-confidence'
 import { ouraDailyWear } from '@/lib/oura/cloud/readiness-signals-map'
-import { rowsOfDeviceInUse, nightAlgorithmVersion } from '@trainingai/shared/health/per-device-normal'
+import { hrvTrendReading, spo2TrendReading } from '@trainingai/shared/health/recovery-trends'
 import { answeredMorningScales } from '@trainingai/shared/health/self-report'
 import type { FigureSignals, FigureSignalExercise } from '@trainingai/shared/ai-periodization/prescription-figures'
 import { repCompletionFromSetLogs } from '@trainingai/shared/ai-periodization/rep-completion'
@@ -598,46 +598,14 @@ export async function aggregateSignals(
   const sleepTrend = sleepDurationTrend(sleepSessions, tz)
   const sleepScoreTrendVal = sleepScoreTrend(sleepSessions, tz)
 
-  // HRV trend — same pattern: recent 3 days vs older baseline.
-  // null when insufficient data. The older baseline excludes low-wear-time days
-  // (one shared filter with readiness-score's HRV/RHR baselines) — an unworn
-  // ring's HRV reading is unreliable and shouldn't anchor what "normal" looks
-  // like. The recent-3 window is left unfiltered — it reflects current status.
-  let hrvTrend: number | null = null
+  // HRV and SpO2 trends — recent 3 nights vs the older baseline, from the device in use and its
+  // newest algorithm version (`recovery-trends.ts`, shared with the daily check, #3718). A blood-oxygen
+  // drop can flag illness, altitude or poor recovery; null until the device has four nights.
   const bodyMetrics = await repo.listBodyMetrics(userId, from14d, today)
-  // #3001: both stretches from the device in use, so Oura's HRV is never compared with the ring's.
-  // #3601: and from its newest algorithm version, read from the same night's sleep.
-  const versionOn = nightAlgorithmVersion(sleepSessions)
-  const hrvRows = rowsOfDeviceInUse(bodyMetrics.filter(m => m.hrvMs != null && m.hrvMs > 0), m => m.hrvMs, m => m.hrvSource, m => versionOn(m.date, m.hrvSource))
-  if (hrvRows.length >= 4) {
-    const sorted = [...hrvRows].sort((a, b) => b.date.localeCompare(a.date))
-    const recent3 = sorted.slice(0, 3)
-    // #3668: wear in the generic shape the connector maps.
-    const wear = wearByDate(ouraDailyWear(await repo.getOuraDaily(userId, from14d, today)))
-    const older = excludeLowWearDays(sorted.slice(3), wear).slice(0, 7)
-    if (older.length > 0) {
-      const recentAvg = recent3.reduce((s, m) => s + m.hrvMs!, 0) / recent3.length
-      const olderAvg = older.reduce((s, m) => s + m.hrvMs!, 0) / older.length
-      hrvTrend = olderAvg > 0 ? recentAvg / olderAvg : null
-    }
-  }
-
-  // SpO2 trend — same recent-3-vs-older-baseline pattern, reusing the bodyMetrics
-  // already fetched for HRV above. A drop can flag illness/altitude/poor recovery.
-  // #3383: both stretches from the device in use — the ring's uncalibrated SpO2 is never compared with
-  // Oura's — and unknown (null) until that device alone has the four nights the comparison needs.
-  let spo2Trend: number | null = null
-  const spo2Rows = rowsOfDeviceInUse(bodyMetrics.filter(m => m.spo2Pct != null && m.spo2Pct > 0), m => m.spo2Pct, m => m.spo2Source, m => versionOn(m.date, m.spo2Source))
-  if (spo2Rows.length >= 4) {
-    const sorted = [...spo2Rows].sort((a, b) => b.date.localeCompare(a.date))
-    const recent3 = sorted.slice(0, 3)
-    const older = sorted.slice(3, 10)
-    if (older.length > 0) {
-      const recentAvg = recent3.reduce((s, m) => s + m.spo2Pct!, 0) / recent3.length
-      const olderAvg = older.reduce((s, m) => s + m.spo2Pct!, 0) / older.length
-      spo2Trend = olderAvg > 0 ? recentAvg / olderAvg : null
-    }
-  }
+  // #3668: wear in the generic shape the connector maps.
+  const wear = wearByDate(ouraDailyWear(await repo.getOuraDaily(userId, from14d, today)))
+  const hrvTrend = hrvTrendReading(bodyMetrics, sleepSessions, wear)?.ratio ?? null
+  const spo2Trend = spo2TrendReading(bodyMetrics, sleepSessions)?.ratio ?? null
 
   const latestIllness = latestIllnessFromDerived(derivedRows)
   const illness = latestIllness ? { flag: latestIllness.flag, score: latestIllness.score } : null
