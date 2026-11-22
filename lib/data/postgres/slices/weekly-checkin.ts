@@ -3,7 +3,7 @@
 // Every query is scoped to the user passed in, which the route takes from the session. Lift identity
 // is the `exercise_preferences` rule (migration 202611221206's header): the library id first, the name
 // only when an id is missing, and never a name row whose own id names a different library lift.
-import { and, eq, isNull, sql } from 'drizzle-orm'
+import { and, eq, inArray, isNull, sql } from 'drizzle-orm'
 import type { getDb } from '../client'
 import * as s from '../schema'
 import { voidSessionPrescription } from './periodization'
@@ -14,17 +14,44 @@ type Db = ReturnType<typeof getDb>
  * Mark a date as rest, or withdraw it (a tombstone; re-choosing revives the same row). THE rest-day
  * write: `PostgresAdapter.setRestDay` (the web route and the `rest_days` sync domain) and the weekly
  * check-in's days off both call it, so the two cannot drift. Takes a transaction or the pool.
+ *
+ * `at` stamps the row's `updated_at` (and the tombstone) with a given instant instead of the clock: the
+ * weekly check-in passes its save's `saved_at`, so a date it wrote is recognisable as its own for as long
+ * as nobody else has touched the row (`checkinOwnedRestDays`). Every other caller leaves it out.
  */
-export async function writeRestDay(db: Db, userId: string, date: string, resting: boolean): Promise<void> {
+export async function writeRestDay(db: Db, userId: string, date: string, resting: boolean, at?: Date): Promise<void> {
+  const stamp = at ?? new Date()
   await db.insert(s.restDays)
-    .values({ userId, date, deletedAt: resting ? null : new Date() })
+    .values({ userId, date, deletedAt: resting ? null : stamp, ...(at ? { updatedAt: at } : {}) })
     .onConflictDoUpdate({
       target: [s.restDays.userId, s.restDays.date],
-      set: { deletedAt: resting ? null : new Date(), updatedAt: new Date() },
+      set: { deletedAt: resting ? null : stamp, updatedAt: stamp },
       // Scoped even though the conflict target already includes user_id: an onConflictDoUpdate
       // arm is an UPDATE, and the standing rule is that every one of them is user-scoped.
       setWhere: eq(s.restDays.userId, userId),
     })
+}
+
+/** Of `dates`, those that are a live rest day of the user's now. One query. */
+export async function liveRestDays(db: Db, userId: string, dates: readonly string[]): Promise<Map<string, Date>> {
+  const out = new Map<string, Date>()
+  if (dates.length === 0) return out
+  const rows = await db.select({ date: s.restDays.date, updatedAt: s.restDays.updatedAt }).from(s.restDays)
+    .where(and(eq(s.restDays.userId, userId), inArray(s.restDays.date, [...dates]), isNull(s.restDays.deletedAt)))
+  for (const r of rows) out.set(r.date, r.updatedAt)
+  return out
+}
+
+/**
+ * #3890 A1: of the dates a check-in recorded as its own (`days_off_written`), those that still are: the
+ * rest day is live and its `updated_at` is still the check-in's write stamp (`saved_at`, which
+ * `writeRestDay` was given). A date the person un-rested, or un-rested and re-rested by hand, has moved
+ * on from that stamp and is theirs now: undo and redo leave it alone and drop it from the record.
+ */
+export async function checkinOwnedRestDays(db: Db, userId: string, recorded: readonly string[], stamp: Date | null): Promise<Set<string>> {
+  if (!stamp || recorded.length === 0) return new Set()
+  const live = await liveRestDays(db, userId, recorded)
+  return new Set([...live].filter(([, at]) => at.getTime() === stamp.getTime()).map(([d]) => d))
 }
 
 const namesArray = (names: readonly string[]) =>

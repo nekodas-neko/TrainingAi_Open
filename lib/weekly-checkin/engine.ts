@@ -26,7 +26,25 @@
  * for is kept as it is (no second write); one it no longer calls for is undone. A lowering or accepted
  * step up that can no longer be undone (a workout started since, or the one-off was used) is kept and
  * reported, never doubled. An accepted injury or swap is never taken back by a redo: changing that
- * answer is refused until the person undoes it (`undo_first`).
+ * answer is refused until the person undoes it (`undo_first`). After an accepted swap the swapped slot
+ * is compared by the slot (the swap's `coach_changes` target), not by the lift now in it.
+ *
+ * **An undo is remembered.** Undo steps back one level: a lowering is taken off and Heavy's own hold
+ * (noted) stays; undoing the hold clears the lift; an undone step up is an open offer again. A save with
+ * the SAME answer does not re-apply what the person undid (`notApplied` reason `undone`); changing the
+ * answer away and back is the explicit way to ask for it again.
+ *
+ * **The missed rep** that turns Heavy into a lowering is `unexcusedMissAtPlan` on the lift's last session
+ * of the week (decision 9 as the Orchestrator set it, 22 Nov), computed once in `weekSummary` for both
+ * GET and the save.
+ *
+ * **Days off** withdraw only what the check-in wrote: `days_off_written` records the dates that were not
+ * already a live rest day when it applied them, and each is written with the save's `saved_at` as its
+ * `updated_at`. A recorded date whose row has moved on from that stamp was changed by hand and is the
+ * person's: never withdrawn, dropped from the record.
+ *
+ * **A shorter session** voids the stored plans that would be served in the applies-to week, at save and
+ * at undo (`voidPlansServedFrom`), so the next read regenerates them with the right budget.
  *
  * `pain_where` is user text: stored, bounded to 200 characters by Zod and the CHECK, returned to its
  * owner, and never put in a prompt or into the injury's notes here.
@@ -36,12 +54,13 @@ import * as s from '@/lib/data/postgres/schema'
 import type { getDb } from '@/lib/data/postgres/client'
 import type { WorkoutRepository } from '@/lib/data/repository'
 import {
-  completedWorkoutDays, getCheckinById, getCheckinByWeek, listCheckinLifts, listProgramLifts, voidPlansServedFrom, writeRestDay,
+  checkinOwnedRestDays, completedWorkoutDays, getCheckinById, getCheckinByWeek, listCheckinLifts, listProgramLifts, liveRestDays,
+  voidPlansServedFrom, writeRestDay,
   type CheckinLiftRow, type CheckinRow, type ProgramLift,
 } from '@/lib/data/postgres/slices/weekly-checkin'
 import { applyCoachPatch, undoCoachChange } from '@/lib/coach/apply'
 import type { CoachPatch } from '@/lib/coach/patch'
-import { dateStrMidnightInTz, shiftDateStr } from '@trainingai/shared/date-utils'
+import { dateStrMidnightInTz, daysBetweenDateStrs, shiftDateStr } from '@trainingai/shared/date-utils'
 import { checkinDue, checkinWeekStart, localClock, plannedWeekOf, type CheckinDueWhy } from '@trainingai/shared/weekly-checkin/due'
 import {
   CHECKIN_HOLD_LIVE, daysOffDates, effectForAnswer, type CheckinAnswer, type CheckinEffect,
@@ -125,6 +144,8 @@ export interface CheckinView {
     holdLive: boolean | null
   }[]
   daysOff: number[] | null
+  /** The dates the check-in itself made rest days (A1): a date already resting when it applied is not here. */
+  daysOffWritten: string[] | null
   shorterSessionMin: number | null
   pain: false | null | { exerciseName: string; exerciseId: string | null; where: string | null }
   swap: null | { exerciseName: string; exerciseId: string | null }
@@ -278,6 +299,7 @@ async function viewOf(ctx: EngineCtx, row: CheckinRow): Promise<CheckinView> {
       holdLive: l.effect === 'held' ? CHECKIN_HOLD_LIVE : null,
     })),
     daysOff: row.daysOffWeekdays ?? null,
+    daysOffWritten: row.daysOffWritten ?? null,
     shorterSessionMin: row.shorterSessionMin ?? null,
     pain: row.painRaised === false ? false
       : row.painRaised === true && row.painExerciseName ? { exerciseName: row.painExerciseName, exerciseId: row.painExerciseId, where: row.painWhere }
@@ -441,6 +463,7 @@ export async function saveCheckin(ctx: EngineCtx, input: SaveInput): Promise<Sav
     const row = await getCheckinByWeek(tx, ctx.userId, input.weekStart, true)
     if (!row) throw new CheckinRefusal(409, 'not_open', 'That week is not open for a check-in')
     const wasSaved = row.status === 'saved'
+    const stamp = new Date()
 
     // An accepted swap changed one slot: that slot now holds the new lift. A redo that names the same slot
     // is the same pick, so the slot (the change's target, this user's) is compared, not the lift in it.
@@ -541,12 +564,34 @@ export async function saveCheckin(ctx: EngineCtx, input: SaveInput): Promise<Sav
       if (res.length !== 1) throw new Error('weekly check-in lift tombstone wrote no row')
     }
 
-    // ── Days off: the first save's dates withdrawn where the new answer drops them, new ones marked ──
+    // ── Days off (A1). Only the dates the check-in itself made rest days are ever withdrawn: a date that
+    // was already a live rest day when the answer applied is the person's, and is neither written nor
+    // recorded. A recorded date the person changed by hand since (un-rested, or un-rested and re-rested:
+    // its `updated_at` is no longer the check-in's stamp) is theirs now, and is dropped from the record
+    // and left alone. Today and earlier are never touched (`daysOffDates`). ──
     const applies = row.appliesWeekStart
-    const before = new Set(wasSaved ? daysOffDates(applies, row.daysOffWeekdays ?? [], today) : [])
+    const recorded = wasSaved ? (row.daysOffWritten ?? []) : []
+    const owned = await checkinOwnedRestDays(tx, ctx.userId, recorded, row.savedAt)
     const after = new Set(daysOffDates(applies, input.daysOff ?? [], today))
-    for (const d of before) if (!after.has(d)) await writeRestDay(tx, ctx.userId, d, false)
-    for (const d of after) if (!before.has(d)) await writeRestDay(tx, ctx.userId, d, true)
+    const written: string[] = []
+    for (const d of recorded) {
+      if (!owned.has(d)) continue
+      if (daysBetweenDateStrs(today, d) <= 0) { written.push(d); continue }
+      if (after.has(d)) {
+        // Still asked for: re-stamped to this save, so it stays recognisably the check-in's.
+        await writeRestDay(tx, ctx.userId, d, true, stamp)
+        written.push(d)
+      } else {
+        await writeRestDay(tx, ctx.userId, d, false, stamp)
+      }
+    }
+    const fresh = [...after].filter(d => !recorded.includes(d))
+    const alreadyResting = await liveRestDays(tx, ctx.userId, fresh)
+    for (const d of fresh) {
+      if (alreadyResting.has(d)) continue
+      await writeRestDay(tx, ctx.userId, d, true, stamp)
+      written.push(d)
+    }
 
     // ── A shorter session: stored plans that would be served in the applies-to week are voided, so the
     // next read regenerates them with (or, on a change back, without) the budget. No model call here. ──
@@ -562,9 +607,11 @@ export async function saveCheckin(ctx: EngineCtx, input: SaveInput): Promise<Sav
     const saved = await tx.update(s.weeklyCheckins)
       .set({
         status: 'saved',
-        savedAt: new Date(),
+        // The stamp the rest days above were written with: what makes them recognisably the check-in's.
+        savedAt: stamp,
         dismissedAt: null,
         daysOffWeekdays: input.daysOff == null ? null : [...new Set(input.daysOff)].sort((x, y) => x - y),
+        daysOffWritten: written.length > 0 ? [...written].sort() : null,
         shorterSessionMin: input.shorterSessionMin,
         painRaised: input.pain === null ? null : input.pain !== false,
         painExerciseName: painLift?.exerciseName ?? null,
@@ -818,10 +865,18 @@ export async function undoCheckinEffect(ctx: EngineCtx, checkinId: string, targe
         return
       }
       case 'days_off': {
-        const dates = daysOffDates(row.appliesWeekStart, row.daysOffWeekdays ?? [], today)
         if (!row.daysOffWeekdays || row.daysOffWeekdays.length === 0) throw new CheckinRefusal(409, 'nothing_to_undo', 'Nothing to undo')
-        for (const d of dates) await writeRestDay(tx, ctx.userId, d, false)
-        await updateRow({ daysOffWeekdays: [] })
+        // Only the dates the check-in itself wrote, and only while they are still its own (A1): a rest day
+        // the person set, before or since, stays. Today and earlier are left as they are, and stay recorded.
+        const recorded = row.daysOffWritten ?? []
+        const owned = await checkinOwnedRestDays(tx, ctx.userId, recorded, row.savedAt)
+        const kept: string[] = []
+        for (const d of recorded) {
+          if (!owned.has(d)) continue
+          if (daysBetweenDateStrs(today, d) <= 0) { kept.push(d); continue }
+          await writeRestDay(tx, ctx.userId, d, false)
+        }
+        await updateRow({ daysOffWeekdays: [], daysOffWritten: kept.length > 0 ? kept : null })
         return
       }
       case 'shorter_session': {

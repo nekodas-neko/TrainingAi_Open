@@ -470,6 +470,61 @@ describe.skipIf(!canRun)('weekly check-in engine (#3890 step 2)', () => {
     await expect(fullSave({ swap: { sessionExerciseId: ids['a:sq'] } })).rejects.toMatchObject({ status: 409, code: 'undo_first' })
   })
 
+  // ── A1: days off never remove a rest day the person set ──
+  const WED = shiftDateStr(APPLIES, 2)
+  const SAT = shiftDateStr(APPLIES, 5)
+  const byHand = (date: string, resting: boolean) => ctxFor(A).repo.setRestDay(A, date, resting)
+  const written = async () => (await pool.query(`SELECT days_off_written::text[] AS w FROM weekly_checkins WHERE user_id = $1`, [A])).rows[0].w
+
+  it('A1: undo of days off keeps a rest day the person set before the check-in, and withdraws the one it wrote', async () => {
+    await byHand(WED, true)
+    const { state } = await fullSave({ daysOff: [3, 6] })
+    expect(await restDays()).toEqual([WED, SAT])
+    expect(state.checkin!.daysOffWritten).toEqual([SAT])
+    await engine.undoCheckinEffect(ctxFor(A), state.checkin!.id, { kind: 'days_off' })
+    expect(await restDays()).toEqual([WED])
+    expect(await written()).toBeNull()
+  })
+
+  it('A1: a redo that drops the day keeps the person\'s rest day; one that drops the check-in\'s withdraws it', async () => {
+    await byHand(WED, true)
+    await fullSave({ daysOff: [3, 6] })
+    await fullSave({ daysOff: [6] })
+    expect(await restDays()).toEqual([WED, SAT])
+    expect(await written()).toEqual([SAT])
+    await fullSave({ daysOff: [] })
+    expect(await restDays()).toEqual([WED])
+    expect(await written()).toBeNull()
+  })
+
+  it('A1: two saves do not double-record, and the record survives a redo', async () => {
+    await fullSave({ daysOff: [3, 6] })
+    await fullSave({ daysOff: [3, 6] })
+    expect(await written()).toEqual([WED, SAT])
+    expect(await count(`SELECT count(*) n FROM rest_days WHERE user_id = $1`, [A])).toBe(2)
+    const { state } = await fullSave({ daysOff: [3, 6] })
+    await engine.undoCheckinEffect(ctxFor(A), state.checkin!.id, { kind: 'days_off' })
+    expect(await restDays()).toEqual([])
+  })
+
+  it('A1: a recorded date the person un-rests and re-rests by hand after the check-in is theirs now', async () => {
+    const { state } = await fullSave({ daysOff: [3, 6] })
+    expect(await written()).toEqual([WED, SAT])
+    await byHand(SAT, false)
+    await byHand(SAT, true)
+    await engine.undoCheckinEffect(ctxFor(A), state.checkin!.id, { kind: 'days_off' })
+    expect(await restDays()).toEqual([SAT]) // Wednesday was the check-in's; Saturday is the person's
+    expect(await written()).toBeNull()
+  })
+
+  it('A1: a recorded date the person un-rested by hand is not re-rested by a redo, and leaves the record', async () => {
+    await fullSave({ daysOff: [3, 6] })
+    await byHand(WED, false)
+    await fullSave({ daysOff: [3, 6] })
+    expect(await restDays()).toEqual([SAT])
+    expect(await written()).toEqual([SAT])
+  })
+
   it('identity: a person with no check-in rows holds nothing and keeps every session length', async () => {
     const db = ctxFor(C).db
     expect([...(await slice.listCheckinHeldLifts(db, C, APPLIES, [SQ, BP]))]).toEqual([])
