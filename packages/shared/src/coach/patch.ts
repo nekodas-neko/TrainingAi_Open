@@ -62,7 +62,8 @@ export const LIFT_PREFERENCE_DURATION: Record<'repRange' | 'restSec' | 'nextLoad
   setsDelta: 'next_time',
 };
 export const DURATION_LABEL = { from_now_on: 'From now on', next_time: 'Just next time' } as const;
-export const PatchChangeSchema = z.discriminatedUnion('field', [
+const BASE_PATCH_CHANGES = [
+
   z.object({
     id: z.string().min(1),
     field: z.literal('exerciseName'),
@@ -162,6 +163,10 @@ export const PatchChangeSchema = z.discriminatedUnion('field', [
     from: z.boolean(),
     to: z.boolean(),
   }),
+] as const;
+/** #3896 step 5: the lift_preference variants, kept apart so a scope that does not offer the domain
+ *  can build its `changes` union without them (`patchChangeSchemaFor`). */
+const LIFT_PREFERENCE_CHANGES = [
   // #3896 step 5, the lift_preference domain. Strict: a model that adds a weight, a % or a set count
   // to one of these is refused, not ignored — no number the model wrote beyond these reaches the
   // write. `from` is only ever compared with the stored row, never written.
@@ -189,7 +194,15 @@ export const PatchChangeSchema = z.discriminatedUnion('field', [
     from: z.union([z.literal(-1), z.literal(1)]).nullable(),
     to: z.union([z.literal(-1), z.literal(1)]),
   }).strict(),
-]);
+] as const;
+export const PatchChangeSchema = z.discriminatedUnion('field', [...BASE_PATCH_CHANGES, ...LIFT_PREFERENCE_CHANGES]);
+/**
+ * The change union a scope hands the model. Without `lift_preference` it is built from the same
+ * variants `main` had, so the tool JSON of a client that never declares the domain does not grow.
+ */
+export function patchChangeSchemaFor(withLiftPreference: boolean) {
+  return withLiftPreference ? PatchChangeSchema : z.discriminatedUnion('field', [...BASE_PATCH_CHANGES]);
+}
 export type PatchChange = z.infer<typeof PatchChangeSchema>;
 export const CoachPatchSchema = z.object({
   domain: z.enum(COACH_PATCH_DOMAINS),

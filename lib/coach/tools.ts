@@ -2,7 +2,7 @@ import { tool } from 'ai'
 import { z } from 'zod'
 import type { WorkoutRepository } from '@/lib/data/repository'
 import { ChoiceListSchema, ChangePreviewSchema, HandoffSchema, NumberDialSchema, ChartSchema, PlanCardSchema } from './widgets'
-import { CoachPatchSchema } from './patch'
+import { CoachPatchSchema, patchChangeSchemaFor } from './patch'
 import { COACH_SCOPES, pickTools, type CoachScope } from './scopes'
 import { ownTargetFromGoals } from '@trainingai/shared/nutrition/calorie-budget'
 import { injurySafeAlternatives } from '@trainingai/shared/workout/injury-substitution'
@@ -35,8 +35,11 @@ function scopedSchemas(scope: CoachScope) {
   const choiceList = ChoiceListSchema.extend({
     source: z.enum(scope.choiceSources as [string, ...string[]]).optional(),
   })
+  // #3896 step 5: the lift_preference variants join the union only when this scope offers the domain,
+  // so a client that never declares it sends the model the tool JSON it always did.
   const patch = CoachPatchSchema.extend({
     domain: z.enum(scope.patchDomains as [string, ...string[]]),
+    changes: z.array(patchChangeSchemaFor(scope.patchDomains.includes('lift_preference'))).min(1).max(8),
   })
   return {
     choiceList,
