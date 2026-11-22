@@ -19,9 +19,11 @@ import { z } from 'zod'
 import { CHECKIN_ANSWERS, type CheckinAnswer, type CheckinEffect } from './effects'
 import type { CheckinDueWhy } from './due'
 import type {
-  CheckinSummary, LastSessionAgainstPlan, LiftDirection, LiftWhy, NotComparedWhy,
+  CheckinLiftSummary, CheckinSummary, LastSessionAgainstPlan, LiftDirection, LiftWhy, NotComparedWhy,
 } from './summary'
-import type { SessionVerdict } from '../ai-periodization/session-read'
+
+/** The shadow read's verdict, as the summary types it (this file does not import the read itself: only the pinned importers do). */
+type SessionVerdict = NonNullable<CheckinLiftSummary['shadow']>['verdict']
 
 type Exhaustive<Union, List extends readonly unknown[]> = [Exclude<Union, List[number]>] extends [never]
   ? true
