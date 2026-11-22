@@ -11,6 +11,8 @@ const USER = '00000000-0000-4000-8000-0000000bf11b'
 
 vi.mock('@/auth', () => ({ auth: vi.fn(async () => ({ user: { id: USER, timezone: 'Australia/Brisbane' } })) }))
 vi.mock('@/lib/rate-limit', () => ({ rateLimit: () => true }))
+// #3749: the route reads the user's saved foods to resolve ingredient numbers; none here.
+vi.mock('@/lib/data', () => ({ getRepository: async () => ({ listFoodItemsByNames: async () => [] }) }))
 vi.mock('@/lib/ai/instrument', () => ({
   bytesKey: () => 'k',
   loggedGenerateObject: async (_meta: unknown, run: () => Promise<unknown>) => run(),

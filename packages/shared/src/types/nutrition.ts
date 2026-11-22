@@ -133,6 +133,13 @@ export interface NutritionIngredient {
   proteinPer100g: number
   carbsPer100g: number
   fatPer100g: number
+  /**
+   * #3749. True when no saved food or bundled reference matched this ingredient's name, so its
+   * per-100 g values are the model's own estimate. Absent means the values came from code (or the
+   * ingredient never passed through the resolver: a saved meal, a hand-built one). Optional so an
+   * older client parses a response that carries it, and the plan-save schema strips it.
+   */
+  estimated?: boolean
   // Client-only stable identity for editable-list rendering (never sent to/from the
   // server) — a refine/new scan replaces the whole array, and keying by index carries
   // stale input/focus state into the wrong row when the ingredient count changes.
