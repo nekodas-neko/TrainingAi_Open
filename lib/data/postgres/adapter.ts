@@ -4923,17 +4923,37 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
 
   // #3671. `achievedAt` is the set's own time (the log's `loggedAt`). Preview uploads a workout at
   // finish, or later when offline, so the upload time dated a 21:00 PR to the next morning.
-  async upsertPersonalRecordIfBetter(userId: string, exerciseName: string, estimated1rm: number, achievedAt: Date = new Date()): Promise<boolean> {
-    const exerciseId = await this.resolveExerciseId(exerciseName)
+  // #4021: `exerciseLogId` is the log this figure came from. The record step runs after the log's own
+  // transaction commits, so a rename can move the log to a new name in between; writing under the name
+  // the caller captured would leave an old-name record with no log behind it. So the log's CURRENT name
+  // is re-read here, inside this transaction, and the figure lands on that. The log row is read
+  // `FOR SHARE` first: a rename's UPDATE of the log then waits for this step (and the rename's record
+  // lock follows ours in the same order, so no deadlock), and one that already committed is seen. The
+  // record row's own lock below is not enough alone: with no record under the name there is nothing to
+  // lock. A log that cannot be found for this user (deleted, not theirs) keeps the caller's name.
+  async upsertPersonalRecordIfBetter(userId: string, exerciseName: string, estimated1rm: number, achievedAt: Date = new Date(), exerciseLogId?: string): Promise<boolean> {
     return this.db.transaction(async tx => {
+      let name = exerciseName
+      if (exerciseLogId) {
+        const [current] = await tx
+          .select({ name: s.exerciseLogs.exerciseName })
+          .from(s.exerciseLogs)
+          .innerJoin(s.workoutSessions, eq(s.workoutSessions.id, s.exerciseLogs.workoutSessionId))
+          .where(and(eq(s.exerciseLogs.id, exerciseLogId), eq(s.workoutSessions.userId, userId)))
+          .for('share', { of: s.exerciseLogs })
+        if (current) name = current.name
+      }
+      const [lib] = await tx.select({ id: s.exerciseLibrary.id }).from(s.exerciseLibrary)
+        .where(eq(s.exerciseLibrary.name, name)).limit(1)
+      const exerciseId = lib?.id ?? null
       const [existing] = await tx
         .select({ best: s.personalRecords.estimated1rm })
         .from(s.personalRecords)
-        .where(and(eq(s.personalRecords.userId, userId), eq(s.personalRecords.exerciseName, exerciseName)))
+        .where(and(eq(s.personalRecords.userId, userId), eq(s.personalRecords.exerciseName, name)))
         .for('update')
       if (existing && estimated1rm <= existing.best) return false
       await tx.insert(s.personalRecords)
-        .values({ userId, exerciseName, exerciseId, estimated1rm, achievedAt })
+        .values({ userId, exerciseName: name, exerciseId, estimated1rm, achievedAt })
         .onConflictDoUpdate({
           target: [s.personalRecords.userId, s.personalRecords.exerciseName],
           set: { estimated1rm, achievedAt, exerciseId },
