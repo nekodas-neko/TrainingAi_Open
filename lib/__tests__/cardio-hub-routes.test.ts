@@ -23,7 +23,7 @@
  *     "every activity log" query exists and adding one for a bests card is not worth it.
  *   · **The trend curves see runs only**, filtered before the maths rather than inside it.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { shiftDateStr, startOfWeekInTz, todayInTz, todayMidnightUtc } from '@trainingai/shared/date-utils'
 import { MIN_RELIABLE_SAMPLES, CORROBORATION, computeObservedHr } from '@trainingai/shared/health/observed-hr'
 
@@ -68,6 +68,23 @@ const otherDaysThisWeek = () => {
   const today = todayInTz(TZ)
   return Array.from({ length: 7 }, (_, i) => shiftDateStr(startOfWeekInTz(TZ), i)).filter(d => d !== today)
 }
+// The week's step total only counts days up to today, so a row meant to add to it has to be dated
+// EARLIER in the week, and on a Monday no such day exists (the two step-sum tests failed every Monday
+// until this was pinned). The clock is set to this week's Wednesday at local midday: still derived
+// from the real week, never a fixed date. Brisbane has no daylight saving, so midday is 02:00Z.
+const atMidweek = () => {
+  const wednesday = shiftDateStr(startOfWeekInTz(TZ), 2)
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date(`${wednesday}T02:00:00Z`))
+}
+const atMonday = () => {
+  const monday = startOfWeekInTz(TZ)
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date(`${monday}T02:00:00Z`))
+}
+const earlierDaysThisWeek = () => { const today = todayInTz(TZ); return otherDaysThisWeek().filter(d => d < today) }
+afterEach(() => { vi.useRealTimers() })
+
 const run = (over: Row = {}) => ({
   activityType: 'run', date: '2026-09-01', distanceKm: 5, durationMin: 25,
   avgHeartRate: 150, cadenceSpm: 170, ...over,
@@ -296,13 +313,15 @@ describe('/api/cardio-week', () => {
   // the ring already counts some of them is unknown, pending #3112); a GPS walk's stored steps are not
   // (the ring already counted them).
   it('adds a treadmill session\'s steps to today and the week, and never a GPS walk\'s', async () => {
+    atMidweek()
     const today = todayInTz(TZ)
+    const [earlier] = earlierDaysThisWeek()
     listBodyMetrics.mockResolvedValue([
-      { date: otherDaysThisWeek()[0], steps: 4000 }, { date: today, steps: 6000 },
+      { date: earlier, steps: 4000 }, { date: today, steps: 6000 },
     ])
     listActivityLogs.mockResolvedValue([
       { activityType: 'treadmill', date: today, steps: 3500, startTime: '12:00:00' },
-      { activityType: 'treadmill', date: otherDaysThisWeek()[0], steps: 2000, startTime: '12:00:00' },
+      { activityType: 'treadmill', date: earlier, steps: 2000, startTime: '12:00:00' },
       { activityType: 'walk', date: today, steps: 4100, distanceKm: 3.2, startTime: '12:00:00' },
     ])
     const body = await (await getWeek()).json()
@@ -311,13 +330,28 @@ describe('/api/cardio-week', () => {
   })
 
   it('sums only this week\'s steps and reads today\'s from today\'s row', async () => {
+    atMidweek()
     const today = todayInTz(TZ)
     listBodyMetrics.mockResolvedValue([
-      { date: otherDaysThisWeek()[0], steps: 4000 }, { date: today, steps: 6000 },
+      { date: earlierDaysThisWeek()[0], steps: 4000 }, { date: today, steps: 6000 },
     ])
     const body = await (await getWeek()).json()
     expect(body.steps.today).toBe(6000)
     expect(body.steps.week).toBe(10_000)
+  })
+
+  // The case the two tests above used to hit by accident: on a Monday the week so far is today alone,
+  // and a row dated later in the week is not part of it.
+  it('on a Monday the week\'s steps are today\'s, and a later day\'s row is not counted', async () => {
+    atMonday()
+    const today = todayInTz(TZ)
+    expect(earlierDaysThisWeek()).toEqual([])
+    listBodyMetrics.mockResolvedValue([
+      { date: today, steps: 6000 }, { date: otherDaysThisWeek()[0], steps: 4000 },
+    ])
+    const body = await (await getWeek()).json()
+    expect(body.steps.today).toBe(6000)
+    expect(body.steps.week).toBe(6000)
   })
 
   // `days.length || 1`: with no zone rows the goal-so-far must still be one day's worth, or a week
