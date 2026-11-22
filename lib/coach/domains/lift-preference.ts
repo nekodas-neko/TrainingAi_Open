@@ -25,9 +25,13 @@
  * window, "until the next workout started after the change", is the undo route's.
  */
 import { and, eq, inArray, isNull, sql } from 'drizzle-orm'
+import { DEFAULT_TZ, todayInTz } from '@trainingai/shared/date-utils'
 import * as s from '@/lib/data/postgres/schema'
 import { voidSessionPrescription } from '@/lib/data/postgres/slices/periodization'
 import type { WorkoutRepository } from '@/lib/data/repository'
+import { buildWorkoutExercises } from '@trainingai/shared/workout/session-data'
+import { buildAutomaticPhaseStatus, isEarlyDeloadWeek } from '@trainingai/shared/phase-engine'
+import { getScheduledSessionsPerWeek } from '@trainingai/shared/schedule-utils'
 import { loadTarget, type TargetRow } from './session-exercise'
 import type { Consequence, Db, DomainHandler, Drift, PreviewResult } from './types'
 import {
@@ -47,6 +51,9 @@ import { resolveWorkingBasisWithSource } from '@trainingai/shared/1rm'
 import type { AiPrescription, PeriodizationPhase, PrescriptionStatus } from '@trainingai/shared/types/ai-periodization'
 
 export type BasisReads = Pick<WorkoutRepository, 'getLastRealOneRmBatch' | 'getExerciseEstimates' | 'listPersonalRecords'>
+/** What the static reader (`staticBaseReps`) also reads: the program, its styles and phases, the library. */
+export type StaticReads = BasisReads & Pick<WorkoutRepository,
+  'getActiveProgram' | 'listProgressionStyles' | 'listExerciseLibrary' | 'listProgramPhases' | 'countAllSessionsSinceStart' | 'getLastExerciseLogsBatch'>
 
 type LiftField = 'repRange' | 'restSec' | 'nextLoadStep' | 'setsDelta'
 type LiftChange = Extract<PatchChange, { field: LiftField }>
@@ -62,7 +69,9 @@ export interface PrefColumns {
   oneShotSetAt: string | null
   deletedAt: string | null
 }
-interface PrefRow extends PrefColumns { id: string; exerciseId: string | null; exerciseName: string }
+interface PrefRow extends PrefColumns { id: string; exerciseId: string | null; exerciseName: string; source: string }
+/** What undo needs to put a row back exactly: its value columns plus the two apply also writes. */
+export interface PrefSnapshot extends PrefColumns { source: string; exerciseId: string | null }
 
 const EMPTY: PrefColumns = { repMin: null, repMax: null, restSec: null, nextLoadStep: null, setsDelta: null, oneShotSetAt: null, deletedAt: null }
 
@@ -81,7 +90,7 @@ export class StaleLiftPreference extends Error {
 async function findRow(db: Db, userId: string, name: string, libId: string | null, lock: boolean): Promise<PrefRow | null> {
   const res = await db.execute(sql`
     SELECT p.id, p.exercise_id, p.exercise_name, p.rep_min, p.rep_max, p.rest_sec, p.next_load_step, p.sets_delta,
-           p.one_shot_set_at::text AS one_shot_set_at, p.deleted_at::text AS deleted_at
+           p.one_shot_set_at::text AS one_shot_set_at, p.deleted_at::text AS deleted_at, p.source
       FROM exercise_preferences p
      WHERE p.user_id = ${userId}
        AND ((${libId}::uuid IS NOT NULL AND p.exercise_id = ${libId}::uuid)
@@ -97,7 +106,7 @@ async function findRow(db: Db, userId: string, name: string, libId: string | nul
 async function rowById(db: Db, userId: string, id: string, lock: boolean): Promise<PrefRow | null> {
   const res = await db.execute(sql`
     SELECT p.id, p.exercise_id, p.exercise_name, p.rep_min, p.rep_max, p.rest_sec, p.next_load_step, p.sets_delta,
-           p.one_shot_set_at::text AS one_shot_set_at, p.deleted_at::text AS deleted_at
+           p.one_shot_set_at::text AS one_shot_set_at, p.deleted_at::text AS deleted_at, p.source
       FROM exercise_preferences p
      WHERE p.id = ${id} AND p.user_id = ${userId}
      ${lock ? sql`FOR UPDATE` : sql``}
@@ -112,6 +121,7 @@ function rowOf(r: Record<string, unknown>): PrefRow {
     id: String(r.id),
     exerciseId: (r.exercise_id as string | null) ?? null,
     exerciseName: String(r.exercise_name),
+    source: String(r.source),
     repMin: num(r.rep_min),
     repMax: num(r.rep_max),
     restSec: num(r.rest_sec),
@@ -124,8 +134,12 @@ function rowOf(r: Record<string, unknown>): PrefRow {
 
 function columnsOf(row: PrefRow | null): PrefColumns {
   if (!row) return { ...EMPTY }
-  const { id: _i, exerciseId: _e, exerciseName: _n, ...cols } = row
+  const { id: _i, exerciseId: _e, exerciseName: _n, source: _s, ...cols } = row
   return cols
+}
+
+function snapshotOf(row: PrefRow): PrefSnapshot {
+  return { ...columnsOf(row), source: row.source, exerciseId: row.exerciseId }
 }
 
 /** The live values the person has now: a tombstoned row reads as none. */
@@ -249,9 +263,12 @@ async function readContext(db: Db, reads: BasisReads, userId: string, target: Ta
 
 // ── The change, worked out by code ───────────────────────────────────────────
 
-type Worked = { ok: true; next: PrefColumns; oneShot: boolean } | { ok: false; refusal: string }
+type Worked = { ok: true; next: PrefColumns; oneShot: boolean; resolved: { changeId: string; to: string }[] } | { ok: false; refusal: string }
 
 const REFUSE_RANGE = `A rep range has to be two whole numbers from ${PREFERENCE_REP_FLOOR} to ${PREFERENCE_REP_CEILING}, low then high, like 12-15.`
+const SPENT_ONE_SHOT = 'This was a one-time change and it has already been used or has expired, so there is nothing left to undo.'
+const REFUSE_UNPREVIEWED = 'This change was not previewed, so the range was not worked out. Ask the Coach again.'
+const REFUSE_TWICE = 'A change can set each thing once. Ask for one value for each.'
 const REFUSE_REST = `Rest between sets has to be from ${PREFERENCE_REST_MIN_SEC} seconds to ${PREFERENCE_REST_MAX_SEC / 60} minutes.`
 
 /**
@@ -259,17 +276,25 @@ const REFUSE_REST = `Rest between sets has to be from ${PREFERENCE_REST_MIN_SEC}
  * empty: its old lasting columns are not revived), changes only the fields accepted, and leaves a
  * pending one-shot alone unless a one-shot field is accepted, in which case the new one-shot replaces
  * it whole. `oneShot` says the write must stamp `one_shot_set_at = now()`.
+ *
+ * `mode` 'preview' works a relative request (`more_reps`) out and reports it in `resolved`, which the
+ * card shows and Apply then carries; 'apply' refuses the relative word, so what is stored is only ever
+ * a range the card showed (F1).
  */
-export function workOutChange(current: PrefColumns, accepted: LiftChange[], nextPlanReps: number | null): Worked {
+export function workOutChange(current: PrefColumns, accepted: LiftChange[], nextPlanReps: number | null, mode: 'preview' | 'apply' = 'preview'): Worked {
   const next: PrefColumns = { ...current, deletedAt: null }
   const shot = accepted.filter(c => c.field === 'nextLoadStep' || c.field === 'setsDelta')
+  const resolved: { changeId: string; to: string }[] = []
+  if (new Set(accepted.map(c => c.field)).size !== accepted.length) return { ok: false, refusal: REFUSE_TWICE }
   for (const c of accepted) {
     if (c.field === 'repRange') {
       let range: { min: number; max: number } | null
       if ((REP_RANGE_REQUESTS as readonly string[]).includes(c.to)) {
+        if (mode === 'apply') return { ok: false, refusal: REFUSE_UNPREVIEWED }
         const base = current.repMin ?? nextPlanReps
         if (base == null) return { ok: false, refusal: 'There is no plan yet to work the reps out from. Say the range, like 12-15.' }
         range = repRangeForRequest(base, c.to as 'more_reps' | 'fewer_reps')
+        if (range) resolved.push({ changeId: c.id, to: `${range.min}-${range.max}` })
         if (!range) return { ok: false, refusal: c.to === 'more_reps' ? 'The reps are already as high as the app allows.' : 'The reps are already as low as the app allows.' }
       } else {
         const [min, max] = c.to.split('-').map(Number)
@@ -292,7 +317,7 @@ export function workOutChange(current: PrefColumns, accepted: LiftChange[], next
     next.setsDelta = (shot.find(c => c.field === 'setsDelta')?.to as PrefColumns['setsDelta']) ?? null
     next.oneShotSetAt = null // stamped by the database
   }
-  return { ok: true, next, oneShot: shot.length > 0 }
+  return { ok: true, next, oneShot: shot.length > 0, resolved }
 }
 
 /** `from` against the live row, field by field. The model's `from` is only ever compared. */
@@ -308,7 +333,7 @@ function driftOf(current: PrefColumns, accepted: LiftChange[]): Drift[] {
 // ── Plans ────────────────────────────────────────────────────────────────────
 
 /** A plan a preference never applies in: a deload, or the baseline test (design §3a). */
-function planExcluded(plan: StoredPlan): 'deload' | 'baseline' | null {
+function planExcluded(plan: Pick<StoredPlan, 'phase' | 'prescription'>): 'deload' | 'baseline' | null {
   const deload = plan.prescription.deload === true || plan.prescription.phase === 'deload'
   const baseline = plan.phase === 'baseline'
   if (preferenceAppliesIn({ deload, baseline })) return null
@@ -316,7 +341,8 @@ function planExcluded(plan: StoredPlan): 'deload' | 'baseline' | null {
 }
 
 /** The plan as generation would store it with `pref`, or the same object when nothing changes. */
-export function restatePlan(ctx: Context, plan: StoredPlan, pref: LiftPreference | null): AiPrescription {
+type RestateInputs = Pick<Context, 'slots' | 'trainingGoal' | 'bodyweight' | 'basisKg' | 'equipment'>
+export function restatePlan(ctx: RestateInputs, plan: Pick<StoredPlan, 'programSessionId' | 'phase' | 'prescription'>, pref: LiftPreference | null): AiPrescription {
   if (planExcluded(plan)) return plan.prescription
   const slotIds = new Map(ctx.slots.filter(x => x.programSessionId === plan.programSessionId).map(x => [x.sessionExerciseId, x.role]))
   let changed = false
@@ -424,13 +450,163 @@ function summaryOf(name: string, after: PrefColumns, accepted: LiftChange[]): st
   return `${name}: ${parts.join(', ')}`
 }
 
+/**
+ * The reps the lift's own session prescribes for it when no stored AI plan does (a `manual` or
+ * `automatic` program, or an `ai_dynamic` one with no plan yet): the first set of the style the workout
+ * screen would show. It is that screen's own reader, `buildWorkoutExercises` — the program's styles and
+ * phases resolved exactly as the workout-data route resolves them — so no number is made up here.
+ * Null when the session prescribes none (no style), or the next session is a deload, a baseline or a
+ * test, where a preference does not apply and the reps shown are not the person's working reps; the
+ * caller then refuses and asks for the range.
+ */
+export async function staticBaseReps(reads: StaticReads, userId: string, target: TargetRow, today: string): Promise<number | null> {
+  const program = await reads.getActiveProgram(userId)
+  if (!program || program.id !== target.programId) return null
+  const programSession = program.sessions.find(x => x.id === target.sessionId)
+  const ex = programSession?.exercises.find(e => e.id === target.id)
+  if (!programSession || !ex) return null
+
+  const isAutomatic = program.phaseMode === 'automatic'
+  const [styles, library, allPhases, lastLogs, lastReal, estimates, prMap] = await Promise.all([
+    reads.listProgressionStyles(userId),
+    reads.listExerciseLibrary(),
+    isAutomatic ? reads.listProgramPhases(userId, program.id) : Promise.resolve([]),
+    reads.getLastExerciseLogsBatch(userId, [target.exerciseName]),
+    reads.getLastRealOneRmBatch(userId, [target.exerciseName]),
+    reads.getExerciseEstimates(userId).catch(() => []),
+    reads.listPersonalRecords(userId),
+  ])
+  let currentPhase: (typeof allPhases)[number] | null = null
+  let isDeloadActive = isEarlyDeloadWeek(program, today)
+  if (isAutomatic && allPhases.length > 0) {
+    const counts = await reads.countAllSessionsSinceStart(userId, program.id)
+    const perWeek = getScheduledSessionsPerWeek(program) / Math.max(1, program.sessions.length)
+    const status = buildAutomaticPhaseStatus(allPhases, counts.get(programSession.id) ?? 0, program, today, perWeek)
+    currentPhase = status.phase
+    isDeloadActive = isDeloadActive || status.isDeloadActive
+  }
+  const phaseType = currentPhase?.phaseType ?? 'normal'
+  if (isDeloadActive || phaseType === 'deload' || phaseType === 'baseline' || phaseType === 'testing') return null
+
+  const [built] = buildWorkoutExercises({ ...programSession, exercises: [ex] }, {
+    lastLogs,
+    lastRealOneRm: lastReal,
+    prMap,
+    estimateMap: new Map(estimates.map(e => [e.exerciseName, e.estimated1rm])),
+    styleById: new Map(styles.map(x => [x.id, x.sets])),
+    styleByName: new Map(styles.map(x => [x.name, x.sets])),
+    styles,
+    libByName: new Map(library.map(e => [e.name.toLowerCase(), e])),
+    currentPhase,
+    allPhases,
+    isDeloadActive: false,
+    isBaselinePhase: false,
+    aiDrivesLoad: false,
+    aiPrescription: null,
+    aiPhaseLabel: '',
+    isAiDynamic: program.phaseMode === 'ai_dynamic',
+    aiDeload: false,
+    droppedThisCycle: new Set(),
+    loggedTodayInThisSession: new Set(),
+    trainingGoal: program.trainingGoal,
+  })
+  const reps = built?.progressionStyle?.[0]?.reps
+  return typeof reps === 'number' && Number.isInteger(reps) && reps > 0 ? reps : null
+}
+
+/** The reps a relative request is worked out from: the person's own range, else the next plan's reps,
+ *  else what the session prescribes (`staticBaseReps`). Read only when a request needs it. */
+async function baseRepsFor(
+  ctx: Context, current: PrefColumns, accepted: LiftChange[], getReads: () => Promise<StaticReads>, userId: string, today: string,
+): Promise<number | null> {
+  const asks = accepted.some(c => c.field === 'repRange' && (REP_RANGE_REQUESTS as readonly string[]).includes(c.to))
+  if (!asks || current.repMin != null) return null
+  return nextPlanReps(ctx) ?? await staticBaseReps(await getReads(), userId, ctx.target, today)
+}
+
+// ── A one-shot that was used up or expired (#4007) ───────────────────────────
+
+/**
+ * A lift's one-shot ("lighter next time", ±1 set) is stamped on every stored plan of the lift (D1).
+ * When it is used up — a log of one session consumed it — or expires, the other sessions' stored plans
+ * still carry the step, and the person would train it a second time. This restates every stored plan
+ * of the user whose row for this lift records exactly that `oneShotSetAt` (to the 2 ms the consume
+ * itself allows) to the lift's preference as it now is, through the same `restatePlanRow` the Coach's
+ * apply uses. No model call. A plan that changed since it was read is left for its own regeneration.
+ *
+ * Returns how many plans it rewrote. Owner-scoped throughout: plans by `user_id`, the program's
+ * sessions by the program's owner.
+ */
+export async function restateSpentOneShot(
+  db: Db, reads: BasisReads, userId: string, exerciseName: string, spentAt: Date,
+): Promise<number> {
+  const rows = await db.select().from(s.sessionPeriodization).where(eq(s.sessionPeriodization.userId, userId))
+  const spentMs = spentAt.getTime()
+  const carries = (p: (typeof rows)[number]) => {
+    const ex = (p.prescription as AiPrescription | null)?.exercises
+    return Array.isArray(ex) && ex.some(e => e.name === exerciseName && e.liftPreference?.oneShotSetAt != null
+      && Math.abs(new Date(e.liftPreference.oneShotSetAt).getTime() - spentMs) < 2)
+  }
+  const plans = rows.filter(p => p.prescription != null && carries(p))
+  if (plans.length === 0) return 0
+
+  const [lib] = await db.select({ id: s.exerciseLibrary.id, equipment: s.exerciseLibrary.equipment, exerciseType: s.exerciseLibrary.exerciseType })
+    .from(s.exerciseLibrary).where(eq(s.exerciseLibrary.name, exerciseName)).limit(1)
+  const row = await findRow(db, userId, exerciseName, lib?.id ?? null, false)
+  const pref = toPreference(liveColumns(row))
+  const [lastReal, estimates, prs] = await Promise.all([
+    reads.getLastRealOneRmBatch(userId, [exerciseName]),
+    reads.getExerciseEstimates(userId).catch(() => []),
+    reads.listPersonalRecords(userId),
+  ])
+  const basisKg = resolveWorkingBasisWithSource({
+    lastNonDeload1rm: lastReal.get(exerciseName)?.estimated1rm,
+    seedEstimate: estimates.find(e => e.exerciseName === exerciseName)?.estimated1rm,
+    allTimePr1rm: prs.get(exerciseName),
+  }).kg
+
+  let rewritten = 0
+  for (const p of plans) {
+    // The slots of this plan's session, and the training goal of the program it belongs to — only a
+    // program this user owns.
+    const slotRows = await db.select({ id: s.sessionExercises.id, role: s.sessionExercises.exerciseRole, goal: s.programs.trainingGoal })
+      .from(s.sessionExercises)
+      .innerJoin(s.programSessions, eq(s.sessionExercises.sessionId, s.programSessions.id))
+      .innerJoin(s.programs, eq(s.programSessions.programId, s.programs.id))
+      .where(and(
+        eq(s.programSessions.id, p.programSessionId),
+        eq(s.programs.userId, userId),
+        eq(s.sessionExercises.exerciseName, exerciseName),
+        isNull(s.sessionExercises.deletedAt),
+      ))
+    if (slotRows.length === 0) continue
+    const prescription = p.prescription as AiPrescription
+    const next = restatePlan({
+      slots: slotRows.map(r => ({ programSessionId: p.programSessionId, sessionName: '', sessionExerciseId: r.id, role: r.role })),
+      trainingGoal: slotRows[0].goal, bodyweight: lib?.exerciseType === 'bodyweight', basisKg, equipment: lib?.equipment ?? null,
+    }, { programSessionId: p.programSessionId, phase: p.phase as PeriodizationPhase, prescription }, pref)
+    if (next === prescription) continue
+    const res = await db.update(s.sessionPeriodization)
+      .set({ prescription: next as unknown as Record<string, unknown>, updatedAt: new Date() })
+      .where(and(
+        eq(s.sessionPeriodization.userId, userId),
+        eq(s.sessionPeriodization.programSessionId, p.programSessionId),
+        sql`${s.sessionPeriodization.prescription} = ${JSON.stringify(prescription)}::jsonb`,
+      ))
+      .returning({ id: s.sessionPeriodization.id })
+    rewritten += res.length
+  }
+  return rewritten
+}
+
 // ── The handler ──────────────────────────────────────────────────────────────
 
 export interface LiftPreferenceBefore {
   /** The preference row this change wrote; also the `coach_changes.target_id`. */
   preferenceId: string
-  /** The row before (its columns, tombstone included), or null when there was no row. */
-  before: PrefColumns | null
+  /** The row before (its columns, tombstone included, and the `source` and `exercise_id` apply also
+   *  writes), or null when there was no row. */
+  before: PrefSnapshot | null
   /** The row as this change left it: undo refuses unless the row still holds exactly this. */
   after: PrefColumns
   /** Each stored plan the change rewrote, before and after. */
@@ -443,7 +619,7 @@ const cols = (c: PrefColumns) => ({
 const same = (a: PrefColumns, b: PrefColumns) =>
   JSON.stringify(cols(a)) === JSON.stringify(cols(b)) && a.oneShotSetAt === b.oneShotSetAt && (a.deletedAt == null) === (b.deletedAt == null)
 
-export function liftPreferenceHandler(getReads: () => Promise<BasisReads>): DomainHandler {
+export function liftPreferenceHandler(getReads: () => Promise<StaticReads>, today: string = todayInTz(DEFAULT_TZ)): DomainHandler {
   return {
     transactional: true,
 
@@ -455,13 +631,13 @@ export function liftPreferenceHandler(getReads: () => Promise<BasisReads>): Doma
       const row = await findRow(db, userId, target.exerciseName, ctx.libId, false)
       const current = liveColumns(row)
       const drift = driftOf(current, accepted)
-      const worked = workOutChange(current, accepted, nextPlanReps(ctx))
+      const worked = workOutChange(current, accepted, await baseRepsFor(ctx, current, accepted, getReads, userId, today))
       const label = { id: target.id, label: `${target.exerciseName} (${target.sessionName})` }
       if (!worked.ok) {
         return { consequences: [{ kind: 'warn', text: worked.refusal }], drift, target: label, refusal: worked.refusal }
       }
       const { consequences } = measure(ctx, current, worked.next, accepted, new Date())
-      return { consequences, drift, target: label }
+      return { consequences, drift, target: label, ...(worked.resolved.length > 0 && { resolved: worked.resolved }) }
     },
 
     async apply(db, userId, patch, accepted) {
@@ -470,13 +646,17 @@ export function liftPreferenceHandler(getReads: () => Promise<BasisReads>): Doma
       if (!target) return { ok: false, reason: 'not_found' }
       const changes = liftChanges(accepted)
       if (changes.length !== accepted.length) return { ok: false, reason: 'invalid', detail: 'Those fields do not belong to that domain' }
+      // The whole patch, not only the accepted part: a patch that names a field twice is not a change
+      // the card could have described.
+      const named = liftChanges(patch.changes)
+      if (new Set(named.map(c => c.field)).size !== named.length) return { ok: false, reason: 'invalid', detail: REFUSE_TWICE }
       const ctx = await readContext(db, await getReads(), userId, target)
 
       const row = await findRow(db, userId, target.exerciseName, ctx.libId, true)
       const current = liveColumns(row)
       const drift = driftOf(current, changes)
       if (drift.length > 0) return { ok: false, reason: 'stale', drift }
-      const worked = workOutChange(current, changes, nextPlanReps(ctx))
+      const worked = workOutChange(current, changes, nextPlanReps(ctx), 'apply')
       if (!worked.ok) return { ok: false, reason: 'invalid', detail: worked.refusal }
       const n = worked.next
 
@@ -523,7 +703,7 @@ export function liftPreferenceHandler(getReads: () => Promise<BasisReads>): Doma
         plans.push({ programSessionId: plan.programSessionId, before: plan.prescription, after: next })
       }
 
-      const beforeState: LiftPreferenceBefore = { preferenceId: w.id, before: row ? columnsOf(row) : null, after, plans }
+      const beforeState: LiftPreferenceBefore = { preferenceId: w.id, before: row ? snapshotOf(row) : null, after, plans }
       return { ok: true, summary: summaryOf(target.exerciseName, after, changes), beforeState: beforeState as unknown as Record<string, unknown>, targetId: w.id }
     },
 
@@ -533,6 +713,12 @@ export function liftPreferenceHandler(getReads: () => Promise<BasisReads>): Doma
       const row = await rowById(db, userId, targetId, true)
       if (!row) return { ok: false, reason: 'not_found' }
       if (!same(columnsOf(row), state.after)) {
+        // The change's one-shot was used up (a log consumed it) or expired, and nothing else moved: that
+        // is not "a later change", and there is nothing left of it to put back.
+        const introducedOneShot = state.after.oneShotSetAt != null && state.before?.oneShotSetAt !== state.after.oneShotSetAt
+        if (introducedOneShot && same(columnsOf(row), { ...state.after, nextLoadStep: null, setsDelta: null, oneShotSetAt: null })) {
+          return { ok: false, reason: 'invalid', detail: SPENT_ONE_SHOT }
+        }
         return { ok: false, reason: 'stale', drift: [{ changeId: 'row', field: 'preference', expected: 'this change', actual: 'a later change' }] }
       }
       const b = state.before
@@ -541,7 +727,10 @@ export function liftPreferenceHandler(getReads: () => Promise<BasisReads>): Doma
             UPDATE exercise_preferences
                SET rep_min = ${b.repMin}, rep_max = ${b.repMax}, rest_sec = ${b.restSec},
                    next_load_step = ${b.nextLoadStep}, sets_delta = ${b.setsDelta},
-                   one_shot_set_at = ${b.oneShotSetAt}::timestamptz, deleted_at = ${b.deletedAt}::timestamptz, updated_at = now()
+                   one_shot_set_at = ${b.oneShotSetAt}::timestamptz, deleted_at = ${b.deletedAt}::timestamptz,
+                   source = COALESCE(${b.source ?? null}, source),
+                   exercise_id = CASE WHEN ${'exerciseId' in b} THEN ${b.exerciseId ?? null}::uuid ELSE exercise_id END,
+                   updated_at = now()
              WHERE id = ${targetId} AND user_id = ${userId}
          RETURNING id`)
         // There was no row: leave a tombstone, so a device that has not synced sees the delete.

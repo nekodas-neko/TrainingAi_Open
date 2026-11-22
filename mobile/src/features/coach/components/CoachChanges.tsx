@@ -14,6 +14,7 @@ import {
   FIELD_UNIT,
   LIFT_PREFERENCE_DURATION,
   liftPreferenceValueLabel,
+  withResolvedChanges,
   type CoachPatch,
   type PatchChange,
 } from '../data/patch';
@@ -134,7 +135,8 @@ export function ChangeCard({
     try {
       const patch = dial
         ? ({ ...args.patch, changes: [{ ...change, to: value }] } as CoachPatch)
-        : args.patch;
+        : // The range the card showed, never the relative word (#3896).
+          withResolvedChanges(args.patch, preview.resolved);
       const result = await coach.actions.apply(patch, dial ? [change.id] : accepted);
       if (result) onResult?.({ status: 'applied', summary: result.summary });
     } catch (cause) {

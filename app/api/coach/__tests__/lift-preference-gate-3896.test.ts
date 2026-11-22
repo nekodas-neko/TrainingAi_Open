@@ -80,6 +80,28 @@ describe('/api/coach lift_preference gate (#3896 step 5)', () => {
     expect(streamed.calls).toHaveLength(0)
   })
 
+  it('a client can widen the capability only for its own request, and only with gated domains the scope offers', async () => {
+    const { COACH_SCOPES, coachScope, withClientDomains } = await import('@/lib/coach/scopes')
+    const before = JSON.stringify(COACH_SCOPES)
+    // Naming every domain there is widens nothing beyond the one gated domain.
+    const all = ['lift_preference', 'program_phase', 'injury', 'session_exercise', 'early_deload', 'nutrition_targets', 'user_goals']
+    const general = withClientDomains(coachScope('general'), all)
+    expect(general.patchDomains).toEqual([...coachScope('general').patchDomains, 'lift_preference'])
+    // A scope that does not offer a domain is not widened by a client naming it.
+    const nutrition = withClientDomains(coachScope('nutrition'), all)
+    expect(nutrition.patchDomains).toEqual(coachScope('nutrition').patchDomains)
+    expect(nutrition.patchDomains).not.toContain('lift_preference')
+    // Naming a domain twice, or in other casing, adds it once or not at all.
+    expect(withClientDomains(coachScope('general'), ['lift_preference', 'lift_preference']).patchDomains.filter(d => d === 'lift_preference')).toHaveLength(1)
+    expect(withClientDomains(coachScope('general'), ['LIFT_PREFERENCE']).patchDomains).not.toContain('lift_preference')
+    // The shared scope objects are never mutated, so one request's declaration is not the next one's.
+    expect(JSON.stringify(COACH_SCOPES)).toBe(before)
+    await post({ patchDomains: ['lift_preference'] })
+    await post({})
+    expect(streamed.calls[0].tools.proposeChange.inputSchema.safeParse(liftProposal).success).toBe(true)
+    expect(streamed.calls[1].tools.proposeChange.inputSchema.safeParse(liftProposal).success).toBe(false)
+  })
+
   it('400s a malformed declaration', async () => {
     expect((await post({ patchDomains: 'lift_preference' })).status).toBe(400)
     expect((await post({ patchDomains: Array(21).fill('x') })).status).toBe(400)

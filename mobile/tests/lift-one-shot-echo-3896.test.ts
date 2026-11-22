@@ -10,7 +10,7 @@ import { WorkoutJournalStore } from '../src/features/workouts/logging/WorkoutJou
 import { finishWorkout, mutationFor } from '../src/features/workouts/logging/workout.ts';
 import { buildCatalog, oneShotTime } from '../src/features/workouts/catalog.ts';
 import {
-  CoachPatchSchema, RENDERED_PATCH_DOMAINS, GATED_PATCH_DOMAINS, liftPreferenceValueLabel,
+  CoachPatchSchema, RENDERED_PATCH_DOMAINS, GATED_PATCH_DOMAINS, liftPreferenceValueLabel, withResolvedChanges,
 } from '../src/features/coach/data/patch.ts';
 import { sqliteFixture } from './storage-fixture.ts';
 import { loggingFixture, programId, exerciseId } from './logging-fixture.ts';
@@ -83,4 +83,34 @@ test('the card reads a lift preference in words (CoachChanges.patchValue uses th
   // Other domains' fields fall through to the card's existing formatting.
   assert.equal(liftPreferenceValueLabel('removed', true), null);
   assert.equal(liftPreferenceValueLabel('stepsGoal', 9000), null);
+});
+
+test('Apply carries the range the card showed, and a bare relative word is never sent', async () => {
+  const { previewSchema } = await import('../src/features/coach/data/models.ts');
+  const { CoachActions } = await import('../src/features/coach/data/CoachActions.ts');
+  const patch = CoachPatchSchema.parse({
+    domain: 'lift_preference',
+    targetId: '10000000-0000-4000-8000-000000000003',
+    changes: [
+      { id: 'r', field: 'repRange', from: '6-8', to: 'more_reps' },
+      { id: 'l', field: 'nextLoadStep', from: null, to: 'lighter' },
+    ],
+  });
+  const shown = previewSchema.parse({
+    consequences: [], drift: [], target: { id: null, label: 'x' }, resolved: [{ changeId: 'r', to: '10-13' }],
+  });
+  const sent = withResolvedChanges(patch, shown.resolved);
+  assert.deepEqual(sent.changes[0], { id: 'r', field: 'repRange', from: '6-8', to: '10-13' });
+  assert.deepEqual(sent.changes[1], patch.changes[1]);
+  assert.equal(withResolvedChanges(patch, undefined), patch);
+  // Only a repRange change is ever rewritten, whatever id the preview names.
+  assert.deepEqual(withResolvedChanges(patch, [{ changeId: 'l', to: '99-99' }]).changes[1], patch.changes[1]);
+
+  const writes: unknown[] = [];
+  const actions = new CoachActions(
+    { connection: { post: async (_p: string, body: unknown) => { writes.push(body); return {}; } }, changes: { pendingFor: () => [] } } as never,
+    () => {},
+  );
+  await assert.rejects(() => actions.apply(patch, ['r', 'l']), /fresh suggestion/);
+  assert.equal(writes.length, 0);
 });

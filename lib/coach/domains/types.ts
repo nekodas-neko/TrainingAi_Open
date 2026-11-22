@@ -25,6 +25,9 @@ export interface PreviewResult {
   /** #3896: the change cannot be made as asked (a rep range or rest outside the limits), in plain
    *  words. The card shows it and offers no Apply. Absent for every domain that cannot refuse. */
   refusal?: string
+  /** #3896 F1: each relative request the preview worked out (`more_reps` → `"12-15"`). Apply carries
+   *  these instead of the word, so what is stored is what the card showed. */
+  resolved?: { changeId: string; to: string }[]
 }
 
 export type ApplyOutcome =

@@ -34,7 +34,7 @@ export function handlerFor(
     // The bar's basis reads (1RM, estimates, records) go through the repository, as every other
     // reader of them does. Imported lazily so the Coach's apply path does not load the whole
     // repository for the domains that never need it.
-    lift_preference: liftPreferenceHandler(async () => (await import('@/lib/data')).getRepository()),
+    lift_preference: liftPreferenceHandler(async () => (await import('@/lib/data')).getRepository(), today),
   }
   return handlers[domain]
 }

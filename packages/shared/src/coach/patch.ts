@@ -258,6 +258,24 @@ export function liftPreferenceValueLabel(field: PatchChange['field'], value: unk
   if (field === 'setsDelta') return value === 1 ? 'One more set' : value === -1 ? 'One fewer set' : null;
   return null;
 }
+/** One change the preview worked out in code: a relative rep request (`more_reps`) as the range it
+ *  means for this person right now. The card shows it, and Apply carries it instead of the word. */
+export interface ResolvedChange { changeId: string; to: string }
+/**
+ * The patch an Apply sends: each change the preview resolved carries the resolved value, so what is
+ * stored is the range the card showed, never a relative word worked out again later.
+ */
+export function withResolvedChanges(patch: CoachPatch, resolved: readonly ResolvedChange[] | undefined): CoachPatch {
+  if (!resolved || resolved.length === 0) return patch;
+  const byId = new Map(resolved.map((r) => [r.changeId, r.to]));
+  return {
+    ...patch,
+    changes: patch.changes.map((c) => {
+      const to = byId.get(c.id);
+      return c.field === 'repRange' && to !== undefined ? { ...c, to } : c;
+    }),
+  };
+}
 export function fieldsMatchDomain(patch: CoachPatch): boolean {
   const allowed = DOMAIN_FIELDS[patch.domain];
   return patch.changes.every((c) => allowed.includes(c.field));
