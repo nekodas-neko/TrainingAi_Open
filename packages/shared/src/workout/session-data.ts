@@ -247,6 +247,7 @@ export function buildWorkoutExercises(
       let preDeloadStyle: StyleSet[] | null = null
       let preDeloadSets: number | undefined
       let aiStyleApplied = false
+      let liftPreference: AppliedLiftPreference | undefined
       if (aiDrivesLoad) {
         const p = aiPrescription!.exercises.find(e => e.sessionExerciseId === ex.id)
         if (p) {
@@ -283,6 +284,9 @@ export function buildWorkoutExercises(
             defaultSets = override.sets
             deloaded = true
             deloadNote = "Deload"
+          } else if (p.liftPreference && !deloaded) {
+            // #3896: what the stored plan applied, so the log can name the one-shot it carried.
+            liftPreference = p.liftPreference
           }
         }
       }
@@ -379,7 +383,6 @@ export function buildWorkoutExercises(
       // `ai_dynamic` lift the AI plan is not driving (an AI plan applied it when it was made). Never in a
       // baseline or any deload (the exercise's, the session's, or a deload phase's style), which stay
       // exactly as before, nor in an `automatic` testing phase, whose reps are the test.
-      let liftPreference: AppliedLiftPreference | undefined
       const pref = liftPreferences?.get(ex.exerciseName)
       if (
         pref && !aiStyleApplied && !deloaded && !isBaselinePhase && !aiDeload && !isDeloadActive &&

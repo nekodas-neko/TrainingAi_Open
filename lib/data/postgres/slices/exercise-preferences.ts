@@ -8,7 +8,7 @@
 // name), so the name fallback skips it.
 import { sql } from 'drizzle-orm'
 import type { getDb } from '../client'
-import type { LiftPreferenceRow } from '@trainingai/shared/ai-periodization/lift-preference'
+import { ONE_SHOT_TTL_DAYS, type LiftPreferenceRow } from '@trainingai/shared/ai-periodization/lift-preference'
 
 type Db = ReturnType<typeof getDb>
 
@@ -21,12 +21,24 @@ interface PreferenceSqlRow {
   next_load_step: string | null
   sets_delta: number | null
   one_shot_set_at: Date | string | null
+  one_shot_expired: boolean
 }
 
 /** The user's live preferences for these lifts, keyed by the name the caller passed. One query. */
 export async function listExercisePreferences(db: Db, userId: string, exerciseNames: string[]): Promise<Map<string, LiftPreferenceRow>> {
   const out = new Map<string, LiftPreferenceRow>()
   if (exerciseNames.length === 0) return out
+  // An expired one-shot (`ONE_SHOT_TTL_DAYS`, database clock) is cleared the moment a read sees it, by a
+  // conditional write that only touches rows still past the limit. If the clear fails the read below
+  // still treats it as expired, so a failure never lets an old one-shot apply.
+  await db.execute(sql`
+    UPDATE exercise_preferences
+       SET next_load_step = NULL, sets_delta = NULL, one_shot_set_at = NULL, updated_at = now()
+     WHERE user_id = ${userId}
+       AND deleted_at IS NULL
+       AND one_shot_set_at IS NOT NULL
+       AND one_shot_set_at < now() - make_interval(days => ${ONE_SHOT_TTL_DAYS})
+  `).catch(err => console.error('[exercise-preferences] clearing an expired one-shot failed:', err))
   const res = await db.execute(sql`
     WITH lifts AS (
       SELECT n.name AS lift, l.id AS lib_id
@@ -35,7 +47,8 @@ export async function listExercisePreferences(db: Db, userId: string, exerciseNa
     )
     SELECT lifts.lift,
            COALESCE(lifts.lib_id IS NOT NULL AND p.exercise_id = lifts.lib_id, false) AS by_id,
-           p.rep_min, p.rep_max, p.rest_sec, p.next_load_step, p.sets_delta, p.one_shot_set_at
+           p.rep_min, p.rep_max, p.rest_sec, p.next_load_step, p.sets_delta, p.one_shot_set_at,
+           COALESCE(p.one_shot_set_at < now() - make_interval(days => ${ONE_SHOT_TTL_DAYS}), false) AS one_shot_expired
     FROM lifts
     JOIN exercise_preferences p
       ON p.user_id = ${userId}
@@ -52,22 +65,32 @@ export async function listExercisePreferences(db: Db, userId: string, exerciseNa
       repMin: r.rep_min == null ? null : Number(r.rep_min),
       repMax: r.rep_max == null ? null : Number(r.rep_max),
       restSec: r.rest_sec == null ? null : Number(r.rest_sec),
-      nextLoadStep: r.next_load_step,
-      setsDelta: r.sets_delta == null ? null : Number(r.sets_delta),
-      oneShotSetAt: r.one_shot_set_at == null ? null : new Date(r.one_shot_set_at),
+      nextLoadStep: r.one_shot_expired ? null : r.next_load_step,
+      setsDelta: r.one_shot_expired || r.sets_delta == null ? null : Number(r.sets_delta),
+      oneShotSetAt: r.one_shot_expired || r.one_shot_set_at == null ? null : new Date(r.one_shot_set_at),
     })
   }
   return out
 }
 
 /**
- * Consume the lift's one-shot, once: null its three columns in ONE conditional write, only while a
- * one-shot is still stored and it was written before `receivedAt` (server time when the log arrived).
+ * Consume the lift's one-shot, once, for a log of a plan that carried it: null its three columns in ONE
+ * conditional write, only while the stored `one_shot_set_at` is the very value the log presents
+ * (`servedSetAt`, the `liftPreference.oneShotSetAt` its plan recorded; the client echoes it in the log
+ * payload). The presented value is only ever compared against the row's own, never stored: a forged,
+ * stale or missing value matches nothing and leaves the one-shot in place. A one-shot set after the
+ * plan was made, or a newer one that replaced the one the plan carried, does not match either.
+ *
+ * Equality is to the millisecond (the plan records an ISO string, which has no microseconds), so the
+ * test is a 2 ms window. No clock is compared here: the set and the expiry both use the database's
+ * `now()`, and a write of `one_shot_set_at` must too (step 5), never an app or device time.
+ *
  * A second device or a retry racing this one re-checks the row after this commits and finds nothing to
  * take, so at most one call returns true. The caller decides whether the log may consume at all
- * (`shouldConsumeOneShot`: a new, non-deload, non-baseline log).
+ * (`logMayConsumeOneShot`: a new, non-deload, non-baseline log).
  */
-export async function consumeLiftOneShot(db: Db, userId: string, exerciseName: string, receivedAt: Date): Promise<boolean> {
+export async function consumeLiftOneShot(db: Db, userId: string, exerciseName: string, servedSetAt: Date): Promise<boolean> {
+  if (Number.isNaN(servedSetAt.getTime())) return false
   const res = await db.execute(sql`
     UPDATE exercise_preferences p
        SET next_load_step = NULL, sets_delta = NULL, one_shot_set_at = NULL, updated_at = now()
@@ -85,7 +108,7 @@ export async function consumeLiftOneShot(db: Db, userId: string, exerciseName: s
        AND p.user_id = ${userId}
        AND p.deleted_at IS NULL
        AND p.one_shot_set_at IS NOT NULL
-       AND p.one_shot_set_at < ${receivedAt.toISOString()}::timestamptz
+       AND abs(extract(epoch FROM (p.one_shot_set_at - ${servedSetAt.toISOString()}::timestamptz))) < 0.002
     RETURNING p.id
   `)
   return (res.rowCount ?? res.rows.length) === 1

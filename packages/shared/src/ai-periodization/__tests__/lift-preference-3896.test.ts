@@ -6,7 +6,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import type { AiPrescription } from '@trainingai/shared/types/ai-periodization'
 import {
-  liftPreferenceFromRow, pctOnePlateStep, setsWithDelta, shouldConsumeOneShot, logMayConsumeOneShot,
+  liftPreferenceFromRow, pctOnePlateStep, setsWithDelta, logMayConsumeOneShot, appliedAfterBudgetRest, ONE_SHOT_TTL_DAYS,
   preferredRepBand, applyLiftPreferenceToStyle, oneShotDue,
   PREFERENCE_REST_MAX_SEC, PREFERENCE_REST_MIN_SEC, type LiftPreference, type LiftPreferenceRow,
 } from '../lift-preference'
@@ -66,15 +66,15 @@ describe('the one-shot is due outside deload and baseline, and a log consumes it
     expect(oneShotDue(shot, { deload: true, baseline: false })).toBeNull()
     expect(oneShotDue(shot, { deload: false, baseline: true })).toBeNull()
   })
-  it('a new, normal log received after the one-shot was set consumes it; nothing else does', () => {
-    const base = { oneShotSetAt: SET_AT, receivedAt: new Date(SET_AT.getTime() + 1000), isNewLog: true, deloaded: false, baseline: false }
-    expect(shouldConsumeOneShot(base)).toBe(true)
-    expect(shouldConsumeOneShot({ ...base, isNewLog: false })).toBe(false) // a retry of a stored log
-    expect(shouldConsumeOneShot({ ...base, deloaded: true })).toBe(false)
-    expect(shouldConsumeOneShot({ ...base, baseline: true })).toBe(false)
-    expect(shouldConsumeOneShot({ ...base, receivedAt: SET_AT })).toBe(false) // server time, strictly after
-    expect(shouldConsumeOneShot({ ...base, oneShotSetAt: null })).toBe(false)
+  it('only a new, normal log may consume it; whether it carried this one-shot is decided by the write', () => {
+    const base = { isNewLog: true, deloaded: false, baseline: false }
     expect(logMayConsumeOneShot(base)).toBe(true)
+    expect(logMayConsumeOneShot({ ...base, isNewLog: false })).toBe(false) // a retry of a stored log
+    expect(logMayConsumeOneShot({ ...base, deloaded: true })).toBe(false)
+    expect(logMayConsumeOneShot({ ...base, baseline: true })).toBe(false)
+  })
+  it('expires after one named limit', () => {
+    expect(ONE_SHOT_TTL_DAYS).toBe(14)
   })
 })
 
@@ -107,6 +107,20 @@ describe('±1 set is held to the role floor and the phase ceiling', () => {
     expect(setsWithDelta(4, 1, 'accessory')).toBeNull() // accessory ceiling 4
     expect(setsWithDelta(5, 1, 'primary')).toBe(6)
     expect(setsWithDelta(5, 1, 'primary', 5)).toBeNull() // accumulation setsMax 5
+  })
+  it('"one fewer" never adds a set: 1 with -1 is no change, not 2', () => {
+    expect(setsWithDelta(1, -1, 'accessory')).toBeNull()
+    expect(setsWithDelta(1, -1, 'primary')).toBeNull()
+    expect(setsWithDelta(0, -1, 'accessory')).toBeNull() // never reaches 0, never "adds" one either
+  })
+  it('"one more" never removes a set: a count above the ceiling is no change, not a clamp down', () => {
+    expect(setsWithDelta(6, 1, 'primary', 5)).toBeNull() // 6 against a phase maximum of 5 (was 5)
+    expect(setsWithDelta(6, 1, 'accessory')).toBeNull() // 6 against an accessory ceiling of 4 (was 4)
+  })
+  it('the normal cases still move by exactly one', () => {
+    expect(setsWithDelta(3, 1, 'accessory')).toBe(4)
+    expect(setsWithDelta(4, -1, 'primary')).toBe(3)
+    expect(setsWithDelta(3, -1, 'secondary')).toBe(2)
   })
 })
 
@@ -289,13 +303,13 @@ const withPref = (s: PrescriptionSignals, id: string, p: LiftPreference, basisKg
   ...s, exercises: s.exercises.map(e => e.sessionExerciseId === id ? { ...e, liftPreference: { preference: p, basisKg } } as Ex : e),
 })
 let n = 0
-async function generate(scenarioIndex: number, sig?: PrescriptionSignals, phase?: string): Promise<AiPrescription> {
+async function generate(scenarioIndex: number, sig?: PrescriptionSignals, phase?: string, preset?: 'short' | 'standard' | 'long'): Promise<AiPrescription> {
   const sc = SCENARIOS[scenarioIndex]
   mocks.signals = structuredClone(sig ?? sc.signals)
   mocks.model = sc.model
   mocks.prompts = []
   const stored: AiPrescription[] = []
-  await generatePrescriptionForSession(`user-3896-pref-${++n}`, SESSION_ID, fakeRepo(phase ?? sc.phase, stored), 'Australia/Brisbane')
+  await generatePrescriptionForSession(`user-3896-pref-${++n}`, SESSION_ID, fakeRepo(phase ?? sc.phase, stored), 'Australia/Brisbane', undefined, preset)
   return stored[0]
 }
 const byId = (p: AiPrescription, id: string) => p.exercises.find(e => e.sessionExerciseId === id)!
@@ -468,6 +482,44 @@ describe('a budget re-fit keeps a one-shot set the plan applied, once', () => {
     current = once.prescription
     const twice = await refitPrescriptionToBudget('u', SESSION_ID, repo, 'Australia/Brisbane', 'standard')
     expect(twice.ok && byId(twice.prescription, 's').sets).toBe(byId(plan, 's').sets)
+  })
+})
+
+describe('a rest the time budget shortened is not recorded as the preferred rest (fix 3)', () => {
+  it('the record keeps restSec only while the final rest is that rest', () => {
+    expect(appliedAfterBudgetRest({ restSec: 120, repRange: { min: 10, max: 12 } }, 120)).toEqual({ restSec: 120, repRange: { min: 10, max: 12 } })
+    expect(appliedAfterBudgetRest({ restSec: 120, repRange: { min: 10, max: 12 } }, 90)).toEqual({ repRange: { min: 10, max: 12 } })
+    expect(appliedAfterBudgetRest({ restSec: 120 }, 90)).toBeUndefined()
+    expect(appliedAfterBudgetRest(undefined, 90)).toBeUndefined()
+    expect(appliedAfterBudgetRest({ loadStep: 'lighter' }, 90)).toEqual({ loadStep: 'lighter' })
+  })
+
+  it('a shorter session: the budget wins and the stored plan does not claim the preferred rest', async () => {
+    const full = await generate(0, withPref(SCENARIOS[0].signals, 'a', pref({ restSec: 120 })), undefined, 'standard')
+    expect(byId(full, 'a')).toMatchObject({ restSec: 120, liftPreference: { restSec: 120 } })
+    const short = await generate(0, withPref(SCENARIOS[0].signals, 'a', pref({ restSec: 120 })), undefined, 'short')
+    expect(byId(short, 'a').restSec).toBeLessThan(120) // an accessory's rest is cut a quarter on a short day
+    expect(byId(short, 'a').liftPreference?.restSec).toBeUndefined()
+  })
+
+  it('a re-fit to a shorter day drops the claim too, and keeps it when the rest is unchanged', async () => {
+    const { refitPrescriptionToBudget } = await import('../refit-prescription')
+    const plan = await generate(0, withPref(SCENARIOS[0].signals, 'a', pref({ restSec: 120 })), undefined, 'standard')
+    mocks.signals = structuredClone(SCENARIOS[0].signals)
+    const stored: AiPrescription[] = []
+    const repo = fakeRepo(SCENARIOS[0].phase, stored, {
+      getSessionPeriodization: async () => ({
+        phase: SCENARIOS[0].phase, phaseStartedAt: new Date(0), prescription: plan, prescriptionStatus: 'pending',
+        prescriptionExpiresAt: new Date('2026-11-28T00:00:00Z'),
+      }),
+    })
+    const same = await refitPrescriptionToBudget('u', SESSION_ID, repo, 'Australia/Brisbane', 'standard')
+    expect(same.ok && byId(same.prescription, 'a').liftPreference?.restSec).toBe(120)
+    const short = await refitPrescriptionToBudget('u', SESSION_ID, repo, 'Australia/Brisbane', 'short')
+    expect(short.ok).toBe(true)
+    if (!short.ok) return
+    expect(byId(short.prescription, 'a').restSec).toBeLessThan(120)
+    expect(byId(short.prescription, 'a').liftPreference?.restSec).toBeUndefined()
   })
 })
 

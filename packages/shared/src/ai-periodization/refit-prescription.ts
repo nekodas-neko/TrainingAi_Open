@@ -14,7 +14,7 @@ import { phaseOfLoads } from '@trainingai/shared/ai-periodization/phase-guards'
 import { budgetForPreset, requestedBudgetMin, type DurationPreset } from '@trainingai/shared/workout/duration-model'
 import type { AiPrescription, PrescriptionStatus } from '@trainingai/shared/types/ai-periodization'
 import type { WorkoutRepository } from '@/lib/data/repository'
-import { setsWithDelta } from '@trainingai/shared/ai-periodization/lift-preference'
+import { setsWithDelta, appliedAfterBudgetRest } from '@trainingai/shared/ai-periodization/lift-preference'
 import { phaseSetsMax } from '@trainingai/shared/ai-periodization/prompt'
 import { UNCLASSIFIED_EXERCISE_ROLE } from '@trainingai/shared/workout/exercise-role'
 
@@ -122,11 +122,18 @@ export async function refitPrescriptionToBudget(
     (budget.restSec.get(ex.sessionExerciseId) ?? fullRest[ex.sessionExerciseId]) !== fullRest[ex.sessionExerciseId])
   const prescription: AiPrescription = {
     ...carried,
-    exercises: stored.exercises.map(ex => ({
-      ...ex,
-      sets: budget.sets.get(ex.sessionExerciseId) ?? ex.sets,
-      restSec: budget.restSec.get(ex.sessionExerciseId) ?? fullRest[ex.sessionExerciseId],
-    })),
+    exercises: stored.exercises.map(ex => {
+      const restSec = budget.restSec.get(ex.sessionExerciseId) ?? fullRest[ex.sessionExerciseId]
+      // The re-fit can shorten a preferred rest too; the record must not claim it was used (#3896).
+      const { liftPreference: recorded, ...exRest } = ex
+      const liftPreference = appliedAfterBudgetRest(recorded, restSec)
+      return {
+        ...exRest,
+        sets: budget.sets.get(ex.sessionExerciseId) ?? ex.sets,
+        restSec,
+        ...(liftPreference && { liftPreference }),
+      }
+    }),
     refitBaseline: {
       ...baseline,
       ...((baseline.restSec || restShortened) && { restSec: fullRest }),

@@ -50,7 +50,7 @@ export interface LiftPreferenceRow {
 export interface LiftOneShot {
   loadStep: LoadStep | null
   setsDelta: -1 | 1 | null
-  /** Server time the one-shot was written. It is consumed by the first finished log received after it. */
+  /** When the one-shot was written, on the database clock. A log consumes it only by presenting this exact value. */
   setAt: Date
 }
 
@@ -96,8 +96,8 @@ export function preferenceAppliesIn(ctx: { deload: boolean; baseline: boolean })
 
 /**
  * Is the one-shot due on this prescription, and what does it do. Due whenever one is stored and the
- * session is neither a deload nor a baseline; it stays due until a finished log consumes it
- * (`shouldConsumeOneShot`), so every plan made before then carries it.
+ * session is neither a deload nor a baseline; it stays due until a log of a plan that carried it
+ * consumes it (`consumeLiftOneShot`) or it expires (`ONE_SHOT_TTL_DAYS`).
  */
 export function oneShotDue(pref: LiftPreference | null | undefined, ctx: { deload: boolean; baseline: boolean }): LiftOneShot | null {
   if (!pref?.oneShot || !preferenceAppliesIn(ctx)) return null
@@ -114,22 +114,12 @@ export function logMayConsumeOneShot(args: { isNewLog: boolean; deloaded: boolea
 }
 
 /**
- * The whole consume decision: a log that may consume (`logMayConsumeOneShot`), and a one-shot written
- * before the server received the log. Both times are the server's; the device's `logged_at` is never
- * compared, so a skewed phone clock cannot consume it early or never. The time half runs in SQL, in
- * the same conditional write that clears it (`consumeLiftOneShot` in
- * lib/data/postgres/slices/exercise-preferences.ts), so two devices or a retry cannot both take it.
+ * How long a one-shot stays applicable. Past this it is not applied and the reader clears it, so a
+ * lift that was skipped, or a workout that was abandoned, cannot carry a "lighter next time" for weeks.
+ * Read in one place: `listExercisePreferences` (lib/data/postgres/slices/exercise-preferences.ts), on
+ * the database clock.
  */
-export function shouldConsumeOneShot(args: {
-  oneShotSetAt: Date | null
-  receivedAt: Date
-  isNewLog: boolean
-  deloaded: boolean
-  baseline: boolean
-}): boolean {
-  return logMayConsumeOneShot(args)
-    && args.oneShotSetAt != null && args.oneShotSetAt.getTime() < args.receivedAt.getTime()
-}
+export const ONE_SHOT_TTL_DAYS = 14
 
 /** The rep band autoregulation and the session read judge a lift against: the person's range when
  *  they chose one, otherwise the role's default. Without this the two would "correct" the
@@ -171,10 +161,26 @@ export function pctOnePlateStep(
 }
 
 /** The ±1 set, held to the role's floor (2) and its ceiling for the phase (`roleCeiling`). Null when the
- *  bound leaves the count where it was. */
+ *  bound leaves the count where it was, and also when it would put the count on the wrong side of it:
+ *  "one fewer" never adds a set (1 with -1 clamps up to the floor of 2) and "one more" never removes
+ *  one (a count already above the ceiling clamps down). A null result is "no change", and the caller
+ *  records nothing as applied. A count never reaches 0. */
 export function setsWithDelta(sets: number, delta: -1 | 1, role: string, phaseSetsMax?: number | null): number | null {
   const next = Math.min(roleCeiling(role, phaseSetsMax), Math.max(roleFloor(role), sets + delta))
-  return next === sets ? null : next
+  if (next < 1) return null
+  return delta < 0 ? (next < sets ? next : null) : (next > sets ? next : null)
+}
+
+/**
+ * The record of what a plan applied, corrected for a rest the time budget then changed. The budget
+ * wins over a preferred rest (it is the time the person has), so a row whose final rest is not the
+ * preferred one must not say it used it: the record drops `restSec`, and the whole record when that
+ * was all it held. Used where a plan is stored after the budget stage (generation and the re-fit).
+ */
+export function appliedAfterBudgetRest(applied: AppliedLiftPreference | undefined, finalRestSec: number): AppliedLiftPreference | undefined {
+  if (!applied || applied.restSec == null || applied.restSec === finalRestSec) return applied
+  const { restSec: _dropped, ...rest } = applied
+  return Object.keys(rest).length > 0 ? rest : undefined
 }
 
 /** Per-set shape the static path works on (a progression style's sets). */

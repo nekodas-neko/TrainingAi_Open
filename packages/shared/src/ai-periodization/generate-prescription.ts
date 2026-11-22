@@ -43,7 +43,7 @@ import { reconcilePrescription } from '@trainingai/shared/ai-periodization/recon
 import { buildPrescriptionShadow } from '@trainingai/shared/ai-periodization/prescription-shadow'
 import { loadSessionReads } from '@trainingai/shared/ai-periodization/session-read-plan'
 import { loadLiftPreferences } from '@trainingai/shared/ai-periodization/lift-preference-read'
-import { clampReps, preferenceAppliesIn } from '@trainingai/shared/ai-periodization/lift-preference'
+import { clampReps, preferenceAppliesIn, appliedAfterBudgetRest } from '@trainingai/shared/ai-periodization/lift-preference'
 import {
   applyLiftPreferenceToPlanRow, applyPlanSetsDelta, mergeApplied, secondaryTargetRpe,
 } from '@trainingai/shared/ai-periodization/lift-preference-plan'
@@ -53,6 +53,10 @@ import type { PrescriptionSignals } from '@trainingai/shared/ai-periodization/si
 import type { WorkoutRepository } from '@/lib/data/repository'
 import { createDedupCache } from '@trainingai/shared/ai-periodization/generation-dedup'
 import { UNCLASSIFIED_EXERCISE_ROLE } from '@trainingai/shared/workout/exercise-role'
+
+function liftPreferenceField(applied: AppliedLiftPreference | undefined): { liftPreference?: AppliedLiftPreference } {
+  return applied ? { liftPreference: applied } : {}
+}
 
 export type GeneratePrescriptionResult =
   | {
@@ -898,7 +902,8 @@ async function runPrescriptionGeneration(
       pct: ex.pct,
       restSec: ex.rest_sec,
       autoregNote: joinNotes(autoreg.notes[ex.session_exercise_id], perExDeload.recentNotes[ex.session_exercise_id]),
-      ...(appliedById.has(ex.session_exercise_id) && { liftPreference: appliedById.get(ex.session_exercise_id) }),
+      // The budget's rest (above) wins over a preferred rest, so the record says so.
+      ...liftPreferenceField(appliedAfterBudgetRest(appliedById.get(ex.session_exercise_id), ex.rest_sec)),
       ...(deloadedIds.has(ex.session_exercise_id) && {
         deloaded: true,
         deloadNote: perExDeload.notes[ex.session_exercise_id],
