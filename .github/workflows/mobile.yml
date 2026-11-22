@@ -143,7 +143,7 @@ jobs:
       # over the project's, so prebuild cannot overwrite it. The runner has 16 GB. The init script
       # logs the heap the build JVM really got. The helper retries a Gradle run once, and only when
       # its log shows a dependency download failure (Maven Central answered 429, #4025), never on a
-      # compile or test failure.
+      # compile or test failure. The cache below is keyed on the lockfile and Gradle files.
       - name: Gradle heap and retry helper
         run: |
           set -euo pipefail
