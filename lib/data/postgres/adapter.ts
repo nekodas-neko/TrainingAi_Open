@@ -537,6 +537,12 @@ function rowToAnalyte(r: {
   }
 }
 
+/** Maps a unique violation (23505) on the library name to the 409 the pre-check gives; any other error passes through. */
+function libraryNameTaken(err: unknown, name: string): unknown {
+  const code = (err as { code?: string }).code ?? (err as { cause?: { code?: string } }).cause?.code
+  return code === '23505' ? new UserFacingError(`An exercise named "${name}" already exists`, 409) : err
+}
+
 export class PostgresWorkoutRepository implements WorkoutRepository {
   async applyHealthConnectBatch(userId:string,batch:import('@trainingai/shared/validation/health-connect-import').HealthConnectBatch,timezone?:string){return healthConnect.applyHealthConnectBatch(this.db,userId,batch,timezone)}
   async rebuildHealthConnect(userId:string,timezone:string){return healthConnect.rebuildHealthConnect(this.db,userId,timezone)}
@@ -3212,7 +3218,10 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       // stamp backwards. `updatedAt` is also set by `trg_set_updated_at`; the explicit set is kept for clarity.
       await tx.update(s.exerciseLogs).set({ exerciseName: newName, updatedAt: sql`now()`, clientEditedAt: sql`GREATEST(client_edited_at, now())` }).where(eq(s.exerciseLogs.exerciseName, oldName))
       await repointStoredExerciseNames(tx, oldName, newName)
+      // A concurrent create or rename can take the name between the check above and this write; the
+      // unique index then answers 23505, which is the same 409 as the check, not a generic failure.
       const [row] = await tx.update(s.exerciseLibrary).set({ name: newName }).where(eq(s.exerciseLibrary.id, id)).returning()
+        .catch(e => { throw libraryNameTaken(e, newName) })
       return { id: row.id, name: row.name, muscles: row.muscles as MuscleAssignment[], equipment: row.equipment ?? [], instructions: row.instructions ?? undefined, createdBy: row.createdBy ?? undefined, exerciseType: (row.exerciseType as ExerciseType) ?? 'weighted' }
     })
   }
@@ -3251,6 +3260,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         })
         .where(eq(s.exerciseLibrary.id, entry.id))
         .returning()
+        .catch(e => { throw libraryNameTaken(e, newName) })
       return { id: row.id, name: row.name, muscles: row.muscles as MuscleAssignment[], equipment: row.equipment ?? [], instructions: row.instructions ?? undefined, exerciseType: (row.exerciseType as ExerciseType) ?? 'weighted' }
     })
   }

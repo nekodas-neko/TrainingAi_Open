@@ -41,9 +41,19 @@ export const EXERCISE_NAME_TABLES = {
  *    `exercise_id` is cleared so the tombstone cannot hold the (user, exercise_id) unique slot.
  *  - `personal_records`: a person with a row under only `oldName` has it moved. A person with both
  *    keeps the better figure on the `newName` row (raised only when the old one is higher by more than
- *    0.005, with its `achieved_at`, exactly as migration 164 step (b)); a tie keeps the target. The
- *    table has no tombstone column and the key is (user, name), so the `oldName` row cannot be hidden
- *    or renamed away without a delete: it is left in place, untouched, and the rename still succeeds.
+ *    0.005, with its `achieved_at`, exactly as migration 164 step (b): only those two columns are
+ *    copied, the target keeps its own `exercise_id`); a tie keeps the target. The table has no
+ *    tombstone column and the key is (user, name), so the `oldName` row cannot be hidden or renamed
+ *    away without a delete: it is left in place, untouched, and the rename still succeeds.
+ *
+ *    THE LEFTOVER. After a collision the person keeps a second `personal_records` row under the OLD
+ *    name, holding a figure the surviving row already has. Until it is cleaned up:
+ *      - `lib/achievements.ts` counts it as one more record;
+ *      - `listRecentPersonalRecords` / `listPersonalRecordsDated` can list it;
+ *      - if an exercise is ever created again under the old name, `upsertPersonalRecordIfBetter`
+ *        compares a new lift against it, so a genuine first record under that name may not count.
+ *    `reconcilePersonalRecord(user, oldName)` would remove it, but that is a hard delete of a derived
+ *    row, so it is NOT called here; the owner has been asked (#4004).
  *  - `set_hr_stats` has no name uniqueness, so every row simply moves.
  */
 export async function repointStoredExerciseNames(tx: SqlTx, oldName: string, newName: string): Promise<void> {
@@ -52,7 +62,7 @@ export async function repointStoredExerciseNames(tx: SqlTx, oldName: string, new
   // Raise the target record where the person's old-name record is the better one (164 step (b)).
   await tx.execute(sql`
     UPDATE personal_records t
-    SET estimated_1rm = s.estimated_1rm, achieved_at = s.achieved_at, exercise_id = COALESCE(t.exercise_id, s.exercise_id)
+    SET estimated_1rm = s.estimated_1rm, achieved_at = s.achieved_at
     FROM personal_records s
     WHERE s.user_id = t.user_id AND s.exercise_name = ${oldName} AND t.exercise_name = ${newName}
       AND s.estimated_1rm > t.estimated_1rm + 0.005
@@ -74,11 +84,15 @@ export async function repointStoredExerciseNames(tx: SqlTx, oldName: string, new
   `)
 
   // Revive a tombstoned target with the live source's choices, so the user's live preference survives.
+  // The revived row's own library id is cleared: a tombstone can still hold an id, possibly another
+  // exercise's, and the revived row now carries the source's choices, so it must point at the renamed
+  // exercise (taken from the source below) or at nothing, never at a different exercise.
   await tx.execute(sql`
     UPDATE exercise_preferences t
     SET rep_min = s.rep_min, rep_max = s.rep_max, rest_sec = s.rest_sec,
         next_load_step = s.next_load_step, sets_delta = s.sets_delta, one_shot_set_at = s.one_shot_set_at,
-        source = s.source, deleted_at = NULL, updated_at = now()
+        source = s.source, deleted_at = NULL, updated_at = now(),
+        exercise_id = NULL
     FROM exercise_preferences s
     WHERE s.user_id = t.user_id AND s.exercise_name = ${oldName} AND t.exercise_name = ${newName}
       AND s.deleted_at IS NULL AND t.deleted_at IS NOT NULL
