@@ -15,7 +15,7 @@ export const headerMetrics = {
   back: {
     left: spacing.lg,
     top: spacing.md,
-    width: sizes.touchTarget,
+    /** The control's height: IconButton draws exactly the touch target, so this is that token. */
     height: sizes.touchTarget,
   },
 };

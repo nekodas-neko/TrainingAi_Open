@@ -14,14 +14,12 @@ export function WorkoutSessionHub({
   onFinish,
   onOptions,
   onMinimize,
-  onMuscles,
 }: {
   workout: WorkoutRecord;
   onLeave: () => void;
   onFinish: () => void;
   onOptions: () => void;
   onMinimize: () => void;
-  onMuscles: () => void;
 }) {
   const journal = useWorkoutJournal();
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -59,9 +57,6 @@ export function WorkoutSessionHub({
       onBack={onLeave}
       backLabel="Back to sessions"
       workout={workout}
-      titleAction={
-        <IconButton icon="muscles" label="Muscles worked" onPress={onMuscles} />
-      }
       actions={
         <Stack direction="row" gap="xs">
           <IconButton icon="down" label="Minimize workout" onPress={onMinimize} />

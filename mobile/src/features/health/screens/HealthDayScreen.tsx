@@ -77,7 +77,7 @@ export function HealthDayScreen({
   );
   return (
     <PageLayout
-      title={formatDateDisplay(date, 'long')}
+      title={formatDateDisplay(date, 'weekday-date-long')}
       onBack={onBack}
       backLabel="Back to Health"
       actions={

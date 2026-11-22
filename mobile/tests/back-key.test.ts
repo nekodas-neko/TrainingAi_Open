@@ -10,7 +10,7 @@ import ts from 'typescript';
 // the Goals editor left the app because their layout never registered a Back handler.
 
 const root = resolve(import.meta.dirname, '..', 'src');
-const LAYOUTS = ['PageLayout', 'Screen', 'WorkoutLayout', 'HealthDetailLayout'];
+const LAYOUTS = ['PageLayout', 'WorkoutLayout', 'HealthDetailLayout'];
 // Tab roots: Back from these leaves the app on purpose.
 const TAB_ROOTS = new Set([
   'HomeScreen',
@@ -21,7 +21,7 @@ const TAB_ROOTS = new Set([
   // #3724: replaces the whole shell when the build is too old; there is nothing behind it.
   'TooOldScreen',
 ]);
-// Rendered inside App's own <Screen onBack>, so App registers Back for them.
+// Rendered inside App's own <PageLayout onBack>, so App registers Back for them.
 const HOSTED_BY_APP = new Set(['DataScreen', 'SettingsScreen']);
 
 function parse(source: string, name: string) {
@@ -76,7 +76,7 @@ async function registeredScreens() {
 }
 
 test('layouts that take onBack register the Android Back handler', async () => {
-  for (const file of ['Screen', 'PageLayout', 'HealthDetailLayout']) {
+  for (const file of ['PageLayout', 'HealthDetailLayout']) {
     const source = await readFile(resolve(root, 'shared', 'ui', `${file}.tsx`), 'utf8');
     assert.match(
       source,

@@ -17,6 +17,10 @@ function BackControl({ onBack, backLabel = BACK_LABEL, backIcon = 'back' }: Back
   return <IconButton icon={backIcon} label={backLabel} onPress={onBack} />;
 }
 
+// A header item as tall as Back, centred on it: the bar's first row. A title block taller than
+// this (subtitle, detail) grows the bar downward and never moves Back or the actions.
+const rowSlot = { minHeight: headerMetrics.back.height, justifyContent: 'center' as const };
+
 export type PageHeaderProps =
   | ({
       mode?: 'bar';
@@ -79,7 +83,7 @@ export function PageHeader(props: PageHeaderProps) {
   return (
     <Stack
       direction="row"
-      align="center"
+      align="flex-start"
       gap="sm"
       style={{
         paddingHorizontal: m.sidePadding,
@@ -88,8 +92,12 @@ export function PageHeader(props: PageHeaderProps) {
         borderBottomColor: theme.colors.border,
       }}
     >
-      {props.onBack && <BackControl {...props} />}
-      <View style={{ flex: 1, minWidth: 0 }}>
+      {props.onBack && (
+        <View style={{ alignSelf: 'flex-start' }}>
+          <BackControl {...props} />
+        </View>
+      )}
+      <View style={[{ flex: 1, minWidth: 0 }, rowSlot]}>
         <AppText variant={m.titleVariant} numberOfLines={1} accessibilityRole="header">
           {title}
         </AppText>
@@ -108,13 +116,15 @@ export function PageHeader(props: PageHeaderProps) {
           </AppText>
         )}
       </View>
-      {titleAction}
+      {titleAction && <View style={rowSlot}>{titleAction}</View>}
       {actions && (
-        <Stack direction="row" gap="xs">
-          {actions}
-        </Stack>
+        <View style={rowSlot}>
+          <Stack direction="row" gap="xs">
+            {actions}
+          </Stack>
+        </View>
       )}
-      {trailing}
+      {trailing && <View style={rowSlot}>{trailing}</View>}
     </Stack>
   );
 }

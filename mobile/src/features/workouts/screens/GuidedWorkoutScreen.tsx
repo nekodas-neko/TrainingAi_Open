@@ -264,7 +264,6 @@ export function GuidedWorkoutScreen({
         }}
         onOptions={() => setPanel('options')}
         onMinimize={closeWorkout}
-        onMuscles={() => setPanel('muscles')}
       />
     );
   } else {
@@ -292,13 +291,6 @@ export function GuidedWorkoutScreen({
         backIcon={flow.stage === 'summary' ? 'forward' : 'back'}
         backLabel={
           flow.stage === 'summary' ? 'Continue to next exercise' : 'Back to session'
-        }
-        titleAction={
-          <IconButton
-            icon="muscles"
-            label="Muscles worked"
-            onPress={() => setPanel('muscles')}
-          />
         }
         actions={
           <Stack direction="row" gap="xs">
@@ -542,6 +534,12 @@ export function GuidedWorkoutScreen({
           </>
         ) : shownPanel === 'options' ? (
           <>
+            <AppButton
+              title="Muscles worked"
+              icon="muscles"
+              variant="surface"
+              onPress={() => setPanel('muscles')}
+            />
             {flow.stage !== 'review' && flow.stage !== 'warmup' && (
               <AppButton
                 title="Exercise details"
