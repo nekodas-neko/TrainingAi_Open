@@ -531,6 +531,9 @@ jobs:
       - name: API responses stay out of the browser HTTP cache
         run: node scripts/check-api-no-store.js
 
+      - name: A test that inserts into exercise_library also deletes from it (#4040)
+        run: node scripts/check-test-exercise-library-cleanup.js
+
       - name: An e2e /api stub blocks the service worker
         run: node scripts/check-e2e-api-stub-sw.js
 
