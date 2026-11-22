@@ -3198,12 +3198,16 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       if (!existing) throw new NotFoundError('Exercise')
       if (existing.createdBy !== userId) throw new UserFacingError('Not authorized to rename this exercise', 403)
       const oldName = existing.name
+      if (newName !== oldName) {
+        const [conflict] = await tx.select({ id: s.exerciseLibrary.id }).from(s.exerciseLibrary)
+          .where(and(eq(s.exerciseLibrary.name, newName), ne(s.exerciseLibrary.id, id)))
+        if (conflict) throw new UserFacingError(`An exercise named "${newName}" already exists`, 409)
+      }
       await renameSessionExercises(tx, oldName, newName)
       // Issue 2939: a rename is a server-decided edit of the log, so it stamps like the lbs-to-kg fix does;
       // without `clientEditedAt` a stale phone replay puts the old name back. GREATEST never moves a newer
       // stamp backwards. `updatedAt` is also set by `trg_set_updated_at`; the explicit set is kept for clarity.
       await tx.update(s.exerciseLogs).set({ exerciseName: newName, updatedAt: sql`now()`, clientEditedAt: sql`GREATEST(client_edited_at, now())` }).where(eq(s.exerciseLogs.exerciseName, oldName))
-      await tx.update(s.personalRecords).set({ exerciseName: newName }).where(eq(s.personalRecords.exerciseName, oldName))
       await repointStoredExerciseNames(tx, oldName, newName)
       const [row] = await tx.update(s.exerciseLibrary).set({ name: newName }).where(eq(s.exerciseLibrary.id, id)).returning()
       return { id: row.id, name: row.name, muscles: row.muscles as MuscleAssignment[], equipment: row.equipment ?? [], instructions: row.instructions ?? undefined, createdBy: row.createdBy ?? undefined, exerciseType: (row.exerciseType as ExerciseType) ?? 'weighted' }
@@ -3228,7 +3232,6 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         // without `clientEditedAt` a stale phone replay puts the old name back. GREATEST never moves a newer
         // stamp backwards. `updatedAt` is also set by `trg_set_updated_at`; the explicit set is kept for clarity.
         await tx.update(s.exerciseLogs).set({ exerciseName: newName, updatedAt: sql`now()`, clientEditedAt: sql`GREATEST(client_edited_at, now())` }).where(eq(s.exerciseLogs.exerciseName, oldName))
-        await tx.update(s.personalRecords).set({ exerciseName: newName }).where(eq(s.personalRecords.exerciseName, oldName))
         await repointStoredExerciseNames(tx, oldName, newName)
         // Old name's cached GIF is now orphaned — the route re-sets or clears the cache for
         // the new name based on the submitted gifUrl.
