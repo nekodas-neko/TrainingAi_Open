@@ -136,6 +136,9 @@ export interface StoredSessionRead extends SessionRead {
   exerciseName: string
   /** The workout the read judged. */
   workoutSessionId: string
+  /** #3890: last week's check-in answered "Heavy" for this lift, so the read never adds load
+   *  (`holdUnderCheckin`). Absent otherwise. */
+  checkinHeld?: true
 }
 
 // ── The rules ────────────────────────────────────────────────────────────────────────────────
@@ -182,6 +185,65 @@ function tooLittle(why: TooLittleDataWhy, sets: SessionReadSetResult[] = []): Se
   }
 }
 
+/**
+ * One set against the plan: the per-set rule of the read, and of the weekly check-in's "missed rep"
+ * (`unexcusedMissAtPlan`), so the two cannot disagree about what a miss is. `prev` is the set before
+ * (its rest is the rest before this one); `isFirst` and `isLast` place it in the session, by set number.
+ *   - unplanned: no planned reps (a freeform or extra set).
+ *   - met / beat: the planned reps, or more (the last set beats at +2, any other at +1).
+ *   - miss-self-heavier: short, at more than one plate step over the planned weight (the lifter's choice;
+ *     every rep excused).
+ *   - miss: short. The first set has no rest before it, so nothing is excused; an unknown rest excuses
+ *     every rep (design §3A.4); a short rest excuses up to `restExcuse` reps.
+ */
+export function classifySet(
+  set: SessionReadSet, prev: SessionReadSet | null, isLast: boolean, isFirst: boolean, weightStepKg: number,
+): SessionReadSetResult {
+  const restBeforeRatio = prev ? ratioOf(prev.restTimeSec, prev.plannedRestSec) : null
+  const planned = set.plannedReps
+  if (planned == null || !(planned > 0)) {
+    return { setNumber: set.setNumber, cls: 'unplanned', missReps: 0, excusedReps: 0, restBeforeRatio }
+  }
+  if (set.reps >= planned) {
+    const beat = isLast ? set.reps >= planned + LAST_SET_BEAT_OVER_PLANNED : set.reps >= planned + 1
+    return { setNumber: set.setNumber, cls: beat ? 'beat' : 'met', missReps: 0, excusedReps: 0, restBeforeRatio }
+  }
+  const missReps = planned - set.reps
+  const step = weightStepKg > 0 ? weightStepKg : 0
+  const selfHeavier = set.plannedWeightKg != null && set.plannedWeightKg > 0 &&
+    set.weightKg > set.plannedWeightKg + SELF_HEAVIER_STEPS * step + 1e-6
+  if (selfHeavier) return { setNumber: set.setNumber, cls: 'miss-self-heavier', missReps, excusedReps: missReps, restBeforeRatio }
+  let excusedReps: number
+  if (isFirst) excusedReps = 0
+  // We don't call a weight too heavy on a miss we can't explain (design §3A.4).
+  else if (restBeforeRatio == null) excusedReps = missReps
+  else excusedReps = Math.min(missReps, restExcuse(restBeforeRatio))
+  return { setNumber: set.setNumber, cls: 'miss', missReps, excusedReps, restBeforeRatio }
+}
+
+/** Every set of a session, in set-number order, by `classifySet`. */
+export function classifySets(sets: readonly SessionReadSet[], weightStepKg: number): { set: SessionReadSet; result: SessionReadSetResult }[] {
+  const sorted = [...sets].sort((a, b) => a.setNumber - b.setNumber)
+  return sorted.map((set, i) => ({
+    set, result: classifySet(set, i > 0 ? sorted[i - 1] : null, i === sorted.length - 1, i === 0, weightStepKg),
+  }))
+}
+
+/**
+ * #3890 decision 9 (the Orchestrator's rule, 22 Nov): a session holds a missed rep the check-in may act on
+ * when a set fell short of its planned reps AT the planned weight or lighter, the short rest before it
+ * does not excuse the reps it lost, and the session was not an override. Built on `classifySet`, so a miss
+ * here is a miss to the read: a set loaded heavier than planned (by any amount, a stricter bar than the
+ * read's one-step `miss-self-heavier`), a set with no planned weight, a miss the rest before it explains
+ * and an unknown rest (which the read excuses) are not.
+ */
+export function unexcusedMissAtPlan(sets: readonly SessionReadSet[], weightStepKg: number, overridden: boolean): boolean {
+  if (overridden) return false
+  return classifySets(sets, weightStepKg).some(({ set, result }) =>
+    result.cls === 'miss' && result.missReps > result.excusedReps &&
+    set.plannedWeightKg != null && set.plannedWeightKg > 0 && set.weightKg <= set.plannedWeightKg + 1e-6)
+}
+
 export function readSession(input: SessionReadInput): SessionRead {
   const sets = [...input.sets].sort((a, b) => a.setNumber - b.setNumber)
   if (input.overridden) return tooLittle('overridden')
@@ -204,15 +266,12 @@ export function readSession(input: SessionReadInput): SessionRead {
 
   sets.forEach((set, i) => {
     const prev = i > 0 ? sets[i - 1] : null
-    const restBeforeRatio = prev ? ratioOf(prev.restTimeSec, prev.plannedRestSec) : null
-    const planned = set.plannedReps
-    if (planned == null || !(planned > 0)) {
-      results.push({ setNumber: set.setNumber, cls: 'unplanned', missReps: 0, excusedReps: 0, restBeforeRatio })
-      return
-    }
+    const result = classifySet(set, prev, i === sets.length - 1, i === 0, step)
+    results.push(result)
+    if (result.cls === 'unplanned') return
+    const planned = set.plannedReps!
     comparable++
     targetReps += planned
-    const isLast = i === sets.length - 1
 
     if (hrRead && prev?.hr?.coverageOk && (prev.hr.recoveredPreset != null || prev.hr.restAdequate != null)) {
       measuredRests++
@@ -224,36 +283,16 @@ export function readSession(input: SessionReadInput): SessionRead {
       if (pct != null && pct > 0 && set.rpe <= expectedRpe(pct, set.reps) - RPE_DEAD_BAND) easyRated++
     }
 
-    if (set.reps >= planned) {
-      const beat = isLast ? set.reps >= planned + LAST_SET_BEAT_OVER_PLANNED : set.reps >= planned + 1
-      if (beat) anyBeat = true
-      if (beat) allExactlyMet = false
-      results.push({ setNumber: set.setNumber, cls: beat ? 'beat' : 'met', missReps: 0, excusedReps: 0, restBeforeRatio })
+    if (result.cls === 'met' || result.cls === 'beat') {
+      if (result.cls === 'beat') { anyBeat = true; allExactlyMet = false }
       return
     }
-
     anyMiss = true
     allExactlyMet = false
-    const missReps = planned - set.reps
-    const selfHeavier = set.plannedWeightKg != null && set.plannedWeightKg > 0 &&
-      set.weightKg > set.plannedWeightKg + SELF_HEAVIER_STEPS * step + 1e-6
-    if (selfHeavier) {
-      results.push({ setNumber: set.setNumber, cls: 'miss-self-heavier', missReps, excusedReps: missReps, restBeforeRatio })
-      return
-    }
-    let excusedReps: number
-    if (i === 0) {
-      excusedReps = 0
-      firstSetMissReps = missReps
-    } else if (restBeforeRatio == null) {
-      // We don't call a weight too heavy on a miss we can't explain (design §3A.4).
-      excusedReps = missReps
-    } else {
-      excusedReps = Math.min(missReps, restExcuse(restBeforeRatio))
-      if (excusedReps > 0) restShort = true
-    }
-    unexplainedReps += missReps - excusedReps
-    results.push({ setNumber: set.setNumber, cls: 'miss', missReps, excusedReps, restBeforeRatio })
+    if (result.cls === 'miss-self-heavier') return
+    if (i === 0) firstSetMissReps = result.missReps
+    else if (result.restBeforeRatio != null && result.excusedReps > 0) restShort = true
+    unexplainedReps += result.missReps - result.excusedReps
   })
 
   if (comparable < MIN_COMPARABLE_SETS) return tooLittle('too-few-planned-sets', results)

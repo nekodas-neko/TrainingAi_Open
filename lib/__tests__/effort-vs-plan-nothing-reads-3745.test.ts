@@ -130,6 +130,13 @@ const SESSION_READ_IMPORTERS = [
   'lib/data/repository.ts',
   'packages/shared/src/ai-periodization/session-read-plan.ts',
   'packages/shared/src/types/ai-periodization.ts',
+  // #3890: the weekly check-in's summary compares the logged sets with the plan through the read's own
+  // per-set rule (`classifySet`), keeps the read's verdict as a machine field only, and lets "Heavy" hold
+  // a stored read (`holdUnderCheckin`, applied inside session-read-plan.ts); neither builds a
+  // prescription. Its one load effect, Heavy plus a missed rep, is `unexcusedMissAtPlan` on the logged
+  // sets, never a verdict, so nothing it writes hangs on the shadow read.
+  'packages/shared/src/weekly-checkin/effects.ts',
+  'packages/shared/src/weekly-checkin/summary.ts',
 ]
 
 const isTest = (path: string) =>

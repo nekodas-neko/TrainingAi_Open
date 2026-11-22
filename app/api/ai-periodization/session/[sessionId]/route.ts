@@ -4,6 +4,7 @@ import { getRepository } from '@/lib/data'
 import { buildCardExerciseSignals } from '@trainingai/shared/ai-periodization/signals'
 import { normalizeStoredPrescription } from '@trainingai/shared/ai-periodization/reconcile-prescription'
 import { servePrescriptionState } from '@trainingai/shared/ai-periodization/prescription-expiry'
+import { fitStoredPlanToCheckinBudget } from '@trainingai/shared/ai-periodization/checkin-plan-budget'
 import { readProgramDeloadCheck } from '@trainingai/shared/ai-periodization/program-phase'
 import { DEFAULT_TZ } from '@trainingai/shared/date-utils'
 import type { Baseline1rmEntry } from '@trainingai/shared/types/ai-periodization'
@@ -29,6 +30,9 @@ export async function GET(
 
   let state = await repo.ensureSessionPeriodization(userId, sessionId)
   if (!state) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  // #3890: in the applies-to week, the weekly check-in's shorter session (no model call, no query for
+  // a person without one).
+  state = await fitStoredPlanToCheckinBudget(userId, sessionId, repo, session?.user?.timezone ?? DEFAULT_TZ, state)
 
   // BF-143. "Has this session been trained since its baseline phase began?" — the only honest test
   // of the interruption the auto-heal below exists to repair, and the one the old condition lacked.

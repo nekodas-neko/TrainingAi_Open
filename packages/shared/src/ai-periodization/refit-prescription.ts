@@ -42,6 +42,10 @@ export async function refitPrescriptionToBudget(
   tz: string,
   durationPreset: DurationPreset,
   now = new Date(),
+  // #3890: set by `fitStoredPlanToCheckinBudget` only. The minutes this fit is for the weekly check-in,
+  // or null to give a check-in fit back. Left out (a length the person picked), a plan the check-in had
+  // fitted is marked as theirs, so the check-in no longer re-fits it.
+  checkin?: { min: number | null },
 ): Promise<RefitResult> {
   // #3927: the program and the session's structure stamp from one snapshot, so the re-fit stores only
   // while the session is still the one this program describes (the guard generation uses, #3895).
@@ -115,6 +119,10 @@ export async function refitPrescriptionToBudget(
   const carried = { ...stored }
   delete carried.droppedExerciseIds
   delete carried.fullSession
+  delete carried.checkinBudgetMin
+  // A check-in fit records its minutes and a fit back clears them; a picked length over a check-in fit
+  // records null, so the check-in leaves that plan alone.
+  const checkinBudgetMin = checkin ? (checkin.min ?? undefined) : stored.checkinBudgetMin !== undefined ? null : undefined
   const fullRest = Object.fromEntries(
     stored.exercises.map(ex => [ex.sessionExerciseId, baseline.restSec?.[ex.sessionExerciseId] ?? ex.restSec]),
   )
@@ -145,6 +153,7 @@ export async function refitPrescriptionToBudget(
     durationPreset,
     sessionTimeBudgetMinutes: validSession.timeBudgetMinutes,
     ...(budget.droppedIds.size > 0 && { droppedExerciseIds: [...budget.droppedIds] }),
+    ...(checkinBudgetMin !== undefined && { checkinBudgetMin }),
   }
 
   // The existing expiry, deliberately: this is the same plan against a different clock, and

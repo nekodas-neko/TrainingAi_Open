@@ -160,6 +160,11 @@ export interface AiPrescription {
   // resolves both in one place (`requestedBudgetMin`), so nothing that reads this needs to care.
   durationPreset?: import('@trainingai/shared/workout/duration-model').DurationPreset
   sessionTimeBudgetMinutes?: number
+  /** #3890: the weekly check-in's shorter session this plan was fitted to, in minutes (by generation, or
+   *  by `fitStoredPlanToCheckinBudget` where the plan is served in the applies-to week). `null`: the
+   *  person picked a length over a check-in fit, so the check-in leaves this plan alone. Absent on
+   *  every plan the check-in never touched. */
+  checkinBudgetMin?: number | null
   // What a no-model duration re-fit starts from (RV-202 ②). Changing the time budget used to
   // re-run the whole model call for work that is pure arithmetic — the budget stage is
   // deterministic — but it cannot re-run against the STORED plan, because the budget passes
@@ -225,6 +230,10 @@ export interface SessionPeriodization {
   pendingTransition: PendingTransition | null
   preEmergencyDeloadPhase: PeriodizationPhase | null
   updatedAt: Date
+  /** #3890: the user's saved weekly check-ins that ask for a shorter session and could apply around
+   *  today, read in the same query as the row (so a person with none costs no extra query). Absent when
+   *  there are none. Which one applies is the caller's to decide in the user's timezone. */
+  checkinSessionBudgets?: { weekStart: string; min: number }[]
 }
 
 export interface ProgramVolumeTarget {

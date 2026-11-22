@@ -47,14 +47,27 @@ export function mapPeriodization(row: typeof s.sessionPeriodization.$inferSelect
 
 export async function getSessionPeriodization(db: Db, userId: string, programSessionId: string): Promise<SessionPeriodization | null> {
   const [row] = await db
-    .select()
+    .select({
+      sp: s.sessionPeriodization,
+      // #3890: a shorter session the weekly check-in asked for, for a week that could hold today in any
+      // timezone (the caller picks the one for the user's local week). In the same statement, so the
+      // stored-plan read costs a person with no check-in nothing extra.
+      checkinBudgets: sql<{ weekStart: string; min: number }[] | null>`(
+        SELECT json_agg(json_build_object('weekStart', c.applies_week_start::text, 'min', c.shorter_session_min))
+          FROM weekly_checkins c
+         WHERE c.user_id = ${userId} AND c.status = 'saved' AND c.deleted_at IS NULL
+           AND c.shorter_session_min IS NOT NULL
+           AND c.applies_week_start BETWEEN CURRENT_DATE - 8 AND CURRENT_DATE + 2)`,
+    })
     .from(s.sessionPeriodization)
     .where(and(
       eq(s.sessionPeriodization.userId, userId),
       eq(s.sessionPeriodization.programSessionId, programSessionId),
     ))
     .limit(1)
-  return row ? mapPeriodization(row) : null
+  if (!row) return null
+  const state = mapPeriodization(row.sp)
+  return row.checkinBudgets?.length ? { ...state, checkinSessionBudgets: row.checkinBudgets } : state
 }
 
 export async function ensureSessionPeriodization(db: Db, userId: string, programSessionId: string): Promise<SessionPeriodization> {

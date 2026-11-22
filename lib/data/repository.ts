@@ -1506,6 +1506,12 @@ export interface WorkoutRepository {
   }>>
   /** #3893: the session read's inputs for the user's workouts started in `[from, to)`, oldest first. Read only. */
   getSessionReadLogs(userId: string, from: Date, to: Date): Promise<import('@trainingai/shared/ai-periodization/session-read').SessionReadLog[]>
+  /** #3890: of these session lifts, the ones the saved weekly check-in for the week starting `weekStart`
+   *  (its `applies_week_start`) answered "Heavy" for. Optional: a repository without it holds nothing. */
+  listCheckinHeldLifts?(userId: string, weekStart: string, exerciseNames: string[]): Promise<Set<string>>
+  /** #3890: the shorter session (minutes) the saved weekly check-in for the week starting `weekStart`
+   *  asked for, or null. Optional: a repository without it changes no budget. */
+  getCheckinSessionBudgetMin?(userId: string, weekStart: string): Promise<number | null>
   /** #3896: the user's live lift preferences for these lifts, keyed by the name passed; id match first,
    *  then the name. One query, owner-scoped. Clears an expired one-shot (`ONE_SHOT_TTL_DAYS`) as it reads. */
   listExercisePreferences(userId: string, exerciseNames: string[]): Promise<Map<string, import('@trainingai/shared/ai-periodization/lift-preference').LiftPreferenceRow>>

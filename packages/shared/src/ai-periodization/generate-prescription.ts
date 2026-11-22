@@ -1,4 +1,4 @@
-import { nextMidnightInTz, todayInTz } from '@trainingai/shared/date-utils'
+import { nextMidnightInTz, startOfWeekInTz, todayInTz } from '@trainingai/shared/date-utils'
 import { prescriptionExpiresAt } from '@trainingai/shared/ai-periodization/prescription-expiry'
 
 /**
@@ -42,6 +42,7 @@ import { PrescriptionSchema } from '@trainingai/shared/ai-periodization/prescrip
 import { reconcilePrescription } from '@trainingai/shared/ai-periodization/reconcile-prescription'
 import { buildPrescriptionShadow } from '@trainingai/shared/ai-periodization/prescription-shadow'
 import { loadSessionReads } from '@trainingai/shared/ai-periodization/session-read-plan'
+import { checkinBudgetApplies } from '@trainingai/shared/ai-periodization/checkin-plan-budget'
 import { loadLiftPreferences } from '@trainingai/shared/ai-periodization/lift-preference-read'
 import { clampReps, preferenceAppliesIn, appliedAfterBudgetRest } from '@trainingai/shared/ai-periodization/lift-preference'
 import {
@@ -334,17 +335,36 @@ export async function generatePrescriptionForSession(
   // undone before the store left the stamp matching, so a plan made for the swapped session was stored.
   const { program: activeProgram, structure } = await repo.getActiveProgramWithStructureStamp(userId, programSessionId)
   const configuredBudget = activeProgram?.sessions.find(s => s.id === programSessionId)?.timeBudgetMinutes
+  // #3890: a shorter session the weekly check-in asked for this week. Read before the dedup key, so a
+  // plan made before the check-in was saved is not served for one made after it. Null for nearly
+  // everyone, and then the key is exactly main's.
+  const checkinBudgetMin = durationPreset == null ? await checkinSessionBudgetMin(repo, userId, tz) : null
   // #3927: the stamp is in the key, so a call after a Coach change or an editor save made inside the
   // 30 s cooldown generates for the session as it is now, rather than being answered with the plan made
   // before the change.
-  const key = `${userId}:${programSessionId}:${todayInTz(tz)}:${excludeSessionId ?? ''}:${durationPreset ?? 'standard'}:${configuredBudget}:${structure}`
+  const key = `${userId}:${programSessionId}:${todayInTz(tz)}:${excludeSessionId ?? ''}:${durationPreset ?? 'standard'}:${configuredBudget}:${structure}${checkinBudgetMin != null ? `:checkin${checkinBudgetMin}` : ''}`
   return prescriptionDedup.run(
     key,
     // An explicit preset choice is a user action asking for a different plan — it must
     // never be answered from the read-through cooldown.
     { skipCooldown: Boolean(excludeSessionId) || durationPreset != null, cacheable: r => r.ok },
-    () => runPrescriptionGeneration(userId, programSessionId, repo, tz, activeProgram, structure, excludeSessionId, durationPreset),
+    () => runPrescriptionGeneration(userId, programSessionId, repo, tz, activeProgram, structure, excludeSessionId, durationPreset, checkinBudgetMin),
   )
+}
+
+/**
+ * #3890: the shorter session this week's check-in asked for (`applies_week_start` = this local Monday).
+ * A failed read is the session's own budget: it is the person's choice, not a safety bound, and losing it
+ * for one plan is the smaller harm than losing the plan.
+ */
+async function checkinSessionBudgetMin(repo: WorkoutRepository, userId: string, tz: string): Promise<number | null> {
+  if (typeof repo.getCheckinSessionBudgetMin !== 'function') return null
+  try {
+    return await repo.getCheckinSessionBudgetMin(userId, startOfWeekInTz(tz))
+  } catch (err) {
+    console.error('[weekly-checkin] reading the session budget failed; planning at the session length:', err)
+    return null
+  }
 }
 
 async function runPrescriptionGeneration(
@@ -360,6 +380,7 @@ async function runPrescriptionGeneration(
   // emergency-deload <36h condition (W5 §4.2). Absent for manual/GET-style prescribe calls.
   excludeSessionId?: string,
   durationPreset?: DurationPreset,
+  checkinBudgetMin?: number | null,
 ): Promise<GeneratePrescriptionResult> {
   // A one-day prescription ends at the midnight that closes the day it was asked for. Read from the
   // start, not the store: a generation that straddles midnight would otherwise live all of the next
@@ -472,9 +493,20 @@ async function runPrescriptionGeneration(
   const requestedMin = durationPreset != null
     ? requestedBudgetMin(validSession.timeBudgetMinutes, durationPreset)
     : undefined
-  const budgetOverrideMin = requestedMin != null && requestedMin !== validSession.timeBudgetMinutes
+  const presetOverrideMin = requestedMin != null && requestedMin !== validSession.timeBudgetMinutes
     ? budgetForPreset(validSession.timeBudgetMinutes, durationPreset)
     : undefined
+  // #3890: the week's shorter session, only when it IS shorter than the session's own budget (or the
+  // session has no limit), and only
+  // when the person did not pick a length for today (a preset is the more recent, more specific ask; the
+  // check-in read is skipped for it). Clamped as a numeric preset is (`budgetForPreset`), so it can never
+  // ask for less than any preset can.
+  const checkinFitMin = presetOverrideMin == null && checkinBudgetApplies(checkinBudgetMin, validSession.timeBudgetMinutes)
+    ? checkinBudgetMin!
+    : null
+  const budgetOverrideMin = presetOverrideMin ?? (
+    checkinFitMin != null ? budgetForPreset(validSession.timeBudgetMinutes, checkinFitMin) : undefined
+  )
   const signals = await aggregateSignals(userId, programSessionId, repo, tz, excludeSessionId, budgetOverrideMin, { program: activeProgram, liftPreferences })
   if (!signals) return { ok: false, error: 'Could not aggregate signals', status: 404 }
   if (programPhase.aligned && programPhase.phase != null) {
@@ -923,6 +955,9 @@ async function runPrescriptionGeneration(
     confidenceReasons: signals.confidenceReasons,
     durationPreset: durationPreset ?? 'standard',
     sessionTimeBudgetMinutes: validSession.timeBudgetMinutes,
+    // #3890: recorded only when the check-in's budget shaped the plan, so a serve-time re-fit knows it
+    // is already fitted (and an undo knows to give the length back). Absent for everyone else.
+    ...(checkinFitMin != null && { checkinBudgetMin: checkinFitMin }),
     refitBaseline,
     ...(droppedIdSet.size > 0 && { droppedExerciseIds: [...droppedIdSet] }),
   }
