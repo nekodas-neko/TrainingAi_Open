@@ -14,6 +14,9 @@ import { phaseOfLoads } from '@trainingai/shared/ai-periodization/phase-guards'
 import { budgetForPreset, requestedBudgetMin, type DurationPreset } from '@trainingai/shared/workout/duration-model'
 import type { AiPrescription, PrescriptionStatus } from '@trainingai/shared/types/ai-periodization'
 import type { WorkoutRepository } from '@/lib/data/repository'
+import { setsWithDelta } from '@trainingai/shared/ai-periodization/lift-preference'
+import { phaseSetsMax } from '@trainingai/shared/ai-periodization/prompt'
+import { UNCLASSIFIED_EXERCISE_ROLE } from '@trainingai/shared/workout/exercise-role'
 
 export type RefitResult =
   | {
@@ -97,6 +100,14 @@ export async function refitPrescriptionToBudget(
     // the next phase on an offer (a pending move to deload would re-fit to deload's 3 sets at the old
     // phase's loads).
     phaseOfLoads(stored, state.phase),
+    // #3896: a one-shot ±1 set the plan applied goes back on after the re-fit, as generation put it on
+    // after the fit. The baseline holds the count before it, so the re-fit can never apply it twice.
+    (id, sets) => {
+      const delta = stored.exercises.find(ex => ex.sessionExerciseId === id)?.liftPreference?.setsDelta
+      if (!delta) return null
+      const role = signals.exercises.find(e => e.sessionExerciseId === id)?.role ?? UNCLASSIFIED_EXERCISE_ROLE
+      return setsWithDelta(sets, delta, role, phaseSetsMax(signals.trainingGoal, phaseOfLoads(stored, state.phase)))
+    },
   )
 
   // The previous fit's drops are stripped rather than merged: an exercise dropped for a

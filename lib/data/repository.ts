@@ -787,7 +787,8 @@ export interface WorkoutRepository {
     sets: (Omit<SetLog, 'id' | 'exerciseLogId'> & { id?: string })[],
     /** Issue 2721: how this write records when the row was decided; omitted means a live server write. */
     stamp?: EditStamp,
-  ): Promise<{ exerciseLog: ExerciseLog; setLogs: SetLog[]; superseded?: true }>
+    /** `inserted` (#3896): this write created the log rather than replaying one already stored. */
+  ): Promise<{ exerciseLog: ExerciseLog; setLogs: SetLog[]; superseded?: true; inserted?: boolean }>
 
   // ── Body & Activity ────────────────────────────────────────────────────────
   upsertBodyMetrics(userId: string, metrics: Omit<BodyMetrics, 'id' | 'userId' | 'createdAt'>[], source: HealthSource): Promise<void>
@@ -1502,6 +1503,12 @@ export interface WorkoutRepository {
   }>>
   /** #3893: the session read's inputs for the user's workouts started in `[from, to)`, oldest first. Read only. */
   getSessionReadLogs(userId: string, from: Date, to: Date): Promise<import('@trainingai/shared/ai-periodization/session-read').SessionReadLog[]>
+  /** #3896: the user's live lift preferences for these lifts, keyed by the name passed; id match first,
+   *  then the name. One query, owner-scoped. Read only. */
+  listExercisePreferences(userId: string, exerciseNames: string[]): Promise<Map<string, import('@trainingai/shared/ai-periodization/lift-preference').LiftPreferenceRow>>
+  /** #3896: consume a lift's one-shot in one conditional write (written before `receivedAt`, server
+   *  time). True only for the call that cleared it. */
+  consumeLiftOneShot(userId: string, exerciseName: string, receivedAt: Date): Promise<boolean>
   getSetTimingRows(userId: string, exerciseNames: string[]): Promise<import('@trainingai/shared/workout/time-profile').TimingRow[]>
   getExercise1rmHistory(userId: string, exerciseNames: string[], tz: string, windowDays?: number): Promise<Record<string, { date: string; rm: number }[]>>
   getWeeklySetsByMuscleGroup(userId: string, programId: string, weekStart: string, weekEnd: string, tz: string): Promise<Record<string, number>>

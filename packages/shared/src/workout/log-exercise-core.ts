@@ -14,6 +14,7 @@ import { defaultUseFor1rm } from '@trainingai/shared/workout/default-use-for-1rm
 import type { ProgramPhaseType } from '@trainingai/shared/types/program';
 import type { EditStamp } from '@trainingai/shared/sync/edited-at';
 import type { WorkoutRepository } from '@/lib/data/repository';
+import { logMayConsumeOneShot } from '@trainingai/shared/ai-periodization/lift-preference';
 
 export { LogExercisePayloadSchema } from './log-payload';
 import type { LogExercisePayload } from './log-payload';
@@ -65,6 +66,9 @@ export async function logExerciseWithRepo(
     progressionStyle, plannedWeights, prescriptionBasisKg, styleName, styleId, muscleGroups, workoutStartedAt, warmupEndedAtMs,
     rpeValues, rpeSources, intensityMode, wasOverride, exerciseDeloaded, effort,
   } = payload;
+  // #3896: server time this log arrived, the clock a lift's one-shot is compared against (never the
+  // device's `logged_at`).
+  const receivedAt = new Date();
 
 
   // Issue 2721: a stale copy is decided before anything is written, so a superseded push leaves the
@@ -341,6 +345,18 @@ export async function logExerciseWithRepo(
   })) {
     // #3671: dated by the set, not the upload, so a workout synced after midnight keeps its day.
     isPR = await repo.upsertPersonalRecordIfBetter(userId, exercise, estimated1rm, loggedAt);
+  }
+
+  // #3896: the first finished log of a lift after its one-shot was set ("lighter / heavier next time",
+  // ±1 set) consumes it, in one conditional write. A deload or baseline log never carried it, and a
+  // re-push of a stored log is not a new one. Best-effort: the log is already saved, and a failed
+  // clear leaves the one-shot for the next log rather than losing the workout.
+  // The time test (one-shot written before `receivedAt`) is in the conditional write itself.
+  if (!superseded && logMayConsumeOneShot({
+    isNewLog: logged.inserted === true, deloaded: deloadedForEstimate, baseline: isBaseline,
+  })) {
+    await (async () => repo.consumeLiftOneShot(userId, exercise, receivedAt))()
+      .catch(err => console.error('[log-exercise] one-shot clear failed (left for the next log):', err));
   }
 
   return {

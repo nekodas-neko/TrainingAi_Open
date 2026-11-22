@@ -6,6 +6,7 @@
 import { dateStrMidnightInTz, shiftDateStr, todayInTz } from '../date-utils'
 import { weightStepFor } from '../workout/load-rounding'
 import { goalRange } from './goal-ranges'
+import { preferredRepBand, type LiftPreference } from './lift-preference'
 import { isReadableLog, readLog, type SessionReadLog, type StoredSessionRead } from './session-read'
 import type { Program, ProgramSession } from '../types/program'
 import type { WorkoutRepository } from '@/lib/data/repository'
@@ -17,7 +18,12 @@ export const SESSION_READ_LOOKBACK_DAYS = 90
 export function sessionReadsFor(
   session: Pick<ProgramSession, 'exercises'>,
   logs: readonly SessionReadLog[],
-  opts: { programStart: Date; trainingGoal: string; equipment: Record<string, string[]> },
+  opts: {
+    programStart: Date; trainingGoal: string; equipment: Record<string, string[]>
+    /** #3896: lifts with a stored preference. A rep range replaces the role's band ceiling, so the
+     *  read never calls for reps past what the lifter chose. */
+    liftPreferences?: ReadonlyMap<string, LiftPreference>
+  },
 ): StoredSessionRead[] {
   const newest = new Map<string, SessionReadLog>()
   for (const log of logs) {
@@ -32,7 +38,7 @@ export function sessionReadsFor(
     const read = readLog(
       log,
       weightStepFor(opts.equipment[ex.exerciseName]),
-      goalRange(opts.trainingGoal, ex.exerciseRole).repMax,
+      preferredRepBand(opts.liftPreferences?.get(ex.exerciseName), goalRange(opts.trainingGoal, ex.exerciseRole)).repMax,
     )
     reads.push({ ...read, sessionExerciseId: ex.id, exerciseName: ex.exerciseName, workoutSessionId: log.workoutSessionId })
   }
@@ -45,6 +51,7 @@ export async function loadSessionReads(
   program: Pick<Program, 'createdAt' | 'trainingGoal'>,
   session: Pick<ProgramSession, 'exercises'>,
   tz: string,
+  liftPreferences?: ReadonlyMap<string, LiftPreference>,
 ): Promise<StoredSessionRead[]> {
   const from = dateStrMidnightInTz(shiftDateStr(todayInTz(tz), -SESSION_READ_LOOKBACK_DAYS), tz)
   // Worked out before either read starts: if this threw between the two calls, the first read's
@@ -59,5 +66,6 @@ export async function loadSessionReads(
     programStart: program.createdAt,
     trainingGoal: program.trainingGoal,
     equipment: equipment ?? {},
+    liftPreferences,
   })
 }

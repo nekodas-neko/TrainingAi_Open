@@ -29,6 +29,7 @@ import { rateLimit } from "@/lib/rate-limit";
 import { estimateProgramSessionMin } from "@trainingai/shared/workout/program-session-duration";
 import { generatePrescriptionForSession } from "@trainingai/shared/ai-periodization/generate-prescription";
 import { regeneratePrescriptionInBackground as regeneratePrescriptionSingleFlight } from "@trainingai/shared/ai-periodization/regenerate-in-background";
+import { loadLiftPreferences } from "@trainingai/shared/ai-periodization/lift-preference-read";
 
 // Re-exported so existing type imports (e.g. `import('@/app/api/workout-data/route').PhaseStatus`)
 // keep resolving after the interfaces moved to lib/workout/session-data.ts.
@@ -170,7 +171,7 @@ async function handleWorkoutData(req: NextRequest) {
     // per-session calls the single-tab path makes — no partitioning needed (buildWorkoutExercises
     // only ever looks up its own session's exercise names).
     const unionNames = [...new Set(program.sessions.flatMap(s => s.exercises.map(ex => ex.exerciseName)))]
-    const [allPhases, prMap, todayExercises, sessionCounts, lastLogs, lastRealOneRm, estimates] = await Promise.all([
+    const [allPhases, prMap, todayExercises, sessionCounts, lastLogs, lastRealOneRm, estimates, liftPreferences] = await Promise.all([
       isAutomatic ? repo.listProgramPhases(userId, program.id) : Promise.resolve([] as ProgramPhase[]),
       repo.listPersonalRecords(userId),
       repo.getDayExerciseNames(userId, todayStr.replace(/-/g, '/'), tz),
@@ -178,6 +179,8 @@ async function handleWorkoutData(req: NextRequest) {
       repo.getLastExerciseLogsBatch(userId, unionNames),
       repo.getLastRealOneRmBatch(userId, unionNames),
       repo.getExerciseEstimates(userId).catch(() => []),
+      // #3896: the user's lift preferences, for a static style the AI plan is not driving.
+      loadLiftPreferences(repo, userId, unionNames),
       // Heals the stored sessions_in_phase before the periodization read below turns it into
       // completedCycles / phaseSessionNumber (SYNC-T2). Batched here rather than awaited
       // separately so it costs no extra round-trip; advisory, so a failure must not take the
@@ -320,6 +323,7 @@ async function handleWorkoutData(req: NextRequest) {
         droppedThisCycle,
         loggedTodayInThisSession,
         trainingGoal: program.trainingGoal,
+        liftPreferences,
       })
 
       perSession[programSession.id] = {
@@ -355,7 +359,7 @@ async function handleWorkoutData(req: NextRequest) {
   const tz = session?.user?.timezone ?? DEFAULT_TZ
   const todayStr = todayInTz(tz)
 
-  const [allPhases, lastLogs, lastRealOneRm, todayExercises, aiPeriodizationState, prMap, estimates] = await Promise.all([
+  const [allPhases, lastLogs, lastRealOneRm, todayExercises, aiPeriodizationState, prMap, estimates, liftPreferences] = await Promise.all([
     isAutomatic ? repo.listProgramPhases(userId, program.id) : Promise.resolve([] as ProgramPhase[]),
     repo.getLastExerciseLogsBatch(userId, exerciseNames),
     repo.getLastRealOneRmBatch(userId, exerciseNames),
@@ -370,6 +374,8 @@ async function handleWorkoutData(req: NextRequest) {
       : Promise.resolve(null),
     repo.listPersonalRecords(userId),
     repo.getExerciseEstimates(userId).catch(() => []),
+    // #3896: the user's lift preferences, for a static style the AI plan is not driving.
+    loadLiftPreferences(repo, userId, exerciseNames),
   ]);
   const estimateMap = new Map(estimates.map(e => [e.exerciseName, e.estimated1rm]));
 
@@ -641,6 +647,7 @@ async function handleWorkoutData(req: NextRequest) {
     droppedThisCycle,
     loggedTodayInThisSession,
     trainingGoal: program.trainingGoal,
+    liftPreferences,
   });
 
   // #2110: which engine built the numbers the bar carries, so the screen can say when they are the
