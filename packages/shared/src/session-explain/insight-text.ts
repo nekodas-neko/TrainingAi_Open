@@ -14,6 +14,8 @@ export interface SessionInsightParts {
   consecutiveTrainingDays?: number | null
   deloadOrRestRecommended?: boolean
   deloadStrength?: 'soft' | 'recommended' | 'strong' | null
+  /** #3718: the reason lines of the AI-rule rest signals that fired (`restSignalReasons`). */
+  restSignalReasons?: readonly { text: string }[]
 }
 
 const COMPONENT_LABEL = {
@@ -76,6 +78,7 @@ export function buildSessionInsightText(p: SessionInsightParts): string {
     context[0] = capitalize(context[0])
     sentences.push(`${joinList(context)}.`)
   }
+  for (const r of p.restSignalReasons ?? []) sentences.push(r.text)
 
   return sentences.join(' ')
 }

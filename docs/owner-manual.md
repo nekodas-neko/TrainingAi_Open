@@ -333,7 +333,7 @@ Everything merged during the week ships together. **A hotfix goes out off-schedu
 production is actually broken**; anything less waits for Tuesday.
 
 1. 🤖 The Orchestrator bumps the version, picks the candidate commit, opens a **release issue**
-   with the checklist, and has the Implementer run the release test (full suite, the route smoke on
+   with the checklist, and has the Implementer run the release test (`node scripts/local-db/migrate.js` from the candidate's tree, then the full suite, the route smoke on
    `pnpm dev` and on a production build,
    local run of the changed flows, the device pass).
 2. 🤖 It sends you the **release summary** in chat, and posts it on the release issue:

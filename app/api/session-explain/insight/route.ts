@@ -5,6 +5,7 @@ import { NextResponse } from 'next/server'
 import { rateLimit } from '@/lib/rate-limit'
 import { DEFAULT_TZ } from '@trainingai/shared/date-utils'
 import { reportServerError } from '@/lib/observability'
+import { restSignalReasons } from '@trainingai/shared/ai-periodization/deload-reasons'
 import { buildSessionInsightText } from '@trainingai/shared/session-explain/insight-text'
 
 export async function GET() {
@@ -40,6 +41,7 @@ export async function GET() {
       consecutiveTrainingDays: recommendation.consecutiveTrainingDays,
       deloadOrRestRecommended: recommendation.deloadOrRestRecommended,
       deloadStrength: recommendation.deloadStrength,
+      restSignalReasons: restSignalReasons(recommendation),
     })
 
     return new Response(text, { headers: { 'Content-Type': 'text/plain; charset=utf-8' } })
