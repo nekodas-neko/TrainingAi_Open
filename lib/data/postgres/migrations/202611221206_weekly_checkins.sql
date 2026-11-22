@@ -59,6 +59,11 @@
 --   swap_change_id      the coach_changes row the accepted swap was applied through (with undo). Only when
 --                       swap_offer_status = 'accepted'. ON DELETE SET NULL. It was on the lift rows in the
 --                       first draft; a swap is one per check-in, so it moved here.
+--   A RENAME DOES NOT REACH pain_exercise_name OR swap_exercise_name: both are kept as answered, like
+--                       the lift rows. After a library rename a still-open offer carries the old name, so
+--                       every reader matches pain_exercise_id / swap_exercise_id first and uses the name
+--                       only when the id is NULL. Step 2's writer fills the id whenever the lift is in
+--                       the library.
 --   deleted_at          tombstone (CLAUDE.md offline-first rule: a hard delete is invisible to a device
 --                       that has not synced). A redo is an update of the same row, so the tombstone is
 --                       for a check-in the person removes; the unique key still covers it. The lift rows
