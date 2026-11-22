@@ -74,6 +74,12 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ mealId
     const current = await repo.getMealPlanMeal(mealId, userId)
     if (!current) return NextResponse.json({ error: 'Not found' }, { status: 404 })
     const restrictions = await repo.listUserDietaryRestrictions(userId)
+    // #3749. The plan's excluded foods are stored on the plan, not on the meal or in this request,
+    // so they are found through the meal's variant. The top-up adds staples by arithmetic with no
+    // model to tell what to avoid, so without them an excluded food could be added silently. A meal
+    // whose plan cannot be found is refused rather than scaled with no exclusions (fail closed).
+    const plan = (await repo.listMealPlans(userId)).find(p => p.variants.some(v => v.id === current.variantId))
+    if (!plan) return NextResponse.json({ error: 'Not found' }, { status: 404 })
     input.ingredients = await scaleWithTopUp(
       input.ingredients as NutritionIngredient[],
       {
@@ -87,6 +93,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ mealId
         mealName: input.name ?? current.name,
         allergies: restrictions.filter(r => r.severity === 'allergy').map(r => r.label),
         avoid: restrictions.filter(r => r.severity === 'avoid').map(r => r.label),
+        excludedFoods: plan.excludedFoods,
       },
     )
   }

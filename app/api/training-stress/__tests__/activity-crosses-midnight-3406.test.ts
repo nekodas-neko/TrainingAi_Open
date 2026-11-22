@@ -19,7 +19,7 @@ vi.mock('@trainingai/shared/health/met-input', async (orig) => {
     },
   }
 })
-const activity = vi.hoisted(() => ({ date: '', startTime: '', endTime: '' }))
+const activity = vi.hoisted(() => ({ date: '', startTime: '', endTime: '', durationMin: null as number | null }))
 vi.mock('@/lib/data', () => ({
   getRepository: async () => ({
     getOuraDailyDerived: async () => [],
@@ -29,7 +29,7 @@ vi.mock('@/lib/data', () => ({
     getOuraDaytimeSignals: async () => ({ met: [], temp: [], still: [], motion: [] }),
     getPerMinuteMovementSeries: async () => [],
     listSleepSessions: async () => [],
-    listActivityLogs: async () => [{ ...activity, activityType: 'run', durationMin: null }],
+    listActivityLogs: async () => [{ ...activity, activityType: 'run' }],
     getHealthConnectIntervals: async () => [],
     upsertOuraDailyDerived: async () => undefined,
   }),
@@ -50,7 +50,7 @@ const cases: [string, string, string, number][] = [
 describe('/api/training-stress activity that crosses midnight (#3406)', () => {
   for (const [name, day, next, hours] of cases) {
     it(`ends 23:00–01:00 on ${name} at 01:00 the next local day`, async () => {
-      Object.assign(activity, { date: day, startTime: '23:00', endTime: '01:00' })
+      Object.assign(activity, { date: day, startTime: '23:00', endTime: '01:00', durationMin: null })
       vi.setSystemTime(new Date(`${next}T22:00:00Z`)) // a finished day
       await GET(new Request(`http://x/api/training-stress?date=${day}`))
       expect(seen.activities).toHaveLength(1)
@@ -60,4 +60,25 @@ describe('/api/training-stress activity that crosses midnight (#3406)', () => {
       expect(endMs - startMs).toBe(hours * HOUR)
     })
   }
+})
+
+// #3853: the roll here was its own copy; an end equal to the start became a 24-hour interval.
+describe('/api/training-stress activity windows follow the shared rule (#3853)', () => {
+  const run = async (over: Partial<typeof activity>) => {
+    Object.assign(activity, { date: '2026-07-01', startTime: '15:50', endTime: '15:50', durationMin: null }, over)
+    vi.setSystemTime(new Date('2026-07-02T22:00:00Z'))
+    await GET(new Request('http://x/api/training-stress?date=2026-07-01'))
+    return seen.activities
+  }
+  it('gives a log whose end equals its start no interval', async () => {
+    expect(await run({})).toHaveLength(0)
+  })
+  it('gives it start + duration when a plausible duration is stored', async () => {
+    const got = await run({ startTime: '07:00', endTime: '07:00', durationMin: 45 })
+    expect(got).toHaveLength(1)
+    expect(got[0].endMs - got[0].startMs).toBe(45 * 60_000)
+  })
+  it('gives a rolled span with no duration and over 4 h no interval', async () => {
+    expect(await run({ endTime: '15:40' })).toHaveLength(0)
+  })
 })

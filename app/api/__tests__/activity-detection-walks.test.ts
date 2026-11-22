@@ -75,6 +75,18 @@ describe('GET /api/activity-detection/walks (#2471)', () => {
     expect((await (await get()).json()).walks).toEqual([])
   })
 
+  // #3853: the same placement rule as the phone, so an overnight log excludes the same minutes.
+  it('places a log whose end is before its start on the next day, and ignores a zero-length one', async () => {
+    repo.listActivityLogs.mockImplementation(async () => [
+      // Brisbane: 23:30 on the 7th to 00:20 on the 8th. T0 is 09:00 on the 7th, so 23:30 is T0 + 870 min.
+      { date: '2026-10-07', startTime: '23:30:00', endTime: '00:20:00', durationMin: 50 },
+      { date: '2026-10-07', startTime: '09:15:00', endTime: '09:15:00' },
+    ])
+    const body = await (await get('?date=2026/10/07')).json()
+    expect(body.walks).toHaveLength(1)
+    expect(body.covered).toEqual([{ startMs: T0 + 870 * MIN, endMs: T0 + 920 * MIN }])
+  })
+
   it('leaves out motion during a lifting session', async () => {
     repo.getDaySessionSummaries.mockImplementation(async () => [{ startedAt: new Date(T0), completedAt: new Date(T0 + 50 * MIN) }])
     expect((await (await get()).json()).walks).toEqual([])

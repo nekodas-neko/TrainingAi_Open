@@ -5,8 +5,9 @@ import { getRepositoryAsync } from '@/lib/data'
 import { rateLimit } from '@/lib/rate-limit'
 import { errorLog } from '@trainingai/shared/logger'
 import {
-  DEFAULT_TZ, dateStrMidnightInTz, localClockTimeToDate, normalizeDateParamIso, shiftDateStr, todayInTz,
+  DEFAULT_TZ, dateStrMidnightInTz, normalizeDateParamIso, shiftDateStr, todayInTz,
 } from '@trainingai/shared/date-utils'
+import { activityLogWindow } from '@trainingai/shared/running/heart-health'
 import { metGridFromDaytimeSamples } from '@trainingai/shared/health/training-stress'
 import { detectWalksFromMet } from '@trainingai/shared/health/walk-detection'
 import { deviceMetGrid } from '@trainingai/shared/health/met-input'
@@ -69,13 +70,11 @@ export async function GET(req: NextRequest) {
       repo.getSourceActivitySessions(userId, { from: shiftDateStr(date, -1), to: shiftDateStr(date, 1) }).catch(() => []),
     ])
 
-    // Stored as HH:MM:SS (Postgres time); the parser takes HH:MM.
+    // The one rule for placing a log (`activityLogWindow`, takes HH:MM:SS as Postgres returns it), the
+    // same as the phone's recorded spans, so an overnight log excludes the same minutes on both.
     const loggedSpans = activities.flatMap(a => {
-      const start = localClockTimeToDate(a.date, a.startTime?.slice(0, 5), tz)
-      if (!start) return []
-      const end = localClockTimeToDate(a.date, a.endTime?.slice(0, 5), tz)
-        ?? (a.durationMin != null ? new Date(start.getTime() + a.durationMin * 60_000) : null)
-      return end && end > start ? [{ startMs: start.getTime(), endMs: end.getTime() }] : []
+      const w = activityLogWindow(a, tz)
+      return w ? [{ startMs: w.from.getTime(), endMs: w.to.getTime() }] : []
     })
     const exclusions = [
       ...sleepRows.map(r => ({ startMs: new Date(r.sleepStart).getTime(), endMs: new Date(r.sleepEnd).getTime() })),

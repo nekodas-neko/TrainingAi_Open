@@ -1,7 +1,7 @@
 import { eq, and, inArray, gt, gte, lte, asc, desc, sql, isNull, or } from 'drizzle-orm'
 import { NotFoundError, UserFacingError } from '@trainingai/shared/errors'
 import { resolveEatenAt } from '@trainingai/shared/nutrition/eaten-at'
-import { findDuplicateFoodItem, identityCalories } from '@trainingai/shared/nutrition/food-item-identity'
+import { findDuplicateFoodItem, identityCalories, text as foldText } from '@trainingai/shared/nutrition/food-item-identity'
 import { lookAlikeFactor, lookAlikeKey } from '@trainingai/shared/nutrition/food-merge'
 import { quantityMultiplierInRange } from '@trainingai/shared/nutrition/quantity-bounds'
 import { wholeCalorieTarget } from '@trainingai/shared/validation/goal-bounds'
@@ -406,6 +406,26 @@ export async function findFoodItemsByBarcode(db: Db, userId: string, barcode: st
     ))
     .orderBy(desc(s.foodItems.createdAt))
     .limit(1)
+  return rows.map(rowToFoodItem)
+}
+
+/**
+ * #3749. The user's live foods whose name, folded for case and whitespace exactly as `text()` in
+ * food-item-identity.ts folds it, is one of `names`. Every source is returned: which origins are
+ * trusted is `resolveIngredientDensity`'s decision, made in shared code where it is tested. Scoped on
+ * `userId` in the WHERE, so another user's food is never read.
+ */
+export async function listFoodItemsByNames(db: Db, userId: string, names: readonly string[]): Promise<FoodItem[]> {
+  const folded = [...new Set(names.map(foldText).filter(Boolean))].slice(0, 200)
+  if (folded.length === 0) return []
+  const rows = await db.select().from(s.foodItems)
+    .where(and(
+      eq(s.foodItems.userId, userId),
+      isNull(s.foodItems.deletedAt),
+      inArray(sql`regexp_replace(lower(btrim(${s.foodItems.name})), '[[:space:]]+', ' ', 'g')`, folded),
+    ))
+    .orderBy(desc(s.foodItems.createdAt))
+    .limit(500)
   return rows.map(rowToFoodItem)
 }
 

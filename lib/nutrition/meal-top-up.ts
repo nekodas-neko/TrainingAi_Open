@@ -7,6 +7,9 @@ import {
   mealFit, fitDistance, TOP_UP_MIN_IMPROVEMENT, type MacroTotals,
 } from '@trainingai/shared/nutrition/meal-macro-fit'
 import type { NutritionIngredient } from '@trainingai/shared/types/nutrition'
+import { ModelIngredientSchema } from '@trainingai/shared/nutrition/ingredient-schema'
+import { planStapleTopUp } from '@trainingai/shared/nutrition/food-reference/staples'
+import { resolveModelIngredients } from '@/lib/nutrition/ingredient-densities'
 
 /**
  * Adding food to a meal that cannot reach its target by being resized.
@@ -26,10 +29,13 @@ import type { NutritionIngredient } from '@trainingai/shared/types/nutrition'
  * mechanism. (It is also what stops a plan prescribing 400 g of feta, so it stays.) The gap is a
  * missing *food*, and the only answer is to add one.
  *
- * **The model, not a lookup table.** A built-in filler list ("rice for carbs, oil for fat") cannot
- * see the user's allergies, their shops, or what the meal actually is; adding rice to an ice cream
- * is worse than the gap. The generator already holds that context and already returns this exact
- * shape.
+ * **Arithmetic first, then the model (#3749).** With a few staples whose numbers come from the
+ * bundled USDA table, closing a protein, carb or fat gap is a division, and `planStapleTopUp` does
+ * it with no model call. A filler list cannot know what the meal is, and adding rice to an ice
+ * cream is worse than the gap, so a staple is used only when it matches the meal's style (sweet or
+ * savoury, read from the ingredients the table recognises) and no recorded allergy, avoid or
+ * excluded food rules it out. When no staple can close the gap the model is asked, as before: it
+ * holds the context a list cannot, and its additions take code's numbers wherever it knows them.
  *
  * Bounded so it can only help:
  *  - runs at most once per meal, and only when a macro is genuinely SHORT (never when overshooting —
@@ -45,14 +51,7 @@ import type { NutritionIngredient } from '@trainingai/shared/types/nutrition'
 const MAX_TOP_UP_INGREDIENTS = 3
 
 const TopUpSchema = z.object({
-  ingredients: z.array(z.object({
-    name: z.string().describe('Ingredient as you would find it in a supermarket'),
-    weightG: z.number(),
-    caloriesPer100g: z.number(),
-    proteinPer100g: z.number(),
-    carbsPer100g: z.number(),
-    fatPer100g: z.number(),
-  })).max(MAX_TOP_UP_INGREDIENTS),
+  ingredients: z.array(ModelIngredientSchema).max(MAX_TOP_UP_INGREDIENTS),
 })
 
 export interface TopUpContext {
@@ -97,6 +96,13 @@ export async function scaleWithTopUp(
   const missing = shortfalls(actual, targets)
   if (missing.length === 0) return scaled
 
+  const byArithmetic = planStapleTopUp({
+    ingredients,
+    targets,
+    restrictions: [...ctx.allergies, ...ctx.avoid, ...(ctx.excludedFoods ?? [])],
+  })
+  if (byArithmetic) return byArithmetic
+
   let extra: NutritionIngredient[]
   try {
     const result = await loggedGenerateObject(
@@ -135,7 +141,7 @@ export async function scaleWithTopUp(
           '- Prefer one or two everyday items over three obscure ones.',
         ].filter(Boolean).join('\n'),
       }))
-    extra = result.object.ingredients as NutritionIngredient[]
+    extra = (await resolveModelIngredients(ctx.userId, result.object.ingredients)).ingredients
   } catch {
     // The gap stands and is displayed, exactly as before this existed.
     return scaled

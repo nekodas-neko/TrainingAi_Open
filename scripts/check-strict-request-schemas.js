@@ -138,14 +138,14 @@ const BASELINE = {
   // Q-495 moved this schema out of the route so it could be unit-tested; the exemption moves with
   // it, for the same reason as before — the Tasker payload's exact shape is not in this repo.
   'packages/shared/src/validation/health-connect-ingest.ts': 1,
-  'app/api/nutrition/meal-plans/generate/meal/route.ts': 2,
-  'app/api/nutrition/meal-plans/generate/route.ts': 2,
+  'app/api/nutrition/meal-plans/generate/meal/route.ts': 1,
+  'app/api/nutrition/meal-plans/generate/route.ts': 1,
   // BF-11b split the single-meal fields out into `CandidateSchema` so the route can return one
-  // entry per meal. All three here are `generateObject` RESPONSE schemas — the model's output, not
-  // a client's input — which is the exemption class this file's header describes and the reason the
-  // number was 2 rather than 0. The route parses no request schema at all; it reads `body.text`,
+  // entry per meal. Both here are `generateObject` RESPONSE schemas — the model's output, not a
+  // client's input — which is the exemption class this file's header describes. The third, the
+  // ingredient, moved to the shared `ModelIngredientSchema` (#3749). The route parses no request schema at all; it reads `body.text`,
   // `body.url` and `body.image` by hand with explicit type and size guards.
-  'app/api/nutrition/scan/route.ts': 3,
+  'app/api/nutrition/scan/route.ts': 2,
   // #2895 review, item 6: Oura's verification GET. Oura is the client and its query is not ours to
   // fix; a parameter it adds later would 400 every subscription's verification, so the schema
   // ignores unknown keys. The constant-time token compare is the check that matters.

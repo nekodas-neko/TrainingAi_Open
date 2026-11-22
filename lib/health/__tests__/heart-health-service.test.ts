@@ -137,3 +137,24 @@ describe('issue 2093 — re-scoring a synthetic history', () => {
     }
   })
 })
+
+describe('issue 3853 — a zero-length log is not credited a whole day', () => {
+  it('leaves a log whose end equals its start unmeasured', async () => {
+    const date = '2026-07-01'
+    // A reading a minute across the whole local day, brisk throughout.
+    const dayStart = new Date('2026-06-30T14:00:00.000Z').getTime() // Brisbane midnight
+    const all = Array.from({ length: 24 * 60 }, (_, i) => ({ timestamp: new Date(dayStart + i * 60_000), bpm: 150, source: 'ring' }))
+    const repo = {
+      getPrescribedRuns: vi.fn(async () => [{ id: 'run-1', date, status: 'pending', durationMin: 25 }]),
+      listActivityLogs: vi.fn(async () => [{
+        id: 'log-1', date, title: 'Treadmill', activityType: 'treadmill',
+        startTime: '15:50:00', endTime: '15:50:00', durationMin: 0.2,
+      }]),
+      getHrForWindow: vi.fn(async (_u: string, from: Date, to: Date) =>
+        all.filter((r) => r.timestamp >= from && r.timestamp <= to)),
+    }
+    const [day] = await heartHealthDays(repo as never, 'u1', TZ, date, date)
+    expect(day.activities[0].effortMin).toBeNull()
+    expect(day).toMatchObject({ met: false, countedMin: 0 })
+  })
+})
