@@ -286,7 +286,6 @@ export function GuidedWorkoutScreen({
               : `${(workout.phaseDetail ?? workout.phase) ? `${workout.phaseDetail ?? workout.phase} · ` : ''}${workout.soloExerciseId ? 'Solo' : `Ex ${visibleIndex + 1}/${visibleExercises.length}`}`
         }
         workout={workout}
-        ring={flow.stage === 'exercise'}
         fillBottom={flow.stage === 'exercise' && !ready && !resting}
         onBack={() => goBack('header')}
         onSystemBack={() => goBack('system')}

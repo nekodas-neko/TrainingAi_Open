@@ -8,9 +8,8 @@ import {
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
-import { AppText } from './AppText';
 import { Stack } from './Stack';
-import { IconButton } from './IconButton';
+import { PageHeader } from './PageHeader';
 import { useTheme } from '../theme/ThemeProvider';
 import { ReorderScrollView } from './ReorderScrollView';
 import { NestedScrollGesture, useNestedScrollBoundary } from './NestedScrollGesture';
@@ -18,39 +17,49 @@ import { NestedScrollGesture, useNestedScrollBoundary } from './NestedScrollGest
 export function PageLayout({
   title,
   subtitle,
+  detail,
   actions,
+  titleAction,
+  headerTrailing,
   children,
-  header,
   hideHeader = false,
   scroll = false,
   footer,
   floatingAction,
   contentStyle,
   onBack,
+  onSystemBack,
+  backLabel,
+  backIcon,
   landing = false,
   reorderable = false,
   fillBottom = false,
-  titleVariant = 'pageTitle',
 }: PropsWithChildren<{
   title: string;
   subtitle?: ReactNode;
+  detail?: string;
   actions?: ReactNode;
-  header?: ReactNode;
+  titleAction?: ReactNode;
+  /** Drawn at the right end of the header, after the actions (the workout timer). */
+  headerTrailing?: ReactNode;
   hideHeader?: boolean;
   scroll?: boolean;
   footer?: ReactNode;
   floatingAction?: ReactNode;
   contentStyle?: StyleProp<ViewStyle>;
   onBack?: () => void;
+  /** Android Back, when it must differ from the header's Back icon (the workout summary, #3879). */
+  onSystemBack?: () => void;
+  /** Spoken for the Back icon; "Back" unless Back goes somewhere named. */
+  backLabel?: string;
+  backIcon?: 'back' | 'forward';
   landing?: boolean;
   reorderable?: boolean;
   fillBottom?: boolean;
-  /** The current app draws every tab page's title at text-xl; Nutrition has its own larger one. */
-  titleVariant?: 'pageTitle' | 'nutritionTitle';
 }>) {
   const { theme } = useTheme();
   const nestedScroll = useNestedScrollBoundary();
-  useAndroidBack(onBack);
+  useAndroidBack(onSystemBack ?? onBack);
   const ContentScrollView = reorderable ? ReorderScrollView : ScrollView;
   return (
     <KeyboardAvoidingView
@@ -63,50 +72,19 @@ export function PageLayout({
         alignSelf: 'center',
       }}
     >
-      {hideHeader ? null : header ? (
-        <View
-          style={{
-            paddingHorizontal: theme.spacing.md,
-            paddingVertical: theme.spacing.sm,
-            borderBottomWidth: landing ? 0 : 1,
-            borderBottomColor: theme.colors.border,
-          }}
-        >
-          {header}
-        </View>
-      ) : (
-        <Stack
-          direction="row"
-          align="center"
-          justify="space-between"
-          style={{
-            paddingHorizontal: theme.spacing.lg,
-            paddingVertical: theme.spacing[landing ? 'lg' : 'md'],
-            borderBottomWidth: landing ? 0 : 1,
-            borderBottomColor: theme.colors.border,
-          }}
-        >
-          {onBack && <IconButton icon="back" label="Back" onPress={onBack} />}
-          <View style={{ flex: 1 }}>
-            <AppText variant={titleVariant} accessibilityRole="header">
-              {title}
-            </AppText>
-            {subtitle ? (
-              typeof subtitle === 'string' ? (
-                <AppText variant="body" tone="muted">
-                  {subtitle}
-                </AppText>
-              ) : (
-                subtitle
-              )
-            ) : null}
-          </View>
-          {actions && (
-            <Stack direction="row" gap="xs">
-              {actions}
-            </Stack>
-          )}
-        </Stack>
+      {hideHeader ? null : (
+        <PageHeader
+          title={title}
+          subtitle={subtitle}
+          detail={detail}
+          actions={actions}
+          titleAction={titleAction}
+          trailing={headerTrailing}
+          onBack={onBack}
+          backLabel={backLabel}
+          backIcon={backIcon}
+          landing={landing}
+        />
       )}
       <View
         style={{

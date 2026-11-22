@@ -78,7 +78,11 @@ async function registeredScreens() {
 test('layouts that take onBack register the Android Back handler', async () => {
   for (const file of ['Screen', 'PageLayout', 'HealthDetailLayout']) {
     const source = await readFile(resolve(root, 'shared', 'ui', `${file}.tsx`), 'utf8');
-    assert.match(source, /useAndroidBack\(onBack\)/, `${file} must call useAndroidBack(onBack)`);
+    assert.match(
+      source,
+      /useAndroidBack\((onSystemBack \?\? )?onBack\)/,
+      `${file} must call useAndroidBack(onBack)`,
+    );
   }
   const workout = await readFile(
     resolve(root, 'features', 'workouts', 'components', 'WorkoutLayout.tsx'),
@@ -87,7 +91,7 @@ test('layouts that take onBack register the Android Back handler', async () => {
   // #3879: a screen may give the gesture its own action (the summary); otherwise it is onBack.
   assert.match(
     workout,
-    /<PageLayout[^>]*onBack=\{onSystemBack \?\? onBack\}/s,
+    /<PageLayout\s[^>]*?onBack=\{onBack\}\s+onSystemBack=\{onSystemBack\}/s,
     'WorkoutLayout must pass onBack on',
   );
 });

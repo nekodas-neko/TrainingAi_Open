@@ -7,7 +7,6 @@ import {
   AppText,
   Card,
   Disclosure,
-  IconButton,
   ListRow,
   PageLayout,
   Picker,
@@ -85,22 +84,17 @@ export function ProfileGoalsScreen({
     <PageLayout
       title="My goals"
       onBack={onBack}
-      header={
-        <Stack direction="row" align="center">
-          <IconButton icon="back" label="Back to More" onPress={onBack} />
-          <AppText variant="heading" style={{ flex: 1 }}>
-            My goals
-          </AppText>
-          <StatusIndicator
-            label="Profile and goals"
-            busy={p.loading || g.loading}
-            error={p.error ?? g.error}
-            onRetry={() => {
-              p.refresh();
-              g.refresh();
-            }}
-          />
-        </Stack>
+      backLabel="Back to More"
+      actions={
+        <StatusIndicator
+          label="Profile and goals"
+          busy={p.loading || g.loading}
+          error={p.error ?? g.error}
+          onRetry={() => {
+            p.refresh();
+            g.refresh();
+          }}
+        />
       }
     >
       {!p.connected ? (

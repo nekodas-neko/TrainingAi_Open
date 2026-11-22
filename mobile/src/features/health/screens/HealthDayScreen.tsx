@@ -17,7 +17,6 @@ import {
   AppText,
   Card,
   Grid,
-  IconButton,
   KeyValueGrid,
   LineChart,
   PageLayout,
@@ -80,19 +79,14 @@ export function HealthDayScreen({
     <PageLayout
       title={formatDateDisplay(date, 'long')}
       onBack={onBack}
-      header={
-        <Stack direction="row" align="center">
-          <IconButton icon="back" label="Back to Health" onPress={onBack} />
-          <AppText variant="heading" style={{ flex: 1, textAlign: 'center' }}>
-            {formatDateDisplay(date, 'long')}
-          </AppText>
-          <StatusIndicator
-            label="Day records"
-            busy={state.loading}
-            error={state.error}
-            onRetry={state.refresh}
-          />
-        </Stack>
+      backLabel="Back to Health"
+      actions={
+        <StatusIndicator
+          label="Day records"
+          busy={state.loading}
+          error={state.error}
+          onRetry={state.refresh}
+        />
       }
     >
       <Stack direction="row" gap="xs" style={{ paddingHorizontal: theme.spacing.lg }}>

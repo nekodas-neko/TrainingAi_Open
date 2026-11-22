@@ -4,9 +4,7 @@ import Svg, { Defs, LinearGradient, Stop, Rect } from 'react-native-svg';
 import { HealthArtwork } from './HealthArtwork';
 import { PageGradient } from './PageGradient';
 import { useTheme } from '../theme/ThemeProvider';
-import { AppText } from './AppText';
-import { IconButton } from './IconButton';
-import { Stack } from './Stack';
+import { PageHeader } from './PageHeader';
 
 export type HealthHeroKind = 'sleep' | 'readiness' | 'activity' | 'heart-rate';
 export function HealthHero({
@@ -57,32 +55,7 @@ export function HealthHero({
       >
         {children}
       </View>
-      <Stack
-        direction="row"
-        align="center"
-        style={{
-          position: 'absolute',
-          top: theme.spacing.sm,
-          left: theme.spacing.md,
-          right: theme.spacing.md,
-        }}
-      >
-        <View
-          style={{
-            backgroundColor:
-              theme.mode === 'light'
-                ? theme.healthArtColors.lightChip
-                : theme.healthArtColors.darkChip,
-            borderRadius: theme.radii.pill,
-          }}
-        >
-          <IconButton icon="back" label="Back" onPress={onBack} />
-        </View>
-        <AppText variant="label" style={{ flex: 1 }}>
-          {title}
-        </AppText>
-        {actions}
-      </Stack>
+      <PageHeader mode="hero" title={title} onBack={onBack} actions={actions} />
     </View>
   );
 }

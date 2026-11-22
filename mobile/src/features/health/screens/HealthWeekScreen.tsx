@@ -41,7 +41,6 @@ export function HealthWeekScreen({ week, onBack }: { week: string; onBack: () =>
       title="Week in review"
       onBack={onBack}
       backLabel="Back to Health"
-      centeredTitle
       actions={
         <StatusIndicator
           label="Weekly review"
