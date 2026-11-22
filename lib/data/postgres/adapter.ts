@@ -129,6 +129,7 @@ import * as prog from './slices/programs'
 import * as period from './slices/periodization'
 import { getSessionReadLogs } from './slices/session-read'
 import { listExercisePreferences, consumeLiftOneShot, type ClearedOneShot } from './slices/exercise-preferences'
+import { getCheckinSessionBudgetMin, listCheckinHeldLifts, writeRestDay } from './slices/weekly-checkin'
 import * as userStatsSlice from './slices/user-stats'
 import * as oura from './slices/oura'
 import { readRawFrames, readRecentRawFrames, DS_BUCKET_SPAN } from './slices/oura-raw-frames'
@@ -4821,15 +4822,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
    * what the `(user_id, date)` unique index is for.
    */
   async setRestDay(userId: string, date: string, resting: boolean): Promise<void> {
-    await this.db.insert(s.restDays)
-      .values({ userId, date, deletedAt: resting ? null : new Date() })
-      .onConflictDoUpdate({
-        target: [s.restDays.userId, s.restDays.date],
-        set: { deletedAt: resting ? null : new Date(), updatedAt: new Date() },
-        // Scoped even though the conflict target already includes user_id: an onConflictDoUpdate
-        // arm is an UPDATE, and the standing rule is that every one of them is user-scoped.
-        setWhere: eq(s.restDays.userId, userId),
-      })
+    // #3890: the write itself is `writeRestDay`, which the weekly check-in's days off also call.
+    await writeRestDay(this.db, userId, date, resting)
   }
 
   async isRestDayChosen(userId: string, date: string): Promise<boolean> {
@@ -8715,6 +8709,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async getRecentSessionsOfType(userId: string, programSessionId: string, limit: number) { return period.getRecentSessionsOfType(this.db, userId, programSessionId, limit) }
   async getSetLogsForSessions(workoutSessionIds: string[]) { return period.getSetLogsForSessions(this.db, workoutSessionIds) }
   async getSessionReadLogs(userId: string, from: Date, to: Date) { return getSessionReadLogs(this.db, userId, from, to) }
+  async listCheckinHeldLifts(userId: string, weekStart: string, exerciseNames: string[]) { return listCheckinHeldLifts(this.db, userId, weekStart, exerciseNames) }
+  async getCheckinSessionBudgetMin(userId: string, weekStart: string) { return getCheckinSessionBudgetMin(this.db, userId, weekStart) }
   async listExercisePreferences(userId: string, exerciseNames: string[]) {
     const cleared: ClearedOneShot[] = []
     const stale: ClearedOneShot[] = []

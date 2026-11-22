@@ -650,7 +650,13 @@ const cols = (c: PrefColumns) => ({
 const same = (a: PrefColumns, b: PrefColumns) =>
   JSON.stringify(cols(a)) === JSON.stringify(cols(b)) && a.oneShotSetAt === b.oneShotSetAt && (a.deletedAt == null) === (b.deletedAt == null)
 
-export function liftPreferenceHandler(getReads: () => Promise<StaticReads>, today: string = todayInTz(DEFAULT_TZ)): DomainHandler {
+/** Who a preference row says wrote it (`exercise_preferences.source`): the Coach, or #3890's weekly
+ *  check-in, which applies its "Heavy plus a miss" and an accepted "Light" through this same writer. */
+export type LiftPreferenceSource = 'coach' | 'checkin'
+
+export function liftPreferenceHandler(
+  getReads: () => Promise<StaticReads>, today: string = todayInTz(DEFAULT_TZ), source: LiftPreferenceSource = 'coach',
+): DomainHandler {
   return {
     transactional: true,
 
@@ -721,14 +727,14 @@ export function liftPreferenceHandler(getReads: () => Promise<StaticReads>, toda
                SET rep_min = ${n.repMin}, rep_max = ${n.repMax}, rest_sec = ${n.restSec},
                    next_load_step = ${n.nextLoadStep}, sets_delta = ${n.setsDelta}, one_shot_set_at = ${stamp},
                    exercise_id = COALESCE(exercise_id, ${ctx.libId}::uuid),
-                   source = 'coach', deleted_at = NULL, updated_at = now()
+                   source = ${source}, deleted_at = NULL, updated_at = now()
              WHERE id = ${row.id} AND user_id = ${userId}
          RETURNING id, one_shot_set_at::text AS one_shot_set_at`)
         : await db.execute(sql`
             INSERT INTO exercise_preferences
                    (user_id, exercise_id, exercise_name, rep_min, rep_max, rest_sec, next_load_step, sets_delta, one_shot_set_at, source)
             VALUES (${userId}, ${ctx.libId}::uuid, ${target.exerciseName}, ${n.repMin}, ${n.repMax}, ${n.restSec},
-                    ${n.nextLoadStep}, ${n.setsDelta}, ${stamp}, 'coach')
+                    ${n.nextLoadStep}, ${n.setsDelta}, ${stamp}, ${source})
             ON CONFLICT ON CONSTRAINT exercise_preferences_lift_key DO NOTHING
          RETURNING id, one_shot_set_at::text AS one_shot_set_at`)
       // Inserted by someone else between the read and this write: the "before" this change would

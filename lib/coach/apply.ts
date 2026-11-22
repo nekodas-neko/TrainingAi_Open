@@ -8,7 +8,7 @@ import { nutritionTargetsHandler, userGoalsHandler } from './domains/goals'
 import { injuryHandler } from './domains/injury'
 import { programPhaseHandler } from './domains/program-phase'
 import { earlyDeloadHandler } from './domains/early-deload'
-import { liftPreferenceHandler, StaleLiftPreference } from './domains/lift-preference'
+import { liftPreferenceHandler, StaleLiftPreference, type LiftPreferenceSource } from './domains/lift-preference'
 import { DEFAULT_TZ, todayInTz } from '@trainingai/shared/date-utils'
 
 export type { ApplyOutcome } from './domains/types'
@@ -23,6 +23,7 @@ export function handlerFor(
   domain: CoachPatchDomain,
   today: string = todayInTz(DEFAULT_TZ),
   timezone: string = DEFAULT_TZ,
+  source: LiftPreferenceSource = 'coach',
 ): DomainHandler {
   const handlers: Record<CoachPatchDomain, DomainHandler> = {
     session_exercise: sessionExerciseHandler,
@@ -34,7 +35,7 @@ export function handlerFor(
     // The bar's basis reads (1RM, estimates, records) go through the repository, as every other
     // reader of them does. Imported lazily so the Coach's apply path does not load the whole
     // repository for the domains that never need it.
-    lift_preference: liftPreferenceHandler(async () => (await import('@/lib/data')).getRepository(), today),
+    lift_preference: liftPreferenceHandler(async () => (await import('@/lib/data')).getRepository(), today, source),
   }
   return handlers[domain]
 }
@@ -57,6 +58,8 @@ export async function applyCoachPatch(
   acceptedIds: string[],
   today?: string,
   timezone?: string,
+  /** #3890: the weekly check-in applies its lift changes through this same path, stamped as its own. */
+  opts: { source?: LiftPreferenceSource } = {},
 ): Promise<ApplyOutcome> {
   const accepted = patch.changes.filter(c => acceptedIds.includes(c.id))
   if (accepted.length === 0) return { ok: false, reason: 'invalid', detail: 'No changes accepted' }
@@ -66,7 +69,7 @@ export async function applyCoachPatch(
     return { ok: false, reason: 'invalid', detail: 'Those fields do not belong to that domain' }
   }
 
-  const handler = handlerFor(patch.domain, today, timezone)
+  const handler = handlerFor(patch.domain, today, timezone, opts.source)
   if (handler.transactional) return applyInTransaction(db, userId, patch, accepted, handler)
 
   const result = await handler.apply(db, userId, patch, accepted)

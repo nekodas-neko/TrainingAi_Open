@@ -1,0 +1,789 @@
+/**
+ * #3890 step 2: the weekly check-in's engine. Reads the state the Preview card and sheet need, saves the
+ * answers, dismisses, resolves an offer and undoes. The routes under app/api/weekly-checkin/ are thin
+ * wrappers: auth, rate limit, Zod, then one call here.
+ *
+ * **The model decides nothing and is not called.** The summary is written by code from the session read
+ * (`packages/shared/src/weekly-checkin/summary.ts`); every answer maps to an effect by one rule
+ * (`effectForAnswer`); every write is named here from values code computed. No request body reaches
+ * `.set()` or an INSERT.
+ *
+ * **One writer per kind of change.** A lowered or stepped-up lift is the Coach's own lift-preference
+ * writer (`applyCoachPatch`, domain `lift_preference`, `nextLoadStep`), stamped `source = 'checkin'`,
+ * with its `coach_changes` row and its undo. A logged injury is the Coach's `injury` domain; a swap is
+ * its `session_exercise` domain; a rest day is `writeRestDay`, the same write as Home's rest-day tap.
+ * This module never writes `exercise_preferences`, `injuries`, `session_exercises` or `coach_changes`
+ * itself.
+ *
+ * **Ownership.** The user is the route's session user. Every client id (a lift slot, a check-in, a lift
+ * row, an alternative) is looked up scoped to that user before anything reads by it; a foreign or
+ * unknown id is `not_found` with nothing written. `pain_injury_id`, `swap_change_id` and
+ * `applied_change_id` are only ever set from a result the Coach writer returned for this user, and the
+ * injury id is checked to be this user's row before it is stored (the foreign keys cannot say that).
+ *
+ * **Redo.** Saving again updates the same row. The first save's automatic effects are taken back before
+ * the new answers apply, so two saves never stack two lowerings: a lowering the new answer still calls
+ * for is kept as it is (no second write); one it no longer calls for is undone. A lowering or accepted
+ * step up that can no longer be undone (a workout started since, or the one-off was used) is kept and
+ * reported, never doubled. An accepted injury or swap is never taken back by a redo: changing that
+ * answer is refused until the person undoes it (`undo_first`).
+ *
+ * `pain_where` is user text: stored, bounded to 200 characters by Zod and the CHECK, returned to its
+ * owner, and never put in a prompt or into the injury's notes here.
+ */
+import { and, desc, eq, gt, isNull, sql } from 'drizzle-orm'
+import * as s from '@/lib/data/postgres/schema'
+import type { getDb } from '@/lib/data/postgres/client'
+import type { WorkoutRepository } from '@/lib/data/repository'
+import {
+  completedWorkoutDays, getCheckinById, getCheckinByWeek, listCheckinLifts, listProgramLifts, writeRestDay,
+  type CheckinLiftRow, type CheckinRow, type ProgramLift,
+} from '@/lib/data/postgres/slices/weekly-checkin'
+import { applyCoachPatch, undoCoachChange } from '@/lib/coach/apply'
+import type { CoachPatch } from '@/lib/coach/patch'
+import { dateStrMidnightInTz, shiftDateStr } from '@trainingai/shared/date-utils'
+import { getScheduledSessionsPerWeek } from '@trainingai/shared/schedule-utils'
+import { checkinDue, checkinWeekStart, localClock, type CheckinDueWhy } from '@trainingai/shared/weekly-checkin/due'
+import { daysOffDates, effectForAnswer, type CheckinAnswer, type CheckinEffect } from '@trainingai/shared/weekly-checkin/effects'
+import { summarizeWeek, type CheckinSummary, type WeekLiftRead } from '@trainingai/shared/weekly-checkin/summary'
+import { isReadableLog, readLog } from '@trainingai/shared/ai-periodization/session-read'
+import { weightStepFor } from '@trainingai/shared/workout/load-rounding'
+import { goalRange } from '@trainingai/shared/ai-periodization/goal-ranges'
+import { preferredRepBand } from '@trainingai/shared/ai-periodization/lift-preference'
+import { loadLiftPreferences } from '@trainingai/shared/ai-periodization/lift-preference-read'
+import { injurySafeAlternatives } from '@trainingai/shared/workout/injury-substitution'
+import { listExercisePreferences } from '@/lib/data/postgres/slices/exercise-preferences'
+
+type Db = ReturnType<typeof getDb>
+
+/** How many library alternatives a swap offer lists (the Coach's tool lists 8). */
+export const SWAP_ALTERNATIVES_LIMIT = 8
+
+export class CheckinRefusal extends Error {
+  constructor(readonly status: 400 | 404 | 409, readonly code: string, message: string) { super(message) }
+}
+const notFound = () => new CheckinRefusal(404, 'not_found', 'Not found')
+
+export interface EngineCtx {
+  db: Db
+  repo: WorkoutRepository
+  userId: string
+  tz: string
+  now?: Date
+}
+
+// ── Lift identity ────────────────────────────────────────────────────────────────────────────
+
+interface LiftId { exerciseId: string | null; exerciseName: string }
+/** The migration's rule: ids match when both carry one; otherwise the names must match and neither
+ *  id may name a different lift. */
+export function sameLift(a: LiftId, b: LiftId): boolean {
+  if (a.exerciseId && b.exerciseId) return a.exerciseId === b.exerciseId
+  return a.exerciseName === b.exerciseName
+}
+const changeMarker = (checkinId: string, what: string) => `weekly-checkin:${checkinId}:${what}`
+
+/** Main lifts, one per lift (the first slot of a lift that is in several sessions). */
+function uniqueLifts(slots: ProgramLift[]): ProgramLift[] {
+  const out: ProgramLift[] = []
+  for (const slot of slots) if (!out.some(l => sameLift(l, slot))) out.push(slot)
+  return out
+}
+
+// ── The state ─────────────────────────────────────────────────────────────────────────────────
+
+export interface CheckinStateLift {
+  /** Send this back as the lift's id in a save. Any slot of the lift is accepted. */
+  sessionExerciseId: string
+  exerciseName: string
+  exerciseId: string | null
+  missedRep: boolean | null
+}
+
+export type CheckinOffer =
+  | { kind: 'step_up'; liftId: string; exerciseName: string; status: 'open' | 'accepted' | 'declined'; changeId: string | null }
+  | { kind: 'pain'; exerciseName: string; where: string | null; status: 'open' | 'accepted' | 'declined'; injuryId: string | null; muscles: string[] }
+  | { kind: 'swap'; exerciseName: string; status: 'open' | 'accepted' | 'declined'; changeId: string | null; alternatives: SwapAlternative[] }
+
+export interface SwapAlternative { exerciseId: string; name: string; equipment: string[]; mainMuscles: string[] }
+
+export interface CheckinView {
+  id: string
+  weekStart: string
+  appliesWeekStart: string
+  status: 'offered' | 'saved' | 'dismissed'
+  savedAt: string | null
+  dismissedAt: string | null
+  lifts: { liftId: string; exerciseName: string; exerciseId: string | null; answer: CheckinAnswer; missedRep: boolean | null; effect: CheckinEffect; offerStatus: string | null; appliedChangeId: string | null }[]
+  daysOff: number[] | null
+  shorterSessionMin: number | null
+  pain: false | null | { exerciseName: string; exerciseId: string | null; where: string | null }
+  swap: null | { exerciseName: string; exerciseId: string | null }
+  offers: CheckinOffer[]
+}
+
+export interface CheckinState {
+  /** Whether the card should show now. */
+  due: boolean
+  why: CheckinDueWhy | null
+  /** The week under review (local Monday), whether due or already answered; null when none. */
+  weekStart: string | null
+  summary: CheckinSummary | null
+  /** The main lifts to ask about. Empty when nothing is under review. */
+  lifts: CheckinStateLift[]
+  checkin: CheckinView | null
+}
+
+interface Review {
+  weekStart: string
+  due: boolean
+  why: CheckinDueWhy | null
+  row: CheckinRow | null
+}
+
+const resolved = (row: CheckinRow | null) => row != null && (row.status === 'saved' || row.status === 'dismissed')
+
+/** Which week is under review now, and whether its card is due. Reads only. */
+async function reviewWeek(ctx: EngineCtx, program: NonNullable<Awaited<ReturnType<WorkoutRepository['getActiveProgram']>>>): Promise<Review | null> {
+  const now = ctx.now ?? new Date()
+  const thisWeek = checkinWeekStart(now, ctx.tz)
+  const lastWeek = shiftDateStr(thisWeek, -7)
+  const [thisRow, lastRow, doneDays] = await Promise.all([
+    getCheckinByWeek(ctx.db, ctx.userId, thisWeek),
+    getCheckinByWeek(ctx.db, ctx.userId, lastWeek),
+    // Up to now: a workout row dated later (a clock-skewed device) has not happened yet.
+    completedWorkoutDays(ctx.db, ctx.userId, dateStrMidnightInTz(thisWeek, ctx.tz), new Date(Math.min(now.getTime(), dateStrMidnightInTz(shiftDateStr(thisWeek, 7), ctx.tz).getTime()) + 1), ctx.tz),
+  ])
+  const schedule = program.schedule
+  const due = checkinDue({
+    now, tz: ctx.tz,
+    thisWeek: {
+      plannedSessions: getScheduledSessionsPerWeek(program),
+      plannedWeekdays: schedule?.type === 'weekly' ? (schedule.days ?? []).filter(d => d.sessionId != null).map(d => d.dayOfWeek) : null,
+      doneDays,
+    },
+    thisWeekResolved: resolved(thisRow),
+    lastWeekResolved: resolved(lastRow),
+  })
+  if (due.weekStart) return { weekStart: due.weekStart, due: true, why: due.why, row: due.weekStart === thisWeek ? thisRow : lastRow }
+  // Not due: still show an answered card for its undo, this week's, or last week's on the Monday after.
+  if (thisRow) return { weekStart: thisWeek, due: false, why: null, row: thisRow }
+  const { today } = localClock(now, ctx.tz)
+  if (lastRow && today === thisWeek) return { weekStart: lastWeek, due: false, why: null, row: lastRow }
+  return null
+}
+
+/** The week's summary and its main lifts, from the logs through the session read. Reads only. */
+async function weekSummary(ctx: EngineCtx, program: NonNullable<Awaited<ReturnType<WorkoutRepository['getActiveProgram']>>>, weekStart: string) {
+  const from = dateStrMidnightInTz(weekStart, ctx.tz)
+  const to = dateStrMidnightInTz(shiftDateStr(weekStart, 7), ctx.tz)
+  const slots = await listProgramLifts(ctx.db, ctx.userId, { primaryOnly: true })
+  const lifts = uniqueLifts(slots)
+  const names = lifts.map(l => l.exerciseName)
+  const [doneDays, logs, equipment, prefs] = await Promise.all([
+    completedWorkoutDays(ctx.db, ctx.userId, from, to, ctx.tz),
+    names.length > 0 ? ctx.repo.getSessionReadLogs(ctx.userId, from, to) : Promise.resolve([]),
+    names.length > 0 ? ctx.repo.getExerciseEquipment(names) : Promise.resolve({} as Record<string, string[]>),
+    loadLiftPreferences(ctx.repo, ctx.userId, names),
+  ])
+  const band = goalRange(program.trainingGoal, 'primary')
+  const perLift = lifts.map(lift => {
+    const reads: WeekLiftRead[] = (logs ?? [])
+      .filter(log => log.exerciseName === lift.exerciseName && log.loggedAt >= program.createdAt && isReadableLog(log))
+      .sort((a, b) => a.loggedAt.getTime() - b.loggedAt.getTime())
+      .map(log => ({
+        day: localClock(log.loggedAt, ctx.tz).today,
+        read: readLog(log, weightStepFor(equipment?.[lift.exerciseName]), preferredRepBand(prefs.get(lift.exerciseName), band).repMax),
+      }))
+    return { exerciseName: lift.exerciseName, exerciseId: lift.exerciseId, reads }
+  })
+  const summary = summarizeWeek({ sessionsDone: doneDays.length, sessionsPlanned: getScheduledSessionsPerWeek(program), lifts: perLift })
+  const stateLifts: CheckinStateLift[] = lifts.map((l, i) => ({
+    sessionExerciseId: l.sessionExerciseId, exerciseName: l.exerciseName, exerciseId: l.exerciseId, missedRep: summary.lifts[i].missedRep,
+  }))
+  return { summary, lifts: stateLifts, slots }
+}
+
+async function libraryMuscles(ctx: EngineCtx, lift: LiftId, fallback: string[]) {
+  const library = await ctx.repo.listExerciseLibrary()
+  const entry = library.find(e => (lift.exerciseId ? e.id === lift.exerciseId : false)) ?? library.find(e => e.name === lift.exerciseName)
+  const main = entry ? entry.muscles.filter(m => m.role === 'main').map(m => m.muscle) : []
+  return { library, entry, mainMuscles: main.length > 0 ? main : fallback }
+}
+
+/** The library alternatives for the same muscles, by the Coach's swap matcher (injury-aware). */
+async function swapAlternatives(ctx: EngineCtx, lift: LiftId): Promise<SwapAlternative[]> {
+  const slot = (await listProgramLifts(ctx.db, ctx.userId)).find(l => sameLift(l, lift))
+  const [{ library, mainMuscles }, injuries] = await Promise.all([
+    libraryMuscles(ctx, lift, slot?.muscleGroups ?? []),
+    ctx.repo.listInjuries(ctx.userId),
+  ])
+  return injurySafeAlternatives(
+    { name: lift.exerciseName, mainMuscles },
+    injuries.filter(i => !i.resolvedDate).map(i => i.muscleName),
+    library,
+    SWAP_ALTERNATIVES_LIMIT,
+  ).map(e => ({ exerciseId: e.id, name: e.name, equipment: e.equipment, mainMuscles: e.muscles.filter(m => m.role === 'main').map(m => m.muscle) }))
+}
+
+async function painMuscles(ctx: EngineCtx, lift: LiftId): Promise<string[]> {
+  const slot = (await listProgramLifts(ctx.db, ctx.userId)).find(l => sameLift(l, lift))
+  const { mainMuscles } = await libraryMuscles(ctx, lift, slot?.muscleGroups ?? [])
+  return [...new Set(mainMuscles)]
+}
+
+async function viewOf(ctx: EngineCtx, row: CheckinRow): Promise<CheckinView> {
+  const lifts = await listCheckinLifts(ctx.db, ctx.userId, row.id)
+  const offers: CheckinOffer[] = []
+  if (row.status === 'saved') {
+    for (const l of lifts) {
+      if (l.effect === 'offered_step_up' && l.offerStatus) {
+        offers.push({ kind: 'step_up', liftId: l.id, exerciseName: l.exerciseName, status: l.offerStatus, changeId: l.appliedChangeId })
+      }
+    }
+    if (row.painExerciseName && row.painOfferStatus) {
+      const lift = { exerciseId: row.painExerciseId, exerciseName: row.painExerciseName }
+      offers.push({
+        kind: 'pain', exerciseName: row.painExerciseName, where: row.painWhere, status: row.painOfferStatus, injuryId: row.painInjuryId,
+        muscles: row.painOfferStatus === 'open' ? await painMuscles(ctx, lift) : [],
+      })
+    }
+    if (row.swapExerciseName && row.swapOfferStatus) {
+      const lift = { exerciseId: row.swapExerciseId, exerciseName: row.swapExerciseName }
+      offers.push({
+        kind: 'swap', exerciseName: row.swapExerciseName, status: row.swapOfferStatus, changeId: row.swapChangeId,
+        alternatives: row.swapOfferStatus === 'open' ? await swapAlternatives(ctx, lift) : [],
+      })
+    }
+  }
+  return {
+    id: row.id,
+    weekStart: row.weekStart,
+    appliesWeekStart: row.appliesWeekStart,
+    status: row.status,
+    savedAt: row.savedAt?.toISOString() ?? null,
+    dismissedAt: row.dismissedAt?.toISOString() ?? null,
+    lifts: lifts.map(l => ({
+      liftId: l.id, exerciseName: l.exerciseName, exerciseId: l.exerciseId, answer: l.answer, missedRep: l.missedRep,
+      effect: l.effect, offerStatus: l.offerStatus, appliedChangeId: l.appliedChangeId,
+    })),
+    daysOff: row.daysOffWeekdays ?? null,
+    shorterSessionMin: row.shorterSessionMin ?? null,
+    pain: row.painRaised === false ? false
+      : row.painRaised === true && row.painExerciseName ? { exerciseName: row.painExerciseName, exerciseId: row.painExerciseId, where: row.painWhere }
+      : null,
+    swap: row.swapExerciseName ? { exerciseName: row.swapExerciseName, exerciseId: row.swapExerciseId } : null,
+    offers,
+  }
+}
+
+/**
+ * The card's state. When the card is due and no row exists yet, the `offered` row is created here: the
+ * migration's `offered_at` is "when the card was first offered (the row is created then)". Idempotent.
+ */
+export async function readCheckinState(ctx: EngineCtx): Promise<CheckinState> {
+  const empty: CheckinState = { due: false, why: null, weekStart: null, summary: null, lifts: [], checkin: null }
+  const program = await ctx.repo.getActiveProgram(ctx.userId)
+  if (!program) return empty
+  const review = await reviewWeek(ctx, program)
+  if (!review) return empty
+  let row = review.row
+  if (!row && review.due) {
+    await ctx.db.insert(s.weeklyCheckins)
+      .values({ userId: ctx.userId, weekStart: review.weekStart, appliesWeekStart: shiftDateStr(review.weekStart, 7) })
+      .onConflictDoNothing()
+    row = await getCheckinByWeek(ctx.db, ctx.userId, review.weekStart)
+  }
+  const { summary, lifts } = await weekSummary(ctx, program, review.weekStart)
+  return {
+    due: review.due && row?.status === 'offered',
+    why: review.due && row?.status === 'offered' ? review.why : null,
+    weekStart: review.weekStart,
+    summary,
+    lifts,
+    checkin: row ? await viewOf(ctx, row) : null,
+  }
+}
+
+// ── Coach writer calls ────────────────────────────────────────────────────────────────────────
+
+/** A workout started after the change: it has shaped a session, so it is kept (the Coach undo route's window). */
+async function trainedSince(db: Db, userId: string, changeId: string): Promise<boolean> {
+  const [rec] = await db.select({ appliedAt: s.coachChanges.appliedAt }).from(s.coachChanges)
+    .where(and(eq(s.coachChanges.id, changeId), eq(s.coachChanges.userId, userId))).limit(1)
+  if (!rec) return false
+  const [w] = await db.select({ id: s.workoutSessions.id }).from(s.workoutSessions)
+    .where(and(eq(s.workoutSessions.userId, userId), gt(s.workoutSessions.startedAt, rec.appliedAt))).limit(1)
+  return w != null
+}
+
+/** Whether this user's change is still in effect (exists and not undone). */
+async function changeLive(db: Db, userId: string, changeId: string | null): Promise<boolean> {
+  if (!changeId) return false
+  const [rec] = await db.select({ id: s.coachChanges.id }).from(s.coachChanges)
+    .where(and(eq(s.coachChanges.id, changeId), eq(s.coachChanges.userId, userId), isNull(s.coachChanges.undoneAt))).limit(1)
+  return rec != null
+}
+
+/** Undo one of this user's changes, inside the caller's transaction. False when it cannot be undone. */
+async function tryUndo(db: Db, userId: string, changeId: string): Promise<{ ok: true } | { ok: false; detail: string }> {
+  if (!(await changeLive(db, userId, changeId))) return { ok: true } // already undone elsewhere (the Coach's history)
+  if (await trainedSince(db, userId, changeId)) return { ok: false, detail: "You've trained since this change, so it stays." }
+  const res = await undoCoachChange(db, userId, changeId)
+  if (res.ok) return { ok: true }
+  return { ok: false, detail: res.reason === 'invalid' ? res.detail : 'This change is no longer the one in effect.' }
+}
+
+/**
+ * One plate lighter or heavier next time for a lift, through the Coach's lift-preference writer. The
+ * `from` is the stored one-off as it is now, so the writer's own stale check runs. Returns the change id,
+ * `already` when the lift already carries that step (nothing to write), or a refusal.
+ */
+async function applyLoadStep(
+  db: Db, ctx: EngineCtx, lift: LiftId, slotId: string, step: 'lighter' | 'heavier', marker: string, today: string,
+): Promise<{ ok: true; changeId: string | null } | { ok: false; detail: string }> {
+  const current = (await listExercisePreferences(db, ctx.userId, [lift.exerciseName])).get(lift.exerciseName)?.nextLoadStep ?? null
+  if (current === step) return { ok: true, changeId: null }
+  const patch: CoachPatch = {
+    domain: 'lift_preference',
+    targetId: slotId,
+    changes: [{ id: marker, field: 'nextLoadStep', from: current === 'lighter' || current === 'heavier' ? current : null, to: step }],
+  }
+  const res = await applyCoachPatch(db, ctx.userId, patch, [marker], today, ctx.tz, { source: 'checkin' })
+  if (res.ok) return { ok: true, changeId: res.changeId }
+  return { ok: false, detail: res.reason === 'invalid' ? res.detail : res.reason === 'stale' ? 'The lift changed while saving.' : 'Not found' }
+}
+
+/** The first live slot of a lift in the active program, by identity. */
+async function slotFor(db: Db, userId: string, lift: LiftId): Promise<ProgramLift | null> {
+  return (await listProgramLifts(db, userId)).find(l => sameLift(l, lift)) ?? null
+}
+
+// ── Save ──────────────────────────────────────────────────────────────────────────────────────
+
+export interface SaveInput {
+  weekStart: string
+  lifts: { sessionExerciseId: string; answer: CheckinAnswer }[]
+  /** null: not answered; false: nothing hurt; a lift and where. */
+  pain: null | false | { sessionExerciseId: string; where: string | null }
+  swap: null | { sessionExerciseId: string }
+  daysOff: number[] | null
+  shorterSessionMin: number | null
+}
+
+export interface SaveOutcome {
+  state: CheckinState
+  /** Lifts whose earlier change could not be taken back and so stays as it was (never doubled). */
+  kept: { exerciseName: string; detail: string }[]
+  /** Lifts whose lowering the writer refused, so they are held instead. */
+  notApplied: { exerciseName: string; detail: string }[]
+}
+
+export async function saveCheckin(ctx: EngineCtx, input: SaveInput): Promise<SaveOutcome> {
+  const program = await ctx.repo.getActiveProgram(ctx.userId)
+  if (!program) throw new CheckinRefusal(409, 'not_open', 'There is no week to review')
+  const review = await reviewWeek(ctx, program)
+  if (!review || review.weekStart !== input.weekStart || (!review.due && !review.row)) {
+    throw new CheckinRefusal(409, 'not_open', 'That week is not open for a check-in')
+  }
+
+  // Every client id resolved against this user's active program before anything is written.
+  const { lifts: mainLifts, slots: mainSlots } = await weekSummary(ctx, program, review.weekStart)
+  const answered = input.lifts.map(a => {
+    const slot = mainSlots.find(l => l.sessionExerciseId === a.sessionExerciseId)
+    if (!slot) throw notFound()
+    const main = mainLifts.find(l => sameLift(l, slot))!
+    return { lift: main, slot, answer: a.answer, effect: effectForAnswer(a.answer, main.missedRep) }
+  })
+  for (let i = 0; i < answered.length; i++) {
+    if (answered.slice(i + 1).some(o => sameLift(o.lift, answered[i].lift))) throw new CheckinRefusal(400, 'duplicate_lift', 'A lift is answered twice')
+  }
+  const resolveSlot = async (id: string) => {
+    const [slot] = await listProgramLifts(ctx.db, ctx.userId, { sessionExerciseId: id })
+    if (!slot) throw notFound()
+    return slot
+  }
+  const painSlot = input.pain ? await resolveSlot(input.pain.sessionExerciseId) : null
+  const swapSlot = input.swap ? await resolveSlot(input.swap.sessionExerciseId) : null
+
+  const now = ctx.now ?? new Date()
+  const { today } = localClock(now, ctx.tz)
+  const kept: SaveOutcome['kept'] = []
+  const notApplied: SaveOutcome['notApplied'] = []
+
+  await ctx.db.transaction(async txRaw => {
+    const tx = txRaw as unknown as Db
+    await tx.insert(s.weeklyCheckins)
+      .values({ userId: ctx.userId, weekStart: input.weekStart, appliesWeekStart: shiftDateStr(input.weekStart, 7) })
+      .onConflictDoNothing()
+    const row = await getCheckinByWeek(tx, ctx.userId, input.weekStart, true)
+    if (!row) throw new CheckinRefusal(409, 'not_open', 'That week is not open for a check-in')
+    const wasSaved = row.status === 'saved'
+
+    // An accepted injury or swap stays until it is undone: a redo may not silently replace it.
+    if (row.painOfferStatus === 'accepted' && row.painExerciseName) {
+      const same = painSlot && sameLift(painSlot, { exerciseId: row.painExerciseId, exerciseName: row.painExerciseName })
+      if (!same) throw new CheckinRefusal(409, 'undo_first', 'Undo the logged injury before changing that answer')
+    }
+    if (row.swapOfferStatus === 'accepted' && row.swapExerciseName) {
+      const same = swapSlot && sameLift(swapSlot, { exerciseId: row.swapExerciseId, exerciseName: row.swapExerciseName })
+      if (!same) throw new CheckinRefusal(409, 'undo_first', 'Undo the swap before changing that answer')
+    }
+
+    // ── Lift rows ──
+    const previous = await listCheckinLifts(tx, ctx.userId, row.id, true)
+    const touched = new Set<string>()
+    for (const a of answered) {
+      const prev = previous.find(p => sameLift(p, a.lift)) ?? null
+      if (prev) touched.add(prev.id)
+      let effect: CheckinEffect = a.effect
+      let offerStatus: 'open' | 'accepted' | 'declined' | null = effect === 'offered_step_up' ? 'open' : null
+      let appliedChangeId: string | null = null
+
+      const prevLive = prev && !prev.deletedAt && (await changeLive(tx, ctx.userId, prev.appliedChangeId))
+      if (prev && prevLive) {
+        const stillWanted = (prev.effect === 'lowered_one_step' && effect === 'lowered_one_step')
+          || (prev.effect === 'offered_step_up' && prev.offerStatus === 'accepted' && effect === 'offered_step_up')
+        if (stillWanted) {
+          appliedChangeId = prev.appliedChangeId
+          offerStatus = prev.effect === 'offered_step_up' ? 'accepted' : null
+        } else {
+          const undone = await tryUndo(tx, ctx.userId, prev.appliedChangeId!)
+          if (!undone.ok) {
+            // It stays, and the row says so: the app did this, and a second step is not added on top.
+            kept.push({ exerciseName: a.lift.exerciseName, detail: undone.detail })
+            effect = prev.effect
+            offerStatus = prev.offerStatus
+            appliedChangeId = prev.appliedChangeId
+          }
+        }
+      } else if (prev && !prev.deletedAt && prev.effect === 'offered_step_up' && prev.offerStatus === 'declined' && effect === 'offered_step_up') {
+        offerStatus = 'declined'
+      }
+
+      if (effect === 'lowered_one_step' && appliedChangeId == null) {
+        const step = await applyLoadStep(tx, ctx, a.lift, a.slot.sessionExerciseId, 'lighter', changeMarker(row.id, `lift:${a.slot.sessionExerciseId}`), today)
+        if (step.ok) {
+          appliedChangeId = step.changeId
+        } else {
+          notApplied.push({ exerciseName: a.lift.exerciseName, detail: step.detail })
+          effect = 'held'
+        }
+      }
+      const id = await upsertLiftRow(tx, ctx.userId, row.id, prev?.id ?? null, a.lift, a.answer, a.lift.missedRep, effect, offerStatus, appliedChangeId)
+      touched.add(id)
+    }
+    // Lifts the redo no longer answers: their change taken back, then the row tombstoned.
+    for (const prev of previous) {
+      if (touched.has(prev.id) || prev.deletedAt) continue
+      if (await changeLive(tx, ctx.userId, prev.appliedChangeId)) {
+        const undone = await tryUndo(tx, ctx.userId, prev.appliedChangeId!)
+        if (!undone.ok) { kept.push({ exerciseName: prev.exerciseName, detail: undone.detail }); continue }
+      }
+      const res = await tx.update(s.weeklyCheckinExercises)
+        .set({ deletedAt: new Date(), updatedAt: new Date(), appliedChangeId: null, effect: 'none', offerStatus: null })
+        .where(and(eq(s.weeklyCheckinExercises.id, prev.id), eq(s.weeklyCheckinExercises.userId, ctx.userId)))
+        .returning({ id: s.weeklyCheckinExercises.id })
+      if (res.length !== 1) throw new Error('weekly check-in lift tombstone wrote no row')
+    }
+
+    // ── Days off: the first save's dates withdrawn where the new answer drops them, new ones marked ──
+    const applies = row.appliesWeekStart
+    const before = new Set(wasSaved ? daysOffDates(applies, row.daysOffWeekdays ?? [], today) : [])
+    const after = new Set(daysOffDates(applies, input.daysOff ?? [], today))
+    for (const d of before) if (!after.has(d)) await writeRestDay(tx, ctx.userId, d, false)
+    for (const d of after) if (!before.has(d)) await writeRestDay(tx, ctx.userId, d, true)
+
+    // ── Pain and swap: offers, never applied here ──
+    const painLift = painSlot ? { exerciseName: painSlot.exerciseName, exerciseId: painSlot.exerciseId } : null
+    const painKeep = painLift && row.painExerciseName && row.painOfferStatus && row.painOfferStatus !== 'open'
+      && sameLift(painLift, { exerciseId: row.painExerciseId, exerciseName: row.painExerciseName })
+    const swapLift = swapSlot ? { exerciseName: swapSlot.exerciseName, exerciseId: swapSlot.exerciseId } : null
+    const swapKeep = swapLift && row.swapExerciseName && row.swapOfferStatus && row.swapOfferStatus !== 'open'
+      && sameLift(swapLift, { exerciseId: row.swapExerciseId, exerciseName: row.swapExerciseName })
+
+    const saved = await tx.update(s.weeklyCheckins)
+      .set({
+        status: 'saved',
+        savedAt: new Date(),
+        dismissedAt: null,
+        daysOffWeekdays: input.daysOff == null ? null : [...new Set(input.daysOff)].sort((x, y) => x - y),
+        shorterSessionMin: input.shorterSessionMin,
+        painRaised: input.pain === null ? null : input.pain !== false,
+        painExerciseName: painLift?.exerciseName ?? null,
+        painExerciseId: painLift?.exerciseId ?? null,
+        painWhere: input.pain ? input.pain.where : null,
+        painOfferStatus: painLift ? (painKeep ? row.painOfferStatus : 'open') : null,
+        painInjuryId: painKeep ? row.painInjuryId : null,
+        swapExerciseName: swapLift?.exerciseName ?? null,
+        swapExerciseId: swapLift?.exerciseId ?? null,
+        swapOfferStatus: swapLift ? (swapKeep ? row.swapOfferStatus : 'open') : null,
+        swapChangeId: swapKeep ? row.swapChangeId : null,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(s.weeklyCheckins.id, row.id), eq(s.weeklyCheckins.userId, ctx.userId)))
+      .returning({ id: s.weeklyCheckins.id })
+    if (saved.length !== 1) throw new Error('weekly check-in save wrote no row')
+  })
+
+  return { state: await readCheckinState(ctx), kept, notApplied }
+}
+
+/** Insert or update one lift row. Returns its id. Every column named; values from code. */
+async function upsertLiftRow(
+  tx: Db, userId: string, checkinId: string, rowId: string | null, lift: LiftId, answer: CheckinAnswer,
+  missedRep: boolean | null, effect: CheckinEffect, offerStatus: 'open' | 'accepted' | 'declined' | null, appliedChangeId: string | null,
+): Promise<string> {
+  if (rowId) {
+    const res = await tx.update(s.weeklyCheckinExercises)
+      .set({
+        exerciseName: lift.exerciseName, exerciseId: lift.exerciseId, answer, missedRep, effect, offerStatus, appliedChangeId,
+        deletedAt: null, updatedAt: new Date(),
+      })
+      .where(and(eq(s.weeklyCheckinExercises.id, rowId), eq(s.weeklyCheckinExercises.userId, userId), eq(s.weeklyCheckinExercises.checkinId, checkinId)))
+      .returning({ id: s.weeklyCheckinExercises.id })
+    if (res.length !== 1) throw new Error('weekly check-in lift update wrote no row')
+    return res[0].id
+  }
+  const res = await tx.insert(s.weeklyCheckinExercises)
+    .values({ userId, checkinId, exerciseName: lift.exerciseName, exerciseId: lift.exerciseId, answer, missedRep, effect, offerStatus, appliedChangeId })
+    .returning({ id: s.weeklyCheckinExercises.id })
+  if (res.length !== 1) throw new Error('weekly check-in lift insert wrote no row')
+  return res[0].id
+}
+
+// ── Dismiss ───────────────────────────────────────────────────────────────────────────────────
+
+/** "Later": the card goes away for this week. It can still be saved after; a saved card cannot be dismissed. */
+export async function dismissCheckin(ctx: EngineCtx, weekStart: string): Promise<CheckinState> {
+  const program = await ctx.repo.getActiveProgram(ctx.userId)
+  const review = program ? await reviewWeek(ctx, program) : null
+  if (!review || review.weekStart !== weekStart || (!review.due && !review.row)) {
+    throw new CheckinRefusal(409, 'not_open', 'That week is not open for a check-in')
+  }
+  await ctx.db.transaction(async txRaw => {
+    const tx = txRaw as unknown as Db
+    await tx.insert(s.weeklyCheckins)
+      .values({ userId: ctx.userId, weekStart, appliesWeekStart: shiftDateStr(weekStart, 7) })
+      .onConflictDoNothing()
+    const row = await getCheckinByWeek(tx, ctx.userId, weekStart, true)
+    if (!row) throw new CheckinRefusal(409, 'not_open', 'That week is not open for a check-in')
+    if (row.status === 'saved') throw new CheckinRefusal(409, 'already_saved', 'This check-in is already saved')
+    if (row.status === 'dismissed') return
+    const res = await tx.update(s.weeklyCheckins)
+      .set({ status: 'dismissed', dismissedAt: new Date(), updatedAt: new Date() })
+      .where(and(eq(s.weeklyCheckins.id, row.id), eq(s.weeklyCheckins.userId, ctx.userId), eq(s.weeklyCheckins.status, 'offered')))
+      .returning({ id: s.weeklyCheckins.id })
+    if (res.length !== 1) throw new CheckinRefusal(409, 'stale', 'The check-in changed; try again')
+  })
+  return readCheckinState(ctx)
+}
+
+// ── Offers ────────────────────────────────────────────────────────────────────────────────────
+
+export type OfferInput =
+  | { kind: 'step_up'; liftId: string }
+  | { kind: 'pain'; muscleName?: string; severity?: 'mild' | 'moderate' | 'severe' }
+  | { kind: 'swap'; toExerciseId?: string }
+
+/** A saved check-in of this user's, locked. */
+async function savedCheckin(tx: Db, userId: string, checkinId: string): Promise<CheckinRow> {
+  const row = await getCheckinById(tx, userId, checkinId, true)
+  if (!row) throw notFound()
+  if (row.status !== 'saved') throw new CheckinRefusal(409, 'not_saved', 'Save the check-in first')
+  return row
+}
+
+async function liftRowOf(tx: Db, userId: string, checkinId: string, liftId: string): Promise<CheckinLiftRow> {
+  const [lift] = await tx.select().from(s.weeklyCheckinExercises)
+    .where(and(
+      eq(s.weeklyCheckinExercises.id, liftId), eq(s.weeklyCheckinExercises.userId, userId),
+      eq(s.weeklyCheckinExercises.checkinId, checkinId), isNull(s.weeklyCheckinExercises.deletedAt),
+    ))
+    .limit(1)
+    .for('update')
+  if (!lift) throw notFound()
+  return lift
+}
+
+export async function resolveOffer(
+  ctx: EngineCtx, checkinId: string, offer: OfferInput, decision: 'accept' | 'decline',
+): Promise<CheckinState> {
+  const { today } = localClock(ctx.now ?? new Date(), ctx.tz)
+  // Read through the pool before the transaction holds a connection.
+  const pre = await getCheckinById(ctx.db, ctx.userId, checkinId)
+  if (!pre) throw notFound()
+  const painChoices = offer.kind === 'pain' && decision === 'accept' && pre.painExerciseName
+    ? await painMuscles(ctx, { exerciseId: pre.painExerciseId, exerciseName: pre.painExerciseName }) : []
+  const swapChoices = offer.kind === 'swap' && decision === 'accept' && pre.swapExerciseName
+    ? await swapAlternatives(ctx, { exerciseId: pre.swapExerciseId, exerciseName: pre.swapExerciseName }) : []
+
+  await ctx.db.transaction(async txRaw => {
+    const tx = txRaw as unknown as Db
+    const row = await savedCheckin(tx, ctx.userId, checkinId)
+
+    if (offer.kind === 'step_up') {
+      const lift = await liftRowOf(tx, ctx.userId, row.id, offer.liftId)
+      if (lift.effect !== 'offered_step_up' || lift.offerStatus !== 'open') throw new CheckinRefusal(409, 'not_open', 'That offer is not open')
+      let changeId: string | null = null
+      if (decision === 'accept') {
+        const slot = await slotFor(tx, ctx.userId, lift)
+        if (!slot) throw new CheckinRefusal(409, 'lift_gone', 'That lift is no longer in your program')
+        const step = await applyLoadStep(tx, ctx, lift, slot.sessionExerciseId, 'heavier', changeMarker(row.id, `lift:${slot.sessionExerciseId}`), today)
+        if (!step.ok) throw new CheckinRefusal(409, 'refused', step.detail)
+        changeId = step.changeId
+      }
+      const res = await tx.update(s.weeklyCheckinExercises)
+        .set({ offerStatus: decision === 'accept' ? 'accepted' : 'declined', appliedChangeId: changeId, updatedAt: new Date() })
+        .where(and(eq(s.weeklyCheckinExercises.id, lift.id), eq(s.weeklyCheckinExercises.userId, ctx.userId)))
+        .returning({ id: s.weeklyCheckinExercises.id })
+      if (res.length !== 1) throw new Error('weekly check-in offer wrote no row')
+      return
+    }
+
+    if (offer.kind === 'pain') {
+      if (!row.painExerciseName || row.painOfferStatus !== 'open') throw new CheckinRefusal(409, 'not_open', 'That offer is not open')
+      let injuryId: string | null = null
+      if (decision === 'accept') {
+        const muscle = offer.muscleName ?? painChoices[0]
+        if (!muscle || !painChoices.includes(muscle)) throw new CheckinRefusal(400, 'muscle', 'Pick one of the muscles that lift trains')
+        const marker = changeMarker(row.id, 'pain')
+        const patch: CoachPatch = {
+          domain: 'injury', targetId: null,
+          changes: [
+            { id: marker, field: 'muscleName', from: null, to: muscle },
+            ...(offer.severity ? [{ id: `${marker}:severity`, field: 'severity' as const, from: null, to: offer.severity }] : []),
+          ],
+        }
+        const res = await applyCoachPatch(tx, ctx.userId, patch, patch.changes.map(c => c.id), today, ctx.tz)
+        if (!res.ok) throw new CheckinRefusal(409, 'refused', res.reason === 'invalid' ? res.detail : 'Could not log the injury')
+        // The injury the Coach writer logged or updated, checked to be this user's before it is stored.
+        const [owned] = await tx.select({ id: s.injuries.id }).from(s.injuries)
+          .innerJoin(s.coachChanges, eq(s.coachChanges.targetId, s.injuries.id))
+          .where(and(eq(s.coachChanges.id, res.changeId), eq(s.coachChanges.userId, ctx.userId), eq(s.injuries.userId, ctx.userId)))
+          .limit(1)
+        if (!owned) throw new Error('weekly check-in: the logged injury is not the user\'s')
+        injuryId = owned.id
+      }
+      const res = await tx.update(s.weeklyCheckins)
+        .set({ painOfferStatus: decision === 'accept' ? 'accepted' : 'declined', painInjuryId: injuryId, updatedAt: new Date() })
+        .where(and(eq(s.weeklyCheckins.id, row.id), eq(s.weeklyCheckins.userId, ctx.userId)))
+        .returning({ id: s.weeklyCheckins.id })
+      if (res.length !== 1) throw new Error('weekly check-in offer wrote no row')
+      return
+    }
+
+    // swap
+    if (!row.swapExerciseName || row.swapOfferStatus !== 'open') throw new CheckinRefusal(409, 'not_open', 'That offer is not open')
+    let changeId: string | null = null
+    if (decision === 'accept') {
+      const alt = swapChoices.find(a => a.exerciseId === offer.toExerciseId)
+      if (!alt) throw new CheckinRefusal(400, 'alternative', 'Pick one of the offered alternatives')
+      const slot = await slotFor(tx, ctx.userId, { exerciseId: row.swapExerciseId, exerciseName: row.swapExerciseName })
+      if (!slot) throw new CheckinRefusal(409, 'lift_gone', 'That lift is no longer in your program')
+      const marker = changeMarker(row.id, 'swap')
+      const patch: CoachPatch = {
+        domain: 'session_exercise', targetId: slot.sessionExerciseId,
+        changes: [{ id: marker, field: 'exerciseName', from: slot.exerciseName, to: alt.name }],
+      }
+      const res = await applyCoachPatch(tx, ctx.userId, patch, [marker], today, ctx.tz)
+      if (!res.ok) throw new CheckinRefusal(409, 'refused', res.reason === 'invalid' ? res.detail : 'Could not swap the lift')
+      changeId = res.changeId
+    }
+    const res = await tx.update(s.weeklyCheckins)
+      .set({ swapOfferStatus: decision === 'accept' ? 'accepted' : 'declined', swapChangeId: changeId, updatedAt: new Date() })
+      .where(and(eq(s.weeklyCheckins.id, row.id), eq(s.weeklyCheckins.userId, ctx.userId)))
+      .returning({ id: s.weeklyCheckins.id })
+    if (res.length !== 1) throw new Error('weekly check-in offer wrote no row')
+  })
+  return readCheckinState(ctx)
+}
+
+// ── Undo ──────────────────────────────────────────────────────────────────────────────────────
+
+export type UndoTarget =
+  | { kind: 'lift'; liftId: string }
+  | { kind: 'pain' }
+  | { kind: 'swap' }
+  | { kind: 'days_off' }
+  | { kind: 'shorter_session' }
+
+/**
+ * Undo one automatic effect or accepted offer, restoring what it changed. The Coach's own undo restores a
+ * preference, an injury or a swap; a hold, the days off and the shorter session are the check-in's own.
+ * An answer stays answered: an undone step up or pain or swap goes back to an open offer.
+ */
+export async function undoCheckinEffect(ctx: EngineCtx, checkinId: string, target: UndoTarget): Promise<CheckinState> {
+  const { today } = localClock(ctx.now ?? new Date(), ctx.tz)
+  await ctx.db.transaction(async txRaw => {
+    const tx = txRaw as unknown as Db
+    const row = await savedCheckin(tx, ctx.userId, checkinId)
+    const undoChange = async (changeId: string | null) => {
+      if (!changeId) return
+      const res = await tryUndo(tx, ctx.userId, changeId)
+      if (!res.ok) throw new CheckinRefusal(409, 'cannot_undo', res.detail)
+    }
+    const updateRow = async (set: Partial<typeof s.weeklyCheckins.$inferInsert>) => {
+      const res = await tx.update(s.weeklyCheckins).set({ ...set, updatedAt: new Date() })
+        .where(and(eq(s.weeklyCheckins.id, row.id), eq(s.weeklyCheckins.userId, ctx.userId)))
+        .returning({ id: s.weeklyCheckins.id })
+      if (res.length !== 1) throw new Error('weekly check-in undo wrote no row')
+    }
+
+    switch (target.kind) {
+      case 'lift': {
+        const lift = await liftRowOf(tx, ctx.userId, row.id, target.liftId)
+        const acceptedStepUp = lift.effect === 'offered_step_up' && lift.offerStatus === 'accepted'
+        if (lift.effect !== 'held' && lift.effect !== 'lowered_one_step' && !acceptedStepUp) {
+          throw new CheckinRefusal(409, 'nothing_to_undo', 'Nothing to undo for that lift')
+        }
+        await undoChange(lift.appliedChangeId)
+        const res = await tx.update(s.weeklyCheckinExercises)
+          .set(acceptedStepUp
+            ? { offerStatus: 'open', appliedChangeId: null, updatedAt: new Date() }
+            : { effect: 'none', offerStatus: null, appliedChangeId: null, updatedAt: new Date() })
+          .where(and(eq(s.weeklyCheckinExercises.id, lift.id), eq(s.weeklyCheckinExercises.userId, ctx.userId)))
+          .returning({ id: s.weeklyCheckinExercises.id })
+        if (res.length !== 1) throw new Error('weekly check-in undo wrote no row')
+        return
+      }
+      case 'pain': {
+        if (row.painOfferStatus !== 'accepted') throw new CheckinRefusal(409, 'nothing_to_undo', 'Nothing to undo')
+        await undoChange(await markedChange(tx, ctx.userId, changeMarker(row.id, 'pain')))
+        await updateRow({ painOfferStatus: 'open', painInjuryId: null })
+        return
+      }
+      case 'swap': {
+        if (row.swapOfferStatus !== 'accepted') throw new CheckinRefusal(409, 'nothing_to_undo', 'Nothing to undo')
+        await undoChange(row.swapChangeId ?? (await markedChange(tx, ctx.userId, changeMarker(row.id, 'swap'))))
+        await updateRow({ swapOfferStatus: 'open', swapChangeId: null })
+        return
+      }
+      case 'days_off': {
+        const dates = daysOffDates(row.appliesWeekStart, row.daysOffWeekdays ?? [], today)
+        if (!row.daysOffWeekdays || row.daysOffWeekdays.length === 0) throw new CheckinRefusal(409, 'nothing_to_undo', 'Nothing to undo')
+        for (const d of dates) await writeRestDay(tx, ctx.userId, d, false)
+        await updateRow({ daysOffWeekdays: [] })
+        return
+      }
+      case 'shorter_session': {
+        if (row.shorterSessionMin == null) throw new CheckinRefusal(409, 'nothing_to_undo', 'Nothing to undo')
+        await updateRow({ shorterSessionMin: null })
+        return
+      }
+    }
+  })
+  return readCheckinState(ctx)
+}
+
+/** The newest live change this user's check-in wrote under `marker` (the change id it gave the writer). */
+async function markedChange(tx: Db, userId: string, marker: string): Promise<string | null> {
+  const [rec] = await tx.select({ id: s.coachChanges.id }).from(s.coachChanges)
+    .where(and(
+      eq(s.coachChanges.userId, userId), isNull(s.coachChanges.undoneAt),
+      sql`${s.coachChanges.patch}->'changes'->0->>'id' = ${marker}`,
+    ))
+    .orderBy(desc(s.coachChanges.appliedAt))
+    .limit(1)
+  return rec?.id ?? null
+}

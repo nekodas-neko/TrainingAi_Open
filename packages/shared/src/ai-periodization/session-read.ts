@@ -136,6 +136,9 @@ export interface StoredSessionRead extends SessionRead {
   exerciseName: string
   /** The workout the read judged. */
   workoutSessionId: string
+  /** #3890: last week's check-in answered "Heavy" for this lift, so the read never adds load
+   *  (`holdUnderCheckin`). Absent otherwise. */
+  checkinHeld?: true
 }
 
 // ── The rules ────────────────────────────────────────────────────────────────────────────────
