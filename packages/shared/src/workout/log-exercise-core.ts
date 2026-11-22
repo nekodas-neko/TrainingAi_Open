@@ -340,7 +340,8 @@ export async function logExerciseWithRepo(
     exerciseDeloaded: exerciseDeloaded ?? false,
   })) {
     // #3671: dated by the set, not the upload, so a workout synced after midnight keeps its day.
-    isPR = await repo.upsertPersonalRecordIfBetter(userId, exercise, estimated1rm, loggedAt);
+    // #4021: pass the log's id so the step writes under the log's current name if a rename moved it.
+    isPR = await repo.upsertPersonalRecordIfBetter(userId, exercise, estimated1rm, loggedAt, logged.exerciseLog.id);
   }
 
   // #3896: a log of a plan that carried the lift's one-shot ("lighter / heavier next time", ±1 set)

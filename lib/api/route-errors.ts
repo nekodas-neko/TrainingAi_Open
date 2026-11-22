@@ -53,6 +53,23 @@ export function refusalResponse(err: unknown, fallback: string): NextResponse {
   return NextResponse.json({ error: fallback }, { status: 500 })
 }
 
+/**
+ * #4021: Postgres cancelled a statement at the pool's `statement_timeout` (code 57014). A rename that
+ * sat on a row lock that long rolled back whole; to the caller it is "busy, try again", not a fault.
+ * Drizzle wraps driver errors, so the code is looked for on the error and down its `cause` chain.
+ */
+export function isStatementTimeout(err: unknown): boolean {
+  for (let e: unknown = err, depth = 0; e && typeof e === 'object' && depth < 5; e = (e as { cause?: unknown }).cause, depth++) {
+    if ((e as { code?: unknown }).code === '57014') return true
+  }
+  return false
+}
+
+/** The 409 a rename answers when it timed out waiting for a lock; nothing was changed. */
+export function renameBusyResponse(): NextResponse {
+  return NextResponse.json({ error: 'The exercise is busy right now. Nothing was changed; try the rename again in a moment.' }, { status: 409 })
+}
+
 /** True when `refusalResponse` will echo the error rather than hide it — for callers deciding
  *  whether a fault is worth reporting. A refused request is not a fault. */
 export function isRefusal(err: unknown): boolean {

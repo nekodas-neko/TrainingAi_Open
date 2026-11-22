@@ -282,14 +282,16 @@ describe.skipIf(!canRun)('rename survives collisions, per person (#4004)', () =>
       expect(await idOf(A, newName)).toEqual([{ exercise_id: entry.id, estimated_1rm: 100 }])
     })
 
-    it('both rows have ids: the survivor keeps its own', async () => {
+    // #4021 changed this case on purpose: the survivor's id was ANOTHER exercise's, so it used to stay and
+    // the record read as that exercise's type. It now ends on the renamed exercise's id.
+    it('both rows have ids and the survivor\'s is another exercise\'s: the survivor ends on the renamed exercise\'s id', async () => {
       const oldName = name('old'); const newName = name('new')
       const entry = await make(oldName)
       const other = await make(name('other'))
       await recordWithId(A, oldName, 140, entry.id)
       await recordWithId(A, newName, 100, other.id)
       await repo.renameExercise(CREATOR, entry.id, newName)
-      expect(await idOf(A, newName)).toEqual([{ exercise_id: other.id, estimated_1rm: 140 }])
+      expect(await idOf(A, newName)).toEqual([{ exercise_id: entry.id, estimated_1rm: 140 }])
     })
 
     it('neither row has an id: the survivor has none', async () => {

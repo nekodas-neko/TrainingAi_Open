@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { refusalResponse, isRefusal, invalidUuidResponse } from "@/lib/api/route-errors";
+import { refusalResponse, isRefusal, invalidUuidResponse, isStatementTimeout, renameBusyResponse } from "@/lib/api/route-errors";
 import { reportServerError } from "@/lib/observability";
 import { auth } from "@/auth";
 import { requireAdmin, adminErrorResponse } from "@/lib/admin";
@@ -133,6 +133,7 @@ export async function PATCH(req: NextRequest) {
       exerciseType: body.data.exerciseType,
     });
   } catch (e) {
+    if (isStatementTimeout(e)) return renameBusyResponse();
     // Every error answered 409 with its own text as the body, so a missing row read as a name
     // clash and a driver failure published its statement (Q-320). The status now comes from the
     // thrown error: 404 missing, 409 clash, 500 anything unmarked.

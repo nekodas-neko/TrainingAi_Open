@@ -17,7 +17,7 @@ type SqlTx = { execute: (query: ReturnType<typeof sql>) => Promise<{ rows: unkno
 export const EXERCISE_NAME_TABLES = {
   session_exercises: { disposition: 'repointed', how: 'renameSessionExercises, which also bumps the programs it touched; cannot collide (unique only on live (session_id, position), the name is not in a key)' },
   exercise_logs: { disposition: 'repointed', how: 'adapter rename paths, stamped with clientEditedAt; cannot collide (no unique key on the name)' },
-  personal_records: { disposition: 'repointed', how: 'repointStoredExerciseNames; per person: a lone old-name row moves, on a collision the target row is raised to the better figure and the old-name row is then deleted (owner-approved, #4004), only if that person has no log left under the old name and the survivor holds at least its figure; the survivor takes the leftover\'s library id when it has none and, on a tie, the earlier date; the only delete in a rename' },
+  personal_records: { disposition: 'repointed', how: 'repointStoredExerciseNames; per person: a lone old-name row moves, on a collision the target row is raised to the better figure and the old-name row is then deleted (owner-approved, #4004), only if that person has no log left under the old name and the survivor holds at least its figure; the survivor takes the leftover\'s library id when it has none (only the renamed exercise\'s own) or ends on the renamed exercise\'s id when it held another\'s, and, on a tie, the earlier date; the only delete in a rename' },
   exercise_estimates: { disposition: 'repointed', how: 'repointStoredExerciseNames; the target name\'s row wins a collision (as migration 164); the colliding old-name row is left in place (no tombstone column, a delete the owner was not asked about)' },
   exercise_preferences: { disposition: 'repointed', how: 'repointStoredExerciseNames; the live row wins a collision, the other is tombstoned, and the library id is carried onto the survivor' },
   set_hr_stats: { disposition: 'repointed', how: 'repointStoredExerciseNames; cannot collide (keyed by set_log_id, no unique key on the name)' },
@@ -54,7 +54,8 @@ export const EXERCISE_NAME_TABLES = {
  *    survivor holds at least its figure (same 0.005 tie band as the raise). Every deleted user is
  *    checked against the set of colliders read up front; a stray one throws and rolls the rename back.
  *    In the same statement, for exactly the rows it deleted, the survivor takes the leftover's library
- *    id when it has none (only the renamed exercise's own id), and on a tie the EARLIER `achieved_at`
+ *    id when it has none (only the renamed exercise's own id), is set to the renamed exercise's id
+ *    when it held a different one (#4021: a stale id would report another exercise's type), and on a tie the EARLIER `achieved_at`
  *    (a record's date is when its best was first reached, which is what a rebuild from logs gives;
  *    migration 164 and `upsertPersonalRecordIfBetter` keep the incumbent's date on a tie instead).
  *    This is the only delete in a rename. A device that has not synced still holds the row until its
@@ -151,8 +152,11 @@ export async function repointStoredExerciseNames(tx: SqlTx, oldName: string, new
       RETURNING s.user_id, s.exercise_id, s.estimated_1rm, s.achieved_at
     ), carried AS (
       UPDATE personal_records t
-      SET exercise_id = COALESCE(t.exercise_id,
-            CASE WHEN g.exercise_id = (SELECT l.id FROM exercise_library l WHERE l.name = ${oldName}) THEN g.exercise_id END),
+      SET exercise_id = CASE
+            WHEN t.exercise_id IS NULL
+              THEN CASE WHEN g.exercise_id = (SELECT l.id FROM exercise_library l WHERE l.name = ${oldName}) THEN g.exercise_id END
+            ELSE COALESCE((SELECT l.id FROM exercise_library l WHERE l.name = ${oldName}), t.exercise_id)
+          END,
           achieved_at = CASE WHEN abs(t.estimated_1rm - g.estimated_1rm) <= 0.005
                              THEN LEAST(t.achieved_at, g.achieved_at) ELSE t.achieved_at END
       FROM gone g
