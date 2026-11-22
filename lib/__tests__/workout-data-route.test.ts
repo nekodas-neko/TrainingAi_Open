@@ -29,6 +29,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { todayInTz, shiftDateStr, dateStrMidnightInTz } from '@trainingai/shared/date-utils'
 import { programMoveMark, trainingWeekOf } from '@trainingai/shared/ai-periodization/program-phase'
+import { prescribedBar } from '@trainingai/shared/workout/load-rounding'
 
 type Row = Record<string, unknown>
 
@@ -52,6 +53,8 @@ const getRecentSessionsOfType = vi.fn(async (_u: string, _s: string, _n: number)
 const getExerciseMuscleAssignments = vi.fn(async (_n: string[]) => ({}) as Record<string, Row[]>)
 const getOuraDailyDerived = vi.fn(async (_u: string, _f: string, _t: string) => [] as Row[])
 const updatePrescriptionExercisesCache = vi.fn(async (_u: string, _s: string, _p: Row) => undefined)
+// #3890: the per-lift preference read, with the week's check-in hold. None by default.
+const listExercisePreferences = vi.fn(async (_u: string, _n: string[], _o?: { checkinWeekStart?: string }) => new Map<string, Row>())
 // #3876: the program's rows and completions, read only for a type in a deload. By default the
 // program waits for its switch-over (two types on different phases), so the type's count decides.
 const waitingRows = () => [
@@ -75,7 +78,7 @@ vi.mock('@/lib/data', () => {
     getDayExerciseNames, listPersonalRecords, getExerciseEstimates, getSessionPeriodization,
     reconcileSessionsInPhase, getMoodLog, getDayCheckin, listInjuries, getRecentSessionsOfType,
     getExerciseMuscleAssignments, getOuraDailyDerived, updatePrescriptionExercisesCache,
-    listSessionPeriodizationForProgram, listProgramCompletions,
+    listSessionPeriodizationForProgram, listProgramCompletions, listExercisePreferences,
   })
   return { getRepository: repo, getRepositoryAsync: repo }
 })
@@ -171,6 +174,7 @@ beforeEach(() => {
   getRecentSessionsOfType.mockResolvedValue([])
   getExerciseMuscleAssignments.mockResolvedValue({})
   getOuraDailyDerived.mockResolvedValue([])
+  listExercisePreferences.mockResolvedValue(new Map())
   buildWorkoutExercises.mockReturnValue([])
   buildAutomaticPhaseStatus.mockReturnValue(phaseStatus())
   freshUser()
@@ -662,6 +666,57 @@ describe('GET /api/workout-data — the consumption-day re-evaluation', () => {
     await get('?tab=' + SESSION_ID)
     expect(getMoodLog).not.toHaveBeenCalled()
     expect(updatePrescriptionExercisesCache).not.toHaveBeenCalled()
+  })
+})
+
+// #3890: the re-evaluation runs after the serve step held the plan. Its revert puts a deloaded row's
+// pre-deload load back, which for a lift deloaded at generation is the unheld load: it is held again.
+describe('GET /api/workout-data — a deload revert in a week the check-in holds the lift (#3890)', () => {
+  const deloadedSquat = (preDeloadPct: number) => prescription({
+    exercises: [
+      { sessionExerciseId: SQUAT, name: 'Squat', sets: 2, reps: 5, pct: 50, restSec: 180, deloaded: true, deloadNote: 'Deload — quads still sore',
+        preDeload: { sets: 4, reps: 5, pct: preDeloadPct, restSec: 180 } },
+      { sessionExerciseId: CURL, name: 'Curl', sets: 3, reps: 12, pct: 60, restSec: 90 },
+    ],
+  })
+  const squatOf = (p: Row) => (p.exercises as Row[]).find(e => e.sessionExerciseId === SQUAT)!
+  beforeEach(() => {
+    getActiveProgram.mockResolvedValue(program({ phaseMode: 'ai_dynamic' }))
+    listExerciseLibrary.mockResolvedValue([
+      { name: 'Squat', exerciseType: 'weighted', equipment: ['barbell'], muscles: [] },
+      { name: 'Curl', exerciseType: 'weighted', equipment: ['dumbbell'], muscles: [] },
+    ])
+    getLastRealOneRmBatch.mockResolvedValue(new Map([['Squat', { estimated1rm: 100 }]]) as never)
+    getLastExerciseLogsBatch.mockResolvedValue(new Map([['Squat', { estimated1rm: 100, sets: [{ weightKg: 70, reps: 5 }, { weightKg: 65, reps: 5 }] }]]))
+  })
+
+  it('a held lift reverted when the soreness clears comes back at its last bar, in the response and the cache', async () => {
+    getSessionPeriodization.mockResolvedValue(periodization({ prescription: deloadedSquat(85) }))
+    await get('?tab=' + SESSION_ID)
+    const unheldCurl = (updatePrescriptionExercisesCache.mock.calls[0][2] as { exercises: Row[] }).exercises[1]
+    updatePrescriptionExercisesCache.mockClear()
+    buildWorkoutExercises.mockClear()
+    freshUser()
+    listExercisePreferences.mockResolvedValue(new Map([['Squat', {
+      repMin: null, repMax: null, restSec: null, nextLoadStep: null, setsDelta: null, oneShotSetAt: null, checkinHeld: true,
+    }]]))
+    getSessionPeriodization.mockResolvedValue(periodization({ prescription: deloadedSquat(85) }))
+    await get('?tab=' + SESSION_ID)
+    const cached = updatePrescriptionExercisesCache.mock.calls[0][2] as Row
+    expect(squatOf(cached)).toMatchObject({ deloaded: false, sets: 4, reps: 5 })
+    expect(prescribedBar(100, squatOf(cached).pct as number, ['barbell'])).toBe(70)
+    expect((cached.checkinHold as { rows: Record<string, { pct: number }> }).rows[SQUAT].pct).toBe(85)
+    const served = buildOptsFor()!.aiPrescription as Row
+    expect(squatOf(served).pct).toBe(squatOf(cached).pct)
+    expect((cached.exercises as Row[])[1]).toEqual(unheldCurl)
+  })
+
+  it('a lift with no hold is reverted to its own load, exactly as before', async () => {
+    getSessionPeriodization.mockResolvedValue(periodization({ prescription: deloadedSquat(85) }))
+    await get('?tab=' + SESSION_ID)
+    const cached = updatePrescriptionExercisesCache.mock.calls[0][2] as Row
+    expect(squatOf(cached)).toMatchObject({ deloaded: false, sets: 4, pct: 85 })
+    expect(cached.checkinHold).toBeUndefined()
   })
 })
 

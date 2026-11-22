@@ -6,13 +6,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { isDeepStrictEqual } from 'node:util'
 import type { AiPrescription, SessionPeriodization } from '@trainingai/shared/types/ai-periodization'
 import type { WorkoutRepository } from '@/lib/data/repository'
 import { SCENARIOS, SESSION_ID, fakeRepo, STATIC_SESSION, staticCtx, exercise, signals } from './fixtures/lift-preference-scenarios'
 import { buildWorkoutExercises } from '../../workout/session-data'
 import { prescribedBar } from '../../workout/load-rounding'
-import { lastSessionBarKg, pctUnderBar, type LiftPreference } from '../lift-preference'
-import { holdPlanRows, holdStoredPrescription, holdStoredPlanUnderCheckin, rewriteHeldRow } from '../checkin-plan-hold'
+import { heaviestLoggedWeightKg, lastSessionBarKg, pctUnderBar, type LiftPreference } from '../lift-preference'
+import { holdPlanRows, holdStoredPrescription, holdStoredPlanUnderCheckin, rehold, rewriteHeldRow } from '../checkin-plan-hold'
 import { loadLiftPreferences } from '../lift-preference-read'
 import { CHECKIN_HOLD_LIVE } from '../../weekly-checkin/effects'
 import type { ExerciseLog } from '../../types/log'
@@ -81,13 +82,30 @@ describe('the ceiling on a pct (pctUnderBar) and the last bar (lastSessionBarKg)
     expect(off).toBeLessThan(80)
   })
   it('does nothing without a basis', () => expect(pctUnderBar(90, null, ['barbell'], 50)).toBe(90))
-  it('the last bar is the most frequent logged working weight; a deload log or no sets is none', () => {
-    const log = (estimated1rm: number, sets: Array<[number, number]>) =>
-      ({ estimated1rm, sets: sets.map(([weightKg, reps], i) => ({ setNumber: i + 1, weightKg, reps })) }) as unknown as ExerciseLog
+  const log = (estimated1rm: number, sets: Array<[number | null | undefined, number]>) =>
+    ({ estimated1rm, sets: sets.map(([weightKg, reps], i) => ({ setNumber: i + 1, weightKg, reps })) }) as unknown as ExerciseLog
+  it('the last bar is the heaviest working weight of the last session, never its lightest or most frequent', () => {
+    expect(lastSessionBarKg(log(120, [[60, 5], [70, 5], [80, 5]]))).toBe(80)
+    expect(lastSessionBarKg(log(120, [[65, 5], [75, 5], [85, 5]]))).toBe(85)
+    expect(lastSessionBarKg(log(120, [[40, 5], [40, 5], [60, 5], [80, 5]]))).toBe(80)
+    expect(lastSessionBarKg(log(120, [[80, 5], [80, 5], [82.5, 5], [82.5, 5]]))).toBe(82.5)
+    expect(lastSessionBarKg(log(120, [[100, 3], [80, 8], [80, 8]]))).toBe(100)
     expect(lastSessionBarKg(log(120, [[80, 5], [90, 5], [90, 5], [90, 4]]))).toBe(90)
+    expect(lastSessionBarKg(log(120, [[72.5, 5]]))).toBe(72.5)
+  })
+  it('a set with a zero or missing weight, or no reps, is ignored; a deload log, an empty log or none is no bar', () => {
+    expect(lastSessionBarKg(log(120, [[0, 10], [null, 8], [undefined, 8], [60, 5], [200, 0]]))).toBe(60)
+    expect(heaviestLoggedWeightKg([])).toBeNull()
+    expect(heaviestLoggedWeightKg(null)).toBeNull()
+    expect(lastSessionBarKg(log(120, []))).toBeNull()
     expect(lastSessionBarKg(log(0, [[50, 5], [50, 5]]))).toBeNull()
     expect(lastSessionBarKg(log(120, [[0, 0]]))).toBeNull()
     expect(lastSessionBarKg(null)).toBeNull()
+  })
+  it('a pyramid planned near its top set is capped at the top set, not cut to the first one', () => {
+    const bar = lastSessionBarKg(log(120, [[60, 5], [70, 5], [80, 5]]))!
+    expect(prescribedBar(100, pctUnderBar(77.5, 100, ['barbell'], bar), ['barbell'])).toBe(77.5)
+    expect(prescribedBar(100, pctUnderBar(85, 100, ['barbell'], bar), ['barbell'])).toBe(80)
   })
 })
 
@@ -231,6 +249,57 @@ describe('the static program path', () => {
   })
 })
 
+describe('a deload on a held lift', () => {
+  it('the full numbers a person reverts a deloaded AI row to are held too; with no hold they are as stored', () => {
+    const plan = {
+      phase: 'accumulation', phaseAction: 'stay', deload: false, reasoning: 'r', confidence: 0.5, estimatedSessionDurationMin: 55, weeklyVolumeContribution: {},
+      exercises: [
+        { sessionExerciseId: 'se-p', name: 'Lift p', sets: 2, reps: 5, pct: 50, restSec: 180, deloaded: true, deloadNote: 'Deload',
+          preDeload: { sets: 4, reps: 5, pct: 85, restSec: 180 } },
+        { sessionExerciseId: 'se-s', name: 'Lift s', sets: 3, reps: 8, pct: 75, restSec: 150 },
+      ],
+    } as unknown as AiPrescription
+    const ctx = { aiDrivesLoad: true, aiPrescription: plan }
+    const plain = buildWorkoutExercises(STATIC_SESSION, staticCtx('ai_dynamic', ctx))
+    const held = buildWorkoutExercises(STATIC_SESSION, staticCtx('ai_dynamic', { ...ctx, liftPreferences: new Map([['Lift p', hold(110)]]) }))
+    const [p0, p1] = [plain, held].map(b => b.find(e => e.name === 'Lift p')!)
+    expect(p1.progressionStyle).toEqual(p0.progressionStyle)
+    expect(prescribedBar(140, p0.preDeloadStyle![0].pct, ['barbell'])).toBeGreaterThan(110)
+    for (const s of p1.preDeloadStyle!) expect(prescribedBar(140, s.pct, ['barbell'])).toBeLessThanOrEqual(110)
+    expect(JSON.stringify(held.filter(e => e.name !== 'Lift p'))).toBe(JSON.stringify(plain.filter(e => e.name !== 'Lift p')))
+  })
+
+  it('a held row a deload cut later keeps its record, so a revert and the week\'s end still know its own load', () => {
+    const ctx = () => ({ preference: hold(75), basisKg: 100, equipment: ['barbell'], bodyweight: false })
+    const held = holdStoredPrescription(PLAN, WEEK, ex => ex.name === 'Lift p' ? ctx() : undefined)
+    const heldPct = rowOf(held, 'p').pct
+    // The re-evaluation deloads the held row: its pre-deload load is the held one.
+    const deloaded = { ...held, exercises: held.exercises.map(e => e.sessionExerciseId === 'p'
+      ? { ...e, pct: 50, sets: 2, deloaded: true, preDeload: { sets: e.sets, reps: e.reps, pct: e.pct, restSec: e.restSec } } : e) } as AiPrescription
+    const kept = holdStoredPrescription(deloaded, WEEK, ex => ex.name === 'Lift p' ? ctx() : undefined)
+    expect(kept).toBe(deloaded)
+    expect(kept.checkinHold!.rows.p).toEqual({ pct: 82.5, heldPct })
+    // Next week the row, still deloaded, keeps its record unchanged (no rewrite each week).
+    expect(holdStoredPrescription(deloaded, '2026-11-30', () => undefined)).toBe(deloaded)
+    // Reverted: back at the held pct, which the record turns back into its own load once not held.
+    const reverted = { ...kept, exercises: kept.exercises.map(e => e.sessionExerciseId === 'p'
+      ? { ...e, ...e.preDeload, deloaded: false, preDeload: undefined } : e) } as AiPrescription
+    expect(rowOf(holdStoredPrescription(reverted, '2026-11-30', () => undefined), 'p').pct).toBe(82.5)
+  })
+
+  it('rehold: a plan the re-evaluation reverted is held from the preferences already read, and left alone with none', () => {
+    const reverted = { ...PLAN }
+    const prefs = new Map([['Lift p', hold(75)]])
+    const lift = () => ({ basisKg: 100, equipment: ['barbell'], bodyweight: false })
+    const out = rehold(reverted, 'accumulation', WEEK, prefs, lift)
+    expect(prescribedBar(100, rowOf(out, 'p').pct, ['barbell'])).toBe(75)
+    expect(rowOf(out, 's')).toEqual(PLAN.exercises[1])
+    expect(rehold(reverted, 'accumulation', WEEK, new Map(), lift)).toBe(reverted)
+    expect(rehold(reverted, 'deload', WEEK, prefs, lift)).toBe(reverted)
+    expect(rehold(reverted, 'accumulation', '2026-11-30', prefs, lift)).toBe(reverted)
+  })
+})
+
 // ── A stored plan where it is served ───────────────────────────────────────────────────────────
 
 const PLAN: AiPrescription = {
@@ -243,10 +312,18 @@ const PLAN: AiPrescription = {
 } as unknown as AiPrescription
 
 /** A repository for the serve step: the held set and last bar are given; every read and write counted. */
-function serveRepo(opts: { heldFor?: Record<string, string[]>; lastBar?: number; basis?: number } = {}) {
+function serveRepo(opts: {
+  heldFor?: Record<string, string[]>; lastBar?: number; basis?: number
+  /** A real compare-and-swap over this stored plan, and a re-read of it (`getSessionPeriodization`). */
+  stored?: AiPrescription
+  /** Runs just before the swap compares (a regeneration landing meanwhile). */
+  beforeSwap?: (set: (p: AiPrescription) => void) => void
+  throwOnWrite?: boolean
+} = {}) {
   const calls: string[] = []
   const writes: AiPrescription[] = []
-  let current: AiPrescription | null = null
+  let current: AiPrescription | null = opts.stored ?? null
+  const cas = opts.stored !== undefined
   const known: Record<string, (...a: never[]) => unknown> = {
     listExercisePreferences: async (_u: string, names: string[], o?: { checkinWeekStart?: string }) => {
       const held = new Set(opts.heldFor?.[o?.checkinWeekStart ?? ''] ?? [])
@@ -259,7 +336,14 @@ function serveRepo(opts: { heldFor?: Record<string, string[]>; lastBar?: number;
     listPersonalRecords: async () => new Map(),
     getExerciseEquipment: async (names: string[]) => Object.fromEntries(names.map(nm => [nm, ['barbell']])),
     getExerciseTypes: async (names: string[]) => Object.fromEntries(names.map(nm => [nm, 'weighted'])),
-    replacePrescriptionIfUnchanged: async (_u: string, _s: string, _before: AiPrescription, after: AiPrescription) => { writes.push(after); current = after; return true },
+    replacePrescriptionIfUnchanged: async (_u: string, _s: string, before: AiPrescription, after: AiPrescription) => {
+      if (opts.throwOnWrite) throw new Error('write failed (test)')
+      opts.beforeSwap?.(p => { current = p })
+      await Promise.resolve()
+      if (cas && !isDeepStrictEqual(current, before)) return false
+      writes.push(after); current = after; return true
+    },
+    ...(cas && { getSessionPeriodization: async () => stateOf(structuredClone(current!), opts.heldFor ? Object.keys(opts.heldFor) : undefined) }),
   }
   const repo = new Proxy({}, { get: (_t, prop: string) => {
     if (!(prop in known)) return undefined
@@ -339,6 +423,35 @@ describe('a stored plan, served before, during and after the applies-to week', (
     expect(await holdStoredPlanUnderCheckin('u', 'ps', serveRepo({ heldFor: { [WEEK]: ['Lift p'] } }).repo, LA, s3, MON_0000)).toBe(s3)
     const s4 = stateOf({ ...PLAN, deload: true }, [WEEK])
     expect((await holdStoredPlanUnderCheckin('u', 'ps', serveRepo({ heldFor: { [WEEK]: ['Lift p'] } }).repo, LA, s4, MON_0000)).prescription).toBe(s4.prescription)
+  })
+
+  it('several reads at once in the held week all serve the held bar, and exactly one writes', async () => {
+    const r = serveRepo({ heldFor: { [WEEK]: ['Lift p'] }, lastBar: 70, stored: PLAN })
+    const served = await Promise.all(Array.from({ length: 5 }, () =>
+      holdStoredPlanUnderCheckin('u', 'ps', r.repo, LA, stateOf(structuredClone(PLAN), [WEEK]), MON_0000)))
+    for (const s of served) expect(prescribedBar(100, rowOf(s.prescription!, 'p').pct, ['barbell'])).toBe(70)
+    expect(r.writes).toHaveLength(1)
+    expect(new Set(served.map(s => JSON.stringify(s.prescription))).size).toBe(1)
+  })
+
+  it('a read whose store loses to a regeneration serves the NEW plan, held, and writes nothing', async () => {
+    const regen = { ...PLAN, reasoning: 'regenerated', exercises: [{ ...PLAN.exercises[0], pct: 87.5, sets: 5 }, PLAN.exercises[1]] } as AiPrescription
+    const r = serveRepo({ heldFor: { [WEEK]: ['Lift p'] }, lastBar: 70, stored: PLAN, beforeSwap: set => set(regen) })
+    const served = await holdStoredPlanUnderCheckin('u', 'ps', r.repo, LA, stateOf(PLAN, [WEEK]), MON_0000)
+    expect(served.prescription!.reasoning).toBe('regenerated')
+    expect(rowOf(served.prescription!, 'p').sets).toBe(5)
+    expect(prescribedBar(100, rowOf(served.prescription!, 'p').pct, ['barbell'])).toBe(70)
+    expect(served.prescription!.checkinHold!.rows.p.pct).toBe(87.5)
+    expect(r.writes).toHaveLength(0)
+  })
+
+  it('a store that throws still serves the held plan', async () => {
+    const r = serveRepo({ heldFor: { [WEEK]: ['Lift p'] }, lastBar: 70, throwOnWrite: true })
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const served = await holdStoredPlanUnderCheckin('u', 'ps', r.repo, LA, stateOf(PLAN, [WEEK]), MON_0000)
+    err.mockRestore()
+    expect(prescribedBar(100, rowOf(served.prescription!, 'p').pct, ['barbell'])).toBe(70)
+    expect(r.writes).toHaveLength(0)
   })
 
   it('composes with the shorter-session fit in either order', () => {

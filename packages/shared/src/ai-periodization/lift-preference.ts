@@ -21,7 +21,7 @@
  */
 import { expectedRpe, pctForExpectedRpe } from './expected-rpe'
 import { prescribedBar, weightStepFor } from '../workout/load-rounding'
-import type { ExerciseLog } from '../types/log'
+import type { ExerciseLog, SetLog } from '../types/log'
 import { roleCeiling } from './role-plausibility'
 import { roleFloor } from './time-budget'
 import { PCT_HARD_FLOOR } from './autoregulation'
@@ -190,24 +190,31 @@ export function setsWithDelta(sets: number, delta: -1 | 1, role: string, phaseSe
 }
 
 /**
- * #3890: the bar the person last used for a lift, from its most recent log (`getLastExerciseLogsBatch`,
- * the log the session screen shows as "last time"): the most frequent weight of its logged sets, the
- * rule the screen's "last time" summary uses (`modalWeight`), over sets with a weight and reps. Null
- * when there is none, and when that log was a deload (its estimate is stored as 0: a deload's bar is not
- * a working weight, so it holds nothing).
+ * #3890: the heaviest working weight among logged sets: the largest `weightKg` of a set that carries a
+ * weight and at least one rep. A set with a zero or missing weight (bodyweight, an unlogged row) or no
+ * reps (nothing was lifted) is ignored. Null when no set qualifies.
+ */
+export function heaviestLoggedWeightKg(sets: readonly Pick<SetLog, 'weightKg' | 'reps'>[] | null | undefined): number | null {
+  let best: number | null = null
+  for (const s of sets ?? []) {
+    const w = s?.weightKg
+    if (typeof w !== 'number' || !(w > 0) || !(typeof s.reps === 'number' && s.reps > 0)) continue
+    if (best == null || w > best) best = w
+  }
+  return best
+}
+
+/**
+ * #3890: the "last bar" the check-in's hold caps a lift at: the HEAVIEST working weight logged in the
+ * lift's most recent session (`getLastExerciseLogsBatch`), by `heaviestLoggedWeightKg`. The hold is a
+ * ceiling on what was lifted last time, so it may only take off load above that: a pyramid or a
+ * back-off session is capped at its top set, never cut to its lightest. Null when there is no such set,
+ * and when that log was a deload (its estimate is stored as 0: a deload's bar is not a working weight,
+ * so it holds nothing).
  */
 export function lastSessionBarKg(log: Pick<ExerciseLog, 'sets' | 'estimated1rm'> | null | undefined): number | null {
   if (!log || !((log.estimated1rm ?? 0) > 0)) return null
-  const weights = log.sets.filter(s => s.weightKg > 0 && s.reps > 0).map(s => s.weightKg)
-  if (weights.length === 0) return null
-  const counts = new Map<number, number>()
-  let best = weights[0], bestCount = 0
-  for (const w of weights) {
-    const c = (counts.get(w) ?? 0) + 1
-    counts.set(w, c)
-    if (c > bestCount) { best = w; bestCount = c }
-  }
-  return best
+  return heaviestLoggedWeightKg(log.sets)
 }
 
 /** #3890: whether the check-in's hold caps this lift: a held lift with a last bar, carrying a load. */

@@ -1,14 +1,17 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { getRepository } from "@/lib/data";
-import { DEFAULT_TZ } from "@trainingai/shared/date-utils";
+import { DEFAULT_TZ, startOfWeekInTz } from "@trainingai/shared/date-utils";
 import { prescriptionDrivesLoad, prescriptionStyleForExercise } from "@trainingai/shared/ai-periodization/apply-prescription";
 import { normalizeStoredPrescription } from "@trainingai/shared/ai-periodization/reconcile-prescription";
 import { isAiPrescriptionPending } from "@trainingai/shared/ai-periodization/prescription-pending";
 import { readProgramDeloadCheck } from "@trainingai/shared/ai-periodization/program-phase";
 import { fitStoredPlanToCheckinBudget } from "@trainingai/shared/ai-periodization/checkin-plan-budget";
 import { resolveBodyweightStyle, resolveWorkingBasis } from "@trainingai/shared/1rm";
-import { mroundStepUp, weightStepFor } from "@trainingai/shared/workout/load-rounding";
+import { prescribedBar } from "@trainingai/shared/workout/load-rounding";
+import { loadLiftPreferences } from "@trainingai/shared/ai-periodization/lift-preference-read";
+import { liftPreferenceOnStyle } from "@trainingai/shared/workout/session-data";
+import { UNCLASSIFIED_EXERCISE_ROLE } from "@trainingai/shared/workout/exercise-role";
 import { rateLimit } from "@/lib/rate-limit";
 import type { StyleSet } from "@trainingai/shared/types/progression";
 import type { ExerciseType } from "@trainingai/shared/types/program";
@@ -81,7 +84,7 @@ export async function GET() {
   const exerciseNames = programSession.exercises.map(ex => ex.exerciseName);
   const isAiDynamic = program.phaseMode === 'ai_dynamic';
 
-  const [, lastRealOneRm, prMap, periodization, estimates] = await Promise.all([
+  const [, lastRealOneRm, prMap, periodization, estimates, liftPreferences] = await Promise.all([
     repo.getLastExerciseLogsBatch(userId, exerciseNames),
     repo.getLastRealOneRmBatch(userId, exerciseNames),
     repo.listPersonalRecords(userId),
@@ -91,6 +94,9 @@ export async function GET() {
           .then(st => st && fitStoredPlanToCheckinBudget(userId, programSession.id, repo, tz, st))
       : Promise.resolve(null),
     repo.getExerciseEstimates(userId).catch(() => []),
+    // #4019 / #3890: the lift preferences and this week's check-in hold, as the session screen reads
+    // them (`/api/workout-data`), so the card shows the bar and reps that screen will.
+    loadLiftPreferences(repo, userId, exerciseNames, { checkinWeekStart: startOfWeekInTz(tz) }),
   ]);
   const estimateMap = new Map(estimates.map(e => [e.exerciseName, e.estimated1rm]));
 
@@ -127,11 +133,13 @@ export async function GET() {
 
       let styleSets: StyleSet[] | null = null;
       let aiStyleApplied = false;
+      let rowDeloaded = false;
       if (drives) {
         const p = prescription!.exercises.find(e => e.sessionExerciseId === ex.id);
         if (p) {
           styleSets = prescriptionStyleForExercise(p);
           aiStyleApplied = true;
+          rowDeloaded = p.deloaded === true;
         }
       }
       if (!styleSets) {
@@ -156,9 +164,22 @@ export async function GET() {
         basis,
       });
 
-      const step = weightStepFor(libEntry?.equipment);
+      // The session screen's own step (`buildWorkoutExercises`): the lift's preference on a static
+      // style, the week's check-in hold on either. The card reads no phase, so none is excluded here.
+      const onStyle = liftPreferenceOnStyle(styleSets, liftPreferences.get(ex.exerciseName), {
+        aiStyleApplied,
+        reduced: rowDeloaded || isBaselinePhase,
+        noPreferencePhase: false,
+        aiPlanDeload: drives && prescription!.deload === true,
+        role: ex.exerciseRole ?? UNCLASSIFIED_EXERCISE_ROLE,
+        bodyweight: exerciseType === 'bodyweight',
+        basisKg: basis > 0 ? basis : null,
+        equipment: libEntry?.equipment,
+      });
+      if (onStyle) styleSets = onStyle.style;
+
       const sets: NextSessionSetPreview[] = (styleSets ?? []).map(s => ({
-        weightKg: exerciseType === 'bodyweight' || basis <= 0 ? null : mroundStepUp(basis * s.pct / 100, step),
+        weightKg: exerciseType === 'bodyweight' || basis <= 0 ? null : prescribedBar(basis, s.pct, libEntry?.equipment),
         reps: s.reps,
         restSec: s.restSec,
       }));

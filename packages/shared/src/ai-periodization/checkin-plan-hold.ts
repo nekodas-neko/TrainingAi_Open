@@ -9,11 +9,17 @@
 // preference). It is applied:
 //   - at generation, after the model and every load rule (`generate-prescription.ts`), and in the rules
 //     fallback, through `holdPlanRows`;
-//   - on the static-style path (`applyLiftPreferenceToStyle`);
+//   - on a session reader's style (`liftPreferenceOnStyle` in `workout/session-data.ts`: the static path
+//     through `applyLiftPreferenceToStyle`, and an AI-driven row), the one step the session screen and the
+//     Next workout card both run;
 //   - where a STORED plan is served (`holdStoredPlanUnderCheckin`, run by `fitStoredPlanToCheckinBudget`
 //     in the four read paths). A save or an undo of the check-in touches no stored plan, so a plan stored
 //     before the save is held here when it is served inside the week, and given its own load back when
-//     it is served after an undo or in a later week (`AiPrescription.checkinHold` keeps that load).
+//     it is served after an undo or in a later week (`AiPrescription.checkinHold` keeps that load);
+//   - after the consumption-day re-evaluation (`rehold`), whose deload revert puts an unheld load back.
+// The "last bar" is the heaviest working weight logged in the lift's most recent session
+// (`lastSessionBarKg`). A lift lowered by the check-in gets the lower of: one step under the plan, and
+// its last bar.
 // Not in a deload or a baseline, not on a row a deload cut, not on a bodyweight lift.
 import { formatInTimeZone } from 'date-fns-tz'
 import { weekStartForDay } from '@trainingai/shared/date-utils'
@@ -78,19 +84,26 @@ export function holdStoredPrescription(
   const marker = stored.checkinHold
   const recorded: CheckinHoldRecord['rows'] = {}
   let changed = false
+  let lowered = false
   const exercises = stored.exercises.map(ex => {
-    if (ex.deloaded) return ex
     const m = marker?.rows[ex.sessionExerciseId]
+    // A row a deload cut since it was held is not held, but keeps its record: its pre-deload load is the
+    // held one, so a revert, and the week's end, still know the load it had of its own.
+    if (ex.deloaded) {
+      if (m) recorded[ex.sessionExerciseId] = m
+      return ex
+    }
     const base = m && ex.pct === m.heldPct ? m.pct : ex.pct
     const ctx = stored.deload ? undefined : ctxFor(ex)
     const bar = ctx ? checkinHoldBar(ctx.preference, ctx) : null
     const next = bar != null ? pctUnderBar(base, ctx!.basisKg, ctx!.equipment, bar) : base
-    if (next < base) recorded[ex.sessionExerciseId] = { pct: base, heldPct: next }
+    if (next < base) { recorded[ex.sessionExerciseId] = { pct: base, heldPct: next }; lowered = true }
     if (next === ex.pct) return ex
     changed = true
     return { ...ex, pct: next }
   })
-  const record = Object.keys(recorded).length > 0 ? { weekStart, rows: recorded } : undefined
+  // Only carried records (deloaded rows) left: they keep the week they were made in.
+  const record = Object.keys(recorded).length > 0 ? { weekStart: lowered ? weekStart : marker!.weekStart, rows: recorded } : undefined
   if (!changed && sameHoldRecord(record, marker)) return stored
   const { checkinHold: _previous, ...rest } = stored
   return { ...rest, exercises, ...(record && { checkinHold: record }) }
@@ -115,16 +128,79 @@ export function rewriteHeldRow<R extends { sessionExerciseId: string; pct: numbe
   return { row: { ...own, pct: m.heldPct }, held: { pct: own.pct, heldPct: m.heldPct } }
 }
 
+/**
+ * #3890: a plan another serve-time rule has just rewritten (the consumption-day re-evaluation, whose
+ * revert puts a deloaded row's pre-deload load back), held again by the same pure rule
+ * (`holdStoredPrescription`), from the preferences the caller already read for `weekStart` through the
+ * one per-lift reader. No query: `lift` gives a row's basis, equipment and type from what the caller
+ * has. Returns the same object when the week holds no lift and the plan carries no hold.
+ */
+export function rehold(
+  prescription: AiPrescription,
+  phase: string,
+  weekStart: string,
+  prefs: ReadonlyMap<string, LiftPreference>,
+  lift: (name: string) => Omit<HoldRowCtx, 'preference'>,
+): AiPrescription {
+  const anyHeld = [...prefs.values()].some(p => p.checkinHold?.weekStart === weekStart)
+  if (!anyHeld && !prescription.checkinHold) return prescription
+  const inPhase = phase !== 'deload' && phase !== 'baseline' && !prescription.deload
+  return holdStoredPrescription(prescription, weekStart, ex => {
+    const preference = prefs.get(ex.name)
+    if (!inPhase || preference?.checkinHold?.weekStart !== weekStart || preference.checkinHold.barKg == null) return undefined
+    return { preference, ...lift(ex.name) }
+  })
+}
+
 /** The statuses whose plan is still the one the lifter is about to train (the re-fit's set). */
 const SERVABLE = new Set(['pending', 'accepted', 'auto_applied'])
+
+/**
+ * The hold of each of `names` for the week starting `weekStart`, read through the one per-lift reader,
+ * keyed by name. A lift with no hold, or whose hold has no last bar, is absent (it caps nothing).
+ */
+async function loadHoldCtx(
+  repo: WorkoutRepository, userId: string, names: readonly string[], weekStart: string,
+): Promise<Map<string, HoldRowCtx>> {
+  const out = new Map<string, HoldRowCtx>()
+  if (names.length === 0) return out
+  const prefs = await loadLiftPreferences(repo, userId, names, { checkinWeekStart: weekStart })
+  const held = new Map([...prefs].filter(([, p]) => p.checkinHold?.barKg != null))
+  if (held.size === 0) return out
+  const heldNames = [...held.keys()]
+  const [prMap, equipment, types] = await Promise.all([
+    repo.listPersonalRecords(userId),
+    repo.getExerciseEquipment(heldNames),
+    repo.getExerciseTypes(heldNames),
+  ])
+  const bases = await liftPreferenceBases(repo, userId, held, prMap)
+  for (const [name, preference] of held) {
+    out.set(name, {
+      preference, basisKg: bases.get(name) ?? null, equipment: equipment[name] ?? [], bodyweight: types[name] === 'bodyweight',
+    })
+  }
+  return out
+}
+
+/** Whether the hold may lower this state's plan at all: not in a deload or a baseline. */
+const holdApplies = (state: SessionPeriodization, stored: AiPrescription) =>
+  state.phase !== 'deload' && state.phase !== 'baseline' && !stored.deload
 
 /**
  * #3890: a stored plan as it is served on `now`'s local date, under that week's check-in hold. With no
  * hold for that week and no hold on the plan it returns `state` as it came, with no query: the held
  * weeks ride on the stored-plan read itself (`checkinHeldWeeks`). Otherwise the lifts are read through
- * the one per-lift reader for that week, the plan is held (or given its own load back), stored with no
- * model call, and served. The store is guarded on the plan being the one read, so a plan remade
- * meanwhile is never overwritten; the next read holds the new one.
+ * the one per-lift reader for that week, the plan is held (or given its own load back) and served.
+ *
+ * The plan served is always the one computed here; storing it is only a cache, so it never decides what
+ * is served. The store is guarded on the plan being the one read, so a plan remade meanwhile is never
+ * overwritten:
+ *  - the store throws: the held plan is served all the same;
+ *  - the store loses (another read held it first, or the plan was remade): the stored plan is read once
+ *    more, held in memory by the same pure rule (`holdStoredPrescription`) and served, with no second
+ *    write. Several reads at once therefore all serve the held bar, and exactly one of them writes.
+ * A failed read of the lifts (their holds, bars or bases) serves the plan as stored: with no bar there
+ * is nothing to hold it to.
  */
 export async function holdStoredPlanUnderCheckin<T extends SessionPeriodization>(
   userId: string,
@@ -141,34 +217,45 @@ export async function holdStoredPlanUnderCheckin<T extends SessionPeriodization>
   if (!heldWeek && !stored.checkinHold) return state
   if (!SERVABLE.has(state.prescriptionStatus)) return state
   if (state.prescriptionExpiresAt != null && state.prescriptionExpiresAt <= now) return state
-  if (typeof repo.replacePrescriptionIfUnchanged !== 'function') return state
+  let ctxByName: Map<string, HoldRowCtx>
+  const asked = new Set<string>()
   try {
-    const ctxByName = new Map<string, HoldRowCtx>()
-    const inPhase = state.phase !== 'deload' && state.phase !== 'baseline' && !stored.deload
-    if (heldWeek && inPhase) {
-      const prefs = await loadLiftPreferences(repo, userId, stored.exercises.map(e => e.name), { checkinWeekStart: weekStart })
-      const held = new Map([...prefs].filter(([, p]) => p.checkinHold?.barKg != null))
-      if (held.size > 0) {
-        const names = [...held.keys()]
-        const [prMap, equipment, types] = await Promise.all([
-          repo.listPersonalRecords(userId),
-          repo.getExerciseEquipment(names),
-          repo.getExerciseTypes(names),
-        ])
-        const bases = await liftPreferenceBases(repo, userId, held, prMap)
-        for (const [name, preference] of held) {
-          ctxByName.set(name, {
-            preference, basisKg: bases.get(name) ?? null, equipment: equipment[name] ?? [], bodyweight: types[name] === 'bodyweight',
-          })
-        }
+    const names = heldWeek && holdApplies(state, stored) ? stored.exercises.map(e => e.name) : []
+    names.forEach(nm => asked.add(nm))
+    ctxByName = await loadHoldCtx(repo, userId, names, weekStart)
+  } catch (err) {
+    console.error('[weekly-checkin] reading the hold for the stored plan failed; serving it as stored:', err)
+    return state
+  }
+  const next = holdStoredPrescription(stored, weekStart, ex => ctxByName.get(ex.name))
+  if (next === stored) return state
+  const held = { ...state, prescription: next }
+  if (typeof repo.replacePrescriptionIfUnchanged !== 'function') return held
+  let won: boolean
+  try {
+    won = await repo.replacePrescriptionIfUnchanged(userId, programSessionId, stored, next)
+  } catch (err) {
+    console.error('[weekly-checkin] storing the held plan failed; serving it held, unstored:', err)
+    return held
+  }
+  if (won) return held
+  // Lost the swap: serve what is stored now, held by the same rule, and write nothing.
+  try {
+    const current = await repo.getSessionPeriodization(userId, programSessionId)
+    const now2 = current?.prescription
+    if (!current || !now2) return held
+    const merged = { ...state, ...current, prescription: now2 } as T
+    if (!heldWeek && !now2.checkinHold) return merged
+    if (heldWeek && holdApplies(current, now2)) {
+      const missing = [...new Set(now2.exercises.map(e => e.name))].filter(nm => !asked.has(nm))
+      if (missing.length > 0) {
+        for (const [nm, ctx] of await loadHoldCtx(repo, userId, missing, weekStart)) ctxByName.set(nm, ctx)
       }
     }
-    const next = holdStoredPrescription(stored, weekStart, ex => ctxByName.get(ex.name))
-    if (next === stored) return state
-    const ok = await repo.replacePrescriptionIfUnchanged(userId, programSessionId, stored, next)
-    return ok ? { ...state, prescription: next } : state
+    const ctxNow = heldWeek && holdApplies(current, now2) ? ctxByName : new Map<string, HoldRowCtx>()
+    return { ...merged, prescription: holdStoredPrescription(now2, weekStart, ex => ctxNow.get(ex.name)) }
   } catch (err) {
-    console.error('[weekly-checkin] applying the hold to the stored plan failed; serving it as stored:', err)
-    return state
+    console.error('[weekly-checkin] re-reading the stored plan after a lost store failed; serving the held plan read first:', err)
+    return held
   }
 }
