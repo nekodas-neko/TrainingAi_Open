@@ -57,6 +57,11 @@ import { PATCH as editMeal } from '@/app/api/nutrition/meal-plans/meals/[mealId]
 
 const PLAN = '00000000-0000-4000-8000-0000000000c1'
 const MEAL = '00000000-0000-4000-8000-0000000000d1'
+const VARIANT = '00000000-0000-4000-8000-0000000000e1'
+
+/** The plan a meal belongs to, as `listMealPlans` returns it: the route finds it through the meal's variant. */
+const planOwningMeal = (excludedFoods: string[] = []) =>
+  ({ id: PLAN, excludedFoods, variants: [{ id: VARIANT, meals: [] }] })
 
 const ingredient = (over: Row = {}) => ({
   name: 'Chicken breast', weightG: 200, caloriesPer100g: 165,
@@ -64,7 +69,7 @@ const ingredient = (over: Row = {}) => ({
 })
 
 const meal = (over: Row = {}) => ({
-  id: MEAL, name: 'Lunch', position: 0,
+  id: MEAL, variantId: VARIANT, name: 'Lunch', position: 0,
   targetCalories: 700, targetProteinG: 50, targetCarbsG: 60, targetFatG: 20, ...over,
 })
 
@@ -319,6 +324,7 @@ describe('PATCH /api/nutrition/meal-plans/meals/[mealId]', () => {
   // would otherwise silently reprice the meal.
   it('scales against the meal\'s own stored targets, not the caller\'s numbers', async () => {
     getMealPlanMeal.mockResolvedValue(meal({ targetCalories: 700, targetProteinG: 50 }))
+    listMealPlans.mockResolvedValue([planOwningMeal()])
     scaleWithTopUp.mockResolvedValue([ingredient({ weightG: 250 })])
     await patchMeal({
       scaleToTarget: true, ingredients: [ingredient()],
@@ -335,10 +341,30 @@ describe('PATCH /api/nutrition/meal-plans/meals/[mealId]', () => {
       { label: 'Peanuts', severity: 'allergy' },
       { label: 'Coriander', severity: 'avoid' },
     ])
+    listMealPlans.mockResolvedValue([planOwningMeal()])
     await patchMeal({ scaleToTarget: true, ingredients: [ingredient()] })
     expect(scaleWithTopUp.mock.calls[0][2]).toMatchObject({
       userId: sessionUser!.id, allergies: ['Peanuts'], avoid: ['Coriander'],
     })
+  })
+
+  // #3749. The top-up now adds staples by arithmetic, with no model in the loop to be told what to
+  // avoid, so the plan's excluded foods must reach it here as they do on the generate routes.
+  it('hands the top-up the excluded foods of the plan the meal belongs to', async () => {
+    listMealPlans.mockResolvedValue([
+      { id: 'other-plan', excludedFoods: ['Mushrooms'], variants: [{ id: 'other-variant', meals: [] }] },
+      planOwningMeal(['Tofu', 'Rice']),
+    ])
+    await patchMeal({ scaleToTarget: true, ingredients: [ingredient()] })
+    expect(scaleWithTopUp.mock.calls[0][2]).toMatchObject({ excludedFoods: ['Tofu', 'Rice'] })
+  })
+
+  it('404s before scaling when the meal\'s plan cannot be found, rather than scaling with no exclusions', async () => {
+    listMealPlans.mockResolvedValue([])
+    const res = await patchMeal({ scaleToTarget: true, ingredients: [ingredient()] })
+    expect(res.status).toBe(404)
+    expect(scaleWithTopUp).not.toHaveBeenCalled()
+    expect(updateMealPlanMeal).not.toHaveBeenCalled()
   })
 
   it('404s before scaling when the meal is not the caller\'s', async () => {
