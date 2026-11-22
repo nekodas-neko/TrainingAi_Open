@@ -314,6 +314,33 @@ async function generate(scenarioIndex: number, sig?: PrescriptionSignals, phase?
 }
 const byId = (p: AiPrescription, id: string) => p.exercises.find(e => e.sessionExerciseId === id)!
 
+describe('#3767 — the model naming minutes in its reasoning changes the note and nothing else', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-11-21T02:00:00Z'))
+  })
+  afterEach(() => { vi.useRealTimers() })
+
+  it('the plan is identical apart from the reasoning text', async () => {
+    const sc = SCENARIOS[0]
+    const withReasoning = async (reasoning: string) => {
+      mocks.signals = structuredClone(sc.signals)
+      mocks.model = { ...sc.model, reasoning }
+      mocks.prompts = []
+      const stored: AiPrescription[] = []
+      await generatePrescriptionForSession(`user-3767-note-${++n}`, SESSION_ID, fakeRepo(sc.phase, stored), 'Australia/Brisbane')
+      return stored[0]
+    }
+    const plain = await withReasoning('Squat holds at 72.5%.')
+    const noisy = await withReasoning('Squat holds at 72.5%, because the day fits 39 minutes. 45 minutes is the target. Rest is short, so it fits 40 min.')
+    expect(noisy.reasoning).not.toMatch(/\b(?:39|40|45)\s*min/)
+    expect(noisy.reasoning).toContain('Squat holds at 72.5%.')
+    // Only text differs: the note, and the model's raw reasoning kept in the re-fit baseline.
+    const textOnly = (p: AiPrescription) => ({ ...p, reasoning: '', refitBaseline: { ...p.refitBaseline, reasoning: '' } })
+    expect(textOnly(noisy)).toEqual(textOnly(plain))
+  })
+})
+
 describe('the AI path: the preference holds after the model, whatever it answered', () => {
   beforeEach(() => {
     vi.useFakeTimers({ toFake: ['Date'] })

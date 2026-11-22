@@ -145,6 +145,67 @@ describe('#3767 — one time budget, and an estimate that fits it', () => {
   })
 })
 
+describe('#3767 leftovers — the minutes filter reads three sentence shapes right', () => {
+  const filter = (model: string) => reasoningWithBudgetNote(model, '')
+
+  it('a sentence that mentions rest still loses its session minutes, and keeps its rest', () => {
+    // "rest" as a noun about something else, and "Rest" about the sets' rest: neither shields a session length.
+    expect(filter('The rest of the session fits in 39 minutes.')).toBe('')
+    expect(filter('Rest is kept short, so the plan fits 40 min.')).toBe('Rest is kept short.')
+    expect(filter('Rest 3 minutes between heavy sets, and the session fits 40 min.')).toBe('Rest 3 minutes between heavy sets.')
+    // Rest given in minutes, in either order, is a prescription and stays.
+    expect(filter('Rest 3 minutes between heavy sets.')).toBe('Rest 3 minutes between heavy sets.')
+    expect(filter('Take 3-minute rests after the heavy sets.')).toBe('Take 3-minute rests after the heavy sets.')
+    expect(filter('Take 2 minutes of rest between sets.')).toBe('Take 2 minutes of rest between sets.')
+  })
+
+  it('a joint other than and / but / so / while splits the sentence instead of emptying it', () => {
+    expect(filter('Squat holds at 72.5%, because the plan fits 39 minutes.')).toBe('Squat holds at 72.5%.')
+    expect(filter('Row adds a set, which keeps the session near 40 min.')).toBe('Row adds a set.')
+    expect(filter('Bench holds, since the day is limited to 45 minutes.')).toBe('Bench holds.')
+    expect(filter('The plan fits 39 minutes, yet squat holds at 72.5%.')).toBe('Squat holds at 72.5%.')
+    // A dependent clause cannot stand alone once what it depended on is gone, so it goes too.
+    expect(filter('The plan fits 39 minutes, which leaves squat unchanged.')).toBe('')
+  })
+
+  it('a sentence that starts with a digit is its own sentence', () => {
+    expect(filter('Row adds a set. 45 minutes is the target.')).toBe('Row adds a set.')
+    expect(filter('Row adds a set. 45 minutes is the target. Calf holds.')).toBe('Row adds a set. Calf holds.')
+    // The abbreviation guard still holds with a digit after it.
+    expect(filter('Sets held at approx. 40 min of work. Row adds a set.')).toBe('Row adds a set.')
+    expect(filter('Row adds a set. 3 sets of 5 at 72.5%.')).toBe('Row adds a set. 3 sets of 5 at 72.5%.')
+  })
+
+  it('leaves alone a number that is not minutes, and a sentence with no figure', () => {
+    for (const s of [
+      'Bench moves to 5 reps at 72.5%.',
+      'Squat holds at 100 kg for 3 sets of 5.',
+      'RPE 8 on the last set, 85% of the best.',
+      '3 sets of 8 on the row.',
+      'Steady week, nothing changes.',
+    ]) expect(filter(s)).toBe(s)
+  })
+
+  it('never touches the code-owned note, whatever minutes it states', () => {
+    const note = ' To keep today\'s plan to about 39 min of work (less a margin), Calf Raise was dropped for today, because the rest of the session would not fit.'
+    expect(reasoningWithBudgetNote('Steady week.', note)).toBe(`Steady week.${note}`)
+    expect(reasoningWithBudgetNote('Fits 39 minutes. Squat holds.', note)).toBe(`Squat holds.${note}`)
+  })
+
+  it('changes the note only: the prescription figures are identical with or without the model naming minutes', () => {
+    const run = () => applyBudgetStage(stage(SIX, 3), signalsFor(SIX, 'strength', 51, 39), 60, undefined, new Set(), undefined, 'accumulation')
+    const a = run()
+    const b = run()
+    expect({ ...b, budgetNote: '' }).toEqual({ ...a, budgetNote: '' })
+    // The filter works on text only: it takes a string and returns a string.
+    const withMinutes = reasoningWithBudgetNote('Squat holds. Fits 39 minutes, because rest is short.', a.budgetNote)
+    const without = reasoningWithBudgetNote('Squat holds.', a.budgetNote)
+    expect(typeof withMinutes).toBe('string')
+    expect(withMinutes.endsWith(a.budgetNote)).toBe(true)
+    expect(without.endsWith(a.budgetNote)).toBe(true)
+  })
+})
+
 describe('#3713 — the phase set range is held in code', () => {
   it('the role ceiling takes the phase maximum when it is lower, and only then', () => {
     expect(roleCeiling('primary')).toBe(6)
