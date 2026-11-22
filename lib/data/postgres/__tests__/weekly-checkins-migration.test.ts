@@ -84,8 +84,13 @@ describe.skipIf(!canRun)('migration 202611221206 — weekly check-ins (#3890)', 
       `INSERT INTO ${table} (${keys.join(', ')}) VALUES (${keys.map((_, i) => `$${i + 1}`).join(', ')}) RETURNING id`,
       Object.values(all))
   }
+  // A calendar date written out, not a clock instant: the week_start + 7 the CHECK wants.
+  const plus7 = (d: string) => {
+    const t = new Date(Date.parse(`${d}T00:00:00Z`) + 7 * 86400000)
+    return `${t.getUTCFullYear()}-${String(t.getUTCMonth() + 1).padStart(2, '0')}-${String(t.getUTCDate()).padStart(2, '0')}`
+  }
   const checkin = async (userId: string, week: string, cols: Record<string, unknown> = {}): Promise<string> =>
-    (await insert('weekly_checkins', { user_id: userId, week_start: week, ...cols })).rows[0].id
+    (await insert('weekly_checkins', { user_id: userId, week_start: week, applies_week_start: plus7(week), ...cols })).rows[0].id
   const lift = (userId: string, checkinId: string, name: string, cols: Record<string, unknown> = {}) =>
     insert('weekly_checkin_exercises', {
       user_id: userId, checkin_id: checkinId, exercise_name: name, answer: 'about_right', effect: 'none', ...cols })
@@ -99,17 +104,21 @@ describe.skipIf(!canRun)('migration 202611221206 — weekly check-ins (#3890)', 
     await runMigrationSql(pool, migrationSql())
     const cols = (await pool.query<{ column_name: string }>(
       `SELECT column_name FROM information_schema.columns WHERE table_name = 'weekly_checkin_exercises'`)).rows.map(r => r.column_name)
-    expect(cols).toContain('swap_change_id')
+    expect(cols).toContain('applied_change_id')
+    expect(cols).toContain('deleted_at')
   })
 
   it('a bare check-in is offered, with every answer null ("not answered")', async () => {
     await cleanWeek(USER_A, '2026-11-09')
     await checkin(USER_A, '2026-11-09')
     const { rows } = await pool.query(
-      `SELECT status, saved_at, dismissed_at, days_off_weekdays, shorter_session_min, pain_raised, pain_injury_id, deleted_at, offered_at IS NOT NULL AS offered
+      `SELECT status, saved_at, dismissed_at, days_off_weekdays, shorter_session_min, pain_raised, pain_exercise_name, pain_exercise_id, pain_where, pain_offer_status, pain_injury_id,
+              swap_exercise_name, swap_exercise_id, swap_offer_status, swap_change_id, deleted_at, offered_at IS NOT NULL AS offered
          FROM weekly_checkins WHERE user_id = $1 AND week_start = '2026-11-09'`, [USER_A])
     expect(rows[0]).toEqual({ status: 'offered', saved_at: null, dismissed_at: null, days_off_weekdays: null,
-      shorter_session_min: null, pain_raised: null, pain_injury_id: null, deleted_at: null, offered: true })
+      shorter_session_min: null, pain_raised: null, pain_exercise_name: null, pain_exercise_id: null, pain_where: null,
+      pain_offer_status: null, pain_injury_id: null, swap_exercise_name: null, swap_exercise_id: null,
+      swap_offer_status: null, swap_change_id: null, deleted_at: null, offered: true })
   })
 
   it('refuses a second check-in for the same user and week, allows another user or week', async () => {
@@ -144,29 +153,126 @@ describe.skipIf(!canRun)('migration 202611221206 — weekly check-ins (#3890)', 
 
   it('stores the answers that are not about one lift, and tells "no days off" from "not answered"', async () => {
     await cleanWeek(USER_A, '2026-10-19'); await cleanWeek(USER_B, '2026-10-19')
-    const injury = (await pool.query(
-      `INSERT INTO injuries (user_id, muscle_name, severity, started_date) VALUES ($1, 'test muscle', 'mild', '2026-11-20') RETURNING id`, [USER_A])).rows[0].id
     await checkin(USER_A, '2026-10-19', {
-      status: 'saved', saved_at: '2026-11-22T08:00:00Z', days_off_weekdays: [3, 6], shorter_session_min: 45,
-      pain_raised: true, pain_injury_id: injury })
+      status: 'saved', saved_at: '2026-11-22T08:00:00Z', days_off_weekdays: [3, 6], shorter_session_min: 45, pain_raised: true })
     await checkin(USER_B, '2026-10-19', { status: 'dismissed', dismissed_at: '2026-11-22T08:00:00Z', days_off_weekdays: [], pain_raised: false })
-    const a = (await pool.query(`SELECT days_off_weekdays, shorter_session_min, pain_raised, pain_injury_id FROM weekly_checkins WHERE user_id = $1 AND week_start = '2026-10-19'`, [USER_A])).rows[0]
-    expect(a).toEqual({ days_off_weekdays: [3, 6], shorter_session_min: 45, pain_raised: true, pain_injury_id: injury })
+    const a = (await pool.query(`SELECT days_off_weekdays, shorter_session_min, pain_raised, applies_week_start::text AS applies FROM weekly_checkins WHERE user_id = $1 AND week_start = '2026-10-19'`, [USER_A])).rows[0]
+    expect(a).toEqual({ days_off_weekdays: [3, 6], shorter_session_min: 45, pain_raised: true, applies: '2026-10-26' })
     const b = (await pool.query(`SELECT days_off_weekdays FROM weekly_checkins WHERE user_id = $1 AND week_start = '2026-10-19'`, [USER_B])).rows[0]
     expect(b.days_off_weekdays).toEqual([])
-    // Deleting the injury keeps the answer and clears the reference.
-    await pool.query(`DELETE FROM injuries WHERE id = $1`, [injury])
-    const after = (await pool.query(`SELECT pain_raised, pain_injury_id FROM weekly_checkins WHERE user_id = $1 AND week_start = '2026-10-19'`, [USER_A])).rows[0]
-    expect(after).toEqual({ pain_raised: true, pain_injury_id: null })
   })
 
-  it('refuses an injury id on a check-in where pain was not raised', async () => {
-    const injury = (await pool.query(
-      `INSERT INTO injuries (user_id, muscle_name, severity, started_date) VALUES ($1, 'test muscle', 'mild', '2026-11-20') RETURNING id`, [USER_A])).rows[0].id
-    await cleanWeek(USER_A, '2026-10-12')
-    await check(checkin(USER_A, '2026-10-12', { pain_raised: false, pain_injury_id: injury }), 'weekly_checkins_pain_injury_check')
-    await check(checkin(USER_A, '2026-10-12', { pain_injury_id: injury }), 'weekly_checkins_pain_injury_check')
-    await pool.query(`DELETE FROM injuries WHERE id = $1`, [injury])
+  describe('the week the next-week answers apply to', () => {
+    beforeEach(async () => { await cleanWeek(USER_A, '2026-10-12') })
+    it('refuses anything but week_start + 7', async () => {
+      await check(checkin(USER_A, '2026-10-12', { applies_week_start: '2026-10-12' }), 'weekly_checkins_applies_week_check')
+      await check(checkin(USER_A, '2026-10-12', { applies_week_start: '2026-10-26' }), 'weekly_checkins_applies_week_check')
+      await check(checkin(USER_A, '2026-10-12', { applies_week_start: '2026-10-20' }), 'weekly_checkins_applies_week_check') // a Tuesday
+    })
+    it('refuses a missing value, and accepts week_start + 7 across a year end', async () => {
+      await expect(insert('weekly_checkins', { user_id: USER_A, week_start: '2026-10-12' })).rejects.toMatchObject({ code: '23502' })
+      await cleanWeek(USER_A, '2026-12-28')
+      await checkin(USER_A, '2026-12-28') // applies 2027-01-04
+      const { rows } = await pool.query(`SELECT applies_week_start::text AS a FROM weekly_checkins WHERE user_id = $1 AND week_start = '2026-12-28'`, [USER_A])
+      expect(rows[0].a).toBe('2027-01-04')
+    })
+    it('finds the check-in for a week by plain equality, one per user', async () => {
+      await checkin(USER_A, '2026-10-12')
+      const { rows } = await pool.query(`SELECT week_start::text AS w FROM weekly_checkins WHERE user_id = $1 AND applies_week_start = '2026-10-19'`, [USER_A])
+      expect(rows).toEqual([{ w: '2026-10-12' }])
+    })
+  })
+
+  describe('pain: which lift, where, and what became of the offer', () => {
+    let injury: string
+    beforeEach(async () => {
+      await cleanWeek(USER_A, '2026-10-12')
+      injury = (await pool.query(
+        `INSERT INTO injuries (user_id, muscle_name, severity, started_date) VALUES ($1, 'test muscle', 'mild', '2026-11-20') RETURNING id`, [USER_A])).rows[0].id
+    })
+    afterEach(async () => { await cleanWeek(USER_A, '2026-10-12'); await pool.query(`DELETE FROM injuries WHERE id = $1`, [injury]) })
+
+    it.each([
+      ['a lift when pain was not raised (false)', { pain_raised: false, pain_exercise_name: 'Squat', pain_offer_status: 'open' }, 'weekly_checkins_pain_detail_check'],
+      ['a lift when pain was not answered', { pain_exercise_name: 'Squat', pain_offer_status: 'open' }, 'weekly_checkins_pain_detail_check'],
+      ['a where when pain was not raised', { pain_raised: false, pain_where: 'left knee' }, 'weekly_checkins_pain_detail_check'],
+      ['an offer status when pain was not raised', { pain_raised: false, pain_offer_status: 'declined' }, 'weekly_checkins_pain_detail_check'],
+      ['an empty lift name', { pain_raised: true, pain_exercise_name: '', pain_offer_status: 'open' }, 'weekly_checkins_pain_lift_check'],
+      ['a library id with no name', { pain_raised: true, pain_exercise_id: 'LIB' }, 'weekly_checkins_pain_lift_check'],
+      ['a where with no lift', { pain_raised: true, pain_where: 'left knee' }, 'weekly_checkins_pain_lift_check'],
+      ['an empty where', { pain_raised: true, pain_exercise_name: 'Squat', pain_offer_status: 'open', pain_where: '' }, 'weekly_checkins_pain_where_check'],
+      ['a where over 200 characters', { pain_raised: true, pain_exercise_name: 'Squat', pain_offer_status: 'open', pain_where: 'x'.repeat(201) }, 'weekly_checkins_pain_where_check'],
+      ['an unknown offer status', { pain_raised: true, pain_exercise_name: 'Squat', pain_offer_status: 'pending' }, 'weekly_checkins_pain_offer_status_check'],
+      ['a lift with no offer status', { pain_raised: true, pain_exercise_name: 'Squat' }, 'weekly_checkins_pain_offer_check'],
+      ['an offer status with no lift', { pain_raised: true, pain_offer_status: 'open' }, 'weekly_checkins_pain_offer_check'],
+      ['an injury while the offer is open', { pain_raised: true, pain_exercise_name: 'Squat', pain_offer_status: 'open', pain_injury_id: 'INJ' }, 'weekly_checkins_pain_injury_check'],
+      ['an injury after the offer was declined', { pain_raised: true, pain_exercise_name: 'Squat', pain_offer_status: 'declined', pain_injury_id: 'INJ' }, 'weekly_checkins_pain_injury_check'],
+      ['an injury with no offer at all', { pain_raised: true, pain_injury_id: 'INJ' }, 'weekly_checkins_pain_injury_check'],
+    ])('refuses %s', async (_n, cols, constraint) => {
+      const fill = Object.fromEntries(Object.entries(cols).map(([k, v]) => [k, v === 'INJ' ? injury : v === 'LIB' ? libId : v]))
+      await check(checkin(USER_A, '2026-10-12', fill), constraint)
+    })
+
+    it('accepts pain not raised, raised with no lift, and each offer status; keeps lift and where when declined', async () => {
+      await checkin(USER_A, '2026-10-12', { pain_raised: false }); await cleanWeek(USER_A, '2026-10-12')
+      await checkin(USER_A, '2026-10-12', { pain_raised: true }); await cleanWeek(USER_A, '2026-10-12')
+      await checkin(USER_A, '2026-10-12', { pain_raised: true, pain_exercise_name: 'Squat', pain_offer_status: 'open' }); await cleanWeek(USER_A, '2026-10-12')
+      await checkin(USER_A, '2026-10-12', { pain_raised: true, pain_exercise_name: 'Squat', pain_exercise_id: libId, pain_where: 'a'.repeat(200), pain_offer_status: 'declined' })
+      const { rows } = await pool.query(
+        `SELECT pain_exercise_name, pain_exercise_id, char_length(pain_where) AS n, pain_offer_status, pain_injury_id FROM weekly_checkins WHERE user_id = $1 AND week_start = '2026-10-12'`, [USER_A])
+      expect(rows[0]).toEqual({ pain_exercise_name: 'Squat', pain_exercise_id: libId, n: 200, pain_offer_status: 'declined', pain_injury_id: null })
+    })
+
+    it('accepts an injury once the offer is accepted, and deleting the injury keeps the answer', async () => {
+      await checkin(USER_A, '2026-10-12', { pain_raised: true, pain_exercise_name: 'Squat', pain_where: 'left knee', pain_offer_status: 'accepted', pain_injury_id: injury })
+      await pool.query(`DELETE FROM injuries WHERE id = $1`, [injury])
+      const { rows } = await pool.query(`SELECT pain_offer_status, pain_injury_id, pain_where FROM weekly_checkins WHERE user_id = $1 AND week_start = '2026-10-12'`, [USER_A])
+      expect(rows[0]).toEqual({ pain_offer_status: 'accepted', pain_injury_id: null, pain_where: 'left knee' })
+    })
+
+    it('sets the pain library id to null when the library lift goes', async () => {
+      const tmp = (await pool.query(`INSERT INTO exercise_library (name) VALUES ('Test Lift 3890 c') RETURNING id`)).rows[0].id
+      await checkin(USER_A, '2026-10-12', { pain_raised: true, pain_exercise_name: 'Gone', pain_exercise_id: tmp, pain_offer_status: 'open' })
+      await pool.query(`DELETE FROM exercise_library WHERE id = $1`, [tmp])
+      const { rows } = await pool.query(`SELECT pain_exercise_name, pain_exercise_id FROM weekly_checkins WHERE user_id = $1 AND week_start = '2026-10-12'`, [USER_A])
+      expect(rows[0]).toEqual({ pain_exercise_name: 'Gone', pain_exercise_id: null })
+    })
+  })
+
+  describe('a swap that was offered', () => {
+    let change: string
+    beforeEach(async () => {
+      await cleanWeek(USER_A, '2026-10-12')
+      change = (await pool.query(
+        `INSERT INTO coach_changes (user_id, domain, target_id, patch) VALUES ($1, 'program', gen_random_uuid(), '{}') RETURNING id`, [USER_A])).rows[0].id
+    })
+    afterEach(async () => { await cleanWeek(USER_A, '2026-10-12'); await pool.query(`DELETE FROM coach_changes WHERE id = $1`, [change]) })
+
+    it.each([
+      ['an empty lift name', { swap_exercise_name: '', swap_offer_status: 'open' }, 'weekly_checkins_swap_lift_check'],
+      ['a library id with no name', { swap_exercise_id: 'LIB' }, 'weekly_checkins_swap_lift_check'],
+      ['an unknown offer status', { swap_exercise_name: 'Squat', swap_offer_status: 'pending' }, 'weekly_checkins_swap_offer_status_check'],
+      ['a lift with no offer status', { swap_exercise_name: 'Squat' }, 'weekly_checkins_swap_offer_check'],
+      ['an offer status with no lift', { swap_offer_status: 'open' }, 'weekly_checkins_swap_offer_check'],
+      ['a change while the offer is open', { swap_exercise_name: 'Squat', swap_offer_status: 'open', swap_change_id: 'CH' }, 'weekly_checkins_swap_change_check'],
+      ['a change after the offer was declined', { swap_exercise_name: 'Squat', swap_offer_status: 'declined', swap_change_id: 'CH' }, 'weekly_checkins_swap_change_check'],
+    ])('refuses %s', async (_n, cols, constraint) => {
+      const fill = Object.fromEntries(Object.entries(cols).map(([k, v]) => [k, v === 'CH' ? change : v === 'LIB' ? libId : v]))
+      await check(checkin(USER_A, '2026-10-12', fill), constraint)
+    })
+
+    it('accepts open and declined offers with no change, and an accepted one with a change that clears when it is deleted', async () => {
+      await checkin(USER_A, '2026-10-12', { swap_exercise_name: 'Squat', swap_offer_status: 'open' }); await cleanWeek(USER_A, '2026-10-12')
+      await checkin(USER_A, '2026-10-12', { swap_exercise_name: 'Squat', swap_exercise_id: libId, swap_offer_status: 'declined' }); await cleanWeek(USER_A, '2026-10-12')
+      await checkin(USER_A, '2026-10-12', { swap_exercise_name: 'Squat', swap_offer_status: 'accepted', swap_change_id: change })
+      await pool.query(`DELETE FROM coach_changes WHERE id = $1`, [change])
+      const { rows } = await pool.query(`SELECT swap_offer_status, swap_change_id FROM weekly_checkins WHERE user_id = $1 AND week_start = '2026-10-12'`, [USER_A])
+      expect(rows[0]).toEqual({ swap_offer_status: 'accepted', swap_change_id: null })
+    })
+
+    it('does not depend on pain: a swap and a no-pain answer sit together', async () => {
+      await checkin(USER_A, '2026-10-12', { pain_raised: false, swap_exercise_name: 'Squat', swap_offer_status: 'open' })
+    })
   })
 
   describe('per-lift rows', () => {
@@ -218,13 +324,43 @@ describe.skipIf(!canRun)('migration 202611221206 — weekly check-ins (#3890)', 
       await expect(lift(USER_B, cid, 'stolen')).rejects.toMatchObject({ code: '23503', constraint: 'weekly_checkin_exercises_checkin_fkey' })
     })
 
-    it('keeps a swap as a reference only, and clears it when the change is deleted', async () => {
-      const change = (await pool.query(
-        `INSERT INTO coach_changes (user_id, domain, target_id, patch) VALUES ($1, 'program', gen_random_uuid(), '{}') RETURNING id`, [USER_A])).rows[0].id
-      await lift(USER_A, cid, 'swapped', { swap_change_id: change })
-      await pool.query(`DELETE FROM coach_changes WHERE id = $1`, [change])
-      const { rows } = await pool.query(`SELECT swap_change_id FROM weekly_checkin_exercises WHERE checkin_id = $1`, [cid])
-      expect(rows[0].swap_change_id).toBeNull()
+    describe('what an accepted step up or a lowering wrote', () => {
+      let change: string
+      beforeEach(async () => {
+        change = (await pool.query(
+          `INSERT INTO coach_changes (user_id, domain, target_id, patch) VALUES ($1, 'lift_preference', gen_random_uuid(), '{}') RETURNING id`, [USER_A])).rows[0].id
+      })
+      afterEach(async () => { await pool.query(`DELETE FROM coach_changes WHERE id = $1`, [change]) })
+
+      it.each([
+        ['an effect of none', { effect: 'none' }],
+        ['a hold', { effect: 'held' }],
+        ['a step up offer that is open', { effect: 'offered_step_up', offer_status: 'open' }],
+        ['a step up offer that was declined', { effect: 'offered_step_up', offer_status: 'declined' }],
+      ])('refuses a change id on %s', async (_n, cols) => {
+        await check(lift(USER_A, cid, 'bad', { ...cols, applied_change_id: change }), 'weekly_checkin_exercises_applied_check')
+      })
+
+      it('accepts a change id on a lowering and on an accepted step up, and none elsewhere', async () => {
+        await lift(USER_A, cid, 'lowered', { answer: 'heavy', missed_rep: true, effect: 'lowered_one_step', applied_change_id: change })
+        await lift(USER_A, cid, 'stepped', { answer: 'light', effect: 'offered_step_up', offer_status: 'accepted', applied_change_id: change })
+        await lift(USER_A, cid, 'lowered-not-yet', { answer: 'heavy', missed_rep: true, effect: 'lowered_one_step' })
+        await lift(USER_A, cid, 'accepted-not-yet', { answer: 'light', effect: 'offered_step_up', offer_status: 'accepted' })
+      })
+
+      it('clears the reference when the change is deleted, keeping the row', async () => {
+        await lift(USER_A, cid, 'lowered', { answer: 'heavy', effect: 'lowered_one_step', applied_change_id: change })
+        await pool.query(`DELETE FROM coach_changes WHERE id = $1`, [change])
+        const { rows } = await pool.query(`SELECT effect, applied_change_id FROM weekly_checkin_exercises WHERE checkin_id = $1`, [cid])
+        expect(rows[0]).toEqual({ effect: 'lowered_one_step', applied_change_id: null })
+      })
+    })
+
+    it('carries a tombstone, which still holds the lift key so a redo revives the row', async () => {
+      await lift(USER_A, cid, 'dropped', { deleted_at: '2026-11-22T08:00:00Z' })
+      await expect(lift(USER_A, cid, 'dropped')).rejects.toMatchObject({ code: '23505', constraint: 'weekly_checkin_exercises_lift_key' })
+      await pool.query(`UPDATE weekly_checkin_exercises SET deleted_at = NULL WHERE checkin_id = $1`, [cid])
+      expect((await pool.query(`SELECT deleted_at FROM weekly_checkin_exercises WHERE checkin_id = $1`, [cid])).rows[0].deleted_at).toBeNull()
     })
 
     it('keeps the row when the library lift goes (id set null)', async () => {
@@ -274,7 +410,7 @@ describe.skipIf(!canRun)('migration 202611221206 — weekly check-ins (#3890)', 
       await client.query(stmt('weekly_checkin_exercises'))
       for (const u of [USER_A, USER_B]) {
         const c = (await client.query(
-          `INSERT INTO weekly_checkins (user_id, week_start) VALUES ($1, '2026-08-03') ON CONFLICT (user_id, week_start) DO UPDATE SET updated_at = now() RETURNING id`, [u])).rows[0].id
+          `INSERT INTO weekly_checkins (user_id, week_start, applies_week_start) VALUES ($1, '2026-08-03', '2026-08-10') ON CONFLICT (user_id, week_start) DO UPDATE SET updated_at = now() RETURNING id`, [u])).rows[0].id
         await client.query(
           `INSERT INTO weekly_checkin_exercises (user_id, checkin_id, exercise_name, answer, effect) VALUES ($1, $2, 'scope', 'heavy', 'held') ON CONFLICT DO NOTHING`, [u, c])
       }

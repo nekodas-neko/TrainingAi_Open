@@ -26,9 +26,11 @@ const MARK = 'acct-del-2120'
 // A multi-column CHECK the generic values cannot satisfy for a LIVE row (a soft-deleted one is
 // exempt from it, which is why A's soft-deleted seed needs nothing).
 // weekly_checkins (#3890) is not exempt when soft-deleted: the fixture fills the nullable
-// pain_injury_id with the user's own injury (allowed only when pain_raised is true), and its generic
-// date is a Tuesday (week_start must be a Monday).
-const WEEKLY_CHECKIN_OVERRIDE = { weekly_checkins: { pain_raised: true, week_start: '2026-09-14' } }
+// pain_injury_id and swap_change_id with the user's own rows, which its CHECKs allow only once the
+// matching offer is accepted (and pain_raised is true); its generic date is a Tuesday (week_start
+// must be a Monday) and applies_week_start must be week_start + 7. weekly_checkin_exercises gets
+// applied_change_id the same way, which only a lowering or an accepted step up may hold.
+const WEEKLY_CHECKIN_OVERRIDE = { weekly_checkin_exercises: { effect: 'lowered_one_step' }, weekly_checkins: { week_start: '2026-09-14', applies_week_start: '2026-09-21', pain_raised: true, pain_exercise_name: 'Squat', pain_offer_status: 'accepted', swap_exercise_name: 'Squat', swap_offer_status: 'accepted' } }
 const LIVE_OVERRIDES = {
   ...WEEKLY_CHECKIN_OVERRIDE,
   apple_health_samples: {

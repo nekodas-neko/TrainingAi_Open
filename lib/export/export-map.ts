@@ -60,6 +60,7 @@ export const SOFT_DELETED: Record<string, string> = {
   exercise_preferences: 'deleted_at',
   // #3890: a weekly check-in the person removed
   weekly_checkins: 'deleted_at',
+  weekly_checkin_exercises: 'deleted_at',
   plan_meal_answers: 'deleted_at',
   blood_panels: 'deleted_at',
   prescribed_runs: 'deleted_at',

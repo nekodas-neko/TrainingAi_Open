@@ -269,7 +269,7 @@ the code. Do not edit between the markers; CI compares this block with a fresh r
 | `user_dietary_restrictions` | SERVER-ONLY | — | — | exported | cascade | user data, no local mirror; writer: meal-plans.ts |
 | `user_stats` | SERVER-ONLY | — | — | exported | cascade | derived aggregate; writer: none found by static grep (raw SQL / script) |
 | `users` | SERVER-ONLY | — | — | exported | cascade | auth / account; writer: more-content.tsx, goals.ts, adapter.ts, social.ts |
-| `weekly_checkin_exercises` | SERVER-ONLY | — | — | exported | cascade | #3890 one main lift answered in a weekly check-in and what the app did with it; stored, no reader; writer: none until #3890 step 2; removed with its check-in; no device copy yet |
+| `weekly_checkin_exercises` | SERVER-ONLY | — | yes | exported | cascade | #3890 one main lift answered in a weekly check-in and what the app did with it; stored, no reader; writer: none until #3890 step 2; deleted_at tombstone; no device copy yet |
 | `weekly_checkins` | SERVER-ONLY | — | yes | exported | cascade | #3890 one weekly check-in per user and training week (local Monday); stored, no reader; writer: none until #3890 step 2; deleted_at tombstone; no device copy yet |
 | `workout_hr_stats` | SERVER-ONLY | — | — | exported | cascade | derived (server rollup); writer: oura.ts |
 | `workout_sessions` | DEVICE-FIRST | `workout_sessions` | yes | exported | cascade | local write + outbox push + delta pull |

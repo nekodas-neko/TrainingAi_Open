@@ -2595,12 +2595,16 @@ export const exercisePreferences = pgTable('exercise_preferences', {
  * `weekStart` is the local Monday of the week reviewed (a date, not an ISO week number). Stored, no
  * reader and no writer until step 2. Answers that are not about one lift live here; the lift answers
  * are in `weeklyCheckinExercises`. Pain goes to `injuries`, days off to `rest_days` (found by date),
- * so only a flag and an injury id are kept. `deletedAt` is the tombstone for a removed check-in.
+ * so only a flag and an injury id are kept.
+ * Every foreign key here is DEFERRABLE INITIALLY IMMEDIATE in the migration (Drizzle cannot say so):
+ * two SET NULL keys into the account-deletion cascade, as `meal_plan_meals`. `deletedAt` is the tombstone for a removed check-in.
  */
 export const weeklyCheckins = pgTable('weekly_checkins', {
   id:                uuid('id').primaryKey().defaultRandom(),
   userId:            uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   weekStart:         date('week_start', { mode: 'string' }).notNull(),
+  /** Always `weekStart` + 7 (CHECK): the week the "next week" answers are for. */
+  appliesWeekStart:  date('applies_week_start', { mode: 'string' }).notNull(),
   status:            text('status').$type<'offered' | 'saved' | 'dismissed'>().notNull().default('offered'),
   offeredAt:         timestamp('offered_at', { withTimezone: true }).notNull().defaultNow(),
   savedAt:           timestamp('saved_at', { withTimezone: true }),
@@ -2608,19 +2612,41 @@ export const weeklyCheckins = pgTable('weekly_checkins', {
   daysOffWeekdays:   smallint('days_off_weekdays').array(),
   shorterSessionMin: smallint('shorter_session_min'),
   painRaised:        boolean('pain_raised'),
+  painExerciseName:  text('pain_exercise_name'),
+  painExerciseId:    uuid('pain_exercise_id').references(() => exerciseLibrary.id, { onDelete: 'set null' }),
+  /** User text. Any use in a prompt goes through lib/ai/prompt-guards.ts. */
+  painWhere:         text('pain_where'),
+  painOfferStatus:   text('pain_offer_status').$type<'open' | 'accepted' | 'declined'>(),
+  /** Writer must ownership-check: a plain FK cannot say "same user". */
   painInjuryId:      uuid('pain_injury_id').references(() => injuries.id, { onDelete: 'set null' }),
+  swapExerciseName:  text('swap_exercise_name'),
+  swapExerciseId:    uuid('swap_exercise_id').references(() => exerciseLibrary.id, { onDelete: 'set null' }),
+  swapOfferStatus:   text('swap_offer_status').$type<'open' | 'accepted' | 'declined'>(),
+  /** Writer must ownership-check: a plain FK cannot say "same user". */
+  swapChangeId:      uuid('swap_change_id').references(() => coachChanges.id, { onDelete: 'set null' }),
   deletedAt:         timestamp('deleted_at', { withTimezone: true }),
   createdAt:         timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt:         timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, t => [
   unique('weekly_checkins_week_key').on(t.userId, t.weekStart),
+  unique('weekly_checkins_applies_week_key').on(t.userId, t.appliesWeekStart),
   unique('weekly_checkins_id_user_key').on(t.id, t.userId),
   check('weekly_checkins_week_start_check', sql`EXTRACT(ISODOW FROM ${t.weekStart}) = 1`),
+  check('weekly_checkins_applies_week_check', sql`${t.appliesWeekStart} = ${t.weekStart} + 7`),
   check('weekly_checkins_status_check', sql`${t.status} IN ('offered', 'saved', 'dismissed')`),
   check('weekly_checkins_status_times_check', sql`(${t.status} = 'offered' AND ${t.savedAt} IS NULL AND ${t.dismissedAt} IS NULL) OR (${t.status} = 'saved' AND ${t.savedAt} IS NOT NULL AND ${t.dismissedAt} IS NULL) OR (${t.status} = 'dismissed' AND ${t.savedAt} IS NULL AND ${t.dismissedAt} IS NOT NULL)`),
   check('weekly_checkins_days_off_check', sql`${t.daysOffWeekdays} IS NULL OR (${t.daysOffWeekdays} <@ ARRAY[1, 2, 3, 4, 5, 6, 7]::smallint[] AND cardinality(${t.daysOffWeekdays}) <= 7)`),
   check('weekly_checkins_shorter_session_check', sql`${t.shorterSessionMin} IS NULL OR (${t.shorterSessionMin} >= 1 AND ${t.shorterSessionMin} <= 240)`),
-  check('weekly_checkins_pain_injury_check', sql`${t.painInjuryId} IS NULL OR ${t.painRaised} IS TRUE`),
+  check('weekly_checkins_pain_detail_check', sql`${t.painRaised} IS TRUE OR (${t.painExerciseName} IS NULL AND ${t.painExerciseId} IS NULL AND ${t.painWhere} IS NULL AND ${t.painOfferStatus} IS NULL)`),
+  check('weekly_checkins_pain_lift_check', sql`(${t.painExerciseName} IS NULL OR ${t.painExerciseName} <> '') AND (${t.painExerciseId} IS NULL OR ${t.painExerciseName} IS NOT NULL) AND (${t.painWhere} IS NULL OR ${t.painExerciseName} IS NOT NULL)`),
+  check('weekly_checkins_pain_where_check', sql`${t.painWhere} IS NULL OR char_length(${t.painWhere}) BETWEEN 1 AND 200`),
+  check('weekly_checkins_pain_offer_status_check', sql`${t.painOfferStatus} IS NULL OR ${t.painOfferStatus} IN ('open', 'accepted', 'declined')`),
+  check('weekly_checkins_pain_offer_check', sql`(${t.painExerciseName} IS NULL) = (${t.painOfferStatus} IS NULL)`),
+  check('weekly_checkins_pain_injury_check', sql`${t.painInjuryId} IS NULL OR COALESCE(${t.painOfferStatus} = 'accepted', false)`),
+  check('weekly_checkins_swap_lift_check', sql`(${t.swapExerciseName} IS NULL OR ${t.swapExerciseName} <> '') AND (${t.swapExerciseId} IS NULL OR ${t.swapExerciseName} IS NOT NULL)`),
+  check('weekly_checkins_swap_offer_status_check', sql`${t.swapOfferStatus} IS NULL OR ${t.swapOfferStatus} IN ('open', 'accepted', 'declined')`),
+  check('weekly_checkins_swap_offer_check', sql`(${t.swapExerciseName} IS NULL) = (${t.swapOfferStatus} IS NULL)`),
+  check('weekly_checkins_swap_change_check', sql`${t.swapChangeId} IS NULL OR COALESCE(${t.swapOfferStatus} = 'accepted', false)`),
 ])
 
 /**
@@ -2628,7 +2654,7 @@ export const weeklyCheckins = pgTable('weekly_checkins', {
  * whether the engine saw a missed rep that week, and what the app did with the answer. Keyed like
  * `exercisePreferences` and `exerciseEstimates` (user + exercise name, `exerciseId` beside it), scoped
  * by check-in. `userId` is held with a composite foreign key so a row cannot belong to another
- * person's check-in. A swap is a `coach_changes` row; only its id is kept. Stored, no reader and no
+ * person's check-in. What the app wrote is a `coach_changes` row; only its id is kept. Stored, no reader and no
  * writer until step 2.
  */
 export const weeklyCheckinExercises = pgTable('weekly_checkin_exercises', {
@@ -2641,7 +2667,10 @@ export const weeklyCheckinExercises = pgTable('weekly_checkin_exercises', {
   missedRep:    boolean('missed_rep'),
   effect:       text('effect').$type<'held' | 'lowered_one_step' | 'offered_step_up' | 'none'>().notNull(),
   offerStatus:  text('offer_status').$type<'open' | 'accepted' | 'declined'>(),
-  swapChangeId: uuid('swap_change_id').references(() => coachChanges.id, { onDelete: 'set null' }),
+  /** The coach_changes row written for this lift (a lowering, or an accepted step up). The writer
+   *  must ownership-check it: a plain FK cannot say "same user". */
+  appliedChangeId: uuid('applied_change_id').references(() => coachChanges.id, { onDelete: 'set null' }),
+  deletedAt:    timestamp('deleted_at', { withTimezone: true }),
   createdAt:    timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt:    timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, t => [
@@ -2653,4 +2682,5 @@ export const weeklyCheckinExercises = pgTable('weekly_checkin_exercises', {
   check('weekly_checkin_exercises_effect_check', sql`${t.effect} IN ('held', 'lowered_one_step', 'offered_step_up', 'none')`),
   check('weekly_checkin_exercises_offer_status_check', sql`${t.offerStatus} IS NULL OR ${t.offerStatus} IN ('open', 'accepted', 'declined')`),
   check('weekly_checkin_exercises_offer_check', sql`(${t.effect} = 'offered_step_up') = (${t.offerStatus} IS NOT NULL)`),
+  check('weekly_checkin_exercises_applied_check', sql`${t.appliedChangeId} IS NULL OR ${t.effect} = 'lowered_one_step' OR (${t.effect} = 'offered_step_up' AND ${t.offerStatus} = 'accepted')`),
 ])

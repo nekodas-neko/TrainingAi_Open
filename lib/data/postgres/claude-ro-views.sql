@@ -2013,7 +2013,8 @@ SELECT
   t.missed_rep,
   t.effect,
   t.offer_status,
-  t.swap_change_id,
+  t.applied_change_id,
+  t.deleted_at,
   t.created_at,
   t.updated_at
 FROM public.weekly_checkin_exercises t
@@ -2024,6 +2025,7 @@ SELECT
   t.id,
   t.user_id,
   t.week_start,
+  t.applies_week_start,
   t.status,
   t.offered_at,
   t.saved_at,
@@ -2031,7 +2033,15 @@ SELECT
   t.days_off_weekdays,
   t.shorter_session_min,
   t.pain_raised,
+  t.pain_exercise_name,
+  t.pain_exercise_id,
+  t.pain_where,
+  t.pain_offer_status,
   t.pain_injury_id,
+  t.swap_exercise_name,
+  t.swap_exercise_id,
+  t.swap_offer_status,
+  t.swap_change_id,
   t.deleted_at,
   t.created_at,
   t.updated_at
