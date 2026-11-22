@@ -4,7 +4,8 @@
 // changes. Each instant is built from a local wall-clock time with `fromZonedTime`, never `now − N days`.
 import { describe, it, expect } from 'vitest'
 import { fromZonedTime } from 'date-fns-tz'
-import { checkinDue, checkinWeekStart, CHECKIN_SUNDAY_HOUR, weekCompleteWhy, type CheckinWeekInput } from '../due'
+import { checkinDue, checkinWeekStart, CHECKIN_SUNDAY_HOUR, plannedWeekOf, weekCompleteWhy, type CheckinWeekInput } from '../due'
+import type { Program } from '../../types/program'
 
 const at = (local: string, tz: string) => fromZonedTime(local, tz)
 const week = (over: Partial<CheckinWeekInput> = {}): CheckinWeekInput => ({ plannedSessions: 3, plannedWeekdays: null, doneDays: [], ...over })
@@ -85,5 +86,40 @@ describe('daylight-saving changes', () => {
     // A workout on the 25-hour Sunday is that Sunday's, and it is the last planned day.
     expect(due('2026-10-25T09:00:00', tz, week({ plannedWeekdays: [6], doneDays: ['2026-10-25'] })))
       .toEqual({ weekStart: '2026-10-19', why: 'last_planned_day_logged' })
+  })
+})
+
+describe('D1: on the grace Monday, last week\'s unanswered card comes first', () => {
+  const tz = 'Australia/Brisbane'
+  // A one-session program: Monday's workout completes this week on the same Monday.
+  const oneSession = week({ plannedSessions: 1, plannedWeekdays: [0], doneDays: ['2026-11-23'] })
+  it('even when this week is already complete that Monday', () => {
+    expect(due('2026-11-23T19:00:00', tz, oneSession, { lastWeekResolved: false })).toEqual({ weekStart: '2026-11-16', why: 'grace_monday' })
+  })
+  it('this week\'s follows once last week\'s is saved or dismissed', () => {
+    expect(due('2026-11-23T19:00:00', tz, oneSession, { lastWeekResolved: true })).toEqual({ weekStart: '2026-11-23', why: 'planned_count_reached' })
+  })
+  it('or when the grace day has ended', () => {
+    expect(due('2026-11-24T08:00:00', tz, oneSession, { lastWeekResolved: false })).toEqual({ weekStart: '2026-11-23', why: 'planned_count_reached' })
+  })
+})
+
+describe('C3: one planned count for the due rule and the summary', () => {
+  const program = (schedule: Program['schedule']) => ({ schedule }) as Pick<Program, 'schedule'>
+  it('a weekly schedule counts its training days (days with a session), once each', () => {
+    expect(plannedWeekOf(program({ id: 's', programId: 'p', type: 'weekly', days: [
+      { dayOfWeek: 0, sessionId: 'a' }, { dayOfWeek: 2 }, { dayOfWeek: 4, sessionId: 'b' },
+    ] } as Program['schedule']))).toEqual({ count: 2, weekdays: [0, 4] })
+  })
+  it('a rotation counts as the volume budget does; no schedule has no planned count', () => {
+    expect(plannedWeekOf(program({ id: 's', programId: 'p', type: 'rotation', restAfterN: 3 } as Program['schedule']))).toEqual({ count: 5, weekdays: null })
+    expect(plannedWeekOf(program(undefined))).toEqual({ count: null, weekdays: null })
+    expect(plannedWeekOf(program({ id: 's', programId: 'p', type: 'weekly', days: [{ dayOfWeek: 1 }] } as Program['schedule']))).toEqual({ count: null, weekdays: [] })
+  })
+  it('no planned count: due only from Sunday 17:00', () => {
+    const tz = 'Australia/Brisbane'
+    const noPlan = week({ plannedSessions: null, doneDays: ['2026-11-16', '2026-11-17', '2026-11-18', '2026-11-19'] })
+    expect(due('2026-11-21T12:00:00', tz, noPlan)).toEqual({ weekStart: null, why: null })
+    expect(due('2026-11-22T17:00:00', tz, noPlan)).toEqual({ weekStart: '2026-11-16', why: 'sunday_evening' })
   })
 })

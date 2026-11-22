@@ -1,72 +1,100 @@
 /**
- * #3890: the week in three lines, worked out by code. Every number comes from the logs through the
- * session read (`readSession`, #3889), and the text is written here from those numbers. No model is
- * called: a model-written summary from the same numbers is the issue's listed alternative, for later.
+ * #3890: the week in three lines, worked out by code. No model is called: a model-written summary from
+ * the same numbers is the issue's listed alternative, for later.
  *
- *   1. Sessions done against planned.
- *   2. For each main lift, what its latest session read says: going up, steady, holding (and why) or
- *      coming down.
- *   3. Days the weight held for short rest (`hold-rest-more`).
+ * **Every sentence states what the logs show, never what the app did** (review, 22 Nov). The session
+ * read (#3889) is in shadow: no plan reads its verdict, so "held for short rest" or "going up" would claim
+ * an action that did not happen. The lines compare each main lift's last session of the week with what
+ * the app asked for, set by set (`classifySet`, the read's own per-set rule):
  *
+ *   1. Sessions done, and planned when the program has a schedule.
+ *   2. For each main lift logged this week, its last session against the plan: beat it, met it, or fell
+ *      short; or that it was logged and not compared, and why (a deload or baseline week, a session
+ *      changed from the plan, not finished, no bar weight, too few planned sets).
+ *   3. Days a short rest cost reps (a miss the rest before it excuses, by the same rule).
+ *
+ * The read's verdict stays available as a machine field (`shadow`), for later, and is never a sentence.
  * Pure. Lift names are the program's own; no health value is in the text.
  */
-import type { SessionRead } from '../ai-periodization/session-read'
+import {
+  classifySets, isReadableLog, readLog, unexcusedMissAtPlan, type SessionReadLog, type SessionVerdict,
+} from '../ai-periodization/session-read'
 
+/** The shadow read's direction for a lift. A machine field: the summary never says it as fact. */
 export type LiftDirection = 'up' | 'steady' | 'held' | 'down' | 'unknown'
 export type LiftWhy = 'more_load' | 'more_reps' | 'short_rest' | 'heart_rate' | 'felt_hard' | 'missed_reps' | 'logging_slip' | null
 
-/** One read of one main lift this week, with the local day of the workout it judged. */
-export interface WeekLiftRead {
+/** The lift's last session of the week against the plan, from the logged sets. */
+export type LastSessionAgainstPlan = 'beat' | 'met' | 'short' | 'not_compared'
+/** Why a logged session was not compared with the plan. */
+export type NotComparedWhy = 'incomplete' | 'deload' | 'baseline' | 'override' | 'no_weight' | 'too_few_planned_sets'
+
+/** One log of one main lift this week, with the local day of its workout. */
+export interface WeekLiftLog {
   day: string
-  /** Shown only: the session read is in shadow (#3889), so the summary's words come from it but no
-   *  effect does. */
-  read: SessionRead
-  /** A set short of its planned reps in this log, from the logged sets themselves (`logHasMissedRep`),
-   *  NOT from the read: decision 9's lowering acts on it, and an effect must not hang on a shadow verdict. */
-  missedRep: boolean
+  log: SessionReadLog
 }
 
 export interface WeekLiftInput {
   exerciseName: string
   exerciseId: string | null
-  /** Oldest first. */
-  reads: readonly WeekLiftRead[]
+  /** The lift's plate step (`weightStepFor`) and the rep ceiling the read uses for it. */
+  weightStepKg: number
+  repCeiling: number | null
+  /** The lift's logs this week in the active program, oldest first. */
+  logs: readonly WeekLiftLog[]
 }
 
 export interface CheckinLiftSummary {
   exerciseName: string
   exerciseId: string | null
-  /** Readable sessions of the lift this week. */
+  /** Sessions the lift was logged in this week. */
   sessions: number
-  direction: LiftDirection
-  why: LiftWhy
-  /** A set short of its planned reps this week (decision 9's "missed rep"); null with no readable session. */
+  /** Its last session against the plan; null when it was not logged this week. */
+  lastSession: LastSessionAgainstPlan | null
+  notComparedWhy: NotComparedWhy | null
+  /**
+   * Decision 9's missed rep, the one value a save acts on (`unexcusedMissAtPlan` on the lift's last
+   * session of the week): null when the lift was not logged, false when that session was not compared.
+   */
   missedRep: boolean | null
+  /** The session read of that last session. In shadow: kept for later, never stated as something the app did. */
+  shadow: { verdict: SessionVerdict; direction: LiftDirection; why: LiftWhy } | null
 }
 
 export interface CheckinSummary {
   sessionsDone: number
-  sessionsPlanned: number
+  /** Null when the program has no schedule to count from. */
+  sessionsPlanned: number | null
   lifts: CheckinLiftSummary[]
-  /** Distinct local days a main lift's read held the weight for short rest. */
+  /** Distinct local days on which a short rest cost a main lift reps. */
   shortRestDays: number
   /** The three lines, in order. */
   lines: [string, string, string]
 }
 
-/** A logged set short of the reps the app asked for (`set_logs.planned_reps`). A set with no planned
- *  reps (a freeform or extra set) is not a miss. */
-export function logHasMissedRep(sets: readonly { reps: number; plannedReps: number | null }[]): boolean {
-  return sets.some(s => s.plannedReps != null && s.plannedReps > 0 && s.reps < s.plannedReps)
+/** Why a log is not compared with the plan, or null when it is. The read's own filters, in its order. */
+export function notComparedWhy(log: SessionReadLog, weightStepKg: number): NotComparedWhy | null {
+  const s = log.session
+  if (!s.completed) return 'incomplete'
+  if (log.exerciseDeloaded || s.isEarlyDeload || s.intensityMode === 'deload' || s.phaseType === 'deload') return 'deload'
+  if (s.phaseType === 'baseline') return 'baseline'
+  if (s.wasOverride) return 'override'
+  if (log.exerciseType === 'bodyweight' || !((log.estimated1rm ?? 0) > 0)) return 'no_weight'
+  if (!isReadableLog(log)) return 'no_weight'
+  if (readLog(log, weightStepKg).verdict === 'too-little-data') return 'too_few_planned_sets'
+  return null
 }
 
-/** Whether a missed rep was seen in the week's logs of a lift: null when there was no readable log. */
-export function missedRepInWeek(reads: readonly WeekLiftRead[]): boolean | null {
-  if (reads.length === 0) return null
-  return reads.some(r => r.missedRep)
+/** The last session against the plan, set by set: any planned set short is short; else any beaten is beat. */
+export function againstPlan(log: SessionReadLog, weightStepKg: number): Exclude<LastSessionAgainstPlan, 'not_compared'> {
+  const classes = classifySets(log.sets, weightStepKg).map(c => c.result.cls)
+  if (classes.some(c => c === 'miss' || c === 'miss-self-heavier')) return 'short'
+  return classes.includes('beat') ? 'beat' : 'met'
 }
 
-export function directionOf(read: SessionRead | null): { direction: LiftDirection; why: LiftWhy } {
+/** The shadow read's verdict in machine words (formerly the summary's line 2; now a field only). */
+export function directionOf(read: ReturnType<typeof readLog> | null): { direction: LiftDirection; why: LiftWhy } {
   if (!read || read.verdict === 'too-little-data') return { direction: 'unknown', why: null }
   switch (read.verdict) {
     case 'progress-load': return { direction: 'up', why: 'more_load' }
@@ -82,63 +110,86 @@ export function directionOf(read: SessionRead | null): { direction: LiftDirectio
   }
 }
 
-const WHY_TEXT: Record<Exclude<LiftWhy, null>, string> = {
-  more_load: 'more weight',
-  more_reps: 'more reps',
-  short_rest: 'short rest',
-  heart_rate: 'heart rate slow to settle',
-  felt_hard: 'felt hard',
-  missed_reps: 'a rep short',
-  logging_slip: 'likely a logging slip',
+/** One lift's week. */
+export function summarizeLift(l: WeekLiftInput): CheckinLiftSummary & { shortRestDays: string[] } {
+  const base = { exerciseName: l.exerciseName, exerciseId: l.exerciseId, sessions: l.logs.length }
+  const shortRestDays = l.logs
+    .filter(({ log }) => notComparedWhy(log, l.weightStepKg) == null && readLog(log, l.weightStepKg, l.repCeiling).restShort)
+    .map(({ day }) => day)
+  const last = l.logs[l.logs.length - 1]
+  if (!last) return { ...base, lastSession: null, notComparedWhy: null, missedRep: null, shadow: null, shortRestDays }
+  const why = notComparedWhy(last.log, l.weightStepKg)
+  if (why) return { ...base, lastSession: 'not_compared', notComparedWhy: why, missedRep: false, shadow: null, shortRestDays }
+  const read = readLog(last.log, l.weightStepKg, l.repCeiling)
+  return {
+    ...base,
+    lastSession: againstPlan(last.log, l.weightStepKg),
+    notComparedWhy: null,
+    missedRep: unexcusedMissAtPlan(last.log.sets, l.weightStepKg, last.log.session.wasOverride),
+    shadow: { verdict: read.verdict, ...directionOf(read) },
+    shortRestDays,
+  }
 }
 
-function nameList(lifts: CheckinLiftSummary[], withWhy: boolean): string {
-  return lifts.map(l => (withWhy && l.why ? `${l.exerciseName} (${WHY_TEXT[l.why]})` : l.exerciseName)).join(', ')
+const AGAINST_PLAN_TEXT: Record<Exclude<LastSessionAgainstPlan, 'not_compared'>, string> = {
+  beat: 'beat the plan',
+  met: 'met the plan',
+  short: 'fell short of the plan',
+}
+const NOT_COMPARED_TEXT: Record<NotComparedWhy, string> = {
+  incomplete: 'not finished',
+  deload: 'deload',
+  baseline: 'baseline week',
+  override: 'changed from the plan',
+  no_weight: 'no bar weight to compare',
+  too_few_planned_sets: 'too few planned sets',
 }
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
 
+/** Line 1. Never "4 of 3"; with no schedule, no planned count. */
+export function sessionsLine(done: number, planned: number | null): string {
+  if (planned == null || planned <= 0) return `${plural(done, 'session', 'sessions')} done.`
+  if (done > planned) return `${plural(done, 'session', 'sessions')} done, ${planned} planned.`
+  return `${done} of ${plural(planned, 'planned session', 'planned sessions')} done.`
+}
+
 export function summarizeWeek(input: {
   sessionsDone: number
-  sessionsPlanned: number
+  sessionsPlanned: number | null
   lifts: readonly WeekLiftInput[]
 }): CheckinSummary {
-  const shortRestDayset = new Set<string>()
+  const days = new Set<string>()
   const lifts: CheckinLiftSummary[] = input.lifts.map(l => {
-    const latest = [...l.reads].reverse().find(r => r.read.verdict !== 'too-little-data') ?? l.reads[l.reads.length - 1] ?? null
-    for (const r of l.reads) if (r.read.verdict === 'hold-rest-more') shortRestDayset.add(r.day)
-    return {
-      exerciseName: l.exerciseName,
-      exerciseId: l.exerciseId,
-      sessions: l.reads.length,
-      ...directionOf(latest?.read ?? null),
-      missedRep: missedRepInWeek(l.reads),
-    }
+    const { shortRestDays, ...lift } = summarizeLift(l)
+    for (const d of shortRestDays) days.add(d)
+    return lift
   })
 
-  const sessionsLine = input.sessionsPlanned > 0
-    ? `${input.sessionsDone} of ${plural(input.sessionsPlanned, 'planned session', 'planned sessions')} done.`
-    : `${plural(input.sessionsDone, 'session', 'sessions')} done.`
-
-  const group = (d: LiftDirection) => lifts.filter(l => l.direction === d)
+  const compared = lifts.filter(l => l.lastSession && l.lastSession !== 'not_compared')
+  const notCompared = lifts.filter(l => l.lastSession === 'not_compared')
   const parts: string[] = []
-  const up = group('up'); const steady = group('steady'); const held = group('held'); const down = group('down')
-  if (up.length) parts.push(`Going up: ${nameList(up, true)}.`)
-  if (steady.length) parts.push(`On plan: ${nameList(steady, false)}.`)
-  if (held.length) parts.push(`Holding: ${nameList(held, true)}.`)
-  if (down.length) parts.push(`Coming down: ${nameList(down, true)}.`)
+  if (compared.length > 0) {
+    parts.push(`Last session: ${compared.map(l => `${l.exerciseName} ${AGAINST_PLAN_TEXT[l.lastSession as keyof typeof AGAINST_PLAN_TEXT]}`).join(', ')}.`)
+  }
+  if (notCompared.length > 0) {
+    const byWhy = new Map<NotComparedWhy, string[]>()
+    for (const l of notCompared) byWhy.set(l.notComparedWhy!, [...(byWhy.get(l.notComparedWhy!) ?? []), l.exerciseName])
+    parts.push(`Logged, not compared this week: ${[...byWhy].map(([why, names]) => `${names.join(', ')} (${NOT_COMPARED_TEXT[why]})`).join('; ')}.`)
+  }
   const liftsLine = parts.length > 0 ? parts.join(' ') : 'No main lift logged this week.'
 
-  const shortRestDays = shortRestDayset.size
+  const shortRestDays = days.size
+  const anyCompared = input.lifts.some(l => l.logs.some(({ log }) => notComparedWhy(log, l.weightStepKg) == null))
   const restLine = shortRestDays > 0
-    ? `Weight held for short rest on ${plural(shortRestDays, 'day', 'days')}.`
-    : 'No day held for short rest.'
+    ? `Short rest cost reps on ${plural(shortRestDays, 'day', 'days')}.`
+    : anyCompared ? 'Short rest cost no reps.' : 'No set compared for rest this week.'
 
   return {
     sessionsDone: input.sessionsDone,
-    sessionsPlanned: input.sessionsPlanned,
+    sessionsPlanned: input.sessionsPlanned != null && input.sessionsPlanned > 0 ? input.sessionsPlanned : null,
     lifts,
     shortRestDays,
-    lines: [sessionsLine, liftsLine, restLine],
+    lines: [sessionsLine(input.sessionsDone, input.sessionsPlanned), liftsLine, restLine],
   }
 }

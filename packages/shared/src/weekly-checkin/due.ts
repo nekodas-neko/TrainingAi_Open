@@ -13,6 +13,8 @@
  */
 import { formatInTimeZone } from 'date-fns-tz'
 import { daysBetweenDateStrs, shiftDateStr, weekStartForDay } from '../date-utils'
+import { getScheduledSessionsPerWeek } from '../schedule-utils'
+import type { Program } from '../types/program'
 
 /** Sunday, the last day of the app's week, as a 0-based index from Monday. */
 const SUNDAY_INDEX = 6
@@ -22,8 +24,8 @@ export const CHECKIN_SUNDAY_HOUR = 17
 export type CheckinDueWhy = 'planned_count_reached' | 'last_planned_day_logged' | 'sunday_evening' | 'grace_monday'
 
 export interface CheckinWeekInput {
-  /** Sessions the week plans (`getScheduledSessionsPerWeek`); 0 or less turns the count rule off. */
-  plannedSessions: number
+  /** Sessions the week plans (`plannedWeekOf`); null, 0 or less turns the count rule off. */
+  plannedSessions: number | null
   /** Training days of a weekly schedule, 0 = Monday … 6 = Sunday (`ScheduleDay.dayOfWeek`); null for
    *  a rotation or no schedule. */
   plannedWeekdays: readonly number[] | null
@@ -63,7 +65,7 @@ export function weekCompleteWhy(weekStart: string, week: CheckinWeekInput): Chec
     const i = daysBetweenDateStrs(weekStart, d)
     return i >= 0 && i <= SUNDAY_INDEX
   })
-  if (week.plannedSessions > 0 && inWeek.length >= week.plannedSessions) return 'planned_count_reached'
+  if (week.plannedSessions != null && week.plannedSessions > 0 && inWeek.length >= week.plannedSessions) return 'planned_count_reached'
   const planned = (week.plannedWeekdays ?? []).filter(d => Number.isInteger(d) && d >= 0 && d <= SUNDAY_INDEX)
   if (planned.length > 0) {
     const last = Math.max(...planned)
@@ -77,13 +79,31 @@ export function checkinDue(input: CheckinDueInput): CheckinDue {
   const weekStart = weekStartForDay(today)
   const dayIndex = daysBetweenDateStrs(weekStart, today)
 
+  // Monday: last week's card comes first while it was never saved or dismissed, even when this week is
+  // already complete that Monday (a one-session program, or Monday is the last training day). Its
+  // Sunday 17:00 has passed by definition, so no session count is needed. This week's card follows once
+  // last week's is resolved, or on Tuesday when the grace day has ended.
+  if (dayIndex === 0 && !input.lastWeekResolved) return { weekStart: shiftDateStr(weekStart, -7), why: 'grace_monday' }
   if (!input.thisWeekResolved) {
     const why = weekCompleteWhy(weekStart, input.thisWeek)
     if (why) return { weekStart, why }
     if (dayIndex === SUNDAY_INDEX && hour >= CHECKIN_SUNDAY_HOUR) return { weekStart, why: 'sunday_evening' }
   }
-  // Monday: last week's card is still open if it was never saved or dismissed. Its Sunday 17:00 has
-  // passed by definition, so no session count is needed.
-  if (dayIndex === 0 && !input.lastWeekResolved) return { weekStart: shiftDateStr(weekStart, -7), why: 'grace_monday' }
   return { weekStart: null, why: null }
+}
+
+/**
+ * The week a program plans, counted once for the due rule and the summary alike (review, 22 Nov): a
+ * weekly schedule's training days (days with a session), a rotation's sessions per week, and nothing
+ * for a program with no schedule, which then has no planned count rather than a default of 3.
+ */
+export function plannedWeekOf(program: Pick<Program, 'schedule'>): { count: number | null; weekdays: number[] | null } {
+  const schedule = program.schedule
+  if (schedule?.type === 'weekly') {
+    const weekdays = [...new Set((schedule.days ?? []).filter(d => d.sessionId != null).map(d => d.dayOfWeek))]
+    return { count: weekdays.length > 0 ? weekdays.length : null, weekdays }
+  }
+  // A rotation's count is `getScheduledSessionsPerWeek`'s, the one the volume budget divides by.
+  if (schedule?.type === 'rotation' && schedule.restAfterN) return { count: getScheduledSessionsPerWeek(program as Program), weekdays: null }
+  return { count: null, weekdays: null }
 }

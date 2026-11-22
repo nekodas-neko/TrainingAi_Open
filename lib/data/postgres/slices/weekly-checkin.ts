@@ -6,6 +6,7 @@
 import { and, eq, isNull, sql } from 'drizzle-orm'
 import type { getDb } from '../client'
 import * as s from '../schema'
+import { voidSessionPrescription } from './periodization'
 
 type Db = ReturnType<typeof getDb>
 
@@ -108,16 +109,45 @@ export async function listProgramLifts(
   }))
 }
 
-/** The local dates of the user's completed workouts that started in `[from, to)`, one per workout. */
-export async function completedWorkoutDays(db: Db, userId: string, from: Date, to: Date, tz: string): Promise<string[]> {
+/**
+ * The local dates of the user's completed workouts of `programId`'s sessions that started in `[from, to)`,
+ * one per workout. An ad-hoc workout or one of another program is not one of the week's planned
+ * sessions, so it neither opens the card early nor counts toward "x of y planned" (review, 22 Nov).
+ */
+export async function completedWorkoutDays(db: Db, userId: string, programId: string, from: Date, to: Date, tz: string): Promise<string[]> {
   const res = await db.execute(sql`
-    SELECT to_char(started_at AT TIME ZONE ${tz}, 'YYYY-MM-DD') AS day
-      FROM workout_sessions
-     WHERE user_id = ${userId} AND deleted_at IS NULL AND completed_at IS NOT NULL
-       AND started_at >= ${from.toISOString()}::timestamptz AND started_at < ${to.toISOString()}::timestamptz
-     ORDER BY started_at
+    SELECT to_char(ws.started_at AT TIME ZONE ${tz}, 'YYYY-MM-DD') AS day
+      FROM workout_sessions ws
+      JOIN program_sessions ps ON ps.id = ws.session_id AND ps.program_id = ${programId}::uuid
+      JOIN programs p ON p.id = ps.program_id AND p.user_id = ${userId}
+     WHERE ws.user_id = ${userId} AND ws.deleted_at IS NULL AND ws.completed_at IS NOT NULL
+       AND ws.started_at >= ${from.toISOString()}::timestamptz AND ws.started_at < ${to.toISOString()}::timestamptz
+     ORDER BY ws.started_at
   `)
   return (res.rows as { day: string }[]).map(r => r.day)
+}
+
+/**
+ * #3890 D2: the active program's sessions whose stored plan could still be served on or after `from`
+ * (the applies-to week's local midnight): a plan not yet trained (`pending`, `auto_applied`) whose expiry
+ * is later than that. A plan is generated when the previous session completes and is served for up to 7
+ * days, so without this the first sessions of the week keep the length they were made with. Voided with
+ * the Coach's own `voidSessionPrescription`, so the next read regenerates (no model call here). An
+ * `accepted` plan is the one the person is about to train, and is left alone, as a preset re-fit leaves it.
+ */
+export async function voidPlansServedFrom(db: Db, userId: string, from: Date): Promise<string[]> {
+  const res = await db.execute(sql`
+    SELECT sp.program_session_id AS id
+      FROM session_periodization sp
+      JOIN program_sessions ps ON ps.id = sp.program_session_id AND ps.deleted_at IS NULL
+      JOIN programs p ON p.id = ps.program_id AND p.user_id = ${userId} AND p.is_active = true
+     WHERE sp.user_id = ${userId} AND sp.prescription IS NOT NULL
+       AND sp.prescription_status IN ('pending', 'auto_applied')
+       AND (sp.prescription_expires_at IS NULL OR sp.prescription_expires_at > ${from.toISOString()}::timestamptz)
+  `)
+  const ids = (res.rows as { id: string }[]).map(r => r.id)
+  for (const id of ids) await voidSessionPrescription(db, userId, id)
+  return ids
 }
 
 export type CheckinRow = typeof s.weeklyCheckins.$inferSelect

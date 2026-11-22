@@ -2,7 +2,9 @@
  * #3890: what each weekly check-in answer does. One rule per answer, here and nowhere else
  * (decisions 8 and 9, the issue's "What the answers do" table):
  *
- *   Heavy                        → held: the lift is held next week, by itself.
+ *   Heavy                        → held: recorded by itself, and fed to the session read (in shadow).
+ *                                  NOT yet enforced by the plan (`CHECKIN_HOLD_LIVE`): no text may say
+ *                                  the weight "is held" until it is; "noted" until then.
  *   Heavy, and a missed rep      → lowered_one_step: one plate lighter next time, by itself, written
  *                                  through the Coach's lift-preference writer (`nextLoadStep: lighter`,
  *                                  the existing one-plate step), with a `coach_changes` row and undo.
@@ -18,6 +20,14 @@ import { daysBetweenDateStrs, shiftDateStr } from '../date-utils'
 import type { SessionRead } from '../ai-periodization/session-read'
 
 export const CHECKIN_ANSWERS = ['heavy', 'about_right', 'light'] as const
+
+/**
+ * Whether a `held` lift's hold is enforced by the live plan. False in #3890 step 2: the hold is recorded
+ * on the check-in row and feeds the shadow session read only, while the plan can still add load. The
+ * follow-up PR that makes it live (no heavier than last session's bar, in the per-lift preference reader,
+ * from `listCheckinHeldLifts`) flips this, and with it what the card may say.
+ */
+export const CHECKIN_HOLD_LIVE = false
 export type CheckinAnswer = (typeof CHECKIN_ANSWERS)[number]
 export type CheckinEffect = 'held' | 'lowered_one_step' | 'offered_step_up' | 'none'
 

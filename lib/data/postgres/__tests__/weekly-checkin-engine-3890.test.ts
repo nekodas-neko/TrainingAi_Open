@@ -40,6 +40,9 @@ describe.skipIf(!canRun)('weekly check-in engine (#3890 step 2)', () => {
     const program = (await pool.query(
       `INSERT INTO programs (user_id, name, phase_mode, is_active, training_goal, created_at) VALUES ($1,'Checkin test','ai_dynamic',true,'strength', now() - interval '90 days') RETURNING id`, [user])).rows[0].id
     const session = (await pool.query(`INSERT INTO program_sessions (program_id, name, position) VALUES ($1,'Day 3890',0) RETURNING id`, [program])).rows[0].id
+    // A weekly schedule, Monday to Wednesday: three planned sessions.
+    const schedule = (await pool.query(`INSERT INTO schedules (program_id, type) VALUES ($1,'weekly') RETURNING id`, [program])).rows[0].id
+    for (const day of [0, 1, 2]) await pool.query(`INSERT INTO schedule_days (schedule_id, day_of_week, session_id) VALUES ($1,$2,$3)`, [schedule, day, session])
     const ex = async (name: string, pos: number, role: string, muscles: string[]) =>
       (await pool.query(`INSERT INTO session_exercises (session_id, exercise_name, exercise_id, position, exercise_role, muscle_groups) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
         [session, name, ids[`lib:${name}`] ?? null, pos, role, muscles])).rows[0].id as string
@@ -58,7 +61,8 @@ describe.skipIf(!canRun)('weekly check-in engine (#3890 step 2)', () => {
           `INSERT INTO exercise_logs (workout_session_id, exercise_name, exercise_id, estimated_1rm, logged_at) VALUES ($1,$2,$3,100,$4) RETURNING id`,
           [ws, name, ids[`lib:${name}`], local(d, 12.5)])).rows[0].id
         for (let n = 1; n <= 3; n++) {
-          const miss = withMiss && name === SQ && d === 0 && n === 2
+          // The miss is in the lift's LAST session of the week: decision 9 reads that one.
+          const miss = withMiss && name === SQ && d === 2 && n === 2
           await pool.query(
             `INSERT INTO set_logs (exercise_log_id, set_number, weight_kg, reps, planned_reps, planned_weight_kg, planned_pct, rest_time_sec, planned_rest_sec)
              VALUES ($1,$2,80,$3,5,80,75,150,150)`, [el, n, miss ? 3 : 5])
@@ -114,9 +118,12 @@ describe.skipIf(!canRun)('weekly check-in engine (#3890 step 2)', () => {
     expect(before.due).toBe(false) // two of three done
     const state = await engine.readCheckinState(ctxFor(A))
     expect(state).toMatchObject({ due: true, why: 'planned_count_reached', weekStart: W0 })
-    expect(state.lifts.map(l => [l.exerciseName, l.missedRep])).toEqual([[SQ, true], [BP, false]])
-    expect(state.summary!.lines[0]).toBe('3 of 3 planned sessions done.')
-    expect(state.summary!.lines[1]).toContain(SQ)
+    expect(state.lifts.map(l => [l.exerciseName, l.missedRep, l.lastSession])).toEqual([[SQ, true, 'short'], [BP, false, 'met']])
+    expect(state.summary!.lines).toEqual([
+      '3 of 3 planned sessions done.',
+      `Last session: ${SQ} fell short of the plan, ${BP} met the plan.`,
+      'Short rest cost no reps.',
+    ])
     expect(state.checkin).toMatchObject({ status: 'offered', weekStart: W0, appliesWeekStart: APPLIES })
     // Reading again does not create a second row.
     await engine.readCheckinState(ctxFor(A))
@@ -182,10 +189,10 @@ describe.skipIf(!canRun)('weekly check-in engine (#3890 step 2)', () => {
       .rejects.toMatchObject({ status: 409, code: 'cannot_undo' })
   })
 
-  it('undo of the lowering restores the preference exactly', async () => {
+  it('undo of the lowering restores the preference exactly, and leaves the Heavy answer\'s hold (noted)', async () => {
     const { state } = await fullSave()
     const after = await engine.undoCheckinEffect(ctxFor(A), state.checkin!.id, { kind: 'lift', liftId: liftOf(state, SQ).liftId })
-    expect(liftOf(after, SQ)).toMatchObject({ effect: 'none', appliedChangeId: null })
+    expect(liftOf(after, SQ)).toMatchObject({ effect: 'held', appliedChangeId: null, holdLive: false })
     expect(await pref(SQ)).toMatchObject({ next_load_step: null })
     expect((await coachChanges())[0].undone_at).not.toBeNull()
   })
@@ -294,6 +301,173 @@ describe.skipIf(!canRun)('weekly check-in engine (#3890 step 2)', () => {
     expect((await coachChanges()).filter(c => !c.undone_at)).toHaveLength(1)
     expect(await coachChanges(B)).toEqual([]) // B's heavy had no miss: a hold
     expect(await count(`SELECT count(*) n FROM injuries WHERE user_id = ANY($1)`, [[A, B]])).toBe(0)
+  })
+
+  // ── After review (22 Nov) ──
+
+  const setSqMiss = (sql: string) => pool.query(
+    `UPDATE set_logs SET ${sql} WHERE set_number = 2 AND exercise_log_id IN (
+       SELECT el.id FROM exercise_logs el JOIN workout_sessions ws ON ws.id = el.workout_session_id
+        WHERE ws.user_id = $1 AND el.exercise_name = $2 AND el.logged_at = $3)`, [A, SQ, local(2, 12.5)])
+  const heavyOnly = { lifts: [{ sessionExerciseId: ids['a:sq'] ?? '', answer: 'heavy' as const }], pain: null, swap: null, daysOff: null, shorterSessionMin: null }
+  const heavySq = () => fullSave({ ...heavyOnly, lifts: [{ sessionExerciseId: ids['a:sq'], answer: 'heavy' }] })
+
+  it('B1: a miss loaded heavier than planned is not a missed rep; GET and the save agree, and Heavy is held', async () => {
+    await setSqMiss('weight_kg = 82.5')
+    const state = await engine.readCheckinState(ctxFor(A))
+    expect(state.lifts.find(l => l.exerciseName === SQ)!.missedRep).toBe(false)
+    const { state: saved } = await heavySq()
+    expect(liftOf(saved, SQ)).toMatchObject({ missedRep: false, effect: 'held', holdLive: false })
+    expect(await coachChanges()).toEqual([])
+  })
+
+  it('B1: a miss after a short rest is excused, so Heavy is held', async () => {
+    await pool.query(
+      `UPDATE set_logs SET rest_time_sec = 30 WHERE set_number = 1 AND exercise_log_id IN (
+         SELECT el.id FROM exercise_logs el JOIN workout_sessions ws ON ws.id = el.workout_session_id
+          WHERE ws.user_id = $1 AND el.exercise_name = $2 AND el.logged_at = $3)`, [A, SQ, local(2, 12.5)])
+    const state = await engine.readCheckinState(ctxFor(A))
+    expect(state.lifts.find(l => l.exerciseName === SQ)!.missedRep).toBe(false)
+    expect(state.summary!.lines[2]).toBe('Short rest cost reps on 1 day.')
+    expect(liftOf((await heavySq()).state, SQ)).toMatchObject({ effect: 'held' })
+  })
+
+  it('B1: an overridden last session is not compared; GET says why, and Heavy is held', async () => {
+    await pool.query(`UPDATE workout_sessions SET was_override = true WHERE user_id = $1 AND started_at = $2`, [A, local(2, 12)])
+    const state = await engine.readCheckinState(ctxFor(A))
+    expect(state.lifts.map(l => [l.exerciseName, l.missedRep, l.lastSession])).toEqual([[SQ, false, 'not_compared'], [BP, false, 'not_compared']])
+    expect(state.summary!.lines[1]).toBe(`Logged, not compared this week: ${SQ}, ${BP} (changed from the plan).`)
+    expect(liftOf((await heavySq()).state, SQ)).toMatchObject({ missedRep: false, effect: 'held' })
+  })
+
+  it('B1: the missed rep stored by the save is the one GET showed (included case)', async () => {
+    const state = await engine.readCheckinState(ctxFor(A))
+    const { state: saved } = await heavySq()
+    expect(liftOf(saved, SQ).missedRep).toBe(state.lifts.find(l => l.exerciseName === SQ)!.missedRep)
+    expect(liftOf(saved, SQ)).toMatchObject({ missedRep: true, effect: 'lowered_one_step' })
+  })
+
+  it('B2: a lowering the person undid is not re-applied by saving the same answers; changing the answer away and back is the way', async () => {
+    const first = await heavySq()
+    const liftId = liftOf(first.state, SQ).liftId
+    await engine.undoCheckinEffect(ctxFor(A), first.state.checkin!.id, { kind: 'lift', liftId })
+    const again = await heavySq()
+    expect(liftOf(again.state, SQ)).toMatchObject({ effect: 'held', appliedChangeId: null })
+    expect(again.notApplied).toEqual([expect.objectContaining({ exerciseName: SQ, reason: 'undone' })])
+    expect((await coachChanges()).filter(c => !c.undone_at)).toHaveLength(0)
+    expect(await pref(SQ)).toMatchObject({ next_load_step: null })
+    // And once more: still not.
+    expect((await heavySq()).notApplied.map(n => n.reason)).toEqual(['undone'])
+    // Undoing the hold too: the same answer again does not bring the hold back either.
+    await engine.undoCheckinEffect(ctxFor(A), first.state.checkin!.id, { kind: 'lift', liftId })
+    expect(liftOf((await heavySq()).state, SQ)).toMatchObject({ effect: 'none' })
+    // The explicit path: change the answer away, then back.
+    await fullSave({ ...heavyOnly, lifts: [{ sessionExerciseId: ids['a:sq'], answer: 'about_right' }] })
+    const back = await heavySq()
+    expect(liftOf(back.state, SQ)).toMatchObject({ effect: 'lowered_one_step' })
+    expect(back.notApplied).toEqual([])
+    expect((await coachChanges()).filter(c => !c.undone_at)).toHaveLength(1)
+  })
+
+  it('B2: a lowering undone from the Coach\'s history is not re-applied either', async () => {
+    const first = await heavySq()
+    const { undoCoachChange } = await import('@/lib/coach/apply')
+    expect(await undoCoachChange(ctxFor(A).db, A, liftOf(first.state, SQ).appliedChangeId!)).toMatchObject({ ok: true })
+    const again = await heavySq()
+    expect(again.notApplied.map(n => n.reason)).toEqual(['undone'])
+    expect((await coachChanges()).filter(c => !c.undone_at)).toHaveLength(0)
+  })
+
+  it('B2: a step up the person undid is an open offer again; a redo writes nothing, and only a tap re-applies it', async () => {
+    const light = () => fullSave({ ...heavyOnly, lifts: [{ sessionExerciseId: ids['a:bp'], answer: 'light' }] })
+    const { state } = await light()
+    const liftId = liftOf(state, BP).liftId
+    await engine.resolveOffer(ctxFor(A), state.checkin!.id, { kind: 'step_up', liftId }, 'accept')
+    await engine.undoCheckinEffect(ctxFor(A), state.checkin!.id, { kind: 'lift', liftId })
+    const redo = await light()
+    expect(liftOf(redo.state, BP)).toMatchObject({ offerStatus: 'open', appliedChangeId: null })
+    expect((await coachChanges()).filter(c => !c.undone_at)).toHaveLength(0)
+    expect(await pref(BP)).toMatchObject({ next_load_step: null })
+    await engine.resolveOffer(ctxFor(A), state.checkin!.id, { kind: 'step_up', liftId }, 'accept')
+    expect(await pref(BP)).toMatchObject({ next_load_step: 'heavier' })
+  })
+
+  it('C4: a held lift says its hold is not live yet', async () => {
+    const { state } = await fullSave({ ...heavyOnly, lifts: [{ sessionExerciseId: ids['a:bp'], answer: 'heavy' }] })
+    expect(liftOf(state, BP)).toMatchObject({ effect: 'held', holdLive: false })
+    expect(JSON.stringify(state)).not.toMatch(/is held|weight held|holding/i)
+  })
+
+  it('C3: an ad-hoc workout and one of another program do not count toward the week', async () => {
+    await pool.query(`INSERT INTO workout_sessions (user_id, session_name, started_at, completed_at) VALUES ($1,'Ad hoc',$2,$3)`, [A, local(1, 15), local(1, 16)])
+    // Two of the program's three sessions by Tuesday evening: the ad-hoc one is not a third, so the card
+    // does not open early (it did when every completed workout counted).
+    expect((await engine.readCheckinState(ctxFor(A, local(1, 18)))).due).toBe(false)
+    expect((await engine.readCheckinState(ctxFor(A))).summary!.lines[0]).toBe('3 of 3 planned sessions done.')
+  })
+
+  it('D2: a stored plan that would be served in the applies-to week is voided at save and again at undo; others are left', async () => {
+    const appliesMidnight = dateStrMidnightInTz(APPLIES, TZ)
+    const plan = { phase: 'accumulation', exercises: [], reasoning: 'stored before the save' }
+    const store = (status: string, expires: Date) => pool.query(
+      `INSERT INTO session_periodization (user_id, program_session_id, phase, prescription, prescription_status, prescription_generated_at, prescription_expires_at)
+       VALUES ($1,$2,'accumulation',$3::jsonb,$4,now(),$5)
+       ON CONFLICT (user_id, program_session_id) DO UPDATE SET prescription = EXCLUDED.prescription,
+         prescription_status = EXCLUDED.prescription_status, prescription_expires_at = EXCLUDED.prescription_expires_at`,
+      [A, ids['a:session'], JSON.stringify(plan), status, expires])
+    const stored = async () => (await pool.query(
+      `SELECT prescription IS NOT NULL AS has, prescription_status AS st FROM session_periodization WHERE user_id = $1 AND program_session_id = $2`, [A, ids['a:session']])).rows[0]
+    const inWeek = new Date(appliesMidnight.getTime() + 36 * 3_600_000)
+
+    // A plan made before the save, served into the applies-to week: voided, so the next read regenerates
+    // it, and the read the generation takes its budget from now answers 40 for that week.
+    await store('pending', inWeek)
+    await fullSave({ shorterSessionMin: 40 })
+    expect(await stored()).toEqual({ has: false, st: 'consumed' })
+    expect(await slice.getCheckinSessionBudgetMin(ctxFor(A).db, A, APPLIES)).toBe(40)
+
+    // A redo with the same budget voids nothing (the plan regenerated with 40 stays).
+    await store('pending', inWeek)
+    const { state } = await fullSave({ shorterSessionMin: 40 })
+    expect(await stored()).toEqual({ has: true, st: 'pending' })
+
+    // Undo: that plan, made with the shorter budget, is voided too, and the budget read is null again.
+    await engine.undoCheckinEffect(ctxFor(A), state.checkin!.id, { kind: 'shorter_session' })
+    expect(await stored()).toEqual({ has: false, st: 'consumed' })
+    expect(await slice.getCheckinSessionBudgetMin(ctxFor(A).db, A, APPLIES)).toBeNull()
+
+    // Not touched: a plan that expires before the week starts, and one the person accepted.
+    await store('pending', new Date(appliesMidnight.getTime() - 3_600_000))
+    await fullSave({ shorterSessionMin: 45 })
+    expect(await stored()).toEqual({ has: true, st: 'pending' })
+    await store('accepted', inWeek)
+    await fullSave({ shorterSessionMin: 50 })
+    expect(await stored()).toEqual({ has: true, st: 'accepted' })
+  })
+
+  it('E1: after an accepted swap, re-saving the same answers is not refused, keeps the swap, the injury and the step up', async () => {
+    const { state } = await fullSave()
+    const bpLift = liftOf(state, BP).liftId
+    await engine.resolveOffer(ctxFor(A), state.checkin!.id, { kind: 'step_up', liftId: bpLift }, 'accept')
+    await engine.resolveOffer(ctxFor(A), state.checkin!.id, { kind: 'swap', toExerciseId: ids[`lib:${ALT}`] }, 'accept')
+    await engine.resolveOffer(ctxFor(A), state.checkin!.id, { kind: 'pain' }, 'accept')
+    const liveBefore = (await coachChanges()).filter(c => !c.undone_at).map(c => c.id).sort()
+    expect(liveBefore).toHaveLength(4) // lowering, step up, swap, injury
+
+    // The card now lists the swapped-in lift for that slot; the person sends the same slot ids again.
+    const redo = await fullSave()
+    expect(redo.kept).toEqual([])
+    expect((await pool.query(`SELECT exercise_name FROM session_exercises WHERE id = $1`, [ids['a:bp']])).rows[0].exercise_name).toBe(ALT)
+    expect(redo.state.checkin!.offers.map(o => [o.kind, o.status])).toEqual([['step_up', 'accepted'], ['pain', 'accepted'], ['swap', 'accepted']])
+    expect(redo.state.checkin!.swap).toEqual({ exerciseName: BP, exerciseId: ids[`lib:${BP}`] })
+    expect(redo.state.checkin!.pain).toMatchObject({ exerciseName: BP })
+    // The press's row carried on through the swapped slot: same row, its step up still live, no new row.
+    expect(liftOf(redo.state, BP)).toMatchObject({ liftId: bpLift, offerStatus: 'accepted' })
+    expect(redo.state.checkin!.lifts.map(l => l.exerciseName).sort()).toEqual([BP, SQ].sort())
+    expect((await coachChanges()).filter(c => !c.undone_at).map(c => c.id).sort()).toEqual(liveBefore)
+    expect(await pref(BP)).toMatchObject({ next_load_step: 'heavier' })
+    // A different slot for the swap is still refused until it is undone.
+    await expect(fullSave({ swap: { sessionExerciseId: ids['a:sq'] } })).rejects.toMatchObject({ status: 409, code: 'undo_first' })
   })
 
   it('identity: a person with no check-in rows holds nothing and keeps every session length', async () => {
