@@ -146,6 +146,17 @@ describe('the buttons (#3896 steps 6-7)', () => {
     expect(streamed.calls).toHaveLength(0)
   })
 
+  // Second review: the app keeps the intent until the person types or taps another button, so an
+  // earlier choice list reopened and answered arrives as a tool-result request still carrying it.
+  it('a tool-result request that still carries "Why this weight?" goes to the model, not the code reply', async () => {
+    whyThisWeightFor.mockResolvedValue('should not be used')
+    const res = await post({ messages: SWAP_CONTINUATION, context: lift, patchDomains: DOMAINS, intent: 'lift_why_weight' })
+    expect(res.status).toBe(200)
+    expect(whyThisWeightFor).not.toHaveBeenCalled()
+    expect(streamed.calls).toHaveLength(1)
+    expect(streamed.calls[0].system).not.toContain('## The button the user tapped')
+  })
+
   it('"Why this weight?" for a slot that is not the user\'s is a 404 with no model call', async () => {
     whyThisWeightFor.mockResolvedValue(null)
     expect((await post({ context: lift, patchDomains: DOMAINS, intent: 'lift_why_weight' })).status).toBe(404)

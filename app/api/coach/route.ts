@@ -316,11 +316,18 @@ export async function POST(req: Request) {
     // call, so every number in the answer is one the app worked out (no model-reported number is shown
     // as fact). The intent gate above has already required a lift context, and the context was just
     // checked as the user's; `whyThisWeightFor` checks the slot again before it reads by it.
-    if (intent === 'lift_why_weight' && parsed.data.context?.sessionExerciseId) {
+    // Only the button's own turn is answered this way. The app keeps sending the intent until the
+    // person types or taps another button, so a tool-result request that follows (an earlier choice
+    // list reopened and answered) can still carry it: that request is a continuation for the model,
+    // and answering it with the "why" text again would swallow the person's pick. There the stale
+    // intent is dropped instead.
+    const buttonTurn = (parsed.data.messages.at(-1) as { role?: unknown } | undefined)?.role === 'user'
+    if (intent === 'lift_why_weight' && buttonTurn && parsed.data.context?.sessionExerciseId) {
       const text = await whyThisWeightFor(getDb(), repo, userId, parsed.data.context.sessionExerciseId, tz, todayIso)
       if (text === null) return NextResponse.json({ error: 'Not found' }, { status: 404 })
       return codeReply(text)
     }
+    const modelIntent = intent === 'lift_why_weight' ? undefined : intent
 
     const modelMessages = await convertToModelMessages(
       resolveDanglingWidgetCalls(parsed.data.messages as UIMessage[]),
@@ -334,7 +341,7 @@ export async function POST(req: Request) {
       scope.systemSection,
       injuryLine,
       contextBlock,
-      intent ? intentBlock(intent) : '',
+      modelIntent ? intentBlock(modelIntent) : '',
     ].filter(Boolean).join('\n\n')
 
     const result = loggedStreamText(
