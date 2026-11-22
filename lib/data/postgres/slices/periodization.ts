@@ -873,6 +873,43 @@ export async function getSetLogsForSessions(db: Db, workoutSessionIds: string[])
     .where(and(inArray(s.exerciseLogs.workoutSessionId, workoutSessionIds), isNull(s.setLogs.deletedAt), isNull(s.exerciseLogs.deletedAt)))
 }
 
+/**
+ * #4061: for each lift (keyed by the name passed), the "How did it feel?" answer on its latest log
+ * among these workout sessions: the newest session, then the newest log in it. A log belongs to a
+ * lift by the `exercise_preferences` rule: the library id of the lift's name first; by name only when
+ * the log carries no id, or the same one (a log renamed away to another library lift is not this one).
+ * Owner-scoped through `workout_sessions.user_id`; deleted rows are skipped. A lift with no log is absent.
+ */
+export async function getLatestExerciseEfforts(
+  db: Db, userId: string, workoutSessionIds: string[], exerciseNames: string[],
+): Promise<Map<string, { vsPlan: number | null; source: string | null }>> {
+  const out = new Map<string, { vsPlan: number | null; source: string | null }>()
+  if (workoutSessionIds.length === 0 || exerciseNames.length === 0) return out
+  const list = (xs: string[]) => sql`${sql.raw('ARRAY[')}${sql.join(xs.map(x => sql`${x}`), sql`, `)}${sql.raw(']::text[]')}`
+  const res = await db.execute(sql`
+    WITH lifts AS (
+      SELECT n.name AS lift, l.id AS lib_id
+      FROM unnest(${list(exerciseNames)}) AS n(name)
+      LEFT JOIN exercise_library l ON l.name = n.name -- unique
+    )
+    SELECT DISTINCT ON (lifts.lift) lifts.lift, el.effort_vs_plan, el.effort_source
+      FROM lifts
+      JOIN exercise_logs el
+        ON el.deleted_at IS NULL
+       AND el.workout_session_id::text = ANY(${list(workoutSessionIds)})
+       AND (
+         (lifts.lib_id IS NOT NULL AND el.exercise_id = lifts.lib_id)
+         OR (el.exercise_name = lifts.lift AND (el.exercise_id IS NULL OR lifts.lib_id IS NULL OR el.exercise_id = lifts.lib_id))
+       )
+      JOIN workout_sessions ws ON ws.id = el.workout_session_id AND ws.user_id = ${userId} AND ws.deleted_at IS NULL
+     ORDER BY lifts.lift, ws.started_at DESC, el.logged_at DESC, el.id DESC
+  `)
+  for (const r of res.rows as Array<{ lift: string; effort_vs_plan: number | null; effort_source: string | null }>) {
+    out.set(r.lift, { vsPlan: r.effort_vs_plan == null ? null : Number(r.effort_vs_plan), source: r.effort_source })
+  }
+  return out
+}
+
 export async function getSetTimingRows(db: Db, userId: string, exerciseNames: string[]): Promise<TimingRow[]> {
   if (exerciseNames.length === 0) return []
   const [userRow] = await db.select({ timingBaselineDate: s.users.timingBaselineDate }).from(s.users).where(eq(s.users.id, userId)).limit(1)

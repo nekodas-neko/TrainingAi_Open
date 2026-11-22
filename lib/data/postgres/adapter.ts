@@ -8729,6 +8729,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async wasProgramSessionTrainedSince(userId: string, programSessionId: string, since: Date) { return period.wasProgramSessionTrainedSince(this.db, userId, programSessionId, since) }
   async getRecentSessionsOfType(userId: string, programSessionId: string, limit: number) { return period.getRecentSessionsOfType(this.db, userId, programSessionId, limit) }
   async getSetLogsForSessions(workoutSessionIds: string[]) { return period.getSetLogsForSessions(this.db, workoutSessionIds) }
+  async getLatestExerciseEfforts(userId: string, workoutSessionIds: string[], exerciseNames: string[]) { return period.getLatestExerciseEfforts(this.db, userId, workoutSessionIds, exerciseNames) }
   async getSessionReadLogs(userId: string, from: Date, to: Date) { return getSessionReadLogs(this.db, userId, from, to) }
   async listCheckinHeldLifts(userId: string, weekStart: string, exerciseNames: string[]) { return listCheckinHeldLifts(this.db, userId, weekStart, exerciseNames) }
   async getCheckinSessionBudgetMin(userId: string, weekStart: string) { return getCheckinSessionBudgetMin(this.db, userId, weekStart) }

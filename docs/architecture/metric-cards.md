@@ -136,7 +136,8 @@ as an injury predictor (Impellizzeri 2020; 2021; Lolli 2019), so its weight stay
 **Raw routes, best first:**
 1. Chest strap on → HR-based load (Banister TRIMP; Morton 1990) for the session.
 2. One tap after the session: `workout_sessions.session_rpe` (column exists) × session minutes.
-   The native tap sits beside the per-set picker (`mobile/src/features/workouts/components/EffortPicker.tsx`).
+   Preview has had no per-set picker since #4061; a native tap would sit beside the end-of-lift
+   question (`mobile/src/features/workouts/components/EffortQuestion.tsx`).
 3. Cardio sessions from the Oura API, Health Connect or Apple (duration and effort where given) →
    minutes × the tapped RPE; with no tap, left missing, not guessed.
 MET-minutes remain a fallback for unlogged movement only: METs measure energy cost, not lifting

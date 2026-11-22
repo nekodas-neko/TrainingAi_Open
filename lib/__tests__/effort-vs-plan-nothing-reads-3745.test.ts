@@ -1,13 +1,15 @@
-// #3745, NOTHING READS THE ANSWER YET.
+// #3745, WHAT READS THE ANSWER, EXACTLY.
 //
 // The after-the-last-set answer ("easier / as expected / harder than expected", stored as
 // exercise_logs.effort_vs_plan and effort_source) is asked, kept on the phone, uploaded, stored and
-// pulled. It must not move a prescription, a score or a Coach prompt until the session read (#3889)
-// is built in a later batch. This pins that: every source file that names the answer is listed
-// here with what it does with it. On the server and in shared code, next to the prescription,
-// scoring and Coach code, each line that names it is pinned exactly; elsewhere, how many lines do.
-// Any new mention, in a listed file or not, fails this test until someone decides, on #3889, that
-// it may read it.
+// pulled. Since #4061 (owner, 23 Nov: "We will gauge from that instead of rpe") ONE live reader takes
+// it: the plan's effort signal, where a tapped Easier or Harder on a lift's latest log stands in for
+// that lift's rated RPE (`effortRpeDelta`), and the prompt line that tells the model so. The session
+// read (#3889) still reads it in shadow. Nothing else may: no score, no progression, no Coach prompt.
+// This pins that: every source file that names the answer is listed here with what it does with it.
+// On the server and in shared code, next to the prescription, scoring and Coach code, each line that
+// names it is pinned exactly; elsewhere, how many lines do. Any new mention, in a listed file or not,
+// fails this test until someone decides, on an issue, that it may read it.
 import { describe, it, expect } from 'vitest'
 import { execSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
@@ -71,7 +73,7 @@ const CARRIERS: Record<string, Carrier> = {
     ],
   },
   'lib/data/postgres/adapter.ts': {
-    why: 'writes it (insert / keep-on-replay upsert) and selects it into the sync pull',
+    why: 'writes it (insert / keep-on-replay upsert), selects it into the sync pull, and routes the plan\'s read (#4061)',
     lines: [
       'effortVsPlan: log.effortVsPlan ?? null,',
       'effortSource: log.effortSource ?? null,',
@@ -79,6 +81,24 @@ const CARRIERS: Record<string, Carrier> = {
       'effortSource: sql`CASE WHEN EXCLUDED.effort_vs_plan IS NULL THEN ${s.exerciseLogs.effortSource} ELSE EXCLUDED.effort_source END`,',
       'effortVsPlan:         s.exerciseLogs.effortVsPlan,',
       'effortSource:         s.exerciseLogs.effortSource,',
+      'async getLatestExerciseEfforts(userId: string, workoutSessionIds: string[], exerciseNames: string[]) { return period.getLatestExerciseEfforts(this.db, userId, workoutSessionIds, exerciseNames) }',
+    ],
+  },
+  'lib/data/postgres/slices/periodization.ts': {
+    why: 'selects each lift\'s latest answer for the plan (#4061), read only, owner-scoped',
+    lines: [
+      'export async function getLatestExerciseEfforts(',
+      '): Promise<Map<string, { vsPlan: number | null; source: string | null }>> {',
+      'const out = new Map<string, { vsPlan: number | null; source: string | null }>()',
+      'SELECT DISTINCT ON (lifts.lift) lifts.lift, el.effort_vs_plan, el.effort_source',
+      'for (const r of res.rows as Array<{ lift: string; effort_vs_plan: number | null; effort_source: string | null }>) {',
+      'out.set(r.lift, { vsPlan: r.effort_vs_plan == null ? null : Number(r.effort_vs_plan), source: r.effort_source })',
+    ],
+  },
+  'lib/data/repository.ts': {
+    why: 'the type of the plan\'s read (#4061)',
+    lines: [
+      "getLatestExerciseEfforts?(userId: string, workoutSessionIds: string[], exerciseNames: string[]): Promise<Map<string, import('@trainingai/shared/ai-periodization/autoregulation').LatestEffortAnswer>>",
     ],
   },
   'lib/data/postgres/slices/session-read.ts': {
@@ -123,6 +143,50 @@ const SHADOW_READERS: Record<string, Carrier> = {
   },
 }
 
+/**
+ * The live reader #4061 decided on (owner, 23 Nov): a tapped Easier or Harder on a lift's latest log is
+ * the plan's effort signal in place of rated RPE, through `computeRpeAdjustment`'s own thresholds; the
+ * prompt states it so the model's text agrees with the adjustment code applies after it.
+ */
+const LIVE_READERS: Record<string, Carrier> = {
+  'packages/shared/src/ai-periodization/autoregulation.ts': {
+    why: 'the mapping: tapped +1 / -1 onto the rated-RPE delta, everything else no signal (#4061)',
+    lines: [
+      "import type { EffortSource, EffortVsPlan } from '@trainingai/shared/workout/effort-vs-plan'",
+      "/** The answer on a lift's latest log, as stored (`exercise_logs.effort_vs_plan` / `effort_source`). */",
+      'export interface LatestEffortAnswer { vsPlan: number | null; source: string | null }',
+      'export function tappedEffort(latest: LatestEffortAnswer | null | undefined): EffortVsPlan | undefined {',
+      'return latest.vsPlan === -1 || latest.vsPlan === 0 || latest.vsPlan === 1 ? latest.vsPlan : undefined',
+    ],
+  },
+  'packages/shared/src/ai-periodization/signals.ts': {
+    why: 'reads each lift\'s latest answer and folds it into the lift\'s rpeDelta (#4061)',
+    lines: [
+      'effortAnswer?: -1 | 0 | 1',
+      'latestEfforts = await (async () => repo.getLatestExerciseEfforts?.(userId, last3Ids, exerciseNames))()',
+      'const effortAnswer = tappedEffort(latestEfforts.get(ex.name))',
+      '...(effortAnswer !== undefined && { effortAnswer }),',
+    ],
+  },
+  'packages/shared/src/ai-periodization/prompt.ts': {
+    why: 'states a tapped Easier or Harder under the RPE trend, from the stored value (#4061)',
+    lines: [
+      "import { EFFORT_VS_PLAN_LABELS } from '@trainingai/shared/workout/effort-vs-plan'",
+      'const effortAnswers = signals.exercises',
+      '.filter(ex => ex.effortAnswer === 1 || ex.effortAnswer === -1)',
+      '.map(ex => `${ex.name}: ${EFFORT_VS_PLAN_LABELS[ex.effortAnswer!].toLowerCase()}`)',
+      'const effortInfo = effortAnswers.length > 0',
+      "? `\\nEffort answer (the lifter's tap after the lift's last set, latest session; read in place of RPE for that lift): ${effortAnswers.join('; ')}`",
+    ],
+  },
+  'packages/shared/src/ai-periodization/generate-prescription.ts': {
+    why: 'marks the delta as the tap\'s, for the cut note\'s wording only (#4061)',
+    lines: [
+      '...(e.effortAnswer !== undefined && { effortFromAnswer: true as const }),',
+    ],
+  },
+}
+
 /** Every non-test file allowed to import the session read while it is in shadow. */
 const SESSION_READ_IMPORTERS = [
   'app/api/admin/session-read-replay/route.ts',
@@ -147,7 +211,7 @@ const naming = (text: string) => text.split('\n').filter(line => NAMES.test(line
 /** Paths where a reader would be: prescription, progression, scoring, readiness and the Coach. */
 const READERS = /ai-periodization|prescription|progression|scor|coach|prompt|autoreg|expected-rpe|1rm|recovery|readiness/i
 
-describe('nothing reads the effort answer yet (#3745, until #3889)', () => {
+describe('exactly these read the effort answer (#3745; live in the plan since #4061)', () => {
   // Tracked and new files alike, so a reader added in a working tree fails before it is committed.
   const files = execSync('git ls-files --cached --others --exclude-standard', { encoding: 'utf8' })
     .split('\n')
@@ -156,8 +220,8 @@ describe('nothing reads the effort answer yet (#3745, until #3889)', () => {
     files.map(path => [path, naming(readFileSync(path, 'utf8'))] as const).filter(([, lines]) => lines.length),
   )
 
-  it('only the carriers and the shadow reader name it, each exactly as pinned', () => {
-    const allowed = { ...CARRIERS, ...SHADOW_READERS }
+  it('only the carriers, the live reader and the shadow reader name it, each exactly as pinned', () => {
+    const allowed = { ...CARRIERS, ...LIVE_READERS, ...SHADOW_READERS }
     expect([...named.keys()].filter(path => !(path in allowed))).toEqual([])
     // And the list is not stale: each carrier still names it.
     expect(Object.keys(allowed).filter(path => !named.has(path))).toEqual([])
@@ -168,14 +232,14 @@ describe('nothing reads the effort answer yet (#3745, until #3889)', () => {
     }
   })
 
-  it('catches a reader, and no prescription, score, progression or Coach file is one', () => {
+  it('catches a reader, and no prescription, score, progression or Coach file is one beyond those pinned', () => {
     // The pin sees the way a reader would read it.
     expect(naming('const harderHold = effort?.vsPlan === 1')).toHaveLength(1)
     expect(naming('if (log.effortSource === "tapped") hold()')).toHaveLength(1)
     // There are such files to check, and none of them names the answer.
     const readers = files.filter(path => READERS.test(path))
     expect(readers.length).toBeGreaterThan(20)
-    expect(readers.filter(path => named.has(path))).toEqual(Object.keys(SHADOW_READERS))
+    expect(readers.filter(path => named.has(path)).sort()).toEqual([...Object.keys(LIVE_READERS), ...Object.keys(SHADOW_READERS)].sort())
     expect(Object.keys(CARRIERS).filter(path => READERS.test(path))).toEqual([])
   })
 
