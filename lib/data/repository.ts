@@ -1142,6 +1142,8 @@ export interface WorkoutRepository {
   searchFoodItems(userId: string, query: string): Promise<FoodItem[]>
   /** #3651. The live food with this exact barcode, newest first; at most one. */
   findFoodItemsByBarcode(userId: string, barcode: string): Promise<FoodItem[]>
+  /** #3749. Live foods whose case- and whitespace-folded name is one of `names`, any source. */
+  listFoodItemsByNames(userId: string, names: readonly string[]): Promise<FoodItem[]>
   /** One owned food item, or null for an unknown id and another user's id alike. */
   getFoodItemById(userId: string, id: string): Promise<FoodItem | null>
   /** #3476. Foods the look-alike merge retired since `since`, and fresh copies of their keepers. */

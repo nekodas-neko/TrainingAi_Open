@@ -79,6 +79,7 @@ const repo = {
   getMostRecentConfirmedWeightKg: vi.fn(async () => 72),
   listSavedMeals: vi.fn(async () => [] as unknown[]),
   listMealTypes: vi.fn(async () => [] as unknown[]),
+  listFoodItemsByNames: vi.fn(async () => []),
 }
 vi.mock('@/lib/data', () => ({ getRepository: async () => repo, getRepositoryAsync: async () => repo }))
 

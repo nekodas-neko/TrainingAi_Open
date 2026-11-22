@@ -26,6 +26,8 @@ import { NutritionIngredientsSchema } from '@trainingai/shared/validators/nutrit
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 import { invalidBodyResponse } from '@/lib/api/route-errors'
 import { PROSE_FIELD_GUARDS } from '@/lib/ai/prompt-guards'
+import { ModelIngredientSchema } from '@trainingai/shared/nutrition/ingredient-schema'
+import { resolveModelIngredients } from '@/lib/nutrition/ingredient-densities'
 
 // The schema's own caps total well under 100 KB (200 excluded foods x 80 chars is the largest
 // array). 256 KB is generous past that.
@@ -74,25 +76,17 @@ const RequestSchema = z.object({
 }).strict()
 
 /**
- * What the model returns. Ingredients use the SAME shape as the food scan (`IngredientSchema` in
- * app/api/nutrition/scan): a weight plus per-100g densities. That is reference data, not
- * arithmetic — every total below is summed in code by `sumIngredients`, with its Atwater
- * cross-check, exactly as a scanned photo is. The model still never states a meal total.
+ * What the model returns. Ingredients are the one shape every AI food route uses
+ * (`ModelIngredientSchema`, #3749): a weight plus per-100g densities, which code replaces with a
+ * saved food's or the bundled table's wherever it knows the food. Every total below is summed in
+ * code by `sumIngredients`, with its Atwater cross-check, exactly as a scanned photo is. The model
+ * still never states a meal total.
  */
-const IngredientSchema = z.object({
-  name: z.string().describe('Ingredient as you would find it in a supermarket'),
-  weightG: z.number().describe('Grams of this ingredient in the meal'),
-  caloriesPer100g: z.number(),
-  proteinPer100g: z.number(),
-  carbsPer100g: z.number(),
-  fatPer100g: z.number(),
-})
-
 const DraftSchema = z.object({
   planName: z.string().describe('Short, plain name for this plan'),
   meals: z.array(z.object({
     name: z.string().describe('Meal name, e.g. "Greek yoghurt with berries and oats"'),
-    ingredients: z.array(IngredientSchema),
+    ingredients: z.array(ModelIngredientSchema),
     notes: z.string().describe('One short line: prep time, swaps, or where to buy it'),
   })),
   restDayAdjustment: z.string().describe('One line on what changes on a rest day, or "" if not applicable'),
@@ -322,7 +316,17 @@ export async function POST(req: Request) {
 
   // The model may return the wrong number of meals however firmly it was asked. Pad or trim rather
   // than failing — a plan with one meal missing is recoverable, a 500 is not.
-  const generated = draft.meals.slice(0, generatedNeeded)
+  //
+  // #3749. The model's meals only: kept and library meals are the user's own and keep their numbers.
+  // One saved-food read for every generated ingredient, split back per meal.
+  const modelMeals = draft.meals.slice(0, generatedNeeded)
+  const resolvedAll = await resolveModelIngredients(userId, modelMeals.flatMap(m => m.ingredients))
+  let cursor = 0
+  const generated = modelMeals.map(m => {
+    const ingredients = resolvedAll.ingredients.slice(cursor, cursor + m.ingredients.length)
+    cursor += m.ingredients.length
+    return { ...m, ingredients }
+  })
   while (generated.length < generatedNeeded) {
     generated.push({ name: `Meal ${kept.length + generated.length + 1}`, ingredients: [], notes: '' })
   }

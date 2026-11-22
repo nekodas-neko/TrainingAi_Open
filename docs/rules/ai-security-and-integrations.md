@@ -58,6 +58,21 @@ key and make testing safer instead ([#2816](https://github.com/nekodas-neko/Trai
   invisible to the read-only views (`claude_ro.ai_call_log` keeps only the owner's rows, matched on
   `user_id`); the admin AI-usage queries (`getAiCallUsageSummary`, no user filter) do show them.
 
+### One food reference for the AI food routes (#3749)
+
+- **The model names the food and its weight; code supplies the per-100 g numbers when it knows
+  them.** The scan, both meal-plan generators and the top-up share `ModelIngredientSchema` and pass
+  the reply through `resolveModelIngredients`: the user's own barcode-sourced saved food, then the
+  bundled USDA FoodData Central table, else the model's figure marked `estimated`. Exact folded
+  name only, never a near match. Map: [`docs/module-map.md`](../module-map.md).
+- **The table is generated, never typed.** `scripts/build-food-reference.mjs` reads the SR Legacy
+  download and writes `fdc-sr-legacy.ts`; every row carries its `fdcId`. Do not add a number by
+  hand: a made-up reference is worse than the model's guess, because the app shows it as fact.
+- **The scan's confidence badge is code's**: high when every ingredient matched, medium when some
+  did, low when none did or `sanitiseNutrition` corrected the totals. The model is not asked for it.
+- **A top-up tries arithmetic first** (`planStapleTopUp`), and calls the model only when no staple of
+  the meal's style, clear of every recorded restriction, can close the gap.
+
 ### What the person sees when the model is down
 
 Checked against the code on 2026-11-21. "Paused" means Google refused on billing
