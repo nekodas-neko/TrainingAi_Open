@@ -99,15 +99,49 @@ describe.skipIf(!canRun)('admin errors and feedback: an admin session must be th
     expect(await seededFeedbackIds()).not.toContain(first)
   })
 
+  // The pending-user count is of every inactive account in the database, and other test files add and
+  // remove inactive users in the same database while the suite runs in parallel (#4012), so two
+  // requests can see different totals. This test therefore never compares two live counts. It checks
+  // the two things it is about: the count the route reports is the count the repository gives, the
+  // same for both roles; and a count of inactive users this test seeded itself is included.
   it('the pending badge counts feedback for the owner only; inactive users still count for any admin', async () => {
-    asUser(OWNER)
-    const owner = await (await pending()).json() as { count: number; feedbackCount: number }
-    expect(owner.feedbackCount).toBeGreaterThanOrEqual(3)
-    asUser(ADMIN)
-    const res = await pending()
-    expect(res.status).toBe(200)
-    const other = await res.json() as { count: number; feedbackCount: number }
-    expect(other).toEqual({ count: owner.count, feedbackCount: 0 })
+    const SEEDED = [
+      '00000000-0000-4000-8000-00000401201a',
+      '00000000-0000-4000-8000-00000401202b',
+      '00000000-0000-4000-8000-00000401203c',
+    ]
+    await pool.query('DELETE FROM users WHERE id = ANY($1::uuid[])', [SEEDED])
+    await pool.query(
+      `INSERT INTO users (id, email, password_hash, timezone, is_admin, is_active)
+       SELECT id, 'pending-badge-4012-' || n || '@example.com', 'x', 'Australia/Brisbane', false, false
+       FROM unnest($1::uuid[]) WITH ORDINALITY AS t(id, n)`,
+      [SEEDED])
+    try {
+      // Real database: both roles count at least the inactive users seeded here (others may add more).
+      asUser(OWNER)
+      const owner = await (await pending()).json() as { count: number; feedbackCount: number }
+      expect(owner.feedbackCount).toBeGreaterThanOrEqual(3)
+      expect(owner.count).toBeGreaterThanOrEqual(SEEDED.length)
+      asUser(ADMIN)
+      const res = await pending()
+      expect(res.status).toBe(200)
+      const other = await res.json() as { count: number; feedbackCount: number }
+      expect(other.feedbackCount).toBe(0)
+      expect(other.count).toBeGreaterThanOrEqual(SEEDED.length)
+
+      // One fixed count source, so the two roles must agree whatever other files do meanwhile.
+      const spy = vi.spyOn(repo, 'countInactiveUsers').mockResolvedValue(7)
+      try {
+        asUser(OWNER)
+        expect((await (await pending()).json() as { count: number }).count).toBe(7)
+        asUser(ADMIN)
+        expect(await (await pending()).json()).toEqual({ count: 7, feedbackCount: 0 })
+      } finally {
+        spy.mockRestore()
+      }
+    } finally {
+      await pool.query('DELETE FROM users WHERE id = ANY($1::uuid[])', [SEEDED])
+    }
   })
 
   it('a non-admin gets the same 403, and no session a 401', async () => {

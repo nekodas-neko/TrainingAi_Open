@@ -122,6 +122,12 @@ export interface NextSessionRecommendation {
   streakWarning?: boolean
   streakBroken?: boolean
   temperatureAlert?: boolean
+  /**
+   * #3718: which of the AI prescription rule's rest signals the daily check saw today — readiness
+   * under the prompt's rest cut, sleep and HRV trends both poor, a low blood-oxygen trend. Absent
+   * when none fired (and on a response from before the field existed).
+   */
+  restSignals?: Array<'readinessVeryLow' | 'sleepAndHrvLow' | 'spo2Low'>
   // Extended ai_dynamic scoring fields
   weightedComponents?: {
     recovery: { score: number; weight: number }
