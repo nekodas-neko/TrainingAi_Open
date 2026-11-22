@@ -6,6 +6,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.532.0",
+    date: "2026-11-23",
+    changes: [
+      "TrainingAi Preview: the Coach answers again. Every Coach message sent from Preview had failed since 1.530.0, because the AI provider refused one field of the lift change options. No new Preview build is needed for this.",
+      "TrainingAi Preview: the Next workout card shows the same weight and reps as the session screen for every kind of program and phase.",
+      "TrainingAi Preview: four small weekly check-in fixes. These need the new Preview build.",
+      "Behind the scenes: a test now checks every option list the AI is given against what the provider accepts, without calling it.",
+    ],
+  },
+  {
     version: "1.531.0",
     date: "2026-11-22",
     changes: [
