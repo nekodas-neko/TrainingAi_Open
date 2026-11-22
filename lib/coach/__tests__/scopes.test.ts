@@ -34,7 +34,8 @@ describe('the general scope withholds nothing', () => {
     const g = COACH_SCOPES.general
     expect([...g.widgetTools].sort()).toEqual(Object.keys(WIDGET_TOOL_NAMES).sort())
     expect([...g.choiceSources].sort()).toEqual([...CHOICE_SOURCES].sort())
-    expect([...g.patchDomains].sort()).toEqual([...COACH_PATCH_DOMAINS].sort())
+    // #3896 step 5: a gated domain joins only when the client names it (`withClientDomains`).
+    expect([...g.patchDomains, ...(g.gatedPatchDomains ?? [])].sort()).toEqual([...COACH_PATCH_DOMAINS].sort())
     expect(g.readTools).toBeNull()
     expect(g.systemSection).toBe('')
   })

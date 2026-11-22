@@ -12,7 +12,7 @@ import { DEFAULT_TZ, todayInTz } from '@trainingai/shared/date-utils'
 import { buildInjuryContext } from '@/lib/ai-chat/context'
 import { buildChatTools } from '@/lib/ai-chat/tools'
 import { buildWidgetTools } from '@/lib/coach/tools'
-import { coachScope, pickTools } from '@/lib/coach/scopes'
+import { coachScope, pickTools, withClientDomains } from '@/lib/coach/scopes'
 import { COACH_MAX_STEPS, coachStepOverride } from '@/lib/coach/step-limit'
 import { resolveDanglingWidgetCalls } from '@/lib/coach/dangling-widgets'
 import { errorLog } from '@trainingai/shared/logger'
@@ -53,6 +53,13 @@ const BodySchema = z.object({
    * not send it gets the Coach it had.
    */
   context: CoachContextSchema.optional(),
+  /**
+   * #3896 step 5: the gated patch domains this client renders (`GATED_PATCH_DOMAINS`). A gated domain
+   * is offered only to a client that names it, so an older Preview build or the web app never gets a
+   * proposal its own copy of the patch schema would reject. Loose strings, so a newer client naming a
+   * domain this server has not shipped still gets a working Coach; only known gated names count.
+   */
+  patchDomains: z.array(z.string().max(40)).max(20).optional(),
 })
 
 // RV-173: the guards belong here for the same reason they belong on every other prose route —
@@ -236,7 +243,7 @@ export async function POST(req: Request) {
     const parsed = BodySchema.safeParse(read.body)
     if (!parsed.success) return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
 
-    const scope = coachScope(parsed.data.scope)
+    const scope = withClientDomains(coachScope(parsed.data.scope), parsed.data.patchDomains)
     const tz = session.user?.timezone ?? DEFAULT_TZ
     const todayIso = todayInTz(tz)
     const repo = await getRepositoryAsync()

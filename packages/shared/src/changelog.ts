@@ -6,6 +6,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.530.0",
+    date: "2026-11-22",
+    changes: [
+      "Both apps: a lift's 1RM trend now compares its latest estimate with the one before it, so it can read \"down\" when a lift has dropped. Before, it was compared with your all-time best and almost never did. This changes how plans are made: a lift that has dropped can have its next weight eased, and it no longer earns extra reps or sets.",
+      "Both apps: food scans, meal plans and meal top-ups take their per-100 g numbers from a reference table of common foods (USDA), or from your own barcode-scanned foods, whenever the food is recognised, so the same food gets the same numbers everywhere. The scan's confidence badge now reflects how much of the meal was recognised, and a top-up first tries a couple of staple foods by simple arithmetic.",
+      "TrainingAi Preview: ask the Coach to change a lift (higher reps and lighter, more rest, one set more or fewer, one plate lighter or heavier next time). You see a card with the new numbers, can apply it, and can undo it. This needs the new Preview build. Plans change only for a lift you change this way.",
+      "Both apps: an activity logged with the same start and end time is no longer treated as lasting a whole day. This affects heart-health minutes, walking and the stress views. No past verdict changes for existing data.",
+      "Both apps: renaming an exercise keeps its starting 1RM and settings, and no longer fails when you already have a record under the new name.",
+      "Current app: Health Connect sync no longer copies another workout's numbers onto an activity with the same start and end time.",
+      "Behind the scenes: the coach's recovery read and the daily Oura reconcile now use source-neutral shapes, there is one set of rules for every AI call, and storage is prepared for rest periods and day tags.",
+    ],
+  },
+  {
     version: "1.529.0",
     date: "2026-11-22",
     changes: [
