@@ -93,7 +93,7 @@ export type ExerciseContext = z.infer<typeof ExerciseContextSchema>
 
 // ── Ownership ────────────────────────────────────────────────────────────────
 
-async function ownProgramSession(db: Db, userId: string, id: string) {
+export async function ownProgramSession(db: Db, userId: string, id: string) {
   const [row] = await db
     .select({ id: s.programSessions.id, name: s.programSessions.name })
     .from(s.programSessions)
@@ -103,7 +103,7 @@ async function ownProgramSession(db: Db, userId: string, id: string) {
   return row ?? null
 }
 
-async function ownWorkout(db: Db, userId: string, id: string) {
+export async function ownWorkout(db: Db, userId: string, id: string) {
   const [row] = await db
     .select({ id: s.workoutSessions.id, sessionName: s.workoutSessions.sessionName, startedAt: s.workoutSessions.startedAt })
     .from(s.workoutSessions)

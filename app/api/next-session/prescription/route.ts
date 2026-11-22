@@ -20,6 +20,8 @@ export interface NextSessionSetPreview {
 
 export interface NextSessionExercisePreview {
   name: string;
+  // #3896 step 7: the slot's id, so the app's "…" on a lift can open the Coach about it.
+  sessionExerciseId: string;
   exerciseType: ExerciseType;
   sets: NextSessionSetPreview[];
 }
@@ -156,7 +158,7 @@ export async function GET() {
         restSec: s.restSec,
       }));
 
-      return { name: ex.exerciseName, exerciseType, sets };
+      return { name: ex.exerciseName, sessionExerciseId: ex.id, exerciseType, sets };
     });
 
   return NextResponse.json({

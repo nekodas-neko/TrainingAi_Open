@@ -26,6 +26,8 @@ import { WorkoutLayout } from '../components/WorkoutLayout';
 import { RecapCard } from '../components/RecapCard';
 import { localRecap } from '../logging/local-recap';
 import { NextPrescription } from '../components/NextPrescription';
+import { RecapLifts } from '../components/RecapLifts';
+import { useCoachLaunch } from '../../coach/CoachProvider';
 import { WorkoutTiming } from '../components/WorkoutTiming';
 import { WorkoutHrRecovery } from '../components/WorkoutHrRecovery';
 import { WorkoutEnergy } from '../components/WorkoutEnergy';
@@ -50,6 +52,7 @@ export function WorkoutLogScreen({
 }) {
   const journal = useWorkoutJournal();
   const { theme } = useTheme();
+  const launchCoach = useCoachLaunch();
   const workout = journal.data.workouts.find((workout) => workout.id === workoutId);
   const xp = useWorkoutXp(workout);
   const stale = useStaleWorkout(workout);
@@ -245,6 +248,7 @@ export function WorkoutLogScreen({
       </View>
 
       <WorkoutHrRecovery workout={workout} />
+      <RecapLifts workout={workout} />
       <NextPrescription />
       <Stack style={{ width: '100%', maxWidth: theme.sizes.summaryWidth }}>
         {openCoach && (
@@ -252,7 +256,14 @@ export function WorkoutLogScreen({
             title="Ask AI Coach"
             icon="coach"
             variant="primary"
-            onPress={openCoach}
+            // #3896 step 6: about this workout once the server has it; before then, as before.
+            onPress={() =>
+              launchCoach(
+                workout.pending.length === 0 && workout.syncedAt
+                  ? { context: { origin: 'recap', workoutId: workout.id } }
+                  : {},
+              )
+            }
           />
         )}
         <Stack direction="row">

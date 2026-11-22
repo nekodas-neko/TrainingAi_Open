@@ -377,6 +377,8 @@ export const nextPrescriptionSpec = {
       .array(
         z.object({
           name: text,
+          // #3896 step 7: absent from a server before it; the lift's "…" then does not show.
+          sessionExerciseId: z.uuid().optional().catch(undefined),
           exerciseType: z.enum(['weighted', 'bodyweight']),
           sets: z.array(
             z.object({ weightKg: finite.nullable(), reps: finite, restSec: finite }),

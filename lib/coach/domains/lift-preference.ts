@@ -35,7 +35,7 @@ import { getScheduledSessionsPerWeek } from '@trainingai/shared/schedule-utils'
 import { loadTarget, type TargetRow } from './session-exercise'
 import type { Consequence, Db, DomainHandler, Drift, PreviewResult } from './types'
 import {
-  DURATION_LABEL, LIFT_PREFERENCE_DURATION, REP_RANGE_REQUESTS, liftPreferenceValueLabel,
+  DURATION_LABEL, LIFT_PREFERENCE_DURATION, REP_RANGE_DEFAULT, REP_RANGE_REQUESTS, liftPreferenceValueLabel,
   type PatchChange,
 } from '../patch'
 import {
@@ -282,6 +282,9 @@ const REFUSE_RANGE = `A rep range has to be two whole numbers from ${PREFERENCE_
 const SPENT_ONE_SHOT = 'This was a one-time change and it has already been used or has expired, so there is nothing left to undo.'
 const REFUSE_UNPREVIEWED = 'This change was not previewed, so the range was not worked out. Ask the Coach again.'
 const REFUSE_TWICE = 'A change can set each thing once. Ask for one value for each.'
+/** #3896 review: "Use the program's default" on a lift with no range of its own is refused rather
+ *  than written, so a tampered client cannot create an all-empty row and a history entry for nothing. */
+export const REFUSE_NOTHING_TO_CLEAR = 'This lift has no rep range of its own, so there is nothing to clear.'
 const REFUSE_REST = `Rest between sets has to be from ${PREFERENCE_REST_MIN_SEC} seconds to ${PREFERENCE_REST_MAX_SEC / 60} minutes.`
 
 /**
@@ -302,6 +305,14 @@ export function workOutChange(current: PrefColumns, accepted: LiftChange[], next
   for (const c of accepted) {
     if (c.field === 'repRange') {
       let range: { min: number; max: number } | null
+      if (c.to === REP_RANGE_DEFAULT) {
+        // The program editor's "Use the program's default" (#3896 step 7): the range is cleared, and
+        // the plan goes back to the reps the program sets. Nothing to clear is refused, not written.
+        if (current.repMin == null && current.repMax == null) return { ok: false, refusal: REFUSE_NOTHING_TO_CLEAR }
+        next.repMin = null
+        next.repMax = null
+        continue
+      }
       if ((REP_RANGE_REQUESTS as readonly string[]).includes(c.to)) {
         if (mode === 'apply') return { ok: false, refusal: REFUSE_UNPREVIEWED }
         const base = current.repMin ?? nextPlanReps
@@ -457,7 +468,7 @@ function liftChanges(changes: PatchChange[]): LiftChange[] {
 
 function summaryOf(name: string, after: PrefColumns, accepted: LiftChange[]): string {
   const parts = accepted.map(c => {
-    const value = c.field === 'repRange' ? liftPreferenceValueLabel('repRange', rangeText(after)) : liftPreferenceValueLabel(c.field, c.to)
+    const value = c.field === 'repRange' ? liftPreferenceValueLabel('repRange', rangeText(after) ?? c.to) : liftPreferenceValueLabel(c.field, c.to)
     return LIFT_PREFERENCE_DURATION[c.field] === 'next_time' ? `${value!.toLowerCase()} next time` : `${value}`
   })
   return `${name}: ${parts.join(', ')}`
@@ -473,6 +484,23 @@ function summaryOf(name: string, after: PrefColumns, accepted: LiftChange[]): st
  * caller then refuses and asks for the range.
  */
 export async function staticBaseReps(reads: StaticReads, userId: string, target: TargetRow, today: string): Promise<number | null> {
+  const next = await staticNextExercise(reads, userId, target, today)
+  if (!next || next.excluded) return null
+  const reps = next.exercise?.progressionStyle?.[0]?.reps
+  return typeof reps === 'number' && Number.isInteger(reps) && reps > 0 ? reps : null
+}
+
+/**
+ * The lift as the workout screen would build it from the program as written (no stored AI plan):
+ * `buildWorkoutExercises` with the program's styles and phases resolved as the workout-data route
+ * resolves them. With `liftPreferences` (the user's stored preferences, as that route loads them) the
+ * built sets carry the preference, as the session screen shows them. `excluded` when the next session
+ * is a deload, a baseline or a test. Null when the lift is not in the user's active program.
+ */
+export async function staticNextExercise(
+  reads: StaticReads, userId: string, target: TargetRow, today: string,
+  liftPreferences?: ReadonlyMap<string, LiftPreference>,
+): Promise<{ exercise: ReturnType<typeof buildWorkoutExercises>[number] | null; excluded: boolean } | null> {
   const program = await reads.getActiveProgram(userId)
   if (!program || program.id !== target.programId) return null
   const programSession = program.sessions.find(x => x.id === target.sessionId)
@@ -499,7 +527,8 @@ export async function staticBaseReps(reads: StaticReads, userId: string, target:
     isDeloadActive = isDeloadActive || status.isDeloadActive
   }
   const phaseType = currentPhase?.phaseType ?? 'normal'
-  if (isDeloadActive || phaseType === 'deload' || phaseType === 'baseline' || phaseType === 'testing') return null
+  const excluded = isDeloadActive || phaseType === 'deload' || phaseType === 'baseline' || phaseType === 'testing'
+  if (excluded) return { exercise: null, excluded: true }
 
   const [built] = buildWorkoutExercises({ ...programSession, exercises: [ex] }, {
     lastLogs,
@@ -522,9 +551,9 @@ export async function staticBaseReps(reads: StaticReads, userId: string, target:
     droppedThisCycle: new Set(),
     loggedTodayInThisSession: new Set(),
     trainingGoal: program.trainingGoal,
+    ...(liftPreferences && { liftPreferences }),
   })
-  const reps = built?.progressionStyle?.[0]?.reps
-  return typeof reps === 'number' && Number.isInteger(reps) && reps > 0 ? reps : null
+  return { exercise: built ?? null, excluded: false }
 }
 
 /** The reps a relative request is worked out from: the person's own range, else the next plan's reps,
