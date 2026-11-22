@@ -2002,6 +2002,42 @@ SELECT
 FROM public.users t
 WHERE t.id = current_setting('app.claude_ro_owner', true)::uuid;
 
+CREATE VIEW claude_ro.weekly_checkin_exercises AS
+SELECT
+  t.id,
+  t.user_id,
+  t.checkin_id,
+  t.exercise_id,
+  t.exercise_name,
+  t.answer,
+  t.missed_rep,
+  t.effect,
+  t.offer_status,
+  t.swap_change_id,
+  t.created_at,
+  t.updated_at
+FROM public.weekly_checkin_exercises t
+WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
+
+CREATE VIEW claude_ro.weekly_checkins AS
+SELECT
+  t.id,
+  t.user_id,
+  t.week_start,
+  t.status,
+  t.offered_at,
+  t.saved_at,
+  t.dismissed_at,
+  t.days_off_weekdays,
+  t.shorter_session_min,
+  t.pain_raised,
+  t.pain_injury_id,
+  t.deleted_at,
+  t.created_at,
+  t.updated_at
+FROM public.weekly_checkins t
+WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
+
 CREATE VIEW claude_ro.workout_hr_stats AS
 SELECT
   t.workout_session_id,

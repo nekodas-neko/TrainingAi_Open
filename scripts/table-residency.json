@@ -31,6 +31,8 @@
     "email_normalisation_preimage": {"class":"SERVER-ONLY","note":"auth migration ledger; writer: none found by static grep (raw SQL / script)"},
     "error_events": {"class":"SERVER-ONLY","note":"ops (30-day prune); writer: adapter.ts, oura.ts"},
     "exercise_preferences": {"class":"SERVER-ONLY","note":"#3896 a person's per-lift rep range, rest and one-shot lighter/heavier and ±1 set; stored, no reader; writer: none until #3896 step 5; deleted_at tombstone; no device copy yet"},
+    "weekly_checkins": {"class":"SERVER-ONLY","note":"#3890 one weekly check-in per user and training week (local Monday); stored, no reader; writer: none until #3890 step 2; deleted_at tombstone; no device copy yet"},
+    "weekly_checkin_exercises": {"class":"SERVER-ONLY","note":"#3890 one main lift answered in a weekly check-in and what the app did with it; stored, no reader; writer: none until #3890 step 2; removed with its check-in; no device copy yet"},
     "exercise_estimates": {"class":"SERVER-ONLY","note":"derived (1RM etc.); writer: adapter.ts"},
     "exercise_gif_cache": {"class":"SERVER-ONLY","note":"reference cache; writer: route.ts, route.ts, adapter.ts"},
     "exercise_library": {"class":"HYDRATED MIRROR","note":"local table exists, NOT in getSyncDelta; filled from API fetches; server authoritative"},
