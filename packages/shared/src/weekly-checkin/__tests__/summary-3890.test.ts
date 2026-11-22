@@ -94,6 +94,20 @@ describe('summarizeWeek: what the logs show, never what the app did', () => {
     expect(s.shortRestDays).toBe(1)
   })
 
+  it('a lift loaded heavier than planned and short on reps went heavier, it did not fall short of the plan', () => {
+    // More than one plate step over the planned 80 kg, with the reps short: the person's choice.
+    const heavier = [set(1, { weightKg: 85, reps: 4 }), set(2, { weightKg: 85, reps: 3 }), set(3)]
+    const s = summarizeWeek({
+      sessionsDone: 1, sessionsPlanned: 3,
+      lifts: [lift('Lift A', [{ day: '2026-11-18', log: log(heavier) }])],
+    })
+    expect(s.lines[1]).toBe('Last session: Lift A went heavier than planned.')
+    expect(s.lifts[0]).toMatchObject({ lastSession: 'heavier', missedRep: false })
+    // A real miss at the planned weight in the same session is still short.
+    const both = summarizeLift(lift('Lift A', [{ day: 'd', log: log([set(1, { weightKg: 85, reps: 3 }), set(2, { reps: 3 }), set(3)]) }]))
+    expect(both).toMatchObject({ lastSession: 'short', missedRep: true })
+  })
+
   it('C2: lifts logged but not compared say so, with the reason, instead of "nothing logged"', () => {
     const s = summarizeWeek({
       sessionsDone: 2, sessionsPlanned: 3,

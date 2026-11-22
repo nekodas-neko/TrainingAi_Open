@@ -406,43 +406,24 @@ describe.skipIf(!canRun)('weekly check-in engine (#3890 step 2)', () => {
     expect((await engine.readCheckinState(ctxFor(A))).summary!.lines[0]).toBe('3 of 3 planned sessions done.')
   })
 
-  it('D2: a stored plan that would be served in the applies-to week is voided at save and again at undo; others are left', async () => {
-    const appliesMidnight = dateStrMidnightInTz(APPLIES, TZ)
+  it('D2: a save and an undo of a shorter session touch no stored plan (it is fitted where it is served)', async () => {
+    const inWeek = new Date(dateStrMidnightInTz(APPLIES, TZ).getTime() + 36 * 3_600_000)
     const plan = { phase: 'accumulation', exercises: [], reasoning: 'stored before the save' }
-    const store = (status: string, expires: Date) => pool.query(
+    await pool.query(
       `INSERT INTO session_periodization (user_id, program_session_id, phase, prescription, prescription_status, prescription_generated_at, prescription_expires_at)
-       VALUES ($1,$2,'accumulation',$3::jsonb,$4,now(),$5)
-       ON CONFLICT (user_id, program_session_id) DO UPDATE SET prescription = EXCLUDED.prescription,
-         prescription_status = EXCLUDED.prescription_status, prescription_expires_at = EXCLUDED.prescription_expires_at`,
-      [A, ids['a:session'], JSON.stringify(plan), status, expires])
-    const stored = async () => (await pool.query(
-      `SELECT prescription IS NOT NULL AS has, prescription_status AS st FROM session_periodization WHERE user_id = $1 AND program_session_id = $2`, [A, ids['a:session']])).rows[0]
-    const inWeek = new Date(appliesMidnight.getTime() + 36 * 3_600_000)
-
-    // A plan made before the save, served into the applies-to week: voided, so the next read regenerates
-    // it, and the read the generation takes its budget from now answers 40 for that week.
-    await store('pending', inWeek)
-    await fullSave({ shorterSessionMin: 40 })
-    expect(await stored()).toEqual({ has: false, st: 'consumed' })
-    expect(await slice.getCheckinSessionBudgetMin(ctxFor(A).db, A, APPLIES)).toBe(40)
-
-    // A redo with the same budget voids nothing (the plan regenerated with 40 stays).
-    await store('pending', inWeek)
+       VALUES ($1,$2,'accumulation',$3::jsonb,'pending',now(),$4)`,
+      [A, ids['a:session'], JSON.stringify(plan), inWeek])
+    const row = async () => (await pool.query(
+      `SELECT prescription::text, prescription_status, prescription_generated_at, prescription_expires_at, updated_at
+         FROM session_periodization WHERE user_id = $1 AND program_session_id = $2`, [A, ids['a:session']])).rows[0]
+    const before = await row()
     const { state } = await fullSave({ shorterSessionMin: 40 })
-    expect(await stored()).toEqual({ has: true, st: 'pending' })
-
-    // Undo: that plan, made with the shorter budget, is voided too, and the budget read is null again.
+    expect(await row()).toEqual(before)
+    await fullSave({ shorterSessionMin: 30 })
+    expect(await row()).toEqual(before)
     await engine.undoCheckinEffect(ctxFor(A), state.checkin!.id, { kind: 'shorter_session' })
-    expect(await stored()).toEqual({ has: false, st: 'consumed' })
+    expect(await row()).toEqual(before)
     expect(await slice.getCheckinSessionBudgetMin(ctxFor(A).db, A, APPLIES)).toBeNull()
-
-    // Not touched: a plan that expires before the week starts, and one the person accepted.
-    await store('pending', new Date(appliesMidnight.getTime() - 3_600_000))
-    await fullSave({ shorterSessionMin: 45 })
-    expect(await stored()).toEqual({ has: true, st: 'pending' })
-    await store('accepted', inWeek)
-    await fullSave({ shorterSessionMin: 50 })
-    expect(await stored()).toEqual({ has: true, st: 'accepted' })
   })
 
   it('E1: after an accepted swap, re-saving the same answers is not refused, keeps the swap, the injury and the step up', async () => {
@@ -523,6 +504,44 @@ describe.skipIf(!canRun)('weekly check-in engine (#3890 step 2)', () => {
     await fullSave({ daysOff: [3, 6] })
     expect(await restDays()).toEqual([SAT])
     expect(await written()).toEqual([SAT])
+  })
+
+  // A tap the person makes at the same moment as the save: their row goes live after the engine read
+  // which dates it owns and before it writes. The write step itself must not take the row over.
+  const restRow = (date: string) => pool.query(`SELECT updated_at, deleted_at FROM rest_days WHERE user_id = $1 AND date = $2`, [A, date]).then(r => r.rows[0])
+
+  it('A1: a rest day the person sets between the save\'s read and its write is neither re-stamped nor recorded', async () => {
+    const db = ctxFor(A).db
+    const stamp = new Date(NOW.getTime() - 60_000)
+    await byHand(SAT, true) // lands after the read point
+    const before = await restRow(SAT)
+    expect(await slice.claimRestDay(db, A, SAT, stamp)).toBe(false)
+    expect(await restRow(SAT)).toEqual(before)
+    // A tombstone and a brand-new date are the check-in's to claim.
+    await byHand(WED, true)
+    await byHand(WED, false)
+    expect(await slice.claimRestDay(db, A, WED, stamp)).toBe(true)
+    expect(await slice.claimRestDay(db, A, shiftDateStr(APPLIES, 6), stamp)).toBe(true)
+    expect((await restRow(WED)).updated_at.getTime()).toBe(stamp.getTime())
+    // Through the engine: the save records only what it wrote, and Undo leaves the person's day live.
+    await pool.query(`DELETE FROM rest_days WHERE user_id = $1 AND date <> $2`, [A, SAT])
+    const { state } = await fullSave({ daysOff: [3, 6] })
+    expect(state.checkin!.daysOffWritten).toEqual([WED])
+    await engine.undoCheckinEffect(ctxFor(A), state.checkin!.id, { kind: 'days_off' })
+    expect(await restDays()).toEqual([SAT])
+  })
+
+  it('A1: a recorded date the person re-taps after the save read it as the check-in\'s is left as they left it', async () => {
+    const db = ctxFor(A).db
+    const { state } = await fullSave({ daysOff: [6] })
+    const savedAt = new Date(state.checkin!.savedAt!)
+    expect(await slice.checkinOwnedRestDays(db, A, [SAT], savedAt)).toEqual(new Set([SAT]))
+    await byHand(SAT, false) // between the ownership read and the withdraw
+    await byHand(SAT, true)
+    const before = await restRow(SAT)
+    expect(await slice.moveOwnedRestDay(db, A, SAT, savedAt, false, new Date())).toBe(false)
+    expect(await restRow(SAT)).toEqual(before)
+    expect(await restDays()).toEqual([SAT])
   })
 
   it('identity: a person with no check-in rows holds nothing and keeps every session length', async () => {
