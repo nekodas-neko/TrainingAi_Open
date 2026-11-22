@@ -5,7 +5,10 @@ import { SECONDS_PER_REP, SET_SETUP_SEC, fitBudgetMin, fitBudgetWholeMin } from 
 import { PCT_BANDS } from '@trainingai/shared/workout/time-profile'
 import { displayOneRm, displayOneRmDelta } from '@trainingai/shared/1rm'
 import { FEVER_TEMP_Z } from '@trainingai/shared/health/illness-radar'
-import { PROMPT_REST_DAY_READINESS_BELOW, cutFor } from '@trainingai/shared/health/readiness-decision-thresholds'
+import {
+  PROMPT_REST_DAY_READINESS_BELOW, REST_DAY_SLEEP_TREND_BELOW, REST_DAY_HRV_TREND_BELOW, REST_DAY_SPO2_TREND_BELOW, cutFor,
+} from '@trainingai/shared/health/readiness-decision-thresholds'
+import { formatTrendRatio } from '@trainingai/shared/health/trend-ratio-shown'
 import { READINESS_MODEL_VERSION } from '@trainingai/shared/health/readiness-composite'
 import { goalRange } from './goal-ranges'
 import { userTextBlock, USER_TEXT_NOTE } from '../ai/untrusted-text'
@@ -189,9 +192,9 @@ phase_action rules:
   soreness, it is handled — do not use this action (or rest_day_recommended) for that
   soreness alone.
 - "rest_day_recommended": multiple systemic stress indicators simultaneously poor
-  (sleep_score_trend < 0.75 AND hrv_trend < 0.75 — use sleep_trend in place of
+  (sleep_score_trend < ${REST_DAY_SLEEP_TREND_BELOW} AND hrv_trend < ${REST_DAY_HRV_TREND_BELOW} — use sleep_trend in place of
   sleep_score_trend when the quality trend is not given; OR external_readiness < ${PROMPT_REST_DAY_READINESS_BELOW},
-  OR spo2_trend < 0.97, OR temp_z >= ${FEVER_TEMP_Z} [skin temperature fever-consistent
+  OR spo2_trend < ${REST_DAY_SPO2_TREND_BELOW}, OR temp_z >= ${FEVER_TEMP_Z} [skin temperature fever-consistent
   vs personal baseline]),
   OR the illness radar is elevated or fever (temperature/RHR/HRV moving together against the
   user's own baseline — training hard while fighting something makes both worse);
@@ -306,16 +309,16 @@ export function buildUserPrompt(
     `  Active injuries in today's session: ${signals.activeInjuredMusclesInSession.length > 0 ? userTextBlock(signals.activeInjuredMusclesInSession) : 'none'}`,
     signals.activeInjuredMusclesInSession.length > 0 ? `  ${USER_TEXT_NOTE}` : '',
     signals.sleepTrend != null
-      ? `  Sleep trend (recent/baseline ratio): ${signals.sleepTrend.toFixed(2)}`
+      ? `  Sleep trend (recent/baseline ratio): ${formatTrendRatio(signals.sleepTrend)}`
       : `  Sleep trend: no data`,
     signals.sleepScoreTrend != null
-      ? `  Sleep quality trend (recent/baseline ratio, our 0-100 sleep score): ${signals.sleepScoreTrend.toFixed(2)}`
+      ? `  Sleep quality trend (recent/baseline ratio, our 0-100 sleep score): ${formatTrendRatio(signals.sleepScoreTrend)}`
       : `  Sleep quality trend: no data`,
     signals.hrvTrend != null
-      ? `  HRV trend (recent/baseline ratio): ${signals.hrvTrend.toFixed(2)}`
+      ? `  HRV trend (recent/baseline ratio): ${formatTrendRatio(signals.hrvTrend)}`
       : `  HRV trend: no data`,
     signals.spo2Trend != null
-      ? `  SpO2 trend (recent/baseline ratio): ${signals.spo2Trend.toFixed(2)}`
+      ? `  SpO2 trend (recent/baseline ratio): ${formatTrendRatio(signals.spo2Trend)}`
       : `  SpO2 trend: no data`,
     signals.tempZ != null
       ? `  Skin temp deviation (temp_z, z-score vs personal baseline; >=${FEVER_TEMP_Z} fever-consistent): ${signals.tempZ > 0 ? '+' : ''}${signals.tempZ.toFixed(1)}`

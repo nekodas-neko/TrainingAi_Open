@@ -65,6 +65,17 @@ export const OTS_LOW_READINESS_BELOW = 67
  *  The alternative, the label (50), is one constant away. */
 export const LOW_READINESS_ALERT_BELOW = 57
 
+/**
+ * #3718 — the trend cuts of the AI prescription prompt's rest-day rule, which the daily check
+ * (`daily-rest-decision.ts`) reads too, so the two cannot disagree. Each is a ratio of the newest 3
+ * nights to the older baseline (`ratioTrend` in `sleep-trend.ts`, `recovery-trends.ts`), not a
+ * readiness score, so they are not in `READINESS_CUTS` and do not move with the readiness scale.
+ * Sleep AND HRV both under their cut is one signal; blood oxygen under its cut is another.
+ */
+export const REST_DAY_SLEEP_TREND_BELOW = 0.75
+export const REST_DAY_HRV_TREND_BELOW = 0.75
+export const REST_DAY_SPO2_TREND_BELOW = 0.97
+
 /** Every cut by name, so a comparison can ask for the one that matches the score's own scale. */
 export const READINESS_CUTS = {
   restDayRecovered: { name: 'rest-day: recovered', where: 'packages/shared/src/health/rest-day-guidance.ts', side: 'atLeast', before: 75, after: REST_DAY_RECOVERED_MIN },

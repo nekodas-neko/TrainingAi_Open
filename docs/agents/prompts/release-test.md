@@ -4,7 +4,7 @@ The Orchestrator has opened a **release issue** naming a candidate commit. Your 
 whether it is safe to ship. You run on the owner's machine.
 
 1. Check out the candidate commit exactly — not `main`, which may have moved.
-2. `pnpm check:rules` and the full `pnpm test` against local Postgres.
+2. Run `node scripts/local-db/migrate.js` from the candidate's tree, then `pnpm check:rules` and the full `pnpm test` against local Postgres. A local database whose read-only views are older than the candidate (a cloud session's start-up step applies the views of whatever tree it started on) fails `db-snapshot-integration` and `owner-only-db-tools-3657` with a "Snapshot drift" error (#4012).
 3. **If the release carries a migration:** restore a recent production snapshot locally, apply the
    migration, and check the data it touches survives.
 4. `pnpm dev` with its output saved to a file, then the route smoke against it:
