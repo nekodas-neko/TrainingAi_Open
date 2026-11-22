@@ -2044,7 +2044,8 @@ SELECT
   t.swap_change_id,
   t.deleted_at,
   t.created_at,
-  t.updated_at
+  t.updated_at,
+  t.days_off_written
 FROM public.weekly_checkins t
 WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
 

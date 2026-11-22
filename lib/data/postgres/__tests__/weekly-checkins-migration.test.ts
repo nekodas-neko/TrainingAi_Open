@@ -17,9 +17,13 @@ const USER_A = '00000000-0000-4000-8000-0000000038b1'
 const USER_B = '00000000-0000-4000-8000-0000000038b2'
 const MON = '2026-11-16' // a Monday
 const MON2 = '2026-11-23'
+const FILE2 = '202611221523_weekly_checkins_days_off_written.sql' // adds weekly_checkins.days_off_written
 
 const migrationSql = () =>
   readFileSync(join(process.cwd(), 'lib/data/postgres/migrations', FILE), 'utf8')
+
+const migration2Sql = () =>
+  readFileSync(join(process.cwd(), 'lib/data/postgres/migrations', FILE2), 'utf8')
 
 describe('schema.ts matches migration 202611221206 (#3890)', () => {
   // No database needed: the Drizzle tables are compared with what the SQL file declares.
@@ -29,19 +33,23 @@ describe('schema.ts matches migration 202611221206 (#3890)', () => {
     .filter(l => /^[a-z_]+\s+(uuid|text|date|boolean|smallint(\[\])?|timestamptz)\b/.test(l))
     .map(l => l.split(/\s+/)[0]).sort()
   const constraints = (table: string) => [...body(table).matchAll(/CONSTRAINT (\w+)/g)].map(m => m[1]).sort()
+  // The later migration adds one column (and its CHECKs) to weekly_checkins only; comments left out.
+  const addSql = () => migration2Sql().split('\n').filter(l => !l.trim().startsWith('--')).join('\n')
+  const addedColumns = (table: string) => table === 'weekly_checkins' ? [...addSql().matchAll(/ADD COLUMN IF NOT EXISTS (\w+)/g)].map(m => m[1]) : []
+  const addedConstraints = (table: string) => table === 'weekly_checkins' ? [...addSql().matchAll(/CONSTRAINT (\w+)/g)].map(m => m[1]) : []
 
   it.each([
     ['weekly_checkins', weeklyCheckins],
     ['weekly_checkin_exercises', weeklyCheckinExercises],
   ] as const)('%s has the same columns, constraints and indexes in both', (name, table) => {
     const cfg = getTableConfig(table)
-    expect(cfg.columns.map(c => c.name).sort()).toEqual(columns(name))
+    expect(cfg.columns.map(c => c.name).sort()).toEqual([...columns(name), ...addedColumns(name)].sort())
     const tsNames = [
       ...cfg.checks.map(c => c.name),
       ...cfg.uniqueConstraints.map(u => u.name),
       ...cfg.foreignKeys.map(f => f.getName()).filter(n => /_checkin_fkey$/.test(n)),
     ].filter((n): n is string => !!n).sort()
-    expect(tsNames).toEqual(constraints(name))
+    expect(tsNames).toEqual([...constraints(name), ...addedConstraints(name)].sort())
   })
   it('has the per-lift partial unique index in both', () => {
     expect(getTableConfig(weeklyCheckinExercises).indexes.map(i => i.config.name))
@@ -60,6 +68,7 @@ describe.skipIf(!canRun)('migration 202611221206 — weekly check-ins (#3890)', 
     const { getPool } = await import('@/lib/data/postgres/client')
     pool = getPool()
     await runMigrationSql(pool, migrationSql())
+    await runMigrationSql(pool, migration2Sql())
     for (const id of [USER_A, USER_B]) {
       await pool.query(
         `INSERT INTO users (id, email, password_hash, timezone) VALUES ($1, $2, 'x', 'Australia/Brisbane')
@@ -426,5 +435,54 @@ describe.skipIf(!canRun)('migration 202611221206 — weekly check-ins (#3890)', 
     } finally {
       await client.query('ROLLBACK'); client.release()
     }
+  })
+
+  describe('days_off_written (202611221523)', () => {
+    const WEEK = '2026-10-05' // applies 2026-10-12 .. 2026-10-18
+    beforeEach(async () => { await cleanWeek(USER_A, WEEK) })
+    const written = async () => (await pool.query(
+      `SELECT days_off_written::text[] AS d FROM weekly_checkins WHERE user_id = $1 AND week_start = $2`, [USER_A, WEEK])).rows[0].d
+
+    it('re-runs cleanly and adds one nullable date[] column with no default', async () => {
+      await runMigrationSql(pool, migration2Sql())
+      await runMigrationSql(pool, migration2Sql())
+      const c = (await pool.query(
+        `SELECT data_type, udt_name, is_nullable, column_default FROM information_schema.columns
+          WHERE table_schema = 'public' AND table_name = 'weekly_checkins' AND column_name = 'days_off_written'`)).rows
+      expect(c).toEqual([{ data_type: 'ARRAY', udt_name: '_date', is_nullable: 'YES', column_default: null }])
+    })
+    it('is NULL on a bare check-in, and accepts NULL, an empty array and dates inside the applies-to week', async () => {
+      await checkin(USER_A, WEEK)
+      expect(await written()).toBeNull()
+      await pool.query(`UPDATE weekly_checkins SET days_off_written = '{}' WHERE user_id = $1 AND week_start = $2`, [USER_A, WEEK])
+      expect(await written()).toEqual([])
+      await pool.query(`UPDATE weekly_checkins SET days_off_written = ARRAY['2026-10-12', '2026-10-18']::date[] WHERE user_id = $1 AND week_start = $2`, [USER_A, WEEK])
+      expect(await written()).toEqual(['2026-10-12', '2026-10-18'])
+      await pool.query(`UPDATE weekly_checkins SET days_off_written = NULL WHERE user_id = $1 AND week_start = $2`, [USER_A, WEEK])
+      expect(await written()).toBeNull()
+    })
+    it('refuses more than seven dates', async () => {
+      const eight = ['2026-10-12', '2026-10-13', '2026-10-14', '2026-10-15', '2026-10-16', '2026-10-17', '2026-10-18', '2026-10-18']
+      await check(checkin(USER_A, WEEK, { days_off_written: eight }), 'weekly_checkins_days_off_written_count_check')
+    })
+    it.each([
+      ['the day before the applies-to week', ['2026-10-11']],
+      ['the day after the applies-to week', ['2026-10-19']],
+      ['the week being reviewed itself', ['2026-10-05']],
+      ['one good date and one outside', ['2026-10-13', '2026-10-25']],
+      ['a NULL element', [null, '2026-10-13']],
+    ])('refuses %s', async (_n, dates) => {
+      await check(checkin(USER_A, WEEK, { days_off_written: dates }), 'weekly_checkins_days_off_written_week_check')
+    })
+    it('accepts all seven days of the applies-to week', async () => {
+      await checkin(USER_A, WEEK, { days_off_written: ['2026-10-12', '2026-10-13', '2026-10-14', '2026-10-15', '2026-10-16', '2026-10-17', '2026-10-18'] })
+      expect((await written())).toHaveLength(7)
+    })
+    it('follows applies_week_start across a year end', async () => {
+      await cleanWeek(USER_A, '2026-12-28')
+      await checkin(USER_A, '2026-12-28', { days_off_written: ['2027-01-04', '2027-01-10'] })
+      await check(checkin(USER_B, '2026-12-28', { days_off_written: ['2027-01-11'] }), 'weekly_checkins_days_off_written_week_check')
+      await cleanWeek(USER_A, '2026-12-28')
+    })
   })
 })
