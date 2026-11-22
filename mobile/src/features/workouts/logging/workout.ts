@@ -81,6 +81,9 @@ const exerciseSchema = z.object({
   // Whether the question was on screen, on the rest card or in the window. A default nobody saw
   // is dropped when the rest card is left (dropUnseenDefaults). Kept on the phone, never uploaded.
   effortShown: z.boolean().default(false),
+  // #3896 step 5: the one-shot this exercise's plan carried, echoed in its log (catalog.ts). A
+  // workout saved before this build reads as carrying none.
+  liftOneShotSetAt: z.string().datetime().max(40).nullable().default(null),
   sets: z.array(setSchema).min(1).max(20),
 });
 const reference = z.object({ exerciseId: z.uuid(), setId: z.uuid() });
@@ -605,6 +608,8 @@ export function mutationFor(
     ...(exercise.styleId === null ? {} : { styleId: exercise.styleId }),
     muscleGroups: exercise.muscles,
     exerciseDeloaded: exercise.deloaded,
+    // #3896 step 5: which one-shot this plan carried; the server only compares it, never stores it.
+    ...(exercise.liftOneShotSetAt ? { liftOneShotSetAt: exercise.liftOneShotSetAt } : {}),
     ...(effort ? { effort } : {}),
     intensityMode: workout.intensityMode,
     wasOverride: workout.wasOverride,

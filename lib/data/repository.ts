@@ -787,7 +787,8 @@ export interface WorkoutRepository {
     sets: (Omit<SetLog, 'id' | 'exerciseLogId'> & { id?: string })[],
     /** Issue 2721: how this write records when the row was decided; omitted means a live server write. */
     stamp?: EditStamp,
-  ): Promise<{ exerciseLog: ExerciseLog; setLogs: SetLog[]; superseded?: true }>
+    /** `inserted` (#3896): this write created the log rather than replaying one already stored. */
+  ): Promise<{ exerciseLog: ExerciseLog; setLogs: SetLog[]; superseded?: true; inserted?: boolean }>
 
   // ── Body & Activity ────────────────────────────────────────────────────────
   upsertBodyMetrics(userId: string, metrics: Omit<BodyMetrics, 'id' | 'userId' | 'createdAt'>[], source: HealthSource): Promise<void>
@@ -1142,6 +1143,8 @@ export interface WorkoutRepository {
   searchFoodItems(userId: string, query: string): Promise<FoodItem[]>
   /** #3651. The live food with this exact barcode, newest first; at most one. */
   findFoodItemsByBarcode(userId: string, barcode: string): Promise<FoodItem[]>
+  /** #3749. Live foods whose case- and whitespace-folded name is one of `names`, any source. */
+  listFoodItemsByNames(userId: string, names: readonly string[]): Promise<FoodItem[]>
   /** One owned food item, or null for an unknown id and another user's id alike. */
   getFoodItemById(userId: string, id: string): Promise<FoodItem | null>
   /** #3476. Foods the look-alike merge retired since `since`, and fresh copies of their keepers. */
@@ -1502,6 +1505,12 @@ export interface WorkoutRepository {
   }>>
   /** #3893: the session read's inputs for the user's workouts started in `[from, to)`, oldest first. Read only. */
   getSessionReadLogs(userId: string, from: Date, to: Date): Promise<import('@trainingai/shared/ai-periodization/session-read').SessionReadLog[]>
+  /** #3896: the user's live lift preferences for these lifts, keyed by the name passed; id match first,
+   *  then the name. One query, owner-scoped. Clears an expired one-shot (`ONE_SHOT_TTL_DAYS`) as it reads. */
+  listExercisePreferences(userId: string, exerciseNames: string[]): Promise<Map<string, import('@trainingai/shared/ai-periodization/lift-preference').LiftPreferenceRow>>
+  /** #3896: consume a lift's one-shot in one conditional write, only while the row's `one_shot_set_at`
+   *  is the value the log's plan carried (`servedSetAt`). True only for the call that cleared it. */
+  consumeLiftOneShot(userId: string, exerciseName: string, servedSetAt: Date): Promise<boolean>
   getSetTimingRows(userId: string, exerciseNames: string[]): Promise<import('@trainingai/shared/workout/time-profile').TimingRow[]>
   getExercise1rmHistory(userId: string, exerciseNames: string[], tz: string, windowDays?: number): Promise<Record<string, { date: string; rm: number }[]>>
   getWeeklySetsByMuscleGroup(userId: string, programId: string, weekStart: string, weekEnd: string, tz: string): Promise<Record<string, number>>

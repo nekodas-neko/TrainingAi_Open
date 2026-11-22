@@ -13,6 +13,7 @@ import {
 } from './models.ts';
 import { WidgetResultSchema, type WidgetResult } from './widgets.ts';
 import { CoachTransport } from './CoachTransport.ts';
+import { RENDERED_PATCH_DOMAINS } from './patch.ts';
 import { failureNotice } from '../../../core/reporting/index.ts';
 
 type State = {
@@ -63,7 +64,8 @@ export class CoachConversation {
       generateId: uuid,
       transport: new CoachTransport({
         api: '/api/coach',
-        body: { scope },
+        // #3896 step 5: the gated patch domains this build renders, so the server offers them.
+        body: { scope, patchDomains: RENDERED_PATCH_DOMAINS },
         fetch: async (_url, init) => {
           if (this.disposed || !resources.connection.coachStream)
             throw new Error('Coach is unavailable.');

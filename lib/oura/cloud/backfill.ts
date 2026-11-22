@@ -15,6 +15,7 @@ import type { WorkoutRepository } from '@/lib/data/repository'
 import { OuraUnavailableError } from './client'
 import { ouraOAuthConfig, type OuraOAuthConfig } from './config'
 import { describeRefusal, fetchOuraDocuments, fetchOuraHeartRate, fetchOuraRingBattery, OuraForbiddenError, OuraRateLimitedError, OuraUnauthorizedError } from './data'
+import { markRingBatteryRefused } from './ring-battery-backoff'
 import { isOuraTypeShared, mapHeartRateRows, mapOuraDocuments, mapRingBatteryRows, OURA_DOCUMENT_TYPE_NAMES, type OuraDocument, type OuraDocumentType, type OuraSeriesType } from './documents'
 import { NO_WRITES, plannedCounts, reattributeAfterHeartRate, refreshStillRhrAfterHeartRate, writeOuraCloudData, type OuraBatteryStore, type OuraCloudWriteCounts, type OuraCloudWriter, type OuraWorkoutHrReattribute } from './ingest'
 import { stampOuraData } from './freshness'
@@ -301,8 +302,9 @@ export async function backfillOuraCloud(deps: OuraBackfillDeps, userId: string, 
           report.dropped += got.dropped
           if (!opts.dryRun) await deps.repo.insertOuraCloudBatteryReadings(userId, mapRingBatteryRows(got.rows))
         } catch (err) {
-          if (err instanceof OuraForbiddenError) { report.forbidden.push('ring_battery'); noteReason('ring_battery', 403, err); break }
+          if (err instanceof OuraForbiddenError) { report.forbidden.push('ring_battery'); noteReason('ring_battery', 403, err); markRingBatteryRefused(userId, Date.now()); break }
           if (err instanceof OuraUnauthorizedError) {
+            markRingBatteryRefused(userId, Date.now())
             let why: true | OuraRefusalVerdict
             try {
               why = await refusedTypeOnly('ring_battery', err)

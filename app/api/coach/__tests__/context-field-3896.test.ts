@@ -17,8 +17,6 @@ vi.mock('@/lib/data/postgres/client', () => ({ getDb: () => ({}), ensureSchema: 
 vi.mock('@/lib/coach/context', async (orig) => ({ ...(await orig<Record<string, unknown>>()), resolveCoachContext }))
 vi.mock('@ai-sdk/google', () => ({ google: { tools: { googleSearch: () => ({}) } } }))
 vi.mock('@/lib/ai/instrument', () => ({
-  COACH_MODEL_ID: 'test',
-  coachModel: () => ({}),
   loggedStreamText: (_meta: unknown, args: { system: string }) => {
     streamed.calls.push(args)
     return { toUIMessageStreamResponse: () => new Response('ok') }

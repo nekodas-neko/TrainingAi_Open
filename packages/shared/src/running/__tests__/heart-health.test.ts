@@ -157,3 +157,64 @@ describe('issue 2093 — placing an activity against the heart-rate series', () 
     expect(activityLogWindow({ date: '2026-10-06', startTime: '07:00' }, TZ)).toBeNull()
   })
 })
+
+describe('issue 3853 — an end equal to the start is not a 24-hour window', () => {
+  const TZ = 'Australia/Brisbane' // UTC+10, no DST
+  const mins = (w: ReturnType<typeof activityLogWindow>) => (w!.to.getTime() - w!.from.getTime()) / 60_000
+  it('gives no window to a zero-length log with no duration', () => {
+    expect(activityLogWindow({ date: '2026-07-01', startTime: '15:50', endTime: '15:50' }, TZ)).toBeNull()
+    expect(activityLogWindow({ date: '2026-07-01', startTime: '15:50', endTime: '15:50', durationMin: 0 }, TZ)).toBeNull()
+  })
+  it('reads an end equal to the start with a duration as start + duration', () => {
+    expect(mins(activityLogWindow({ date: '2026-07-01', startTime: '07:00', endTime: '07:00', durationMin: 45 }, TZ))).toBe(45)
+    // The issue's 12-second treadmill log: a 12-second window, which holds fewer than two readings.
+    const tiny = activityLogWindow({ date: '2026-07-01', startTime: '15:50:00', endTime: '15:50:00', durationMin: 0.2 }, TZ)
+    expect(mins(tiny)).toBeCloseTo(0.2)
+    const readings = Array.from({ length: 24 * 60 }, (_, i) => ({ timestamp: tiny!.from.getTime() - 3_600_000 + i * 60_000, bpm: 150 }))
+    const inside = readings.filter((r) => r.timestamp >= tiny!.from.getTime() && r.timestamp <= tiny!.to.getTime())
+    expect(inside.length).toBeLessThan(2)
+  })
+  it('gives no window to an end equal to the start with an implausible duration', () => {
+    expect(activityLogWindow({ date: '2026-07-01', startTime: '07:00', endTime: '07:00', durationMin: 241 }, TZ)).toBeNull()
+    expect(mins(activityLogWindow({ date: '2026-07-01', startTime: '07:00', endTime: '07:00', durationMin: 240 }, TZ))).toBe(240)
+  })
+  it('does not trust a huge duration to replace a mistyped rolled end', () => {
+    expect(activityLogWindow({ date: '2026-07-01', startTime: '15:50', endTime: '15:40', durationMin: 5000 }, TZ)).toBeNull()
+  })
+  it('gives no window to a rolled span over 4 h with no duration to confirm it', () => {
+    expect(activityLogWindow({ date: '2026-07-01', startTime: '15:50', endTime: '15:40' }, TZ)).toBeNull()
+    expect(activityLogWindow({ date: '2026-07-01', startTime: '15:50', endTime: '15:49' }, TZ)).toBeNull()
+  })
+  it('keeps a long genuine overnight log whose duration confirms it', () => {
+    expect(mins(activityLogWindow({ date: '2026-07-01', startTime: '23:00', endTime: '07:00', durationMin: 480 }, TZ))).toBe(480)
+  })
+  it('keeps a short overnight log with no duration', () => {
+    expect(mins(activityLogWindow({ date: '2026-07-01', startTime: '23:40', endTime: '00:20' }, TZ))).toBe(40)
+  })
+  it('keeps an overnight log whose duration matches', () => {
+    const w = activityLogWindow({ date: '2026-07-01', startTime: '23:40', endTime: '00:20', durationMin: 40 }, TZ)
+    expect(w?.from.toISOString()).toBe('2026-07-01T13:40:00.000Z')
+    expect(w?.to.toISOString()).toBe('2026-07-01T14:20:00.000Z')
+  })
+  it('uses the duration from the start when the rolled span is over an hour off it', () => {
+    // 15:50 to 15:40 would roll to 23 h 50 min; the log says 20 minutes.
+    const w = activityLogWindow({ date: '2026-07-01', startTime: '15:50', endTime: '15:40', durationMin: 20 }, TZ)
+    expect((w!.to.getTime() - w!.from.getTime()) / 60_000).toBe(20)
+    // Exactly an hour off still rolls: the duration only wins past an hour.
+    const edge = activityLogWindow({ date: '2026-07-01', startTime: '23:00', endTime: '00:00', durationMin: 120 }, TZ)
+    expect((edge!.to.getTime() - edge!.from.getTime()) / 60_000).toBe(60)
+    const over = activityLogWindow({ date: '2026-07-01', startTime: '23:00', endTime: '00:00', durationMin: 121 }, TZ)
+    expect((over!.to.getTime() - over!.from.getTime()) / 60_000).toBe(121)
+  })
+  it('measures an overnight window across a clock change in the profile timezone', () => {
+    // Sydney's daylight time ended at 03:00 on 5 Apr 2026 (clocks back to 02:00): 23:00 to 03:00 is
+    // five real hours, not four.
+    const w = activityLogWindow({ date: '2026-04-04', startTime: '23:00', endTime: '03:00', durationMin: 300 }, 'Australia/Sydney')
+    expect((w!.to.getTime() - w!.from.getTime()) / 60_000).toBe(300)
+    // With no duration the clock times alone are believed only up to 4 h: five real hours is past
+    // the bound, two and a half is not.
+    const bare = activityLogWindow({ date: '2026-04-04', startTime: '23:00', endTime: '01:30' }, 'Australia/Sydney')
+    expect((bare!.to.getTime() - bare!.from.getTime()) / 60_000).toBe(150)
+    expect(activityLogWindow({ date: '2026-04-04', startTime: '23:00', endTime: '03:00' }, 'Australia/Sydney')).toBeNull()
+  })
+})

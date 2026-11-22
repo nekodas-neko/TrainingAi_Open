@@ -270,8 +270,6 @@ export async function invalidateOuraSync(): Promise<void> {
     invalidateCache('health-trends:'),
     // wear-time/HRV F6 sparklines (bare key, distinct from the health-trends: family)
     invalidateCache('health-trends-summary'),
-    // exercise-detected-card's unreviewed-Oura-workouts list
-    invalidateCache('oura-unreviewed-workouts'),
     invalidateCache('sleep-performance-correlation'),
     // B3/B4/B5: a drain brings new HR/MET/RHR → OTS, body battery, and the HR profile.
     invalidateCache('training-stress'),
@@ -716,13 +714,6 @@ export async function invalidateFoodItems(): Promise<void> {
 /** Saved-meal definitions changed (create/update/delete in the saved-meals sheet). */
 export async function invalidateSavedMeals(): Promise<void> {
   await invalidateCache('saved-meals')
-}
-
-/** A detected-workout suggestion was marked reviewed or dismissed (exercise-detected-card,
- *  exercise-review-sheet). Distinct from invalidateOuraSync — that's a full BLE/Cloud sync
- *  bringing new data; this is just clearing one dismissed/reviewed suggestion off the list. */
-export async function invalidateOuraWorkoutReview(): Promise<void> {
-  await invalidateCache('oura-unreviewed-workouts')
 }
 
 /** The Home header's manual "Refresh" button. Narrower than invalidateWorkoutSummaries() (which

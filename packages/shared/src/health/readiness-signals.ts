@@ -23,6 +23,9 @@
  * - {@link DailyWear}: how long the source was not worn on a local day. Oura maps
  *   `daily_activity.non_wear_time` (seconds); Fitbit's or Health Connect's off-wrist time would map
  *   here. Readiness's low-wear rule reads it (#3668).
+ * - {@link DailyResilienceLevel}: the source's own resilience level for a day, as the source's word.
+ *   Oura maps `daily_resilience.level`; it is not the app's 1–5 scale and is never mapped onto it.
+ *   The coach's recovery tool reads it for a day the app has no level of its own (#3884).
  *
  * Pure types; importing no node module.
  */
@@ -80,5 +83,13 @@ export interface DaytimeHighRecovery {
 export interface DailyWear {
   date: string
   nonWearSec: number
+  source: string
+}
+
+/** A source's own resilience level for a local day, in the source's own words (Oura: limited, adequate,
+ *  solid, strong, exceptional). Not the app's 1–5 scale. */
+export interface DailyResilienceLevel {
+  date: string
+  level: string
   source: string
 }

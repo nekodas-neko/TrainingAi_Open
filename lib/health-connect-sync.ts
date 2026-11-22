@@ -9,6 +9,7 @@ import type { HealthConnectPlugin } from '@devmaxime/capacitor-health-connect';
 import { intervalsToPhase5Min, type SleepStage, type StageInterval } from '@trainingai/shared/health/hypnogram';
 import { msToHHMMInTz, toAestDay, shiftDateStr, dateStrMidnightInTz, daysBetweenDateStrs, isCalendarDate, todayInTz, DEFAULT_TZ } from '@trainingai/shared/date-utils';
 import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
+import { activityLogWindow } from '@trainingai/shared/running/heart-health';
 import { capitalize } from '@trainingai/shared/format/capitalize';
 import { FirstHandFilter, firstHandSkipsLapsed, knownFirstHandSources, type FirstHandSources } from '@trainingai/shared/health/health-connect-origin';
 import {
@@ -425,6 +426,24 @@ export interface EnrichmentCandidate {
   date: string;
   startTime?: string; // "HH:MM", local time
   endTime?: string;   // "HH:MM", local time
+  /** The log's stored duration. It places a log whose end equals its start, and confirms or
+   *  overrides an overnight end (see `activityLogWindow`). Absent from an older server's reply. */
+  durationMin?: number;
+}
+
+/**
+ * The Health Connect read window for one enrichment candidate, as ISO instants; `null` when the
+ * log cannot be placed and so must not be read. Placed by `activityLogWindow`, the one home for
+ * turning a log's clock times into a window (#3998): this used to roll the end a day when it was
+ * not after the start, so an end equal to start (a 12-second treadmill log) asked Health Connect
+ * for 24 hours and PATCHed whatever it found onto that log.
+ */
+export function enrichmentWindowIso(c: EnrichmentCandidate, tz: string): { start: string; end: string } | null {
+  const window = activityLogWindow(
+    { date: c.date, startTime: c.startTime, endTime: c.endTime, durationMin: c.durationMin },
+    tz,
+  );
+  return window ? { start: window.from.toISOString(), end: window.to.toISOString() } : null;
 }
 
 /**
@@ -505,9 +524,9 @@ export async function enrichActivityLogs(
 
   for (const c of candidates) {
     if (!c.startTime || !c.endTime) continue;
-    const start = localDateTimeToIso(c.date, c.startTime, tz);
-    const end = localDateTimeToIso(c.date, c.endTime, tz, c.endTime <= c.startTime ? 1 : 0);
-    const metrics = await getSessionMetrics(HealthConnect, canRead, start, end, filter);
+    const window = enrichmentWindowIso(c, tz);
+    if (!window) continue;
+    const metrics = await getSessionMetrics(HealthConnect, canRead, window.start, window.end, filter);
     if (!Object.keys(metrics).length) continue;
 
     try {

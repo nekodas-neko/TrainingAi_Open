@@ -6,6 +6,33 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.530.0",
+    date: "2026-11-22",
+    changes: [
+      "Both apps: a lift's 1RM trend now compares its latest estimate with the one before it, so it can read \"down\" when a lift has dropped. Before, it was compared with your all-time best and almost never did. This changes how plans are made: a lift that has dropped can have its next weight eased, and it no longer earns extra reps or sets.",
+      "Both apps: food scans, meal plans and meal top-ups take their per-100 g numbers from a reference table of common foods (USDA), or from your own barcode-scanned foods, whenever the food is recognised, so the same food gets the same numbers everywhere. The scan's confidence badge now reflects how much of the meal was recognised, and a top-up first tries a couple of staple foods by simple arithmetic.",
+      "TrainingAi Preview: ask the Coach to change a lift (higher reps and lighter, more rest, one set more or fewer, one plate lighter or heavier next time). You see a card with the new numbers, can apply it, and can undo it. This needs the new Preview build. Plans change only for a lift you change this way.",
+      "Both apps: an activity logged with the same start and end time is no longer treated as lasting a whole day. This affects heart-health minutes, walking and the stress views. No past verdict changes for existing data.",
+      "Both apps: renaming an exercise keeps its starting 1RM and settings, and no longer fails when you already have a record under the new name.",
+      "Current app: Health Connect sync no longer copies another workout's numbers onto an activity with the same start and end time.",
+      "Behind the scenes: the coach's recovery read and the daily Oura reconcile now use source-neutral shapes, there is one set of rules for every AI call, and storage is prepared for rest periods and day tags.",
+    ],
+  },
+  {
+    version: "1.529.0",
+    date: "2026-11-22",
+    changes: [
+      "Both apps: the \"unusual day\" question about your readiness now follows the day's score. If the score changes after the question was first asked, a question you haven't answered yet is brought up to date with it.",
+      "Both apps: once you have rated how an unusual day felt, a later answer to the same question no longer replaces your rating.",
+      "TrainingAi Preview: the walking week now says where you stand: Week met, On track or Behind.",
+      "Both apps: the trainer also reads how you did on each exercise's last session (rest between sets, reps against plan, how it felt). For now it only records this: nothing about it is shown and no plan changes.",
+      "TrainingAi Preview: choose a walking plan or a running plan, and see your walking week on the Cardio Hub.",
+      "TrainingAi Preview: you can enter starting 1RMs when building a program, use your earlier training data as a baseline, and your food region and label style are saved to your account. Tap a muscle to see its 6-week tonnage trend.",
+      "TrainingAi Preview: each kind of number (volume, distance, water, XP, counts) is written the same way on every screen.",
+      "Behind the scenes: dependency security patches and some tidying of shared helper code, with no change to what you see.",
+    ],
+  },
+  {
     version: "1.528.0",
     date: "2026-11-21",
     changes: [

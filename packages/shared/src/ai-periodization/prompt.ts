@@ -163,7 +163,7 @@ When phase_action is "transition_recommended", the "phase" field MUST be the pha
 moving TO, and it must differ from current_phase. A transition to the phase already in
 progress is invalid — use "stay" instead.
 
-Strength trend: use rm1_trend and rm1_change_kg only (current PR vs previous PR).
+Strength trend: use rm1_trend and rm1_change_kg only (the latest 1RM estimate vs the one before it; current_1rm is the all-time best and is not the figure compared).
 Do NOT compare current_1rm against baseline_1rm as a strength metric — baseline is only
 the starting weight anchor from the AMRAP week and will be exceeded quickly.
 
@@ -209,7 +209,6 @@ Output field notes:
 - session_exercise_id: copy exactly from the exercise list — never invent one.
 - reasoning: 1-2 sentences. Never state a time budget or any duration in minutes: the app adds
   the sentence about time itself, and removes any minutes figure you write.
-- confidence: your certainty in this prescription, 0.0-1.0.
 
 ${PROSE_FIELD_GUARDS}`
 }
@@ -244,12 +243,16 @@ export function buildUserPrompt(
   // Q-19b: the change is reps for a bodyweight movement, kilograms otherwise. `rm1ChangeKg`
   // is a kg-domain delta by name, so it cannot be printed with a unit without this.
   const rm1Change = (ex: PrescriptionSignals['exercises'][number]): string => {
-    if (ex.current1rm == null) return `${ex.rm1ChangeKg > 0 ? '+' : ''}${ex.rm1ChangeKg.toFixed(1)} kg`
-    const previous = ex.current1rm - ex.rm1ChangeKg
-    return displayOneRmDelta(ex.current1rm, previous, ex.exerciseType)?.text
+    // The change is latest − previous estimate (#3891), so the delta is built from `latest1rm`,
+    // not from `current1rm` (the all-time best).
+    const latest = ex.latest1rm ?? ex.current1rm
+    if (latest == null) return `${ex.rm1ChangeKg > 0 ? '+' : ''}${ex.rm1ChangeKg.toFixed(1)} kg`
+    const previous = latest - ex.rm1ChangeKg
+    return displayOneRmDelta(latest, previous, ex.exerciseType)?.text
       ?? `${ex.rm1ChangeKg > 0 ? '+' : ''}${ex.rm1ChangeKg.toFixed(1)} kg`
   }
 
+  const preferencesApply = state.phase !== 'deload' && state.phase !== 'baseline'
   const exerciseLines = signals.exercises.map(ex => {
     const musclesStr = ex.muscleAssignments.length > 0
       ? ex.muscleAssignments.map(ma => `${ma.muscle} (${ma.role})`).join(', ')
@@ -266,11 +269,16 @@ export function buildUserPrompt(
     // render it through the shared helper so the model is given "6 RM", not "118 kg".
     const oneRm = (v: number | null | undefined) =>
       v == null ? 'unknown' : displayOneRm(v, ex.exerciseType).text
+    // #3896: the lifter's own rep range for this lift, so the plan and its reasoning agree with the
+    // clamp code applies after the answer. Code enforces it; this line only keeps the text coherent.
+    // Not said in a deload or baseline, where a preference does not apply. Absent: the line is as before.
+    const range = preferencesApply ? ex.liftPreference?.preference.repRange : null
+    const rangeStr = range ? `, rep_range: ${range.min}-${range.max} (the lifter's choice for this lift; keep reps inside it)` : ''
     return `  - ${ex.name} (id: ${ex.sessionExerciseId}, role: ${ex.role}, muscles: ${musclesStr}, ` +
       `baseline_1rm: ${oneRm(ex.baseline1rm)} [anchor only — do not use for trend], ` +
       `current_1rm: ${oneRm(ex.current1rm)}, ` +
       `rm1_trend: ${ex.rm1Trend} ${rm1Change(ex)}, ` +
-      `avg_set_duration: ${ex.avgSetDurationSec}s, transition_sec: ${ex.transitionSec}${measuredStr})` +
+      `avg_set_duration: ${ex.avgSetDurationSec}s, transition_sec: ${ex.transitionSec}${measuredStr}${rangeStr})` +
       (ex.plateau ? ' [1RM flat ≥3 weeks — consider a stimulus change]' : '')
   }).join('\n')
 

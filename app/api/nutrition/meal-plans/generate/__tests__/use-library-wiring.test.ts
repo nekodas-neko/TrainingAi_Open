@@ -21,7 +21,6 @@ const USER = '00000000-0000-4000-8000-000000001b21'
 vi.mock('@/auth', () => ({ auth: vi.fn(async () => ({ user: { id: USER, timezone: 'Australia/Brisbane' } })) }))
 vi.mock('@/lib/rate-limit', () => ({ rateLimit: () => true }))
 vi.mock('@/lib/ai/instrument', () => ({
-  aiModel: () => ({}),
   contentKey: (...parts: unknown[]) => parts.join('|'),
   loggedGenerateObject: async (_meta: unknown, run: () => Promise<unknown>) => run(),
 }))
@@ -80,6 +79,7 @@ const repo = {
   getMostRecentConfirmedWeightKg: vi.fn(async () => 72),
   listSavedMeals: vi.fn(async () => [] as unknown[]),
   listMealTypes: vi.fn(async () => [] as unknown[]),
+  listFoodItemsByNames: vi.fn(async () => []),
 }
 vi.mock('@/lib/data', () => ({ getRepository: async () => repo, getRepositoryAsync: async () => repo }))
 

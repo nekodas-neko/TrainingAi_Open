@@ -2,7 +2,7 @@ import { convertToModelMessages, stepCountIs, type UIMessage } from 'ai'
 import { google } from '@ai-sdk/google'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { COACH_MODEL_ID, coachModel, loggedStreamText } from '@/lib/ai/instrument'
+import { loggedStreamText } from '@/lib/ai/instrument'
 import { aiPausedResponse, aiStreamErrorText } from '@/lib/ai/provider-paused'
 import { PROSE_GUARDS } from '@/lib/ai/prompt-guards'
 import { auth } from '@/auth'
@@ -12,7 +12,7 @@ import { DEFAULT_TZ, todayInTz } from '@trainingai/shared/date-utils'
 import { buildInjuryContext } from '@/lib/ai-chat/context'
 import { buildChatTools } from '@/lib/ai-chat/tools'
 import { buildWidgetTools } from '@/lib/coach/tools'
-import { coachScope, pickTools } from '@/lib/coach/scopes'
+import { coachScope, pickTools, withClientDomains } from '@/lib/coach/scopes'
 import { COACH_MAX_STEPS, coachStepOverride } from '@/lib/coach/step-limit'
 import { resolveDanglingWidgetCalls } from '@/lib/coach/dangling-widgets'
 import { errorLog } from '@trainingai/shared/logger'
@@ -53,6 +53,13 @@ const BodySchema = z.object({
    * not send it gets the Coach it had.
    */
   context: CoachContextSchema.optional(),
+  /**
+   * #3896 step 5: the gated patch domains this client renders (`GATED_PATCH_DOMAINS`). A gated domain
+   * is offered only to a client that names it, so an older Preview build or the web app never gets a
+   * proposal its own copy of the patch schema would reject. Loose strings, so a newer client naming a
+   * domain this server has not shipped still gets a working Coach; only known gated names count.
+   */
+  patchDomains: z.array(z.string().max(40)).max(20).optional(),
 })
 
 // RV-173: the guards belong here for the same reason they belong on every other prose route —
@@ -236,7 +243,7 @@ export async function POST(req: Request) {
     const parsed = BodySchema.safeParse(read.body)
     if (!parsed.success) return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
 
-    const scope = coachScope(parsed.data.scope)
+    const scope = withClientDomains(coachScope(parsed.data.scope), parsed.data.patchDomains)
     const tz = session.user?.timezone ?? DEFAULT_TZ
     const todayIso = todayInTz(tz)
     const repo = await getRepositoryAsync()
@@ -283,9 +290,8 @@ export async function POST(req: Request) {
     ].filter(Boolean).join('\n\n')
 
     const result = loggedStreamText(
-      { section: 'coach', userId, model: COACH_MODEL_ID },
+      { section: 'coach', userId },
       {
-        model: coachModel(),
         system,
         messages: modelMessages,
         tools: {
@@ -301,7 +307,8 @@ export async function POST(req: Request) {
           // was the open risk: historically the two could not be combined.
           google_search: google.tools.googleSearch({}),
         },
-        // **This is what made Coach fast** (Q-170). Latency here is almost entirely output-token
+        // **The thinking level is what made Coach fast** (Q-170) — set to 'minimal' on the `coach` entry
+        // of `AI_SECTIONS` (lib/ai/instrument.ts), no longer here. Latency here is almost entirely output-token
         // generation — measured at ~1.8 s fixed overhead plus ~270 tokens/sec — and a picker turn
         // was emitting **2,204 output tokens to render a ~400-token widget**. The rest was
         // reasoning the user never sees. Dropping the thinking level took the same turn to 554
@@ -311,7 +318,6 @@ export async function POST(req: Request) {
         // Two other levers were measured first and BOTH made it worse — inlining the program into
         // the system prompt, and forcing a sentence before every tool call. See the Q-170 backlog
         // entry before trying either again.
-        providerOptions: { google: { thinkingConfig: { thinkingLevel: 'minimal' } } },
         // The read-only tools may chain; a widget tool ends the turn by suspending, so this bounds
         // data gathering rather than widget rendering.
         stopWhen: stepCountIs(COACH_MAX_STEPS),

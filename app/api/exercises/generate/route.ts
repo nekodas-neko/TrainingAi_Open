@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { generateObject } from 'ai'
-import { aiModel, loggedGenerateObject } from '@/lib/ai/instrument'
+import { loggedGenerateObject } from '@/lib/ai/instrument'
 import { aiPausedResponse } from '@/lib/ai/provider-paused'
 import { rateLimit } from '@/lib/rate-limit'
 import { z } from 'zod'
@@ -87,12 +87,11 @@ export async function POST(req: NextRequest) {
 
     const { object } = await loggedGenerateObject(
       { section: 'exercises-generate', userId: session.user.id, fingerprint: body.data.name },
-      signal => generateObject({
-        model: aiModel(),
+      (signal, settings) => generateObject({
+        ...settings,
         schema: ExerciseGenSchema,
         system: SYSTEM_PROMPT,
         prompt: `Exercise name: "${body.data.name}"`,
-        maxRetries: 0,
         abortSignal: signal,
       }),
     )

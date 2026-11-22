@@ -39,8 +39,8 @@ export function activityHrWindows(
   }
   for (const log of input.activityLogs ?? []) {
     const w = activityLogWindow(log, tz)
-    // The same bound for a log: an end time equal to its start reads as the next day's, a 24-hour
-    // span (a 12-second treadmill log did this), which would count the whole day at 5½ min a gap.
+    // The same bound for a log, kept as a second line of defence behind `activityLogWindow`: a
+    // same-day span over 4 h (06:00 to 22:00) would count the whole day at 5½ min a gap.
     if (w && isPlausibleSessionDuration((w.to.getTime() - w.from.getTime()) / 60_000)) {
       out.push({ fromMs: w.from.getTime(), toMs: w.to.getTime() })
     }

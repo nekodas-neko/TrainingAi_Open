@@ -11,6 +11,8 @@ import { pctForExpectedRpe } from "@trainingai/shared/ai-periodization/expected-
 import { resolveBodyweightStyle, resolveWorkingBasis, resolveWorkingBasisWithSource } from "@trainingai/shared/1rm";
 import { toAestDateStr } from "@trainingai/shared/date-utils";
 import { UNCLASSIFIED_EXERCISE_ROLE } from './exercise-role';
+import { applyLiftPreferenceToStyle, type LiftPreference } from "@trainingai/shared/ai-periodization/lift-preference";
+import type { AppliedLiftPreference } from "@trainingai/shared/types/ai-periodization";
 
 export interface PerSessionPhaseStatus {
   sessionId: string
@@ -126,6 +128,10 @@ export interface WorkoutExercise {
   preDeloadSets?: number;
   // Client-only: set by applyDeloadReverts when the user opted back to full weights.
   deloadReverted?: boolean;
+  /** #3896: what the lift's stored preference changed on the static style (an `automatic` phase
+   *  style, or an `ai_dynamic` lift the AI plan is not driving). Absent when nothing changed. An AI
+   *  plan's own record is on the prescription's exercise. */
+  liftPreference?: AppliedLiftPreference;
 }
 
 /** Structural mirror of the repository's `LastRealOneRm` — declared here so `packages/shared`
@@ -169,7 +175,13 @@ export interface BuildWorkoutExercisesCtx {
   droppedThisCycle: Set<string>;
   loggedTodayInThisSession: Set<string>;
   trainingGoal: string;
+  /** #3896: the user's lift preferences, keyed by exercise name (`listExercisePreferences`). Optional:
+   *  absent or empty, every exercise is built exactly as before. */
+  liftPreferences?: ReadonlyMap<string, LiftPreference>;
 }
+
+/** #3896: `automatic` phase types a lift preference never applies in. */
+const PHASES_WITHOUT_PREFERENCE: ReadonlySet<string> = new Set(['deload', 'baseline', 'testing'])
 
 // Pure mapping from a program session's exercises to the client-facing WorkoutExercise[].
 // No DB access, no side effects — every input arrives resolved in `ctx`. This is the exact
@@ -183,7 +195,7 @@ export function buildWorkoutExercises(
     lastLogs, lastRealOneRm, prMap, estimateMap, styleById, styleByName, styles, libByName,
     currentPhase, allPhases, isDeloadActive, isBaselinePhase, aiDrivesLoad, aiPrescription,
     aiPhaseLabel, isAiDynamic, aiDeload, droppedThisCycle,
-    loggedTodayInThisSession, trainingGoal,
+    loggedTodayInThisSession, trainingGoal, liftPreferences,
   } = ctx;
 
   // Early-deload style substitution (W5 §4.1) — see deloadAwareStylePhase.
@@ -235,6 +247,7 @@ export function buildWorkoutExercises(
       let preDeloadStyle: StyleSet[] | null = null
       let preDeloadSets: number | undefined
       let aiStyleApplied = false
+      let liftPreference: AppliedLiftPreference | undefined
       if (aiDrivesLoad) {
         const p = aiPrescription!.exercises.find(e => e.sessionExerciseId === ex.id)
         if (p) {
@@ -271,6 +284,9 @@ export function buildWorkoutExercises(
             defaultSets = override.sets
             deloaded = true
             deloadNote = "Deload"
+          } else if (p.liftPreference && !deloaded) {
+            // #3896: what the stored plan applied, so the log can name the one-shot it carried.
+            liftPreference = p.liftPreference
           }
         }
       }
@@ -363,6 +379,29 @@ export function buildWorkoutExercises(
         }) ?? 0,
       });
 
+      // #3896: the lift's stored preference on a static style: an `automatic` phase style, or an
+      // `ai_dynamic` lift the AI plan is not driving (an AI plan applied it when it was made). Never in a
+      // baseline or any deload (the exercise's, the session's, or a deload phase's style), which stay
+      // exactly as before, nor in an `automatic` testing phase, whose reps are the test.
+      const pref = liftPreferences?.get(ex.exerciseName)
+      if (
+        pref && !aiStyleApplied && !deloaded && !isBaselinePhase && !aiDeload && !isDeloadActive &&
+        !PHASES_WITHOUT_PREFERENCE.has(styleResolutionPhase?.phaseType ?? 'normal') &&
+        progressionStyle && progressionStyle.length > 0
+      ) {
+        const applied = applyLiftPreferenceToStyle(progressionStyle, pref, {
+          role: ex.exerciseRole ?? UNCLASSIFIED_EXERCISE_ROLE,
+          bodyweight: bwType === 'bodyweight',
+          basisKg: workingBasis.kg,
+          equipment: libEntry?.equipment,
+        })
+        if (applied) {
+          progressionStyle = applied.style
+          defaultSets = applied.style.length
+          liftPreference = applied.applied
+        }
+      }
+
       return {
         name: ex.exerciseName,
         sessionExerciseId: ex.id,
@@ -411,6 +450,7 @@ export function buildWorkoutExercises(
         preDeloadSets,
         // AI-dynamic prescriptions flatten supersets (v1 scope decision).
         supersetGroup: aiDrivesLoad ? null : (ex.supersetGroup ?? null),
+        ...(liftPreference && { liftPreference }),
       } satisfies WorkoutExercise;
     });
 }

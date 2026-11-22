@@ -4,15 +4,16 @@ import { generateObject } from 'ai'
 import { userTextBlock, sanitiseUserText, USER_TEXT_NOTE } from '@trainingai/shared/ai/untrusted-text'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
-import { aiModel, loggedGenerateObject, contentKey } from '@/lib/ai/instrument'
+import { loggedGenerateObject, contentKey } from '@/lib/ai/instrument'
 import { aiPausedResponse } from '@/lib/ai/provider-paused'
 import { rateLimit } from '@/lib/rate-limit'
 import { scaleWithTopUp } from '@/lib/nutrition/meal-top-up'
 import { sumIngredients } from '@trainingai/shared/nutrition/scan-totals'
-import type { NutritionIngredient } from '@trainingai/shared/types/nutrition'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 import { invalidBodyResponse } from '@/lib/api/route-errors'
 import { PROSE_FIELD_GUARDS } from '@/lib/ai/prompt-guards'
+import { ModelIngredientSchema } from '@trainingai/shared/nutrition/ingredient-schema'
+import { resolveModelIngredients } from '@/lib/nutrition/ingredient-densities'
 
 // Same shape as the plan route plus one meal's ingredients. 256 KB is generous.
 const MAX_BODY_BYTES = 256 * 1024
@@ -39,6 +40,10 @@ const IngredientInputSchema = z.object({
   proteinPer100g: z.number().min(0).max(100),
   carbsPer100g: z.number().min(0).max(100),
   fatPer100g: z.number().min(0).max(100),
+  // #3749. A plan this route or its sibling returned marks unmatched ingredients, and the edit sheet
+  // sends a meal's ingredients back as it holds them. Accepted so that round trip is not a 400;
+  // never read.
+  estimated: z.boolean().optional(),
 }).strict()
 
 const RequestSchema = z.object({
@@ -64,18 +69,9 @@ const RequestSchema = z.object({
   }).strict().optional(),
 }).strict()
 
-const IngredientSchema = z.object({
-  name: z.string().describe('Ingredient as you would find it in a supermarket'),
-  weightG: z.number().describe('Grams of this ingredient in the meal'),
-  caloriesPer100g: z.number(),
-  proteinPer100g: z.number(),
-  carbsPer100g: z.number(),
-  fatPer100g: z.number(),
-})
-
 const MealSchema = z.object({
   name: z.string().describe('Meal name, e.g. "Greek yoghurt with berries and oats"'),
-  ingredients: z.array(IngredientSchema),
+  ingredients: z.array(ModelIngredientSchema),
   notes: z.string().describe('One short line: prep time, swaps, or where to buy it'),
 })
 
@@ -134,10 +130,9 @@ export async function POST(req: Request) {
           meal: contentKey(input.currentMeal?.name),
         },
       },
-      signal => generateObject({
-        model: aiModel(),
+      (signal, settings) => generateObject({
+        ...settings,
         schema: MealSchema,
-        maxRetries: 0,
         abortSignal: signal,
         prompt: [
           rewriting
@@ -193,8 +188,10 @@ export async function POST(req: Request) {
   // Same portion scaling the whole-plan route applies, so a reroll lands on the target instead of
   // arriving with the drift its predecessor had — plus a top-up when scaling alone cannot reach it,
   // which is the common case for a rewrite that swapped a dense ingredient for a lighter one.
+  // #3749. Code's per-100 g numbers wherever it knows the food, before portioning on them.
+  const resolved = await resolveModelIngredients(userId, meal.ingredients)
   const ingredients = await scaleWithTopUp(
-    meal.ingredients as NutritionIngredient[],
+    resolved.ingredients,
     {
       calories: input.targetCalories,
       proteinG: input.targetProteinG, carbsG: input.targetCarbsG, fatG: input.targetFatG,

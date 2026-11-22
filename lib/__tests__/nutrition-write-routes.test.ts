@@ -33,7 +33,6 @@ vi.mock('@/lib/data', () => ({
 }))
 vi.mock('ai', () => ({ generateObject: (o: unknown) => generateObject(o) }))
 vi.mock('@/lib/ai/instrument', () => ({
-  aiModel: () => ({}),
   contentKey: (...p: unknown[]) => p.join('|'),
   loggedGenerateObject: async (_m: unknown, run: () => Promise<unknown>) => run(),
 }))

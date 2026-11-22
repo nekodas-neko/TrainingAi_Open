@@ -106,7 +106,7 @@ describe('noteAiBillingError — one owner-visible row an hour', () => {
 
 describe('the AI chokepoint raises the signal for every route', () => {
   it('withAiLogging records a billing refusal and rethrows the original error', async () => {
-    await expect(withAiLogging({ section: 'x', userId: 'someone-else' }, async () => { throw DEPLETED })).rejects.toBe(DEPLETED)
+    await expect(withAiLogging({ section: 'prescription', userId: 'someone-else' }, async () => { throw DEPLETED })).rejects.toBe(DEPLETED)
     await flush()
     const rows = insertErrorEvent.mock.calls.map(c => c[0] as { userId: string; message: string })
     expect(rows).toHaveLength(1)
@@ -115,7 +115,7 @@ describe('the AI chokepoint raises the signal for every route', () => {
   })
 
   it('does not signal a transient failure', async () => {
-    await expect(withAiLogging({ section: 'x' }, async () => { throw apiError(400, 'Invalid JSON payload') }, () => false)).rejects.toThrow()
+    await expect(withAiLogging({ section: 'prescription' }, async () => { throw apiError(400, 'Invalid JSON payload') }, () => false)).rejects.toThrow()
     await flush()
     expect(insertErrorEvent).not.toHaveBeenCalled()
   })

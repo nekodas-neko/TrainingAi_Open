@@ -14,6 +14,7 @@ import { QUANTITY_MULTIPLIER_MIN, QUANTITY_MULTIPLIER_MAX, quantityMultiplierInR
 import { NotFoundError, UserFacingError } from '@trainingai/shared/errors'
 import { eq, and, or, inArray, notInArray, gt, gte, lt, lte, asc, desc, sql, ne, isNotNull, isNull, getTableColumns } from 'drizzle-orm'
 import { getDb, getPool } from './client'
+import { repointStoredExerciseNames } from './exercise-name-tables'
 import { withUserLock } from './user-lock'
 import { estWorkoutKcal, plausibleSessionActiveMin } from '@trainingai/shared/health/workout-energy'
 import { ouraIdForActivityType } from '@trainingai/shared/health/daily-energy'
@@ -125,6 +126,7 @@ import * as social from './slices/social'
 import * as prog from './slices/programs'
 import * as period from './slices/periodization'
 import { getSessionReadLogs } from './slices/session-read'
+import { listExercisePreferences, consumeLiftOneShot, type ClearedOneShot } from './slices/exercise-preferences'
 import * as userStatsSlice from './slices/user-stats'
 import * as oura from './slices/oura'
 import { readRawFrames, readRecentRawFrames, DS_BUCKET_SPAN } from './slices/oura-raw-frames'
@@ -533,6 +535,12 @@ function rowToAnalyte(r: {
     refHigh: r.refHigh,
     flagText: r.flagText,
   }
+}
+
+/** Maps a unique violation (23505) on the library name to the 409 the pre-check gives; any other error passes through. */
+function libraryNameTaken(err: unknown, name: string): unknown {
+  const code = (err as { code?: string }).code ?? (err as { cause?: { code?: string } }).cause?.code
+  return code === '23505' ? new UserFacingError(`An exercise named "${name}" already exists`, 409) : err
 }
 
 export class PostgresWorkoutRepository implements WorkoutRepository {
@@ -1368,7 +1376,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     log: Omit<ExerciseLog, 'id' | 'sets'> & { exerciseLogId?: string },
     sets: (Omit<SetLog, 'id' | 'exerciseLogId'> & { id?: string })[],
     stamp: EditStamp = { kind: 'server' },
-  ): Promise<{ exerciseLog: ExerciseLog; setLogs: SetLog[]; superseded?: true }> {
+  ): Promise<{ exerciseLog: ExerciseLog; setLogs: SetLog[]; superseded?: true; inserted?: boolean }> {
     return this.db.transaction(async tx => {
       // Resolve exercise_id from library (best-effort; NULL for custom exercises)
       const [libRow] = await tx.select({ id: s.exerciseLibrary.id })
@@ -1471,7 +1479,9 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         .returning()
       const exerciseLogId = r.id
       const exerciseLog: ExerciseLog = { ...log, id: exerciseLogId, sets: [] }
-      if (sets.length === 0) return { exerciseLog, setLogs: [] }
+      // #3896: a log this write created, not a re-push of one already stored. Only a new log may
+      // consume a lift's one-shot, so a retry after a newer one-shot was set cannot take it.
+      if (sets.length === 0) return { exerciseLog, setLogs: [], inserted: !isReplay }
       // Collapsed once and reused: `.returning()` is zipped against this array by index below, and
       // `total_sets` is counted from it — collapsing inline would misalign the first and inflate
       // the second whenever a payload repeats a set id.
@@ -1547,7 +1557,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         `)
       }
 
-      return { exerciseLog, setLogs }
+      return { exerciseLog, setLogs, inserted: !isReplay }
     })
   }
 
@@ -2130,7 +2140,9 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   }
 
   /**
-   * The two most recent **real** 1RM estimates per exercise, newest first.
+   * The two most recent **real** 1RM estimates per exercise, newest first. These are the pair
+   * the strength trend compares (`computeRm1Trend`), from finished, not-deleted, non-deload
+   * sessions (#3891).
    *
    * `> 0`, not `IS NOT NULL` (Q-298). A deloaded exercise stores `estimated_1rm = 0` **on purpose**
    * — deload work is submaximal and must not read as a max — so `IS NOT NULL` admitted it as an
@@ -2182,6 +2194,11 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
           -- production has broken.
           AND el.exercise_deloaded = false
           AND el.deleted_at IS NULL AND ws.deleted_at IS NULL
+          -- #3891: this pair is the lift's strength trend, which feeds the plan. A session still
+          -- in progress has not produced an estimate to compare, and a deload session's work is
+          -- submaximal. NOT of a null-safe test, so an untagged (NULL phase_type) session stays in.
+          AND ws.completed_at IS NOT NULL
+          AND NOT ${period.wsIsDeloadSession}
       ) ranked
       WHERE rn = 1 OR (NOT is_baseline AND rn_kind = 2)
     `)
@@ -3181,13 +3198,21 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       if (!existing) throw new NotFoundError('Exercise')
       if (existing.createdBy !== userId) throw new UserFacingError('Not authorized to rename this exercise', 403)
       const oldName = existing.name
+      if (newName !== oldName) {
+        const [conflict] = await tx.select({ id: s.exerciseLibrary.id }).from(s.exerciseLibrary)
+          .where(and(eq(s.exerciseLibrary.name, newName), ne(s.exerciseLibrary.id, id)))
+        if (conflict) throw new UserFacingError(`An exercise named "${newName}" already exists`, 409)
+      }
       await renameSessionExercises(tx, oldName, newName)
       // Issue 2939: a rename is a server-decided edit of the log, so it stamps like the lbs-to-kg fix does;
       // without `clientEditedAt` a stale phone replay puts the old name back. GREATEST never moves a newer
       // stamp backwards. `updatedAt` is also set by `trg_set_updated_at`; the explicit set is kept for clarity.
       await tx.update(s.exerciseLogs).set({ exerciseName: newName, updatedAt: sql`now()`, clientEditedAt: sql`GREATEST(client_edited_at, now())` }).where(eq(s.exerciseLogs.exerciseName, oldName))
-      await tx.update(s.personalRecords).set({ exerciseName: newName }).where(eq(s.personalRecords.exerciseName, oldName))
+      await repointStoredExerciseNames(tx, oldName, newName)
+      // A concurrent create or rename can take the name between the check above and this write; the
+      // unique index then answers 23505, which is the same 409 as the check, not a generic failure.
       const [row] = await tx.update(s.exerciseLibrary).set({ name: newName }).where(eq(s.exerciseLibrary.id, id)).returning()
+        .catch(e => { throw libraryNameTaken(e, newName) })
       return { id: row.id, name: row.name, muscles: row.muscles as MuscleAssignment[], equipment: row.equipment ?? [], instructions: row.instructions ?? undefined, createdBy: row.createdBy ?? undefined, exerciseType: (row.exerciseType as ExerciseType) ?? 'weighted' }
     })
   }
@@ -3210,7 +3235,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         // without `clientEditedAt` a stale phone replay puts the old name back. GREATEST never moves a newer
         // stamp backwards. `updatedAt` is also set by `trg_set_updated_at`; the explicit set is kept for clarity.
         await tx.update(s.exerciseLogs).set({ exerciseName: newName, updatedAt: sql`now()`, clientEditedAt: sql`GREATEST(client_edited_at, now())` }).where(eq(s.exerciseLogs.exerciseName, oldName))
-        await tx.update(s.personalRecords).set({ exerciseName: newName }).where(eq(s.personalRecords.exerciseName, oldName))
+        await repointStoredExerciseNames(tx, oldName, newName)
         // Old name's cached GIF is now orphaned — the route re-sets or clears the cache for
         // the new name based on the submitted gifUrl.
         await tx.delete(s.exerciseGifCache).where(eq(s.exerciseGifCache.exerciseName, oldName))
@@ -3226,6 +3251,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         })
         .where(eq(s.exerciseLibrary.id, entry.id))
         .returning()
+        .catch(e => { throw libraryNameTaken(e, newName) })
       return { id: row.id, name: row.name, muscles: row.muscles as MuscleAssignment[], equipment: row.equipment ?? [], instructions: row.instructions ?? undefined, exerciseType: (row.exerciseType as ExerciseType) ?? 'weighted' }
     })
   }
@@ -5199,6 +5225,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async createFoodItem(userId: string, data: Omit<FoodItem, 'id' | 'userId' | 'createdAt'> & { id?: string }, opts?: { reuseExisting?: boolean }) { return n.createFoodItem(this.db, userId, data, opts) }
   async searchFoodItems(userId: string, query: string) { return n.searchFoodItems(this.db, userId, query) }
   async findFoodItemsByBarcode(userId: string, barcode: string) { return n.findFoodItemsByBarcode(this.db, userId, barcode) }
+  async listFoodItemsByNames(userId: string, names: readonly string[]) { return n.listFoodItemsByNames(this.db, userId, names) }
   async getFoodItemById(userId: string, id: string) { return n.getFoodItemById(this.db, userId, id) }
   async listRetiredFoodItems(userId: string, since: Date) { return n.listRetiredFoodItems(this.db, userId, since) }
   async getSupplementDayLog(userId: string, supplementId: string, date: string) { return n.getSupplementDayLog(this.db, userId, supplementId, date) }
@@ -8686,6 +8713,35 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async getRecentSessionsOfType(userId: string, programSessionId: string, limit: number) { return period.getRecentSessionsOfType(this.db, userId, programSessionId, limit) }
   async getSetLogsForSessions(workoutSessionIds: string[]) { return period.getSetLogsForSessions(this.db, workoutSessionIds) }
   async getSessionReadLogs(userId: string, from: Date, to: Date) { return getSessionReadLogs(this.db, userId, from, to) }
+  async listExercisePreferences(userId: string, exerciseNames: string[]) {
+    const cleared: ClearedOneShot[] = []
+    const out = await listExercisePreferences(this.db, userId, exerciseNames, cleared)
+    // An expired one-shot is still stamped on the lift's stored plans (#4007): take it out, right after
+    // the clear. A failure is logged and never fails the read.
+    for (const c of cleared) await this.restateSpentOneShot(this.db, userId, c.exerciseName, new Date(c.setAtMs))
+    return out
+  }
+
+  /** Restate the stored plans that still carry a spent one-shot (#4007). Runs in its own savepoint when
+   *  given a transaction, and never throws: the log or read that spent the step must not fail on it. */
+  private async restateSpentOneShot(db: typeof this.db, userId: string, exerciseName: string, spentAt: Date) {
+    try {
+      const { restateSpentOneShot } = await import('@/lib/coach/domains/lift-preference')
+      await db.transaction(async sp => { await restateSpentOneShot(sp as unknown as typeof this.db, this, userId, exerciseName, spentAt) })
+    } catch (err) {
+      console.error('[lift-preference] restating stored plans after a spent one-shot failed:', err)
+    }
+  }
+  // The consume and the restate of the lift's other stored plans commit together; the restate runs in a
+  // savepoint, so a failure there is logged and the consume still stands (#4007).
+  async consumeLiftOneShot(userId: string, exerciseName: string, servedSetAt: Date) {
+    return this.db.transaction(async tx => {
+      const t = tx as unknown as typeof this.db
+      const took = await consumeLiftOneShot(t, userId, exerciseName, servedSetAt)
+      if (took) await this.restateSpentOneShot(t, userId, exerciseName, servedSetAt)
+      return took
+    })
+  }
   async getSetTimingRows(userId: string, exerciseNames: string[]) { return period.getSetTimingRows(this.db, userId, exerciseNames) }
   async getExercise1rmHistory(userId: string, exerciseNames: string[], tz: string, windowDays?: number) { return period.getExercise1rmHistory(this.db, userId, exerciseNames, tz, windowDays) }
   async getWeeklySetsByMuscleGroup(userId: string, programId: string, weekStart: string, weekEnd: string, tz: string) { return period.getWeeklySetsByMuscleGroup(this.db, userId, programId, weekStart, weekEnd, tz) }

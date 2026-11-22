@@ -22,7 +22,7 @@ function repoFor(phase: string, trained: { sessionId: string; phase: string }[])
     reconcileSessionsInPhase: async () => undefined,
     getOuraCloudSwitchDay: async () => null,
     listPersonalRecords: async () => new Map(),
-    listPrevious1rm: async () => new Map(),
+    listRecent1rm: async () => new Map(),
     // Stored target is the flat seeded value, which must no longer reach the engine.
     listVolumeTargets: async () => [{ muscleGroup: 'chest', targetSetsPerWeek: 14 }],
     getWeeklySetsByMuscleGroup: async () => ({ chest: 0 }),

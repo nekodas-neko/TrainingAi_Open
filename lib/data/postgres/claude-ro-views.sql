@@ -550,6 +550,25 @@ SELECT
   t.reviewed_at
 FROM public.exercise_media t;
 
+CREATE VIEW claude_ro.exercise_preferences AS
+SELECT
+  t.id,
+  t.user_id,
+  t.exercise_id,
+  t.exercise_name,
+  t.rep_min,
+  t.rep_max,
+  t.rest_sec,
+  t.next_load_step,
+  t.sets_delta,
+  t.one_shot_set_at,
+  t.source,
+  t.deleted_at,
+  t.created_at,
+  t.updated_at
+FROM public.exercise_preferences t
+WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
+
 -- feedback_submissions: withholding "screenshot_data"
 CREATE VIEW claude_ro.feedback_submissions AS
 SELECT
@@ -1791,6 +1810,42 @@ SELECT
   t.onset_median,
   t.efficiency_median
 FROM public.sleep_verdicts t
+WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
+
+CREATE VIEW claude_ro.source_day_tags AS
+SELECT
+  t.id,
+  t.user_id,
+  t.source,
+  t.source_record_id,
+  t.start_day,
+  t.end_day,
+  t.start_at,
+  t.end_at,
+  t.tag_codes,
+  t.custom_name,
+  t.comment,
+  t.deleted_at,
+  t.created_at,
+  t.updated_at
+FROM public.source_day_tags t
+WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
+
+CREATE VIEW claude_ro.source_rest_periods AS
+SELECT
+  t.id,
+  t.user_id,
+  t.source,
+  t.source_record_id,
+  t.start_day,
+  t.end_day,
+  t.start_at,
+  t.end_at,
+  t.episodes,
+  t.deleted_at,
+  t.created_at,
+  t.updated_at
+FROM public.source_rest_periods t
 WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
 
 CREATE VIEW claude_ro.step_live_windows AS

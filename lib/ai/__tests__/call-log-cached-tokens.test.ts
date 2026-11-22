@@ -63,7 +63,7 @@ describe('ai_call_log records provider cache hits (Q-295)', () => {
 
   it('is null when the provider reports no cache information at all', async () => {
     const { withAiLogging } = await import('../instrument')
-    await withAiLogging({ section: 'health-insight' }, async () => ({ usage: { inputTokens: 160 } }))
+    await withAiLogging({ section: 'prescription' }, async () => ({ usage: { inputTokens: 160 } }))
     await flush()
     expect(logged[0].cachedInputTokens).toBeNull()
     // and the rest of the row is unaffected

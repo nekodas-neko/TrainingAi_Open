@@ -22,7 +22,7 @@ const BACKOFF_MIN_PCT = 5
 export const BACKOFF_MAX_PCT = 10
 const COMPLETION_FLOOR = 0.7 // ≤ this (missed badly) → max cut
 const COMPLETION_CEIL = 0.95 // ≥ this (missed by ~a rep) → min cut
-const PCT_HARD_FLOOR = 40 // never cut a working set below this %1RM in one step
+export const PCT_HARD_FLOOR = 40 // never cut a working set below this %1RM in one step
 
 export interface AutoregSignal {
   role: string
@@ -116,6 +116,9 @@ export interface AutoregExercise {
 
 export interface AutoregExerciseSignal extends AutoregSignal {
   sessionExerciseId: string
+  /** #3896: the lifter's own rep range for this lift. When set, "add reps" climbs to its top and the
+   *  clamp holds reps inside it, instead of the goal's band for the role. */
+  repBand?: { repMin: number; repMax: number }
 }
 
 // Apply the quadrant to a whole prescription. Pure: returns a new exercise array plus the set of
@@ -134,7 +137,7 @@ export function applyAutoregulation(
     const sig = signals.find((s) => s.sessionExerciseId === ex.sessionExerciseId)
     if (!sig) return { ...ex }
 
-    const band = goalRange(trainingGoal, sig.role)
+    const band = sig.repBand ?? goalRange(trainingGoal, sig.role)
     const adj = computeRpeAdjustment(sig, { phase, currentReps: ex.reps, band })
     if (!adj.note) return { ...ex }
 

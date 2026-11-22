@@ -5,7 +5,7 @@ import { AlertTriangleIcon, CheckIcon, ClockIcon, Loader2Icon } from "lucide-rea
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@trainingai/shared/utils";
-import { FIELD_LABEL, FIELD_UNIT, type PatchChange } from "@/lib/coach/patch";
+import { FIELD_LABEL, FIELD_UNIT, withResolvedChanges, type PatchChange, type ResolvedChange } from "@/lib/coach/patch";
 import { GOAL_LOCAL_STORAGE_KEYS } from "@/lib/coach/domains/goals";
 import { clearCalorieGoalSeeds } from "@/lib/home/home-prefs";
 import { invalidateCoachChange } from "@/lib/cache-groups";
@@ -58,6 +58,8 @@ export function ChangePreview({ args, onApplied, onCancel, onStale, disabled }: 
   );
   const [consequences, setConsequences] = useState<Consequence[] | null>(null);
   const [drift, setDrift] = useState<Drift[]>([]);
+  // A relative rep request as the range the server worked out: Apply sends this, not the word (#3896).
+  const [resolved, setResolved] = useState<ResolvedChange[] | undefined>(undefined);
   const [applying, setApplying] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Guards a double-tap on Apply. Five rapid taps once fired four complete-workout POSTs.
@@ -75,6 +77,7 @@ export function ChangePreview({ args, onApplied, onCancel, onStale, disabled }: 
         if (cancelled || !data) return;
         setConsequences(data.consequences ?? []);
         setDrift(data.drift ?? []);
+        setResolved(Array.isArray(data.resolved) ? data.resolved : undefined);
       })
       .catch(() => {
         // A failed preview must not block the change — it costs the consequence list, not the
@@ -99,7 +102,7 @@ export function ChangePreview({ args, onApplied, onCancel, onStale, disabled }: 
       const res = await fetch("/api/coach/apply", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ patch: args.patch, acceptedChangeIds: acceptedIds }),
+        body: JSON.stringify({ patch: withResolvedChanges(args.patch, resolved), acceptedChangeIds: acceptedIds }),
       });
       const data = await res.json().catch(() => ({}));
       if (res.status === 409) {

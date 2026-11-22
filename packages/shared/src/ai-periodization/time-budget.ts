@@ -67,7 +67,7 @@ const TRIM_ORDER = ['accessory', 'secondary', 'primary']
 // first); secondary and primary need progressively larger imbalances to jump the queue.
 const ROLE_TRIM_BIAS: Record<string, number> = { accessory: 0, secondary: 0.3, primary: 0.5 }
 
-function roleFloor(role: string): number {
+export function roleFloor(role: string): number {
   return SET_FLOOR[role] ?? 2
 }
 

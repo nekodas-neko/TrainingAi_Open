@@ -116,6 +116,10 @@ export function applyBudgetStage(
   fullShapeById?: ReadonlyMap<string, { sets: number; reps: number; pct: number; restSec: number }>,
 
   phase?: string | null,
+  /** #3896: a lift's one-shot ±1 set, applied to the FITTED count so the budget's trim cannot undo
+   *  it, and before the figures below so the session is costed for the set it carries. Returns the
+   *  new count, or null to leave it. Not called for a dropped exercise. */
+  adjustFittedSets?: (sessionExerciseId: string, sets: number) => number | null,
 ): BudgetStageResult {
   // Time-budget enforcement — the AI is asked to fit the budget, but trim deterministically
   // so the session is guaranteed to fit the allocated time. Sets are cut by muscle-overage
@@ -196,6 +200,13 @@ export function applyBudgetStage(
         ?? ex.sets,
     ]),
   )
+  if (adjustFittedSets) {
+    for (const [id, n] of sets) {
+      if (droppedIds.has(id)) continue
+      const next = adjustFittedSets(id, n)
+      if (next != null) sets.set(id, next)
+    }
+  }
 
   // Dropped exercises keep their prescription entry (the Workout Review "drop this cycle"
   // convention — droppedExerciseIds filters at render), so every derived total below must
@@ -268,18 +279,34 @@ export function applyBudgetStage(
 
 // A minutes figure — "within the 39-minute budget", "about 45 min". Seconds ("90 s rest") never
 // match. Code owns what the plan says about the session's time (`budgetNote`), so a model clause
-// stating minutes is removed (#3767) — but only that clause, and never one about rest between sets
-// ("Rest 3 minutes between heavy sets" is a prescription, not a session length).
-const MINUTES_FIGURE = /\b\d+(?:\.\d+)?\s*-?\s*(?:min|mins|minute|minutes)\b/i
-const ABOUT_REST = /\brest(?:s|ed|ing)?\b/i
-const statesSessionMinutes = (text: string) => MINUTES_FIGURE.test(text) && !ABOUT_REST.test(text)
+// stating minutes is removed (#3767) — but only that clause, and never a figure that is the length
+// of a rest between sets ("Rest 3 minutes between heavy sets" is a prescription, not a session length).
+const MINUTES_FIGURE = /\b\d+(?:\.\d+)?\s*-?\s*(?:min|mins|minute|minutes)\b/gi
 
-// Sentence ends: terminal punctuation, then space, then a capital or an opening quote. "approx. 40
-// min" and "72.5%" therefore stay inside one sentence, so a removal never leaves "Sets held at
-// approx." behind.
-const SENTENCE_BREAK = /(?<=[.!?])\s+(?=["'(A-Z])/
-// Clause joints inside a sentence: ", and", ", but", ", so", ", while", ";", " — ".
-const CLAUSE_BREAK = /(,\s+(?:and|but|so|while)\s+|;\s+|\s+—\s+)/
+// A figure is a rest length when "rest" sits right against it — "Rest 3 minutes", "rest for about
+// 3 minutes" before it, "3-minute rests", "2 minutes of rest", "3 minutes between sets" after it.
+// The word "rest" elsewhere in the sentence ("the rest of the session fits 39 minutes") does not
+// shield a session length.
+const REST_BEFORE = /\brest(?:s|ed|ing)?\s+(?:(?:for|of|about|around|up to)\s+)*~?$/i
+const REST_AFTER = /^\s*(?:of\s+rest\b|rests?\b|between\b|per\s+set\b)/i
+
+const statesSessionMinutes = (text: string): boolean =>
+  Array.from(text.matchAll(MINUTES_FIGURE)).some(m => {
+    const end = m.index + m[0].length
+    return !(REST_BEFORE.test(text.slice(0, m.index)) || REST_AFTER.test(text.slice(end)))
+  })
+
+// Sentence ends: terminal punctuation, then space, then a capital, an opening quote or a digit
+// ("45 minutes is the target" is a sentence of its own). "72.5%" has no space after its dot, and
+// "approx. 40 min" is held together by the abbreviation guard, so a removal never leaves "Sets held
+// at approx." behind.
+const SENTENCE_BREAK = /(?<=[.!?])\s+(?=["'(A-Z])|(?<=[.!?])(?<!\b(?:approx|ca|est|vs|avg|no|e\.g|i\.e)\.)\s+(?=\d)/
+// Clause joints inside a sentence. A joint that opens an independent clause (", and", ", but",
+// ", so", ", while", ", yet", ", then", ";", " — ") lets that clause stand alone once its neighbour
+// is removed. A dependent one (", because", ", which", ", as", ...) cannot stand alone, so it goes
+// with the clause it depended on.
+const CLAUSE_BREAK = /(,\s+(?:and|but|so|while|yet|then|therefore|thus|hence|because|since|as|which|although|though|whereas)\s+|;\s+|\s+[—–]\s+)/
+const DEPENDENT_JOINT = /^,\s+(?:because|since|as|which|although|though|whereas)\s+$/
 
 /** One sentence with its minutes clauses removed; '' when nothing of it is left. */
 function withoutMinutesClauses(sentence: string): string {
@@ -290,8 +317,11 @@ function withoutMinutesClauses(sentence: string): string {
   const parts = body.split(CLAUSE_BREAK)
   const clauses = parts.filter((_, i) => i % 2 === 0)
   let out = ''
+  let previousDropped = false
   for (let i = 0; i < clauses.length; i++) {
-    if (statesSessionMinutes(clauses[i])) continue
+    const dropped: boolean = statesSessionMinutes(clauses[i]) || (previousDropped && DEPENDENT_JOINT.test(parts[2 * i - 1] ?? ''))
+    previousDropped = dropped
+    if (dropped) continue
     // The joint before a clause goes with it, unless it now opens the sentence.
     out += out === '' ? clauses[i].trim() : `${parts[2 * i - 1]}${clauses[i]}`
   }

@@ -2501,3 +2501,91 @@ export const nativeBuildSightings = pgTable('native_build_sightings', {
   lastSeenAt:   timestamp('last_seen_at', { withTimezone: true }).notNull().defaultNow(),
   requestCount: integer('request_count').notNull().default(1),
 }, t => [primaryKey({ columns: [t.userId, t.buildCode, t.day] })])
+
+/**
+ * #3898 step 1 (migration 202611212239) — a connected source's rest periods: a span the person
+ * marked as resting or ill. Generic shape (connector guide §3h); stored, no reader yet, no writer
+ * until step 2. `source` is the connector id; one row per (user, source, source record id).
+ * `deletedAt` is the tombstone for a record the source deleted.
+ */
+export const sourceRestPeriods = pgTable('source_rest_periods', {
+  id:             uuid('id').primaryKey().defaultRandom(),
+  userId:         uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  source:         text('source').notNull(),
+  sourceRecordId: text('source_record_id').notNull(),
+  startDay:       date('start_day', { mode: 'string' }).notNull(),
+  endDay:         date('end_day', { mode: 'string' }),
+  startAt:        timestamp('start_at', { withTimezone: true }),
+  endAt:          timestamp('end_at', { withTimezone: true }),
+  episodes:       jsonb('episodes').$type<{ at: string; tags: string[] }[]>().notNull().default(sql`'[]'::jsonb`),
+  deletedAt:      timestamp('deleted_at', { withTimezone: true }),
+  createdAt:      timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt:      timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, t => [
+  unique('source_rest_periods_record_key').on(t.userId, t.source, t.sourceRecordId),
+  index('source_rest_periods_user_start_day_idx').on(t.userId, t.startDay),
+  check('source_rest_periods_source_check', sql`${t.source} <> ''`),
+  check('source_rest_periods_source_record_id_check', sql`${t.sourceRecordId} <> ''`),
+])
+
+/**
+ * #3898 step 1 (migration 202611212239) — a connected source's day tags and notes, at an instant or
+ * over a span. One shape holds the source's older single-note tag and its newer tag with a duration
+ * (connector guide §3i). Stored, no reader yet, no writer until step 2. `tagCodes` is empty for a
+ * text-only note; a custom tag keeps the source's own marker there and its name in `customName`.
+ */
+export const sourceDayTags = pgTable('source_day_tags', {
+  id:             uuid('id').primaryKey().defaultRandom(),
+  userId:         uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  source:         text('source').notNull(),
+  sourceRecordId: text('source_record_id').notNull(),
+  startDay:       date('start_day', { mode: 'string' }).notNull(),
+  endDay:         date('end_day', { mode: 'string' }),
+  startAt:        timestamp('start_at', { withTimezone: true }).notNull(),
+  endAt:          timestamp('end_at', { withTimezone: true }),
+  tagCodes:       text('tag_codes').array().notNull().default([]),
+  customName:     text('custom_name'),
+  comment:        text('comment'),
+  deletedAt:      timestamp('deleted_at', { withTimezone: true }),
+  createdAt:      timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt:      timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, t => [
+  unique('source_day_tags_record_key').on(t.userId, t.source, t.sourceRecordId),
+  index('source_day_tags_user_start_day_idx').on(t.userId, t.startDay),
+  check('source_day_tags_source_check', sql`${t.source} <> ''`),
+  check('source_day_tags_source_record_id_check', sql`${t.sourceRecordId} <> ''`),
+])
+
+/**
+ * #3896 step 3 (migration 202611212318) — what a person chose for one lift: a lasting rep range and
+ * rest, and two one-shots (a lighter / heavier step and ±1 set) consumed by the next completed log.
+ * Modelled on `exerciseEstimates`: one row per (user, exercise name) with `exerciseId` carried beside
+ * it. Every preference is nullable; null means the program as written. Stored, no reader and no
+ * writer until steps 4 and 5. `deletedAt` is the tombstone for a cleared preference.
+ */
+export const exercisePreferences = pgTable('exercise_preferences', {
+  id:           uuid('id').primaryKey().defaultRandom(),
+  userId:       uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  exerciseId:   uuid('exercise_id').references(() => exerciseLibrary.id, { onDelete: 'set null' }),
+  exerciseName: text('exercise_name').notNull(),
+  repMin:       smallint('rep_min'),
+  repMax:       smallint('rep_max'),
+  restSec:      integer('rest_sec'),
+  nextLoadStep: text('next_load_step').$type<'lighter' | 'heavier'>(),
+  setsDelta:    smallint('sets_delta').$type<-1 | 1>(),
+  oneShotSetAt: timestamp('one_shot_set_at', { withTimezone: true }),
+  source:       text('source').$type<'coach' | 'checkin' | 'editor'>().notNull(),
+  deletedAt:    timestamp('deleted_at', { withTimezone: true }),
+  createdAt:    timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt:    timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, t => [
+  unique('exercise_preferences_lift_key').on(t.userId, t.exerciseName),
+  uniqueIndex('exercise_preferences_user_exercise_id_key').on(t.userId, t.exerciseId).where(sql`exercise_id IS NOT NULL`),
+  check('exercise_preferences_exercise_name_check', sql`${t.exerciseName} <> ''`),
+  check('exercise_preferences_rep_range_check', sql`(${t.repMin} IS NULL AND ${t.repMax} IS NULL) OR (${t.repMin} IS NOT NULL AND ${t.repMax} IS NOT NULL AND ${t.repMin} >= 1 AND ${t.repMin} <= ${t.repMax} AND ${t.repMax} <= 30)`),
+  check('exercise_preferences_rest_sec_check', sql`${t.restSec} IS NULL OR ${t.restSec} >= 0`),
+  check('exercise_preferences_next_load_step_check', sql`${t.nextLoadStep} IS NULL OR ${t.nextLoadStep} IN ('lighter', 'heavier')`),
+  check('exercise_preferences_sets_delta_check', sql`${t.setsDelta} IS NULL OR ${t.setsDelta} IN (-1, 1)`),
+  check('exercise_preferences_one_shot_check', sql`((${t.nextLoadStep} IS NOT NULL OR ${t.setsDelta} IS NOT NULL) AND ${t.oneShotSetAt} IS NOT NULL) OR (${t.nextLoadStep} IS NULL AND ${t.setsDelta} IS NULL AND ${t.oneShotSetAt} IS NULL)`),
+  check('exercise_preferences_source_check', sql`${t.source} IN ('coach', 'checkin', 'editor')`),
+])

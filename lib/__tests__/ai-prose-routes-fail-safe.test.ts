@@ -21,7 +21,6 @@ vi.mock('@/lib/data', () => ({
   getRepositoryAsync: async () => ({ getNextSession }),
 }))
 vi.mock('@/lib/ai/instrument', () => ({
-  aiModel: () => ({}),
   loggedStreamText: (m: unknown, o: unknown) => loggedStreamText(m, o),
   loggedGenerateText: async (_m: unknown, run: () => Promise<{ text: string }>) => run(),
 }))

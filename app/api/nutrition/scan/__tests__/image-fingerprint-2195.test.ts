@@ -9,11 +9,12 @@ const USER = '00000000-0000-4000-8000-000000219500'
 
 vi.mock('@/auth', () => ({ auth: vi.fn(async () => ({ user: { id: USER, timezone: 'Australia/Brisbane' } })) }))
 vi.mock('@/lib/rate-limit', () => ({ rateLimit: () => true }))
+// #3749: the route reads the user's saved foods to resolve ingredient numbers; none here.
+vi.mock('@/lib/data', () => ({ getRepository: async () => ({ listFoodItemsByNames: async () => [] }) }))
 
 const seen: unknown[] = []
 vi.mock('@/lib/ai/instrument', async importOriginal => ({
   ...(await importOriginal<typeof import('@/lib/ai/instrument')>()),
-  aiModel: () => ({}),
   loggedGenerateObject: async (meta: { fingerprint: unknown }, run: () => Promise<unknown>) => {
     seen.push(meta.fingerprint)
     return run()

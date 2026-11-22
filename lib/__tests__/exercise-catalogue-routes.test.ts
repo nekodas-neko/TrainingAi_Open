@@ -30,7 +30,6 @@ vi.mock('@/auth', () => ({ auth: async () => (sessionUser ? { user: sessionUser 
 vi.mock('@/lib/observability', () => ({ reportServerError: (...a: unknown[]) => reportServerError(...a) }))
 vi.mock('ai', () => ({ generateObject: (...a: unknown[]) => generateObject(...a) }))
 vi.mock('@/lib/ai/instrument', () => ({
-  aiModel: () => 'test-model',
   loggedGenerateObject: (meta: unknown, run: () => Promise<unknown>) => loggedGenerateObject(meta, run),
 }))
 vi.mock('@/lib/data', () => {

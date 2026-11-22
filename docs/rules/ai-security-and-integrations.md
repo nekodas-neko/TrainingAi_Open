@@ -34,6 +34,74 @@ key and make testing safer instead ([#2816](https://github.com/nekodas-neko/Trai
 
 ---
 
+## One set of rules for every AI call (#3752)
+
+- **Settings live in one table.** `AI_SECTIONS` in `lib/ai/instrument.ts`, keyed by section name:
+  model, thinking level, SDK retries, time limit. A route names its `section:` and passes none of
+  them: the wrapper (`loggedGenerateObject`, `loggedGenerateText`, `loggedStreamText`) hands the call
+  its settings, and a route spreads them into the SDK options. A new AI call adds a row, not a
+  `maxRetries: 0`. There is **no temperature**: Google's guidance for these models is to leave it at
+  the default and newer ones ignore it, so a repeatable answer has to come from code deciding more.
+- **The model's confidence is not asked for.** The workout plan prompt used to ask for one and the
+  code threw it away in favour of `computeConfidence`. It is gone from the prompt and
+  `PrescriptionSchema`; an older answer that still carries the key parses and the key is dropped.
+- **A custom rule holds the line.** `node scripts/check-ai-call-sites.js` (a Custom Rules step, so
+  `pnpm check:rules`): `generateObject`, `generateText` and `streamText` are called only inside a
+  logged wrapper whose `section:` is a literal key of the table (also under an alias or a namespace
+  import, and `streamObject`, `embed`, `embedMany`, `ToolLoopAgent`); no SDK call carries its own
+  `model`, `maxRetries` or `providerOptions`; `@google/genai` (any subpath) is imported only by
+  `lib/exercise-image-gen.ts`; and `mobile/src` imports only the client chat plumbing from `ai`. The
+  script's header lists what it still cannot catch.
+- **The image tool logs.** `lib/exercise-image-gen.ts` spends from the same key and writes one
+  `ai_call_log` row per model request under section `exercise-image` (success, a reply with no image,
+  or a throw). It has no signed-in user in hand, so `user_id` is empty there. That makes those rows
+  invisible to the read-only views (`claude_ro.ai_call_log` keeps only the owner's rows, matched on
+  `user_id`); the admin AI-usage queries (`getAiCallUsageSummary`, no user filter) do show them.
+
+### One food reference for the AI food routes (#3749)
+
+- **The model names the food and its weight; code supplies the per-100 g numbers when it knows
+  them.** The scan, both meal-plan generators and the top-up share `ModelIngredientSchema` and pass
+  the reply through `resolveModelIngredients`: the user's own barcode-sourced saved food, then the
+  bundled USDA FoodData Central table, else the model's figure marked `estimated`. Exact folded
+  name only, never a near match. Map: [`docs/module-map.md`](../module-map.md).
+- **The table is generated, never typed.** `scripts/build-food-reference.mjs` reads the SR Legacy
+  download and writes `fdc-sr-legacy.ts`; every row carries its `fdcId`. Do not add a number by
+  hand: a made-up reference is worse than the model's guess, because the app shows it as fact.
+- **A food whose numbers depend on its state has no bare name**, in the table or from a saved
+  barcode food: `STATE_DEPENDENT_FOOD_KEYS` (`food-reference/state-dependent.ts`) is the one list,
+  and a test over the generated table fails when a bare name is pinned to one state of a food the
+  table holds in several.
+- **The scan's confidence badge is code's, by calories**: high when every ingredient matched, medium
+  when the matched ones carry at least half of the meal's calories, low otherwise or when
+  `sanitiseNutrition` corrected the totals (`matchConfidence`). The model is not asked for it.
+- **A top-up tries arithmetic first** (`planStapleTopUp`), and calls the model only when no staple of
+  the meal's style, clear of every recorded restriction, can close the gap in at most two additions
+  of 15 g or more without pushing calories or a macro over target.
+
+### What the person sees when the model is down
+
+Checked against the code on 2026-11-21. "Paused" means Google refused on billing
+(`aiPausedResponse`, a 503 `ai_paused` with a fixed message); any other failure is the route's own
+error.
+
+| Feature | When the model is down today | What it should offer instead (not built) |
+|---|---|---|
+| Workout plan (`prescription`) | The program as written, from rules, with its own reasoning line (a deload week as the program runs it, or the program's own sets). An error only when no exercise in the session has a progression style: there are no numbers to fall back to, so the route returns a 502 "AI generation failed". | Where the session has no progression styles, show its plain exercise list instead of the error. |
+| Workout recap | No model is involved: the route answers from the session's numbers (#3748), the same text every time. | Nothing to add. |
+| Coach (`coach`) | When the refusal is billing: the fixed "paused" sentence. Any other failure: a generic error line (`An error occurred.` in the stream, or a 500 `Coach failed`). | Say plainly it could not be reached, and link the screens that answer without it (today's plan, the log). |
+| Food scan (`nutrition-scan`) | An error: 502 "AI service unavailable. Please try again." (or paused). | Offer food **search** and **barcode** on the same screen, with the photo kept so it can be retried. |
+| Meal plan (`meal-plan-generate`) | An error (502, or paused), **except** slots the library fills and a plan that needs nothing from the model, which come back without one. Rerolling or rewriting one meal (`meal-plan-generate-meal`, `meal-plan-edit-meal`) is an error. | Fill every slot from the saved-meal library and offer the last plan again; say which slots could not be filled. |
+| Meal top-up (`meal-plan-top-up`) | The meal as scaled, with its gap shown. Never an error: the route swallows any failure of the call, a billing refusal included, and says nothing. | Nothing to add. |
+| Program builder (`generate-program`) and builder chat (`builder-chat`) | An error (502/500, or paused). | Offer to start from a saved program or a blank one in the program editor, and keep what the person typed. |
+| New exercise (`exercises-generate`) | A name the library already holds is answered from the library with no model call (#3751). Any other name is an error (500, or paused). | Offer the manual add form (name, muscles, equipment) and the library search. |
+
+The issue listed the recap as "the facts joined into a line" and the coach as "a paused message";
+both were corrected above: the recap no longer calls a model, and the coach shows the paused message
+only for a billing refusal.
+
+---
+
 ## AI & Security Defaults
 
 - Every LLM call returning structured data uses `generateObject`/a response schema — never `JSON.parse` of free text. Keep it that way: prose-only `generateText` routes must never grow a `JSON.parse` of model text, and every `generateText`/`streamText` call is wrapped in try-catch returning a JSON error (`health-insight` and `weekly-digest` once shipped without). Deterministic math lives in code: no LLM self-reported number (confidence, totals) may gate an automatic action **or be shown to the user as fact** — a model handed a score of 80 called it *"perfect"* twice (Q-292), which gates nothing and is read as true. Prose routes import `PROSE_GUARDS` (`lib/ai/prompt-guards.ts`): quote the given numbers, no superlatives, metric units only, and no diagnosis — describe a deviation, never name a condition or suggest infection (#2421, TN-46).
