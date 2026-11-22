@@ -34,21 +34,21 @@ const send = (handler: (r: NextRequest) => Promise<Response>, method: string, bo
 beforeEach(() => { for (const m of [renameExercise, adminUpdateExercise, reportServerError, dbInsert]) m.mockClear() })
 
 describe('a rename cancelled by the statement timeout', () => {
-  it('POST /api/exercises (mergeWithId) answers 409 busy, and does not file a server error', async () => {
+  it('POST /api/exercises (mergeWithId) answers 409 busy, and still files the timeout', async () => {
     renameExercise.mockRejectedValueOnce(cancel())
     const res = await send(POST, 'POST', { name: 'New', mergeWithId: ID })
     expect(res.status).toBe(409)
     expect((await res.json()).error).toMatch(/busy/i)
-    expect(reportServerError).not.toHaveBeenCalled()
+    expect(reportServerError).toHaveBeenCalledTimes(1)
   })
 
-  it('PATCH /api/admin/exercises answers 409 busy, writes no gif row, and files no server error', async () => {
+  it('PATCH /api/admin/exercises answers 409 busy, writes no gif row, and still files the timeout', async () => {
     adminUpdateExercise.mockRejectedValueOnce(cancel())
     const res = await send(PATCH, 'PATCH', { id: ID, name: 'New', equipment: ['barbell'], muscles: [] })
     expect(res.status).toBe(409)
     expect((await res.json()).error).toMatch(/busy/i)
     expect(dbInsert).not.toHaveBeenCalled()
-    expect(reportServerError).not.toHaveBeenCalled()
+    expect(reportServerError).toHaveBeenCalledTimes(1)
   })
 
   it('any other failure is still a 500 and is still reported', async () => {

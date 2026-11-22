@@ -89,7 +89,12 @@ export async function POST(req: NextRequest) {
       const exercise = await repo.renameExercise(session.user.id, body.data.mergeWithId, body.data.name)
       return NextResponse.json({ exercise })
     } catch (e) {
-      if (isStatementTimeout(e)) return renameBusyResponse()
+      if (isStatementTimeout(e)) {
+        // Still reported: 57014 is any statement over the pool's limit, so a slow query must not
+        // hide behind the "busy" answer.
+        reportServerError(e, { userId: session.user.id, url: '/api/exercises' })
+        return renameBusyResponse()
+      }
       if (!isRefusal(e)) reportServerError(e, { userId: session.user.id, url: '/api/exercises' })
       return refusalResponse(e, 'Rename failed')
     }

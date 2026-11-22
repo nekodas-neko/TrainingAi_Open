@@ -133,7 +133,12 @@ export async function PATCH(req: NextRequest) {
       exerciseType: body.data.exerciseType,
     });
   } catch (e) {
-    if (isStatementTimeout(e)) return renameBusyResponse();
+    if (isStatementTimeout(e)) {
+      // Still reported: 57014 is any statement over the pool's limit, so a slow query must not hide
+      // behind the "busy" answer.
+      reportServerError(e, { url: '/api/admin/exercises' });
+      return renameBusyResponse();
+    }
     // Every error answered 409 with its own text as the body, so a missing row read as a name
     // clash and a driver failure published its statement (Q-320). The status now comes from the
     // thrown error: 404 missing, 409 clash, 500 anything unmarked.
