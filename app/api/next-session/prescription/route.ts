@@ -1,20 +1,14 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { getRepository } from "@/lib/data";
-import { DEFAULT_TZ, startOfWeekInTz } from "@trainingai/shared/date-utils";
-import { prescriptionDrivesLoad, prescriptionStyleForExercise } from "@trainingai/shared/ai-periodization/apply-prescription";
-import { normalizeStoredPrescription } from "@trainingai/shared/ai-periodization/reconcile-prescription";
-import { isAiPrescriptionPending } from "@trainingai/shared/ai-periodization/prescription-pending";
+import { DEFAULT_TZ, startOfWeekInTz, todayInTz } from "@trainingai/shared/date-utils";
 import { readProgramDeloadCheck } from "@trainingai/shared/ai-periodization/program-phase";
 import { fitStoredPlanToCheckinBudget } from "@trainingai/shared/ai-periodization/checkin-plan-budget";
-import { resolveBodyweightStyle, resolveWorkingBasis } from "@trainingai/shared/1rm";
 import { prescribedBar } from "@trainingai/shared/workout/load-rounding";
 import { loadLiftPreferences } from "@trainingai/shared/ai-periodization/lift-preference-read";
-import { liftPreferenceOnStyle } from "@trainingai/shared/workout/session-data";
-import { UNCLASSIFIED_EXERCISE_ROLE } from "@trainingai/shared/workout/exercise-role";
 import { rateLimit } from "@/lib/rate-limit";
-import type { StyleSet } from "@trainingai/shared/types/progression";
-import type { ExerciseType } from "@trainingai/shared/types/program";
+import { readSessionFromStoredState } from "@trainingai/shared/workout/read-session";
+import type { ExerciseType, ProgramPhase } from "@trainingai/shared/types/program";
 
 export interface NextSessionSetPreview {
   weightKg: number | null;
@@ -80,11 +74,17 @@ export async function GET() {
 
   const programSession = recommendation.session;
   const styleById = new Map(styles.map(s => [s.id, s.sets]));
+  const styleByName = new Map(styles.map(s => [s.name, s.sets]));
   const libByName = new Map(library.map(e => [e.name.toLowerCase(), e]));
   const exerciseNames = programSession.exercises.map(ex => ex.exerciseName);
+  const isAutomatic = program.phaseMode === 'automatic';
   const isAiDynamic = program.phaseMode === 'ai_dynamic';
+  const todayStr = todayInTz(tz);
 
-  const [, lastRealOneRm, prMap, periodization, estimates, liftPreferences] = await Promise.all([
+  const [allPhases, sessionCounts, lastLogs, lastRealOneRm, prMap, periodization, estimates, liftPreferences] = await Promise.all([
+    // The phase a static program's session is in, read as /api/workout-data reads it.
+    isAutomatic ? repo.listProgramPhases(userId, program.id) : Promise.resolve([] as ProgramPhase[]),
+    isAutomatic ? repo.countAllSessionsSinceStart(userId, program.id) : Promise.resolve(new Map<string, number>()),
     repo.getLastExerciseLogsBatch(userId, exerciseNames),
     repo.getLastRealOneRmBatch(userId, exerciseNames),
     repo.listPersonalRecords(userId),
@@ -94,104 +94,53 @@ export async function GET() {
           .then(st => st && fitStoredPlanToCheckinBudget(userId, programSession.id, repo, tz, st))
       : Promise.resolve(null),
     repo.getExerciseEstimates(userId).catch(() => []),
-    // #4019 / #3890: the lift preferences and this week's check-in hold, as the session screen reads
-    // them (`/api/workout-data`), so the card shows the bar and reps that screen will.
+    // #4019 / #3890: the lift preferences and this week's check-in hold, as the session screen reads them.
     loadLiftPreferences(repo, userId, exerciseNames, { checkinWeekStart: startOfWeekInTz(tz) }),
   ]);
   const estimateMap = new Map(estimates.map(e => [e.exerciseName, e.estimated1rm]));
 
-  // Normalise a stored no-op transition (target phase === current phase) before it decides
-  // whether the AI drives this preview — see normalizeStoredPrescription.
-  const prescription = periodization?.prescription
-    ? normalizeStoredPrescription(
-        periodization.prescription, periodization.phase,
-        new Map(programSession.exercises.map(e => [e.id, e.exerciseRole])),
-      )
-    : null;
-  // An ai_dynamic program has no phase rows, so its baseline is this pair alone (workout-data).
-  const isBaselinePhase = periodization?.phase === 'baseline' && !periodization.baselineComplete;
   // #3876: an aligned program's deload ends at the program's cap, not the type's count.
   const programDeload = isAiDynamic
     ? await readProgramDeloadCheck(repo, userId, program.id, periodization, tz).catch(() => null)
     : null;
-  const pending = prescription == null || isAiPrescriptionPending(periodization, { isAiDynamic, isBaselinePhase, programDeload });
-  // An aged-out prescription is made again when the session is opened, so the preview shows it as
-  // pending rather than previewing the expired one (#3700).
-  const drives = isAiDynamic && prescription != null && periodization != null && !pending
-    && prescriptionDrivesLoad(prescription.phaseAction, periodization.prescriptionStatus);
+
+  // #4019: the card takes every lift's sets, reps and bar from the same function the session screen's
+  // batch read runs (`readSessionFromStoredState` -> `buildWorkoutExercises`), not from a copy of it. It
+  // differs from the screen's own single-session read in two ways, both because it previews a FUTURE
+  // session: no re-evaluation against today's soreness and check-in (that step is a write and today's
+  // signals are not that session's), and no `?aiDeload` toggle (the person has not opened it).
+  const read = readSessionFromStoredState({
+    program, programSession, todayStr, allPhases,
+    thisSessionCount: sessionCounts.get(programSession.id) ?? 0,
+    periodization, programDeload,
+    loggedTodayInThisSession: new Set<string>(),
+    shared: { lastLogs, lastRealOneRm, prMap, estimateMap, styleById, styleByName, styles, libByName, liftPreferences },
+  });
+
+  // 'pending': an ai_dynamic program with no plan in hand (none stored, consumed, aged out, or a
+  // baseline, which has none): the plan is made when the session is opened.
   const source: NextSessionPrescriptionResponse['source'] = !isAiDynamic
     ? 'static'
-    : drives ? 'driving' : (pending ? 'pending' : 'static');
+    : read.aiDrivesLoad ? 'driving' : (read.aiPrescription == null || read.aiPrescriptionPending ? 'pending' : 'static');
 
-  const droppedThisCycle = new Set(drives ? (prescription!.droppedExerciseIds ?? []) : []);
-
-  const exercises: NextSessionExercisePreview[] = programSession.exercises
-    .filter(ex => !droppedThisCycle.has(ex.id))
-    .map(ex => {
-      const libEntry = libByName.get(ex.exerciseName.toLowerCase());
-      const exerciseType: ExerciseType = libEntry?.exerciseType ?? 'weighted';
-
-      let styleSets: StyleSet[] | null = null;
-      let aiStyleApplied = false;
-      let rowDeloaded = false;
-      if (drives) {
-        const p = prescription!.exercises.find(e => e.sessionExerciseId === ex.id);
-        if (p) {
-          styleSets = prescriptionStyleForExercise(p);
-          aiStyleApplied = true;
-          rowDeloaded = p.deloaded === true;
-        }
-      }
-      if (!styleSets) {
-        const resolved = ex.styleId ? styleById.get(ex.styleId) ?? null : null;
-        styleSets = resolved
-          ? resolved.map(s => ({ pct: s.pct, reps: s.reps, restSec: s.restSec, useFor1rm: s.useFor1rm } as StyleSet))
-          : null;
-      }
-
-      // Same resolver as the workout screen (Q-5) — this inline max was the second of three
-      // copies, and the reason the preview and the session it previews could differ.
-      const basis = resolveWorkingBasis({
-        lastNonDeload1rm: lastRealOneRm.get(ex.exerciseName)?.estimated1rm,
-        seedEstimate: estimateMap.get(ex.exerciseName),
-        allTimePr1rm: prMap.get(ex.exerciseName),
-      }) ?? 0;
-      styleSets = resolveBodyweightStyle({
-        bwType: exerciseType,
-        style: styleSets,
-        isBaselinePhase: false,
-        aiStyleApplied,
-        basis,
-      });
-
-      // The session screen's own step (`buildWorkoutExercises`): the lift's preference on a static
-      // style, the week's check-in hold on either. The card reads no phase, so none is excluded here.
-      const onStyle = liftPreferenceOnStyle(styleSets, liftPreferences.get(ex.exerciseName), {
-        aiStyleApplied,
-        reduced: rowDeloaded || isBaselinePhase,
-        noPreferencePhase: false,
-        aiPlanDeload: drives && prescription!.deload === true,
-        role: ex.exerciseRole ?? UNCLASSIFIED_EXERCISE_ROLE,
-        bodyweight: exerciseType === 'bodyweight',
-        basisKg: basis > 0 ? basis : null,
-        equipment: libEntry?.equipment,
-      });
-      if (onStyle) styleSets = onStyle.style;
-
-      const sets: NextSessionSetPreview[] = (styleSets ?? []).map(s => ({
-        weightKg: exerciseType === 'bodyweight' || basis <= 0 ? null : prescribedBar(basis, s.pct, libEntry?.equipment),
-        reps: s.reps,
-        restSec: s.restSec,
-      }));
-
-      return { name: ex.exerciseName, sessionExerciseId: ex.id, exerciseType, sets };
-    });
+  const exercises: NextSessionExercisePreview[] = read.exercises.map(ex => ({
+    name: ex.name,
+    sessionExerciseId: ex.sessionExerciseId,
+    exerciseType: ex.exerciseType,
+    sets: (ex.progressionStyle ?? []).map(s => ({
+      weightKg: ex.exerciseType === 'bodyweight' || !ex.estimated1rm || ex.estimated1rm <= 0
+        ? null
+        : prescribedBar(ex.estimated1rm, s.pct, ex.equipment),
+      reps: s.reps,
+      restSec: s.restSec,
+    })),
+  }));
 
   return NextResponse.json({
     isRestDay: false,
     sessionName: programSession.name,
     source,
-    ...(drives && prescription!.source ? { prescriptionSource: prescription!.source } : {}),
+    ...(read.aiDrivesLoad && read.aiPrescription!.source ? { prescriptionSource: read.aiPrescription!.source } : {}),
     exercises,
   } satisfies NextSessionPrescriptionResponse, { headers: CACHE_HEADERS });
 }
