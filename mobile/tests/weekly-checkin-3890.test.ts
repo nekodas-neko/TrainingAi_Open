@@ -1,11 +1,18 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { HomeStore } from '../src/features/home/data/HomeStore.ts';
 import { ApiError } from '../src/features/account/api/client.ts';
 import {
   answersIncomplete,
   cardView,
   changeCount,
   changesLine,
+  checkinStateSchema,
+  isReviewWeek,
+  LATER_PREFIX,
+  liftOf,
+  reconcileAnswers,
+  withoutNotesFor,
   defaultAnswers,
   laterKey,
   resultRows,
@@ -19,7 +26,7 @@ import { ID, LONG_NAME, due, saveResponse, saved, savedWithNotApplied } from './
 // #3890 step 3: the weekly check-in's card, its answers and its writes, against the engine's real
 // response shapes (fixtures/weekly-checkin-states.ts). The API is a stand-in that records each call.
 const TODAY = '2026-11-22';
-const spec = weeklyCheckinSpec(TODAY);
+const spec = weeklyCheckinSpec();
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 function api(respond: (path: string, body: unknown) => unknown, offline = false) {
@@ -59,12 +66,17 @@ function strings(value: unknown): string[] {
 }
 
 test('the card is due with the server’s counts, and hides for today only after Later', () => {
-  assert.deepEqual(cardView(due, {}, TODAY), { kind: 'due', title: 'Your week in review: 4 of 4 sessions' });
+  // The title is fixed and the count is the server's own first line; the phone composes none.
+  assert.deepEqual(cardView(due, {}, TODAY), {
+    kind: 'due',
+    title: 'Your week in review',
+    summary: '4 of 4 planned sessions done.',
+  });
   const later = { [laterKey('2026-11-16', TODAY)]: true };
   assert.equal(cardView(due, later, TODAY), null);
   assert.equal(cardView(due, later, '2026-11-23')?.kind, 'due', 'back the next day');
-  const noSchedule = { ...due, summary: { ...due.summary!, sessionsPlanned: null, sessionsDone: 2 } };
-  assert.equal((cardView(noSchedule, {}, TODAY) as { title: string }).title, 'Your week in review: 2 sessions');
+  const over = { ...due, summary: { ...due.summary!, sessionsDone: 5, lines: ['5 sessions, one more than planned.', 'b', 'c'] as [string, string, string] } };
+  assert.equal((cardView(over, {}, TODAY) as { summary: string }).summary, '5 sessions, one more than planned.');
   assert.equal(cardView({ ...due, due: false }, {}, TODAY), null);
   assert.equal(cardView({ ...due, checkin: { ...due.checkin!, status: 'dismissed' } }, {}, TODAY), null);
   assert.equal(cardView(null, {}, TODAY), null);
@@ -171,7 +183,6 @@ test('a 409 or 404 shows the server’s sentence and reloads the state; nothing 
   for (const [status, sentence] of [
     [409, 'That week is not open for a check-in'],
     [409, 'Undo the swap first'],
-    [404, 'Not found'],
   ] as const) {
     const { actions, replaced, reloads } = api(() => {
       throw new ApiError(status, undefined, undefined, '/api/weekly-checkin/save', true, sentence);
@@ -181,6 +192,15 @@ test('a 409 or 404 shows the server’s sentence and reloads the state; nothing 
     assert.equal(replaced.length, 0);
     assert.deepEqual(reloads, [spec]);
   }
+  // A 404 says it plainly, never the server's bare "Not found".
+  const gone = api(() => {
+    throw new ApiError(404, undefined, undefined, '/api/weekly-checkin/save', true, 'Not found');
+  });
+  assert.deepEqual(await gone.actions.save(saveBody(due.weekStart!, due, defaultAnswers(due))), {
+    ok: false,
+    message: 'This check-in is no longer available. Pull to refresh.',
+  });
+  assert.deepEqual(gone.reloads, [spec]);
   // A refused undo (a workout started since) shows its reason.
   const refused = api(() => {
     throw new ApiError(409, undefined, undefined, '/api/weekly-checkin/undo', true, "You've trained since this change, so it stays.");
@@ -279,4 +299,177 @@ test('a lift the save lists under notApplied or kept shows the server’s reason
     notApplied: [],
   });
   assert.equal(kept[0].note, "You've trained since this change, so it stays.");
+});
+
+// ── After review ───────────────────────────────────────────────────────────────────────────
+
+const rawLift = (state: typeof saved, patch: Record<string, unknown>) =>
+  ({ ...state, checkin: { ...state.checkin!, lifts: state.checkin!.lifts.map((l, i) => (i === 0 ? { ...l, ...patch } : l)) } });
+
+test('a lift the engine calls "heavier" parses and the card shows', () => {
+  const raw = { ...due, lifts: due.lifts.map((l, i) => (i === 0 ? { ...l, lastSession: 'heavier' } : l)) };
+  const parsed = checkinStateSchema.parse(raw);
+  assert.equal(parsed.lifts[0].lastSession, 'heavier');
+  assert.equal(cardView(parsed, {}, TODAY)?.kind, 'due');
+});
+
+test('a value the server adds later never hides the card or states something untrue', () => {
+  const lastSession = checkinStateSchema.parse({ ...due, lifts: due.lifts.map((l) => ({ ...l, lastSession: 'sandbagged' })) });
+  assert.equal(lastSession.lifts[0].lastSession, null);
+  assert.equal(cardView(lastSession, {}, TODAY)?.kind, 'due');
+  const unknown = checkinStateSchema.parse(rawLift(saved, { effect: 'paused', holdLive: 'maybe' }));
+  const row = resultRows(unknown.checkin!, null)[0];
+  assert.equal(row.status, 'Saved');
+  assert.equal(row.undo, undefined);
+  assert.equal(cardView(unknown, {}, TODAY)?.kind, 'saved');
+  assert.equal(changeCount(unknown.checkin!).changes, 2, 'the unknown effect counts as no change');
+  // Unknown offer status, unknown offer kind, unknown due reason and check-in status.
+  const odd = checkinStateSchema.parse({
+    ...saved,
+    why: 'eventually',
+    checkin: {
+      ...saved.checkin,
+      status: 'archived',
+      offers: [{ kind: 'mystery' }, { ...saved.checkin!.offers[0], status: 'pending' }],
+    },
+  });
+  assert.equal(odd.why, null);
+  assert.equal(odd.checkin!.offers.length, 1);
+  assert.equal(cardView(odd, {}, TODAY), null, 'an unknown check-in status claims nothing');
+  const status = resultRows({ ...odd.checkin!, status: 'saved' }, null).find((r) => r.key === `lift:${ID.rowLift}`)!;
+  assert.equal(status.status, 'Saved');
+  assert.equal(status.offer, undefined);
+});
+
+test('a save whose reply cannot be parsed reloads and does not say "could not reach"', async () => {
+  const { actions, reloads, replaced } = api(() => ({ state: { nonsense: true } }));
+  const result = await actions.save(saveBody(due.weekStart!, due, defaultAnswers(due)));
+  assert.equal(result.ok, true);
+  assert.match((result as { notice: string }).notice, /went through on the server/);
+  assert.doesNotMatch((result as { notice: string }).notice, /could not reach/i);
+  assert.deepEqual(reloads, [spec]);
+  assert.equal(replaced.length, 0);
+});
+
+test('an unreadable reply to an undo or an offer reloads the same way', async () => {
+  const { actions, reloads } = api(() => 'not json');
+  assert.equal((await actions.undo(ID.checkin, { kind: 'days_off' })).ok, true);
+  assert.equal((await actions.offer(ID.checkin, { kind: 'step_up', liftId: ID.rowLift }, 'accept')).ok, true);
+  assert.equal(reloads.length, 2);
+});
+
+test('a 400 shows the server’s own sentence, not the network message', async () => {
+  const { actions } = api(() => {
+    throw new ApiError(400, undefined, undefined, '/api/weekly-checkin/offer', true, 'That lift trains no main muscle');
+  });
+  assert.deepEqual(await actions.offer(ID.checkin, { kind: 'pain' }, 'accept'), {
+    ok: false,
+    message: 'That lift trains no main muscle',
+  });
+});
+
+test('a pain offer for a lift with no main muscles offers only "Not now", with the reason', () => {
+  const view = {
+    ...saved.checkin!,
+    offers: saved.checkin!.offers.map((o) => (o.kind === 'pain' ? { ...o, muscles: [] } : o)),
+  };
+  const pain = resultRows(view, null).find((r) => r.key === 'pain')!;
+  assert.equal(pain.offer?.accept, undefined);
+  assert.match(pain.offer!.question, /could not tell which muscle/);
+  assert.match(pain.offer!.question, /injuries screen/);
+  assert.deepEqual(pain.offer!.decline, { kind: 'pain' });
+});
+
+test('a lowering already in place says so, and the count agrees with the row', () => {
+  const view = checkinStateSchema.parse(rawLift(saved, { appliedChangeId: null })).checkin!;
+  const row = resultRows(view, null)[0];
+  assert.equal(row.status, 'Already set one step lighter');
+  assert.equal(row.undo, undefined);
+  assert.equal(changeCount(view).changes, changeCount(saved.checkin!).changes - 1);
+});
+
+test('both values of holdLive are worded truthfully', () => {
+  const held = (holdLive: boolean) =>
+    resultRows(
+      checkinStateSchema.parse(rawLift(saved, { effect: 'held', holdLive, appliedChangeId: null })).checkin!,
+      null,
+    )[0];
+  assert.equal(held(true).status, 'Holding Squat next week');
+  assert.deepEqual(held(true).undo, { kind: 'lift', liftId: ID.squatLift });
+  assert.equal(held(false).status, 'Noted. Your plan does not change for it yet');
+  assert.equal(held(false).undo, undefined);
+  assert.doesNotMatch(held(false).status, /holding/i);
+  const count = (holdLive: boolean) =>
+    changeCount(checkinStateSchema.parse(rawLift(saved, { effect: 'held', holdLive, appliedChangeId: null })).checkin!).changes;
+  assert.equal(count(true), count(false) + 1);
+});
+
+test('after a reload, answers for lifts that are gone are dropped and say so', () => {
+  const answers = {
+    ...defaultAnswers(due),
+    lifts: { ...defaultAnswers(due).lifts, [ID.squat]: 'heavy' as const },
+    pain: 'yes' as const,
+    painLift: ID.squat,
+    swap: 'yes' as const,
+    swapLift: ID.bench,
+  };
+  const same = reconcileAnswers(answers, due);
+  assert.equal(same.reset, false);
+  assert.equal(same.answers, answers);
+  const fewer = { ...due, lifts: due.lifts.filter((l) => l.sessionExerciseId !== ID.squat) };
+  const next = reconcileAnswers(answers, fewer);
+  assert.equal(next.reset, true);
+  assert.equal(next.answers.lifts[ID.squat], undefined);
+  assert.equal(next.answers.painLift, null);
+  assert.equal(next.answers.swapLift, ID.bench, 'a pick that is still there stays');
+  assert.equal(next.answers.lifts[ID.bench], 'about_right');
+});
+
+test('a lift’s reason is cleared when its row changes', () => {
+  const notes = {
+    kept: [{ exerciseName: 'Squat', detail: 'a' }],
+    notApplied: [
+      { exerciseName: 'Squat', detail: 'b', reason: 'undone' },
+      { exerciseName: 'Bench Press', detail: 'c', reason: 'refused' },
+    ],
+  };
+  assert.deepEqual(withoutNotesFor(notes, 'Squat'), {
+    kept: [],
+    notApplied: [{ exerciseName: 'Bench Press', detail: 'c', reason: 'refused' }],
+  });
+  assert.equal(withoutNotesFor(null, 'Squat'), null);
+  assert.equal(liftOf(saved.checkin!, { kind: 'lift', liftId: ID.squatLift }), 'Squat');
+  assert.equal(liftOf(saved.checkin!, { kind: 'step_up', liftId: ID.rowLift }), 'Barbell Row');
+  assert.equal(liftOf(saved.checkin!, { kind: 'pain' }), null);
+});
+
+test('a cached state is shown only for this week or last week, so a repeat visit never pops in', () => {
+  assert.equal(isReviewWeek('2026-11-16', '2026-11-22'), true);
+  assert.equal(isReviewWeek('2026-11-16', '2026-11-23'), true, 'Monday grace: last week');
+  assert.equal(isReviewWeek('2026-11-16', '2026-11-30'), false, 'two weeks on');
+  assert.equal(isReviewWeek(null, TODAY), false);
+  // The same key on every day of the week; the spec carries no date.
+  assert.equal(JSON.stringify(weeklyCheckinSpec()), JSON.stringify(weeklyCheckinSpec()));
+  assert.equal(cardView(due, {}, '2026-12-14'), null);
+  assert.equal(cardView(due, {}, '2026-11-23')?.kind, 'due');
+});
+
+test('"Later" markers do not pile up: writing one removes the earlier days’ and weeks’', async () => {
+  const values = new Map<string, string>();
+  const storage = {
+    get: async (k: string) => values.get(k) ?? null,
+    set: async (k: string, v: string) => void values.set(k, v),
+    remove: async (k: string) => void values.delete(k),
+  };
+  const connection = { origin: 'https://example.com', userId: 'one', timezone: 'Australia/Brisbane', get: async () => ({}), post: async () => ({ processed: 0, errors: [] }) };
+  const store = new HomeStore(storage as never, connection as never, () => '10000000-0000-4000-8000-000000000001', () => {}, () => 0);
+  await store.initialize();
+  await store.mark('morning:2026-11-22');
+  await store.markOnly(LATER_PREFIX, laterKey('2026-11-09', '2026-11-17'));
+  await store.markOnly(LATER_PREFIX, laterKey('2026-11-16', '2026-11-22'));
+  const keys = () => Object.keys(store.getSnapshot().markers).filter((k) => k.startsWith(LATER_PREFIX));
+  assert.deepEqual(keys(), [laterKey('2026-11-16', '2026-11-22')]);
+  assert.equal(store.getSnapshot().markers['morning:2026-11-22'], true, 'other markers stay');
+  await store.markOnly(LATER_PREFIX, laterKey('2026-11-16', '2026-11-22'), false);
+  assert.deepEqual(keys(), []);
 });

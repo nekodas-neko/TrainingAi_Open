@@ -46,6 +46,7 @@ export function WeeklyCheckinCard({
       </AppText>
       <Stack gap="xs">
         <AppText variant="heading">{view.title}</AppText>
+        <AppText variant="body">{view.summary}</AppText>
         <AppText variant="caption" tone="muted">
           1 minute. Tell us how the lifts felt and plan next week.
         </AppText>

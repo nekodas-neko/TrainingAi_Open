@@ -4,7 +4,7 @@ import { registerHooks } from 'node:module';
 import { test } from 'node:test';
 import { createElement, type ReactElement } from 'react';
 import { sizes, spacing } from '../src/shared/theme/tokens.ts';
-import { defaultAnswers, type CheckinAnswers } from '../src/features/home/data/weekly-checkin.ts';
+import { checkinStateSchema, defaultAnswers, type CheckinAnswers } from '../src/features/home/data/weekly-checkin.ts';
 import { ID, LONG_NAME, due, saved, savedWithNotApplied } from './fixtures/weekly-checkin-states.ts';
 
 // #3890 step 3: the weekly check-in card, sheet and result, rendered. The shared UI and the theme are
@@ -75,7 +75,7 @@ test('the due card: label, the server’s count, one line, Start review and Late
   const pressed: string[] = [];
   const html = renderToStaticMarkup(
     createElement(WeeklyCheckinCard, {
-      view: { kind: 'due', title: 'Your week in review: 4 of 4 sessions' },
+      view: { kind: 'due', title: 'Your week in review', summary: '4 of 4 planned sessions done.' },
       onStart: () => pressed.push('start'),
       onLater: () => pressed.push('later'),
       onSee: () => pressed.push('see'),
@@ -83,7 +83,7 @@ test('the due card: label, the server’s count, one line, Start review and Late
   );
   assert.equal(
     text(html),
-    'Weekly check-in Your week in review: 4 of 4 sessions 1 minute. Tell us how the lifts felt and plan next week. Start review Later',
+    'Weekly check-in Your week in review 4 of 4 planned sessions done. 1 minute. Tell us how the lifts felt and plan next week. Start review Later',
   );
   assert.match(html, /data-tone="checkin"/);
   press('Start review');
@@ -237,4 +237,57 @@ test('the result shows the server’s reason for a lift it did not apply', () =>
 test('while one call is in flight, no other control can be tapped', () => {
   renderSheet({ state: saved, sending: 'pain' });
   assert.deepEqual([...controls.keys()], ['Done']);
+});
+
+test('an unknown effect and an unknown lastSession render safely in the result and the form', () => {
+  const odd = checkinStateSchema.parse({
+    ...saved,
+    lifts: saved.lifts.map((l) => ({ ...l, lastSession: 'heavier' })),
+    checkin: {
+      ...saved.checkin,
+      lifts: saved.checkin!.lifts.map((l, i) => (i === 0 ? { ...l, effect: 'paused', answer: 'huge' } : l)),
+    },
+  });
+  const html = renderSheet({ state: odd });
+  assert.ok(text(html).includes('Squat Saved'));
+  assert.doesNotMatch(text(html), /lighter next time.*Squat/);
+  assert.ok(renderSheet({ state: checkinStateSchema.parse({ ...due, lifts: due.lifts.map((l) => ({ ...l, lastSession: 'heavier' })) }) }));
+});
+
+test('both holdLive values render: Holding with Undo, or Noted', () => {
+  const live = (holdLive: boolean) =>
+    renderSheet({
+      state: {
+        ...saved,
+        checkin: {
+          ...saved.checkin!,
+          lifts: saved.checkin!.lifts.map((l) => (l.liftId === ID.benchLift ? { ...l, holdLive } : l)),
+        },
+      },
+    });
+  const yes = live(true);
+  assert.ok(text(yes).includes('Bench Press: Heavy Holding Bench Press next week'));
+  assert.ok(controls.has('Undo: Bench Press: Heavy'));
+  const no = live(false);
+  assert.ok(text(no).includes('Noted. Your plan does not change for it yet'));
+  assert.ok(!controls.has('Undo: Bench Press: Heavy'));
+});
+
+test('with nothing left under review the sheet stays up with the message and a Close button', () => {
+  const closed = checkinStateSchema.parse({ ...due, due: false, weekStart: null, summary: null, lifts: [], checkin: null });
+  const html = renderSheet({ state: closed, message: 'This check-in is no longer available. Pull to refresh.' });
+  assert.ok(text(html).includes('This check-in is no longer available. Pull to refresh.'));
+  assert.ok(controls.has('Close'));
+  assert.ok(!controls.has('Save review'));
+  assert.ok(text(renderSheet({ state: null })).includes('no longer available'));
+});
+
+test('a pain offer with no muscle shows no Log injury button, only Not now', () => {
+  const state = {
+    ...saved,
+    checkin: { ...saved.checkin!, offers: saved.checkin!.offers.map((o) => (o.kind === 'pain' ? { ...o, muscles: [] } : o)) },
+  };
+  const html = renderSheet({ state });
+  assert.ok(text(html).includes('could not tell which muscle'));
+  assert.ok(!controls.has('Log injury'));
 });

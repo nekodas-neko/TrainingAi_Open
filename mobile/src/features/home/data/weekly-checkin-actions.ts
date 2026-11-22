@@ -14,12 +14,19 @@ import {
   type saveBody,
 } from './weekly-checkin.ts';
 
-export type CheckinResult = { ok: true; notes?: SaveNotes } | { ok: false; message: string | null };
+/** `notice`: the call went through but its reply could not be read; the state is being reloaded. */
+export type CheckinResult =
+  | { ok: true; notes?: SaveNotes; notice?: string }
+  | { ok: false; message: string | null };
 
 export const OFFLINE_MESSAGE =
   'You’re offline. Nothing was sent; your answers stay here. Save when you’re back online.';
 const LOST_MESSAGE =
   'The connection dropped, so this may not have reached the server. Your answers stay here; try again. Sending again never applies a change twice.';
+const GONE_MESSAGE = 'This check-in is no longer available. Pull to refresh.';
+const CHANGED_MESSAGE = 'The check-in changed. It has been refreshed.';
+const UNREADABLE_MESSAGE =
+  'That went through on the server, but its reply could not be read. The check-in is being reloaded.';
 const PENDING_MESSAGE = 'Changes made on this phone are still syncing. Try again in a moment.';
 
 type Resources = Pick<WorkoutResources, 'write' | 'replace' | 'load'> & {
@@ -78,27 +85,43 @@ export class WeeklyCheckinActions {
     if (this.isOffline()) return { ok: false, message: OFFLINE_MESSAGE };
     this.busy = true;
     try {
-      const response = await this.resources.write('POST', path, body, coachPaths);
-      const { state, notes } = read(response);
-      await this.resources.replace(this.spec, state).catch(() => {});
-      this.onChanged();
-      return notes ? { ok: true, notes } : { ok: true };
-    } catch (failure) {
-      if (failure instanceof ApiError && (failure.status === 409 || failure.status === 404)) {
-        void this.resources.load(this.spec, true);
-        return {
-          ok: false,
-          message:
-            failure.serverMessage ??
-            (failure.status === 404
-              ? 'That is no longer there. The check-in has been refreshed.'
-              : 'The check-in changed. It has been refreshed.'),
-        };
+      let response: unknown;
+      try {
+        response = await this.resources.write('POST', path, body, coachPaths);
+      } catch (failure) {
+        return this.failed(failure);
       }
-      if (isConnectionFailure(failure)) return { ok: false, message: LOST_MESSAGE };
-      return { ok: false, message: failureNotice('Could not reach the weekly check-in.', failure) };
+      // The server answered. A reply this build cannot read is not a network failure: the change was
+      // made, so say so and reload the real state.
+      let read_: { state: CheckinState; notes?: SaveNotes };
+      try {
+        read_ = read(response);
+      } catch {
+        void this.resources.load(this.spec, true);
+        this.onChanged();
+        return { ok: true, notice: UNREADABLE_MESSAGE };
+      }
+      await this.resources.replace(this.spec, read_.state).catch(() => {});
+      this.onChanged();
+      return read_.notes ? { ok: true, notes: read_.notes } : { ok: true };
     } finally {
       this.busy = false;
     }
+  }
+  private failed(failure: unknown): CheckinResult {
+    if (failure instanceof ApiError && (failure.status === 409 || failure.status === 404)) {
+      void this.resources.load(this.spec, true);
+      return {
+        ok: false,
+        message:
+          failure.status === 404 ? GONE_MESSAGE : (failure.serverMessage ?? CHANGED_MESSAGE),
+      };
+    }
+    // The server's own validation sentence for a refused body, never the network message.
+    if (failure instanceof ApiError && failure.status === 400 && failure.serverMessage) {
+      return { ok: false, message: failure.serverMessage };
+    }
+    if (isConnectionFailure(failure)) return { ok: false, message: LOST_MESSAGE };
+    return { ok: false, message: failureNotice('Could not reach the weekly check-in.', failure) };
   }
 }

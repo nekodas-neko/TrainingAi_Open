@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { CHECKIN_ANSWERS, type CheckinAnswer, type CheckinEffect } from '@trainingai/shared/weekly-checkin/effects';
 import type { CheckinDueWhy } from '@trainingai/shared/weekly-checkin/due';
 import type { CheckinSummary, LastSessionAgainstPlan } from '@trainingai/shared/weekly-checkin/summary';
+import { shiftDateStr, weekStartForDay } from '@trainingai/shared/date-utils';
 import { MIN_PRESET_BUDGET_MIN } from '@trainingai/shared/workout/duration-model';
 
 // #3890 step 3: the weekly check-in's Home card and sheet read and write the engine's five routes
@@ -10,10 +11,45 @@ import { MIN_PRESET_BUDGET_MIN } from '@trainingai/shared/workout/duration-model
 // the shared enums and types. It keeps only what the screens use. Every word the result shows about
 // an effect comes from a server field; nothing here works out an effect itself.
 
-const answer = z.enum(CHECKIN_ANSWERS);
-const effect = z.enum(['held', 'lowered_one_step', 'offered_step_up', 'none'] satisfies CheckinEffect[]);
-const offerStatus = z.enum(['open', 'accepted', 'declined']);
-const lastSession = z.enum(['beat', 'met', 'short', 'not_compared'] satisfies LastSessionAgainstPlan[]);
+// Every list below is checked against the shared type it mirrors: a member the shared type has and
+// the list lacks fails the type check (`Exhaustive`), so a value the engine adds cannot be missed
+// here silently. `satisfies` alone would only catch an extra member.
+type Exhaustive<Union, List extends readonly unknown[]> = [Exclude<Union, List[number]>] extends [never]
+  ? true
+  : { missing: Exclude<Union, List[number]> };
+const EFFECTS = ['held', 'lowered_one_step', 'offered_step_up', 'none'] as const satisfies readonly CheckinEffect[];
+const LAST_SESSIONS = [
+  'beat',
+  'met',
+  'short',
+  'heavier',
+  'not_compared',
+] as const satisfies readonly LastSessionAgainstPlan[];
+const DUE_WHY = [
+  'planned_count_reached',
+  'last_planned_day_logged',
+  'sunday_evening',
+  'grace_monday',
+] as const satisfies readonly CheckinDueWhy[];
+const checkedLists: [
+  Exhaustive<CheckinEffect, typeof EFFECTS>,
+  Exhaustive<LastSessionAgainstPlan, typeof LAST_SESSIONS>,
+  Exhaustive<CheckinDueWhy, typeof DUE_WHY>,
+  Exhaustive<CheckinAnswer, typeof CHECKIN_ANSWERS>,
+] = [true, true, true, true];
+void checkedLists;
+
+/** A value the screens branch on: a known one as is, any other becomes `'unknown'` (never a parse failure). */
+const orUnknown = <const T extends readonly [string, ...string[]]>(list: T) =>
+  z.union([z.enum(list), z.string().transform((): 'unknown' => 'unknown')]);
+/** A value the screens never branch on: a known one as is, any other is dropped to null. */
+const knownOrNull = <const T extends readonly [string, ...string[]]>(list: T) =>
+  z.enum(list).nullable().catch(null);
+
+const answer = orUnknown(CHECKIN_ANSWERS);
+const effect = orUnknown(EFFECTS);
+const offerStatus = orUnknown(['open', 'accepted', 'declined'] as const);
+const lastSession = knownOrNull(LAST_SESSIONS);
 
 const summarySchema = z.object({
   sessionsDone: z.number(),
@@ -26,10 +62,10 @@ const stateLiftSchema = z.object({
   exerciseName: z.string(),
   exerciseId: z.string().nullable(),
   missedRep: z.boolean().nullable(),
-  lastSession: lastSession.nullable(),
+  lastSession,
 });
 
-const offerSchema = z.discriminatedUnion('kind', [
+const knownOffer = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('step_up'),
     liftId: z.string(),
@@ -65,7 +101,7 @@ const viewSchema = z.object({
   id: z.string(),
   weekStart: z.string(),
   appliesWeekStart: z.string(),
-  status: z.enum(['offered', 'saved', 'dismissed']),
+  status: orUnknown(['offered', 'saved', 'dismissed'] as const),
   savedAt: z.string().nullable(),
   lifts: z.array(
     z.object({
@@ -77,7 +113,8 @@ const viewSchema = z.object({
       effect,
       offerStatus: z.string().nullable(),
       appliedChangeId: z.string().nullable(),
-      holdLive: z.boolean().nullable(),
+      // Anything but a plain true is read as not live: the row never claims a hold it cannot vouch for.
+      holdLive: z.boolean().nullable().catch(null),
     }),
   ),
   daysOff: z.array(z.number()).nullable(),
@@ -89,19 +126,18 @@ const viewSchema = z.object({
     z.object({ exerciseName: z.string(), exerciseId: z.string().nullable(), where: z.string().nullable() }),
   ]),
   swap: z.object({ exerciseName: z.string(), exerciseId: z.string().nullable() }).nullable(),
-  offers: z.array(offerSchema),
+  // An offer of a kind this build does not know is left out; the rest of the check-in still shows.
+  offers: z
+    .array(z.unknown())
+    .transform((items) => items.flatMap((item) => {
+      const parsed = knownOffer.safeParse(item);
+      return parsed.success ? [parsed.data] : [];
+    })),
 });
 
 export const checkinStateSchema = z.object({
   due: z.boolean(),
-  why: z
-    .enum([
-      'planned_count_reached',
-      'last_planned_day_logged',
-      'sunday_evening',
-      'grace_monday',
-    ] satisfies CheckinDueWhy[])
-    .nullable(),
+  why: knownOrNull(DUE_WHY),
   weekStart: z.string().nullable(),
   summary: summarySchema.nullable(),
   lifts: z.array(stateLiftSchema),
@@ -115,7 +151,7 @@ export const saveOutcomeSchema = z.object({
     z.object({
       exerciseName: z.string(),
       detail: z.string(),
-      reason: z.enum(['refused', 'undone', 'swapped']),
+      reason: z.string(),
     }),
   ),
 });
@@ -134,21 +170,32 @@ const summaryMatches: Same<
 > = true;
 void summaryMatches;
 
-/** The day's state; "today" is in the key so yesterday's card is never painted as today's. */
-export const weeklyCheckinSpec = (today: string) => ({
+/**
+ * The state, cached under one key so a repeat visit paints the last known card at once and revalidates
+ * behind it. A cached state is only shown while it is for a week the card can still be about
+ * (`isReviewWeek`), so an old week's card is never painted as today's.
+ */
+export const weeklyCheckinSpec = () => ({
   path: '/api/weekly-checkin',
-  partition: today,
   ttl: 300_000,
   schema: checkinStateSchema,
 });
 
+/** This week or last week (the Monday grace window): the only weeks a check-in can be about. */
+export function isReviewWeek(weekStart: string | null, today: string) {
+  if (!weekStart) return false;
+  const thisWeek = weekStartForDay(today);
+  return weekStart === thisWeek || weekStart === shiftDateStr(thisWeek, -7);
+}
+
 export const CHECKIN_PATH = '/api/weekly-checkin';
 
 /** "Later" on this phone, for today only: the card is back tomorrow while its window is open. */
-export const laterKey = (weekStart: string, today: string) => `weekly-checkin-later:${weekStart}:${today}`;
+export const LATER_PREFIX = 'weekly-checkin-later:';
+export const laterKey = (weekStart: string, today: string) => `${LATER_PREFIX}${weekStart}:${today}`;
 
 export type CardView =
-  | { kind: 'due'; title: string }
+  | { kind: 'due'; title: string; summary: string }
   | { kind: 'saved'; changes: number; openOffers: number }
   | null;
 
@@ -157,20 +204,14 @@ export function cardView(
   markers: Readonly<Record<string, boolean>>,
   today: string,
 ): CardView {
-  if (!state?.weekStart || !state.checkin) return null;
+  if (!state?.weekStart || !state.checkin || !isReviewWeek(state.weekStart, today)) return null;
   if (state.checkin.status === 'saved') {
     return { kind: 'saved', ...changeCount(state.checkin) };
   }
   if (!state.due || state.checkin.status !== 'offered' || !state.summary) return null;
   if (markers[laterKey(state.weekStart, today)]) return null;
-  const { sessionsDone, sessionsPlanned } = state.summary;
-  return {
-    kind: 'due',
-    title:
-      sessionsPlanned == null
-        ? `Your week in review: ${sessionsDone} ${sessionsDone === 1 ? 'session' : 'sessions'}`
-        : `Your week in review: ${sessionsDone} of ${sessionsPlanned} sessions`,
-  };
+  // The count is the server's own first line; the phone composes none (it can read "5 of 4").
+  return { kind: 'due', title: 'Your week in review', summary: state.summary.lines[0] };
 }
 
 /**
@@ -289,7 +330,7 @@ export type ResultRow = {
   note?: string;
   undo?: UndoTarget;
   /** An open offer: Yes / Not now. */
-  offer?: { question: string; accept: OfferAction; acceptLabel: string; decline: OfferAction };
+  offer?: { question: string; accept?: OfferAction; acceptLabel?: string; decline: OfferAction };
   /** An open swap offer: one button per alternative the server listed. */
   alternatives?: { exerciseId: string; label: string }[];
   declineSwap?: OfferAction;
@@ -314,7 +355,7 @@ export function resultRows(view: CheckinView, notes: SaveNotes | null): ResultRo
         ...base,
         title: `${lift.exerciseName}: Heavy`,
         // No change id: the lift already carried that step, so there is nothing of this save's to undo.
-        status: 'One step lighter next time',
+        status: lift.appliedChangeId ? 'One step lighter next time' : 'Already set one step lighter',
         undo: lift.appliedChangeId ? { kind: 'lift', liftId: lift.liftId } : undefined,
       });
     } else if (lift.effect === 'held') {
@@ -338,7 +379,9 @@ export function resultRows(view: CheckinView, notes: SaveNotes | null): ResultRo
             ? 'Step up applied'
             : status === 'declined'
               ? 'Not changed: you said not now'
-              : 'Offered, not changed yet',
+              : status === 'open'
+                ? 'Offered, not changed yet'
+                : 'Saved',
         undo: status === 'accepted' ? { kind: 'lift', liftId: lift.liftId } : undefined,
         offer:
           status === 'open'
@@ -350,12 +393,15 @@ export function resultRows(view: CheckinView, notes: SaveNotes | null): ResultRo
               }
             : undefined,
       });
-    } else {
+    } else if (lift.effect === 'none') {
       rows.push({
         ...base,
-        title: `${lift.exerciseName}: ${lift.answer === 'heavy' ? 'Heavy' : lift.answer === 'light' ? 'Light' : 'About right'}`,
+        title: lift.answer === 'unknown' ? lift.exerciseName : `${lift.exerciseName}: ${lift.answer === 'heavy' ? 'Heavy' : lift.answer === 'light' ? 'Light' : 'About right'}`,
         status: 'No change',
       });
+    } else {
+      // An effect this build does not know: say it was saved, with the server's own text if it sent any.
+      rows.push({ ...base, title: lift.exerciseName, status: 'Saved' });
     }
   }
   for (const offer of view.offers) {
@@ -369,16 +415,25 @@ export function resultRows(view: CheckinView, notes: SaveNotes | null): ResultRo
             ? 'Injury logged'
             : offer.status === 'declined'
               ? 'No injury logged'
-              : 'Offered, not logged yet',
+              : offer.status === 'open'
+                ? 'Offered, not logged yet'
+                : 'Saved',
         undo: offer.status === 'accepted' ? { kind: 'pain' } : undefined,
         offer:
           offer.status === 'open'
-            ? {
-                question: muscle ? `Log an injury to ${muscle}?` : 'Log an injury?',
-                accept: { kind: 'pain' },
-                acceptLabel: 'Log injury',
-                decline: { kind: 'pain' },
-              }
+            ? muscle
+              ? {
+                  question: `Log an injury to ${muscle}?`,
+                  accept: { kind: 'pain' },
+                  acceptLabel: 'Log injury',
+                  decline: { kind: 'pain' },
+                }
+              : {
+                  // The route needs a muscle to log against; with none it would refuse, so only "Not now".
+                  question:
+                    'The app could not tell which muscle this lift trains. You can log the injury from the injuries screen instead.',
+                  decline: { kind: 'pain' },
+                }
             : undefined,
       });
     } else if (offer.kind === 'swap') {
@@ -390,9 +445,11 @@ export function resultRows(view: CheckinView, notes: SaveNotes | null): ResultRo
             ? 'Swap applied'
             : offer.status === 'declined'
               ? `Kept ${offer.exerciseName}`
-              : offer.alternatives.length
-                ? 'Pick one to swap it for, or keep it'
-                : 'No alternative found for the same muscles',
+              : offer.status !== 'open'
+                ? 'Saved'
+                : offer.alternatives.length
+                  ? 'Pick one to swap it for, or keep it'
+                  : 'No alternative found for the same muscles',
         undo: offer.status === 'accepted' ? { kind: 'swap' } : undefined,
         alternatives:
           offer.status === 'open'
@@ -422,4 +479,44 @@ export function resultRows(view: CheckinView, notes: SaveNotes | null): ResultRo
     });
   }
   return rows;
+}
+
+// ── Keeping the sheet true to the state ────────────────────────────────────────────────────
+
+/**
+ * After a reload the lifts under review may differ. Answers, and the pain or swap pick, for a lift
+ * the server no longer lists are dropped; `reset` says whether anything was.
+ */
+export function reconcileAnswers(answers: CheckinAnswers, state: CheckinState) {
+  const ids = new Set(state.lifts.map((l) => l.sessionExerciseId));
+  const kept = Object.entries(answers.lifts).filter(([id]) => ids.has(id));
+  const painGone = answers.painLift != null && !ids.has(answers.painLift);
+  const swapGone = answers.swapLift != null && !ids.has(answers.swapLift);
+  const reset = kept.length !== Object.keys(answers.lifts).length || painGone || swapGone;
+  if (!reset) return { answers, reset };
+  return {
+    reset,
+    answers: {
+      ...answers,
+      lifts: Object.fromEntries(kept),
+      painLift: painGone ? null : answers.painLift,
+      swapLift: swapGone ? null : answers.swapLift,
+    },
+  };
+}
+export const LIFTS_CHANGED_MESSAGE =
+  'The lifts for this week changed, so your answers for those were reset. Check them before saving.';
+
+/** The server's reasons for one lift, dropped once that lift's row changes or is undone. */
+export function withoutNotesFor(notes: SaveNotes | null, exerciseName: string): SaveNotes | null {
+  if (!notes) return notes;
+  return {
+    kept: notes.kept.filter((n) => n.exerciseName !== exerciseName),
+    notApplied: notes.notApplied.filter((n) => n.exerciseName !== exerciseName),
+  };
+}
+/** The lift a row's undo or offer touches, if it is a lift's. */
+export function liftOf(view: CheckinView | null, target: UndoTarget | OfferAction) {
+  if (target.kind !== 'lift' && target.kind !== 'step_up') return null;
+  return view?.lifts.find((l) => l.liftId === target.liftId)?.exerciseName ?? null;
 }

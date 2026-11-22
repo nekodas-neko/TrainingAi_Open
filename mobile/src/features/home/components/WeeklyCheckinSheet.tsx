@@ -35,7 +35,7 @@ const YES_NO = [
 ] as const;
 
 export type CheckinSheetProps = {
-  state: CheckinState;
+  state: CheckinState | null;
   answers: CheckinAnswers;
   onAnswers: (next: CheckinAnswers) => void;
   notes: SaveNotes | null;
@@ -55,16 +55,34 @@ export type CheckinSheetProps = {
  * and undos, from the state the last call returned.
  */
 export function WeeklyCheckinSheet(props: CheckinSheetProps) {
-  const { state, onClose } = props;
-  const saved = state.checkin?.status === 'saved';
+  const { onClose } = props;
+  const state = props.state;
+  // Nothing is left under review (a refusal reloaded the state): keep the sheet up with the message,
+  // until the person closes it.
+  if (!state?.weekStart || !state.checkin || state.checkin.status === 'dismissed' || state.checkin.status === 'unknown') {
+    return (
+      <Sheet
+        visible
+        title="Weekly check-in"
+        onClose={onClose}
+        footer={<ResultFooter onClose={onClose} label="Close" />}
+      >
+        <AppText variant="body" accessibilityLiveRegion="polite">
+          {props.message ?? 'This check-in is no longer available.'}
+        </AppText>
+      </Sheet>
+    );
+  }
+  const live = { ...props, state };
+  const saved = state.checkin.status === 'saved';
   return (
     <Sheet
       visible
       title={saved ? 'Review saved · What changes next week' : 'Weekly check-in'}
       onClose={onClose}
-      footer={saved ? <ResultFooter onClose={onClose} /> : <SaveFooter {...props} />}
+      footer={saved ? <ResultFooter onClose={onClose} /> : <SaveFooter {...live} />}
     >
-      {saved ? <ResultBody {...props} /> : <FormBody {...props} />}
+      {saved ? <ResultBody {...live} /> : <FormBody {...live} />}
     </Sheet>
   );
 }
@@ -78,7 +96,9 @@ function Question({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-function FormBody({ state, answers, onAnswers }: CheckinSheetProps) {
+type Live = CheckinSheetProps & { state: CheckinState };
+
+function FormBody({ state, answers, onAnswers }: Live) {
   const lifts = state.lifts.map((l) => ({ label: l.exerciseName, value: l.sessionExerciseId }));
   const set = (patch: Partial<CheckinAnswers>) => onAnswers({ ...answers, ...patch });
   return (
@@ -201,16 +221,16 @@ function SaveFooter({ answers, offline, sending, message, onSave }: CheckinSheet
   );
 }
 
-function ResultFooter({ onClose }: { onClose: () => void }) {
+function ResultFooter({ onClose, label = 'Done' }: { onClose: () => void; label?: string }) {
   const { theme } = useTheme();
   return (
     <Stack style={{ paddingTop: theme.spacing.sm }}>
-      <AppButton title="Done" onPress={onClose} />
+      <AppButton title={label} onPress={onClose} />
     </Stack>
   );
 }
 
-function ResultBody(props: CheckinSheetProps) {
+function ResultBody(props: Live) {
   const { state, notes, message } = props;
   const rows = state.checkin ? resultRows(state.checkin, notes) : [];
   return (
@@ -234,7 +254,7 @@ function ResultRowView({
   sending,
   onOffer,
   onUndo,
-}: CheckinSheetProps & { row: ResultRow }) {
+}: Live & { row: ResultRow }) {
   const { theme } = useTheme();
   const checkinId = state.checkin?.id;
   const blocked = offline || sending !== null;
@@ -275,14 +295,16 @@ function ResultRowView({
         <Stack gap="xs">
           <AppText variant="body">{row.offer.question}</AppText>
           <Stack direction="row">
-            <AppButton
-              title={row.offer.acceptLabel}
-              variant="secondary"
-              busy={busy}
-              disabled={blocked}
-              style={{ flex: 1 }}
-              onPress={() => onOffer(row.key, row.offer!.accept, 'accept')}
-            />
+            {row.offer.accept && (
+              <AppButton
+                title={row.offer.acceptLabel ?? 'Yes'}
+                variant="secondary"
+                busy={busy}
+                disabled={blocked}
+                style={{ flex: 1 }}
+                onPress={() => onOffer(row.key, row.offer!.accept!, 'accept')}
+              />
+            )}
             <AppButton
               title="Not now"
               variant="ghost"
