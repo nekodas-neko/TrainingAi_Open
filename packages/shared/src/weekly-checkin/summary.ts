@@ -8,8 +8,9 @@
  * the app asked for, set by set (`classifySet`, the read's own per-set rule):
  *
  *   1. Sessions done, and planned when the program has a schedule.
- *   2. For each main lift logged this week, its last session against the plan: beat it, met it, or fell
- *      short; or that it was logged and not compared, and why (a deload or baseline week, a session
+ *   2. For each main lift logged this week, its last session against the plan: beat it, met it, fell
+ *      short, or went heavier than planned (short on reps only at more than the planned weight); or that
+ *      it was logged and not compared, and why (a deload or baseline week, a session
  *      changed from the plan, not finished, no bar weight, too few planned sets).
  *   3. Days a short rest cost reps (a miss the rest before it excuses, by the same rule).
  *
@@ -25,7 +26,7 @@ export type LiftDirection = 'up' | 'steady' | 'held' | 'down' | 'unknown'
 export type LiftWhy = 'more_load' | 'more_reps' | 'short_rest' | 'heart_rate' | 'felt_hard' | 'missed_reps' | 'logging_slip' | null
 
 /** The lift's last session of the week against the plan, from the logged sets. */
-export type LastSessionAgainstPlan = 'beat' | 'met' | 'short' | 'not_compared'
+export type LastSessionAgainstPlan = 'beat' | 'met' | 'short' | 'heavier' | 'not_compared'
 /** Why a logged session was not compared with the plan. */
 export type NotComparedWhy = 'incomplete' | 'deload' | 'baseline' | 'override' | 'no_weight' | 'too_few_planned_sets'
 
@@ -86,10 +87,15 @@ export function notComparedWhy(log: SessionReadLog, weightStepKg: number): NotCo
   return null
 }
 
-/** The last session against the plan, set by set: any planned set short is short; else any beaten is beat. */
+/**
+ * The last session against the plan, set by set: a planned set short at the planned weight or lighter
+ * is short; else a set short only because the person loaded more than planned (`miss-self-heavier`) is
+ * heavier, which is what the logs show, not a shortfall against the plan; else any beaten is beat.
+ */
 export function againstPlan(log: SessionReadLog, weightStepKg: number): Exclude<LastSessionAgainstPlan, 'not_compared'> {
   const classes = classifySets(log.sets, weightStepKg).map(c => c.result.cls)
-  if (classes.some(c => c === 'miss' || c === 'miss-self-heavier')) return 'short'
+  if (classes.includes('miss')) return 'short'
+  if (classes.includes('miss-self-heavier')) return 'heavier'
   return classes.includes('beat') ? 'beat' : 'met'
 }
 
@@ -135,6 +141,7 @@ const AGAINST_PLAN_TEXT: Record<Exclude<LastSessionAgainstPlan, 'not_compared'>,
   beat: 'beat the plan',
   met: 'met the plan',
   short: 'fell short of the plan',
+  heavier: 'went heavier than planned',
 }
 const NOT_COMPARED_TEXT: Record<NotComparedWhy, string> = {
   incomplete: 'not finished',
