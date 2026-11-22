@@ -26,6 +26,9 @@ const SUB = (id: string) => `google-sub-${id.slice(-4)}`
 type Pool = import('pg').Pool
 
 const liveOverrides = () => ({
+  // #3890: the fixture fills pain_injury_id (allowed only when pain_raised is true), and its generic
+  // date is a Tuesday (week_start must be a Monday).
+  weekly_checkins: { pain_raised: true, week_start: '2026-09-14' },
   apple_health_samples: {
     start_at: new Date('2026-09-15T00:00:00Z'), end_at: new Date('2026-09-15T00:01:00Z'),
     source_bundle_id: 'com.example', quantity_value: 1, quantity_unit: 'count',

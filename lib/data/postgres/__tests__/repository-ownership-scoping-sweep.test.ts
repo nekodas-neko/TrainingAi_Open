@@ -1151,6 +1151,8 @@ const B_OVERRIDES: Record<string, Row> = {
     steps: 9000, weight_kg: 80, body_fat_pct: 20, bmr_kcal: 1800,
     source_map: JSON.stringify({ weight_kg: 'scale_ble', steps: 'manual' }),
   },
+  // #3890: the fixture fills pain_injury_id (allowed only when pain_raised is true) and its generic date is a Tuesday (week_start must be a Monday).
+  weekly_checkins: { pain_raised: true, week_start: '2026-09-14' },
   sleep_sessions: { duration_hours: 7 },
   scale_raw_samples: { status: 'pending', decoded: '{}' },
   workout_sessions: { completed_at: new Date(AT.getTime() + 3_600_000) },
