@@ -68,10 +68,16 @@ key and make testing safer instead ([#2816](https://github.com/nekodas-neko/Trai
 - **The table is generated, never typed.** `scripts/build-food-reference.mjs` reads the SR Legacy
   download and writes `fdc-sr-legacy.ts`; every row carries its `fdcId`. Do not add a number by
   hand: a made-up reference is worse than the model's guess, because the app shows it as fact.
-- **The scan's confidence badge is code's**: high when every ingredient matched, medium when some
-  did, low when none did or `sanitiseNutrition` corrected the totals. The model is not asked for it.
+- **A food whose numbers depend on its state has no bare name**, in the table or from a saved
+  barcode food: `STATE_DEPENDENT_FOOD_KEYS` (`food-reference/state-dependent.ts`) is the one list,
+  and a test over the generated table fails when a bare name is pinned to one state of a food the
+  table holds in several.
+- **The scan's confidence badge is code's, by calories**: high when every ingredient matched, medium
+  when the matched ones carry at least half of the meal's calories, low otherwise or when
+  `sanitiseNutrition` corrected the totals (`matchConfidence`). The model is not asked for it.
 - **A top-up tries arithmetic first** (`planStapleTopUp`), and calls the model only when no staple of
-  the meal's style, clear of every recorded restriction, can close the gap.
+  the meal's style, clear of every recorded restriction, can close the gap in at most two additions
+  of 15 g or more without pushing calories or a macro over target.
 
 ### What the person sees when the model is down
 

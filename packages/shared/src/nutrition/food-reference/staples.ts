@@ -14,19 +14,32 @@
 //    it out (`excludedBy`), and an allergy, avoid or excluded food that contains one of them, or is
 //    contained in one, or names the staple, removes it. Deliberately broad: "dairy-free" removes
 //    every dairy staple, and a staple wrongly withheld costs only a model call.
+//  - **A short list of real ingredients.** At most `MAX_STAPLE_ADDITIONS`, the model path's own cap
+//    of three less one, and any addition that ends under `MIN_STAPLE_ADDITION_G` after the final
+//    scale is dropped: a pinch of potato is clutter, not food. Dropping one reopens a gap, which is
+//    re-checked.
+//  - **It adds what is short, not what is over.** A staple that closes protein can push fat or
+//    calories past the target (tofu is 8 g of fat per 100 g). Anything over beyond `mealFit`'s own
+//    tolerance that the plain scale was not already over by is refused.
+// Refusing is null, and null means the model is asked.
 //
 // PURE: no I/O.
 
 import type { NutritionIngredient } from '@trainingai/shared/types/nutrition'
 import { text } from '../food-item-identity'
 import { scaleIngredientsToTargets, dominantMacro } from '../meal-split'
-import { mealFit, fitDistance, TOP_UP_MIN_IMPROVEMENT } from '../meal-macro-fit'
+import { mealFit, fitDistance, TOP_UP_MIN_IMPROVEMENT, type MealFit } from '../meal-macro-fit'
 import { sumIngredients } from '../scan-totals'
 import { FDC_SR_LEGACY_ROWS } from './fdc-sr-legacy'
 import { referenceRowFor } from './resolve'
 import type { FoodReferenceRow } from './types'
 
 export type MealStyle = 'sweet' | 'savoury'
+
+/** The most staples one top-up adds. The model's path is capped at 3, and fewer is a better meal. */
+export const MAX_STAPLE_ADDITIONS = 2
+/** An addition that ends up lighter than this once the meal is re-portioned is not worth a line. */
+export const MIN_STAPLE_ADDITION_G = 15
 type Macro = 'protein' | 'carbs' | 'fat'
 
 // Which table rows say a meal is sweet or savoury. Foods that sit in both (avocado, bread, nuts,
@@ -81,7 +94,7 @@ export const TOP_UP_STAPLES: readonly Staple[] = [
   { fdcId: 169753, name: 'white rice, cooked', macro: 'carbs', style: 'savoury', excludedBy: ['rice', 'grain', 'low carb', 'keto'], maxG: 300 },
   { fdcId: 170438, name: 'potatoes, boiled', macro: 'carbs', style: 'savoury', excludedBy: ['potato', 'nightshade', 'low carb', 'keto'], maxG: 300 },
   { fdcId: 173944, name: 'banana', macro: 'carbs', style: 'sweet', excludedBy: ['banana', 'fruit', 'low carb', 'keto'], maxG: 150 },
-  { fdcId: 173904, name: 'rolled oats', macro: 'carbs', style: 'sweet', excludedBy: ['oat', 'gluten', 'grain', 'coeliac', 'celiac', 'low carb', 'keto'], maxG: 100 },
+  { fdcId: 173904, name: 'rolled oats, dry', macro: 'carbs', style: 'sweet', excludedBy: ['oat', 'gluten', 'grain', 'coeliac', 'celiac', 'low carb', 'keto'], maxG: 100 },
   { fdcId: 171413, name: 'olive oil', macro: 'fat', style: 'savoury', excludedBy: ['olive', 'oil'], maxG: 20 },
   { fdcId: 171705, name: 'avocado', macro: 'fat', style: 'savoury', excludedBy: ['avocado'], maxG: 100 },
   { fdcId: 170567, name: 'almonds', macro: 'fat', style: 'sweet', excludedBy: ['nut', 'almond'], maxG: 40 },
@@ -121,6 +134,19 @@ export interface StapleTopUpInput {
   table?: readonly FoodReferenceRow[]
 }
 
+const OVERSHOOT_KEYS = ['calories', 'protein', 'carbs', 'fat'] as const
+
+/**
+ * What a top-up pushed over target: calories or a macro that is 'over' by `mealFit`'s own tolerance
+ * (10% with an absolute floor; one definition of "on target", not a second one here) after the
+ * top-up, and was not already over by at least as much before it. A meal that came in over, and was
+ * not made worse, is not the top-up's fault.
+ */
+export function topUpOvershoots(before: MealFit, after: MealFit): (typeof OVERSHOOT_KEYS)[number][] {
+  return OVERSHOOT_KEYS.filter(k => after[k].status === 'over'
+    && !(before[k].status === 'over' && before[k].delta >= after[k].delta))
+}
+
 const MACROS: readonly { key: Macro; per100: 'proteinPer100g' | 'carbsPer100g' | 'fatPer100g'; fit: 'protein' | 'carbs' | 'fat' }[] = [
   { key: 'protein', per100: 'proteinPer100g', fit: 'protein' },
   { key: 'carbs', per100: 'carbsPer100g', fit: 'carbs' },
@@ -129,8 +155,9 @@ const MACROS: readonly { key: Macro; per100: 'proteinPer100g' | 'carbsPer100g' |
 
 /**
  * The meal with staples added and re-portioned, when that closes every short macro; null when it
- * cannot (no style, no eligible staple for a short macro, or the result still falls short or does
- * not improve the fit by `TOP_UP_MIN_IMPROVEMENT`). Null means "ask the model", never "give up".
+ * cannot (no style, no eligible staple for a short macro, more than `MAX_STAPLE_ADDITIONS` needed,
+ * or the result still falls short, overshoots, or does not improve the fit by
+ * `TOP_UP_MIN_IMPROVEMENT`). Null means "ask the model", never "give up".
  */
 export function planStapleTopUp(input: StapleTopUpInput): NutritionIngredient[] | null {
   const table = input.table ?? FDC_SR_LEGACY_ROWS
@@ -154,7 +181,7 @@ export function planStapleTopUp(input: StapleTopUpInput): NutritionIngredient[] 
     let gramsShort = -fit[m.fit].delta
     const per100Key = m.key === 'protein' ? 'proteinG' : m.key === 'carbs' ? 'carbsG' : 'fatG'
     for (const staple of TOP_UP_STAPLES) {
-      if (!(gramsShort > 0)) break
+      if (!(gramsShort > 0) || additions.length >= MAX_STAPLE_ADDITIONS) break
       if (staple.macro !== m.key || staple.style !== style) continue
       if (present.has(staple.fdcId) || stapleRestricted(staple, input.restrictions)) continue
       const row = table.find(r => r.fdcId === staple.fdcId)
@@ -170,7 +197,7 @@ export function planStapleTopUp(input: StapleTopUpInput): NutritionIngredient[] 
       // The scaler files a food by its dominant macro; a staple filed elsewhere would be portioned
       // against the wrong target.
       if (dominantMacro(addition) !== m.key) continue
-      addition.weightG = Math.max(5, Math.min(staple.maxG, Math.round(gramsShort / (row[per100Key] / 100))))
+      addition.weightG = Math.max(MIN_STAPLE_ADDITION_G, Math.min(staple.maxG, Math.round(gramsShort / (row[per100Key] / 100))))
       gramsShort -= addition.weightG * row[per100Key] / 100
       additions.push(addition)
       present.add(staple.fdcId)
@@ -178,17 +205,33 @@ export function planStapleTopUp(input: StapleTopUpInput): NutritionIngredient[] 
     if (gramsShort > fit[m.fit].target * 0.1) return null
   }
 
-  const caps = new Map(additions.map(a => [a.name, TOP_UP_STAPLES.find(s => s.name === a.name)!.maxG]))
   // The scaler portions the additions with the rest of the meal, and may stretch one past its cap
-  // when the gap is wide. Held to the cap, and the fit judged on what is actually offered.
-  const merged = (scaleIngredientsToTargets([...ingredients, ...additions], targets) as NutritionIngredient[])
-    .map(i => {
-      const cap = caps.get(i.name)
-      return cap != null && i.weightG > cap ? { ...i, weightG: cap } : i
-    })
+  // when the gap is wide. Held to the cap, and the fit judged on what is actually offered. An
+  // addition the re-portioning leaves under `MIN_STAPLE_ADDITION_G` is dropped and the rest portioned
+  // again without it, until none is left that small.
+  const portion = (kept: readonly NutritionIngredient[]) => {
+    const caps = new Map(kept.map(a => [a.name, TOP_UP_STAPLES.find(s => s.name === a.name)!.maxG]))
+    return (scaleIngredientsToTargets([...ingredients, ...kept], targets) as NutritionIngredient[])
+      .map(i => {
+        const cap = caps.get(i.name)
+        return cap != null && i.weightG > cap ? { ...i, weightG: cap } : i
+      })
+  }
+  let kept = additions
+  let merged = portion(kept)
+  for (;;) {
+    const trace = new Set(merged.filter(i => kept.some(a => a.name === i.name) && Math.round(i.weightG) < MIN_STAPLE_ADDITION_G).map(i => i.name))
+    if (trace.size === 0) break
+    kept = kept.filter(a => !trace.has(a.name))
+    if (kept.length === 0) return null
+    merged = portion(kept)
+  }
   const after = sumIngredients(merged)
   const afterFit = mealFit(after, targets)
   if (MACROS.some(m => afterFit[m.fit].status === 'under')) return null
+  // Not over what it was not already over: the plain scale's own overshoot (a meal that brought too
+  // much fat) is not this top-up's doing, but making it worse, or creating a new one, is.
+  if (topUpOvershoots(fit, afterFit).length > 0) return null
   if (!(fitDistance(after, targets) < fitDistance(before, targets) * (1 - TOP_UP_MIN_IMPROVEMENT))) return null
   return merged
 }

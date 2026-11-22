@@ -5,7 +5,8 @@
 // plan. Code now supplies them whenever it knows the food, tried in this order:
 //
 //   1. the user's own saved food of that name, when it came from a barcode (see
-//      `TRUSTED_SAVED_FOOD_SOURCES` for why only a barcode);
+//      `TRUSTED_SAVED_FOOD_SOURCES` for why only a barcode) and the name is not a bare
+//      state-dependent one (see `state-dependent.ts`);
 //   2. the bundled USDA FoodData Central table (`fdc-sr-legacy.ts`);
 //   3. nothing: the model's numbers stand, and the ingredient is marked `estimated`.
 //
@@ -19,6 +20,7 @@
 import type { NutritionIngredient } from '@trainingai/shared/types/nutrition'
 import { text } from '../food-item-identity'
 import { FDC_SR_LEGACY_ROWS } from './fdc-sr-legacy'
+import { isStateDependentFoodName } from './state-dependent'
 import type { FoodReferenceRow } from './types'
 
 /** A saved food as the resolver needs it. A `FoodItem` is a superset. */
@@ -126,7 +128,10 @@ export function resolveIngredientDensity(name: string, ctx: ResolveContext = {})
   const key = text(name)
   if (!key) return null
 
-  const own = (ctx.savedFoods ?? [])
+  // The same rule as the table's: no bare name for a food whose numbers depend on its state. A bag
+  // of dry rice saved as "Rice" is ~360 kcal per 100 g, and the model's "Rice 200 g" is a cooked
+  // plate, so a saved food of such a name is never used and the ingredient stays the model's.
+  const own = isStateDependentFoodName(key) ? [] : (ctx.savedFoods ?? [])
     .filter(f => f.source != null && TRUSTED_SAVED_FOOD_SOURCES.includes(f.source) && text(f.name) === key)
     .map(savedFoodDensity)
     .filter((d): d is IngredientDensity => d != null)
@@ -180,21 +185,33 @@ export function applyReferenceDensities(
 
 export type MatchConfidence = 'high' | 'medium' | 'low'
 
-/**
- * The review screen's badge, from code rather than the model's opinion of itself: high when every
- * ingredient's numbers came from code, medium when some did, low when none did.
- */
-export function confidenceFromMatches(matched: number, total: number): MatchConfidence {
-  if (total > 0 && matched >= total) return 'high'
-  if (matched > 0) return 'medium'
-  return 'low'
-}
+/** The share of a meal's calories the matched ingredients must carry for "medium". */
+export const MEDIUM_CONFIDENCE_CALORIE_SHARE = 0.5
 
 /**
- * The badge after `sanitiseNutrition` has run. That function lowers the confidence it is handed
- * exactly when it corrected something, and a correction means the numbers were wrong somewhere,
- * so any change makes the badge low.
+ * The review screen's badge, from code rather than the model's opinion of itself. The one function
+ * every route calls, so both apps read the same rule off the response:
+ *
+ *  - **high** when every ingredient's numbers came from code (none is marked `estimated`);
+ *  - **medium** when the ingredients that did carry at least half of the meal's calories;
+ *  - **low** otherwise, and whenever `sanitiseNutrition` had to correct the totals (`corrected`).
+ *
+ * Weighed by calories, not by count: one matched garnish beside an unmatched 400 kcal ingredient is
+ * not a mostly-known meal. A meal with no ingredients, or none that carries calories, has nothing to
+ * weigh and is high only when everything matched (an empty list is low).
+ *
+ * It does not know the model's weight estimate. A meal can read high with every number from USDA
+ * and still be off by the grams the model guessed.
  */
-export function confidenceAfterSanitise(before: MatchConfidence, after: string | undefined): MatchConfidence {
-  return after === before ? before : 'low'
+export function matchConfidence(
+  ingredients: readonly NutritionIngredient[],
+  opts: { corrected?: boolean } = {},
+): MatchConfidence {
+  if (opts.corrected || ingredients.length === 0) return 'low'
+  if (ingredients.every(i => !i.estimated)) return 'high'
+  const kcal = (i: NutritionIngredient) => Math.max(0, (Number(i.weightG) || 0) * (Number(i.caloriesPer100g) || 0) / 100)
+  const total = ingredients.reduce((sum, i) => sum + kcal(i), 0)
+  if (!(total > 0)) return 'low'
+  const known = ingredients.filter(i => !i.estimated).reduce((sum, i) => sum + kcal(i), 0)
+  return known >= total * MEDIUM_CONFIDENCE_CALORIE_SHARE ? 'medium' : 'low'
 }

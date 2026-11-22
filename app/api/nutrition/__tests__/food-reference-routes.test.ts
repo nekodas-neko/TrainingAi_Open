@@ -127,24 +127,31 @@ describe('one ingredient schema in all four routes', () => {
 
 describe('the scan takes code\'s numbers and its badge from code', () => {
   it('every ingredient matched: badge high, numbers from the table, the model\'s ignored', async () => {
-    model.reply = scanReply([guess('banana', 120), guess('rolled oats', 50)])
+    model.reply = scanReply([guess('banana', 120), guess('rolled oats, dry', 50)])
     const body = await scanText()
     expect(body.confidence).toBe('high')
     expect(body.candidates[0].confidence).toBe('high')
     expect(per100(body.ingredients[0])).toEqual(tableNumbers('banana'))
-    expect(per100(body.ingredients[1])).toEqual(tableNumbers('rolled oats'))
+    expect(per100(body.ingredients[1])).toEqual(tableNumbers('rolled oats, dry'))
     expect(body.ingredients.some(i => i.estimated)).toBe(false)
-    const [b, o] = [referenceRowFor('banana')!, referenceRowFor('rolled oats')!]
+    const [b, o] = [referenceRowFor('banana')!, referenceRowFor('rolled oats, dry')!]
     expect(body.calories).toBe(Math.round(b.kcal * 1.2 + o.kcal * 0.5))
   })
 
-  it('some matched: badge medium, the unmatched one keeps the model\'s numbers and is marked', async () => {
-    model.reply = scanReply([guess('banana', 120), guess('nana\'s secret sauce', 30)])
+  it('some matched, carrying at least half the calories: badge medium, the unmatched one keeps the model\'s numbers and is marked', async () => {
+    model.reply = scanReply([guess('banana', 120), guess('nana\'s secret sauce', 10)])   // 107 of 157 kcal
     const body = await scanText()
     expect(body.confidence).toBe('medium')
     expect(per100(body.ingredients[1])).toEqual([500, 30, 30, 28])
     expect(body.ingredients[1].estimated).toBe(true)
     expect(body.ingredients[0].estimated).toBeUndefined()
+  })
+
+  it('a matched garnish beside an unmatched heavy ingredient: badge low, not medium', async () => {
+    model.reply = scanReply([guess('cucumber', 20), guess('nana\'s lasagne', 200)])
+    const body = await scanText()
+    expect(body.confidence).toBe('low')
+    expect(body.candidates[0].confidence).toBe('low')
   })
 
   it('none matched: badge low, numbers exactly as the model gave them, each marked', async () => {
@@ -165,12 +172,21 @@ describe('the scan takes code\'s numbers and its badge from code', () => {
   it('prefers the user\'s own barcode food, and never a saved food that came from an AI scan', async () => {
     db.foods = [
       { id: 'mine', userId: USER, name: 'banana', source: 'barcode', servingSizeG: 100, calories: 95, proteinG: 1, carbsG: 23, fatG: 0.3 },
-      { id: 'ai-guess', userId: USER, name: 'rolled oats', source: 'ai', servingSizeG: 100, calories: 300, proteinG: 9, carbsG: 50, fatG: 5 },
+      { id: 'ai-guess', userId: USER, name: 'rolled oats, dry', source: 'ai', servingSizeG: 100, calories: 300, proteinG: 9, carbsG: 50, fatG: 5 },
     ]
-    model.reply = scanReply([guess('banana', 100), guess('rolled oats', 50)])
+    model.reply = scanReply([guess('banana', 100), guess('rolled oats, dry', 50)])
     const body = await scanText()
     expect(per100(body.ingredients[0])).toEqual([95, 1, 23, 0.3])
-    expect(per100(body.ingredients[1])).toEqual(tableNumbers('rolled oats'))
+    expect(per100(body.ingredients[1])).toEqual(tableNumbers('rolled oats, dry'))
+  })
+
+  it('never takes a saved barcode food of a state-dependent name: a bag of dry rice is not the plate', async () => {
+    db.foods = [{ id: 'bag', userId: USER, name: 'Rice', source: 'barcode', servingSizeG: 100, calories: 360, proteinG: 7, carbsG: 79, fatG: 0.6 }]
+    model.reply = scanReply([{ ...guess('Rice', 200), caloriesPer100g: 130, proteinPer100g: 2.7, carbsPer100g: 28, fatPer100g: 0.3 }])
+    const body = await scanText()
+    expect(per100(body.ingredients[0])).toEqual([130, 2.7, 28, 0.3])
+    expect(body.ingredients[0].estimated).toBe(true)
+    expect(body.confidence).toBe('low')
   })
 
   it('never resolves another user\'s saved food', async () => {

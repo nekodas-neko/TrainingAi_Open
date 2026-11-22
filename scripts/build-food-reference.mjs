@@ -19,6 +19,11 @@
 // 165 roasted) has NO bare name: "rice" or "chicken breast" stays unmatched, and keeps the model's
 // own figure marked as an estimate, rather than the table picking a state for it. Only a name that
 // says the state ("cooked white rice", "white rice, cooked", "white rice (cooked)") matches.
+// The same goes for oats (dry 379 kcal, a bowl of porridge about 71), and for a name that points at
+// one of several different products (double cream, coconut milk as a drink or a can, plain yoghurt
+// regular or Greek, toast against untoasted bread). The foods that are refused a bare name are
+// listed once, in `food-reference/state-dependent.ts`, and a test over the generated table fails
+// when a bare name is pinned to one state of a food the table holds in several.
 //
 // Re-running the script on the same file produces the same output byte for byte.
 
@@ -143,7 +148,10 @@ const ROWS = [
   [175180, 'Crustaceans, shrimp, cooked', [...stated('prawns', 'cooked'), ...stated('shrimp', 'cooked')]],
 
   // Eggs. Raw, poached and boiled are within 10 kcal per 100 g of each other; fried and scrambled
-  // carry the fat they were cooked in, so those are named by state.
+  // carry the fat they were cooked in, so those are named by state. Bare "egg" and "eggs" stay on
+  // the RAW row on purpose (owner's review call): recipes and meal plans weigh eggs raw, and the
+  // fat an egg is fried in is its own ingredient, so a fried egg is "fried egg" plus the oil.
+  // The states test (`food-reference-states.test.ts`) names this as its one kept exception.
   [171287, 'Egg, whole, raw, fresh', ['egg', 'eggs', 'whole egg', 'whole eggs', 'large egg', 'large eggs', ...stated('egg', 'raw'), ...stated('eggs', 'raw')]],
   [173424, 'Egg, whole, cooked, hard-boiled', [...stated('egg', 'boiled', 'hard-boiled'), ...stated('eggs', 'boiled', 'hard-boiled'), 'hard boiled egg', 'hard boiled eggs']],
   [172186, 'Egg, whole, cooked, poached', [...stated('egg', 'poached'), ...stated('eggs', 'poached')]],
@@ -162,7 +170,9 @@ const ROWS = [
   [170894, 'Yogurt, Greek, plain, nonfat', ['nonfat greek yogurt', 'non-fat greek yogurt', 'fat free greek yogurt', 'nonfat greek yoghurt', 'non-fat greek yoghurt', 'fat free greek yoghurt', 'plain nonfat greek yogurt']],
   [170903, 'Yogurt, Greek, plain, lowfat', ['low fat greek yogurt', 'low-fat greek yogurt', 'low fat greek yoghurt', 'low-fat greek yoghurt']],
   [171304, 'Yogurt, Greek, plain, whole milk', ['full fat greek yogurt', 'full-fat greek yogurt', 'full fat greek yoghurt', 'full-fat greek yoghurt', 'whole milk greek yogurt']],
-  [171284, 'Yogurt, plain, whole milk', ['plain yogurt', 'plain yoghurt', 'natural yoghurt', 'natural yogurt']],
+  // Bare "plain" or "natural" yoghurt is not on this row: a Greek-style plain yoghurt has more than
+  // twice the protein of the regular one, so the name does not say which food it is.
+  [171284, 'Yogurt, plain, whole milk', ['whole milk yogurt', 'whole milk yoghurt']],
   [170886, 'Yogurt, plain, low fat', ['low fat plain yogurt', 'low fat natural yoghurt', 'low-fat natural yoghurt']],
   [170888, 'Yogurt, vanilla, low fat.', ['vanilla yogurt', 'vanilla yoghurt', 'low fat vanilla yogurt', 'low fat vanilla yoghurt']],
   [173414, 'Cheese, cheddar', ['cheddar', 'cheddar cheese', 'tasty cheese']],
@@ -178,7 +188,7 @@ const ROWS = [
   [171251, 'Cheese, swiss', ['swiss cheese']],
   [173430, 'Butter, without salt', ['unsalted butter']],
   [173410, 'Butter, salted', ['butter', 'salted butter']],
-  [170859, 'Cream, fluid, heavy whipping', ['heavy cream', 'thickened cream', 'whipping cream', 'double cream']],
+  [170859, 'Cream, fluid, heavy whipping', ['heavy cream', 'thickened cream', 'whipping cream']],
   [167575, 'Ice creams, vanilla', ['vanilla ice cream']],
 
   // Grains and starches, by state: dry and cooked differ about threefold.
@@ -196,12 +206,12 @@ const ROWS = [
   [169699, 'Couscous, dry', [...stated('couscous', 'dry', 'uncooked')]],
   [169700, 'Couscous, cooked', [...stated('couscous', 'cooked')]],
   [170287, 'Bulgur, cooked', [...stated('bulgur', 'cooked'), ...stated('bulgur wheat', 'cooked')]],
-  [173904, 'Cereals, oats, regular and quick, not fortified, dry', ['rolled oats', 'oats', 'quick oats', 'oatmeal, dry', ...stated('rolled oats', 'dry', 'uncooked', 'raw'), ...stated('oats', 'dry', 'uncooked', 'raw')]],
+  [173904, 'Cereals, oats, regular and quick, not fortified, dry', ['oatmeal, dry', ...stated('rolled oats', 'dry', 'uncooked', 'raw'), ...stated('oats', 'dry', 'uncooked', 'raw')]],
   [173905, 'Cereals, oats, regular and quick, unenriched, cooked with water', ['porridge made with water', ...stated('oats', 'cooked with water'), ...stated('oatmeal', 'cooked with water')]],
   [171646, 'Cereals ready-to-eat, granola, homemade', ['granola', 'homemade granola']],
   [168894, 'Wheat flour, white, all-purpose, enriched, bleached', ['plain flour', 'all-purpose flour', 'all purpose flour', 'white flour']],
-  [172688, 'Bread, whole-wheat, commercially prepared', ['wholemeal bread', 'whole wheat bread', 'whole-wheat bread', 'wholemeal toast']],
-  [174924, 'Bread, white, commercially prepared', ['white bread', 'white toast']],
+  [172688, 'Bread, whole-wheat, commercially prepared', ['wholemeal bread', 'whole wheat bread', 'whole-wheat bread']],
+  [174924, 'Bread, white, commercially prepared', ['white bread']],
   [168013, 'Bread, multi-grain', ['multigrain bread', 'multi-grain bread', 'grain bread']],
   [172684, 'Bread, rye', ['rye bread']],
   [174915, 'Bread, pita, white, enriched', ['pita bread', 'pita', 'white pita']],
@@ -237,7 +247,7 @@ const ROWS = [
   [170556, 'Seeds, pumpkin and squash seed kernels, dried', ['pumpkin seeds', 'pepitas']],
   [170562, 'Seeds, sunflower seed kernels, dried', ['sunflower seeds']],
   [170150, 'Seeds, sesame seeds, whole, dried', ['sesame seeds']],
-  [170173, 'Nuts, coconut milk, canned', ['coconut milk', 'canned coconut milk']],
+  [170173, 'Nuts, coconut milk, canned', [...stated('coconut milk', 'canned')]],
 
   // Oils, sweeteners and a few everyday extras.
   [171413, 'Oil, olive, salad or cooking', ['olive oil', 'extra virgin olive oil', 'extra-virgin olive oil', 'evoo']],

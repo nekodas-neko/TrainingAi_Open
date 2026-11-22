@@ -2,10 +2,11 @@
 import { describe, it, expect } from 'vitest'
 import { FDC_SR_LEGACY, FDC_SR_LEGACY_ROWS } from '../food-reference/fdc-sr-legacy'
 import {
-  resolveIngredientDensity, applyReferenceDensities, confidenceFromMatches, confidenceAfterSanitise,
+  resolveIngredientDensity, applyReferenceDensities, matchConfidence,
   referenceRowFor, TRUSTED_SAVED_FOOD_SOURCES, type SavedFoodForDensity,
 } from '../food-reference/resolve'
 import { text } from '../food-item-identity'
+import { STATE_DEPENDENT_FOOD_KEYS } from '../food-reference/state-dependent'
 import { sanitiseNutrition, sumIngredients } from '../scan-totals'
 import type { NutritionIngredient } from '@trainingai/shared/types/nutrition'
 
@@ -46,22 +47,20 @@ describe('the bundled table', () => {
   })
 
   it('gives a food whose numbers depend on its state no bare name', () => {
-    for (const bare of ['rice', 'white rice', 'chicken breast', 'pasta', 'quinoa', 'salmon', 'potato', 'lentils', 'black beans', 'chickpeas']) {
-      expect(referenceRowFor(bare), bare).toBeNull()
-    }
+    for (const bare of STATE_DEPENDENT_FOOD_KEYS) expect(referenceRowFor(bare), bare).toBeNull()
     expect(referenceRowFor('white rice, cooked')?.kcal).toBeLessThan(200)
     expect(referenceRowFor('white rice, uncooked')?.kcal).toBeGreaterThan(300)
   })
 })
 
 const saved = (over: Partial<SavedFoodForDensity>): SavedFoodForDensity => ({
-  id: 'food-1', name: 'Rolled oats', source: 'barcode', servingSizeG: 40,
+  id: 'food-1', name: 'Cheddar', source: 'barcode', servingSizeG: 40,
   calories: 150, proteinG: 5, carbsG: 25, fatG: 3, ...over,
 })
 
 describe('resolveIngredientDensity', () => {
   it('prefers the user\'s own barcode-sourced food, per 100 g, over the table', () => {
-    const d = resolveIngredientDensity('rolled oats', { savedFoods: [saved({})] })
+    const d = resolveIngredientDensity('cheddar', { savedFoods: [saved({})] })
     expect(d).toEqual({
       caloriesPer100g: 375, proteinPer100g: 12.5, carbsPer100g: 62.5, fatPer100g: 7.5,
       source: 'saved-food', ref: 'food-1',
@@ -69,8 +68,8 @@ describe('resolveIngredientDensity', () => {
   })
 
   it('falls to the table when there is no saved food', () => {
-    const row = referenceRowFor('rolled oats')!
-    expect(resolveIngredientDensity('Rolled  Oats ')).toEqual({
+    const row = referenceRowFor('cheddar')!
+    expect(resolveIngredientDensity('Cheddar ')).toEqual({
       caloriesPer100g: row.kcal, proteinPer100g: row.proteinG, carbsPer100g: row.carbsG, fatPer100g: row.fatG,
       source: 'reference', ref: `fdc:${row.fdcId}`,
     })
@@ -82,7 +81,7 @@ describe('resolveIngredientDensity', () => {
   })
 
   it.each(['ai', 'manual', 'text', null, undefined, 'something-new'])('never uses a saved food whose source is %s', source => {
-    const d = resolveIngredientDensity('rolled oats', { savedFoods: [saved({ source })] })
+    const d = resolveIngredientDensity('cheddar', { savedFoods: [saved({ source })] })
     expect(d?.source).toBe('reference')
   })
 
@@ -91,22 +90,22 @@ describe('resolveIngredientDensity', () => {
   })
 
   it('never takes a near match, from a saved food or the table', () => {
-    const own = [saved({ name: 'Rolled oats, organic' })]
-    expect(resolveIngredientDensity('rolled oats', { savedFoods: own })?.source).toBe('reference')
-    for (const near of ['rolled oat', 'rolledoats', 'oats rolled', 'banana slices', 'bananna', 'chicken breast cooked', 'olive-oil']) {
+    const own = [saved({ name: 'Cheddar, organic' })]
+    expect(resolveIngredientDensity('cheddar', { savedFoods: own })?.source).toBe('reference')
+    for (const near of ['chedd', 'cheddarr', 'cheese cheddar', 'banana slices', 'bananna', 'chicken breast cooked', 'olive-oil']) {
       expect(resolveIngredientDensity(near), near).toBeNull()
     }
   })
 
   it('uses neither of two saved foods that share a name and disagree', () => {
     const own = [saved({ id: 'a' }), saved({ id: 'b', calories: 200 })]
-    expect(resolveIngredientDensity('rolled oats', { savedFoods: own })?.source).toBe('reference')
+    expect(resolveIngredientDensity('cheddar', { savedFoods: own })?.source).toBe('reference')
     const agree = [saved({ id: 'a' }), saved({ id: 'b', servingSizeG: 80, calories: 300, proteinG: 10, carbsG: 50, fatG: 6 })]
-    expect(resolveIngredientDensity('rolled oats', { savedFoods: agree })?.ref).toBe('a')
+    expect(resolveIngredientDensity('cheddar', { savedFoods: agree })?.ref).toBe('a')
   })
 
   it('skips a saved food with no serving size', () => {
-    expect(resolveIngredientDensity('rolled oats', { savedFoods: [saved({ servingSizeG: 0 })] })?.source).toBe('reference')
+    expect(resolveIngredientDensity('cheddar', { savedFoods: [saved({ servingSizeG: 0 })] })?.source).toBe('reference')
   })
 
   it('resolves only from the foods it is handed: another user\'s are never in that list', () => {
@@ -145,20 +144,72 @@ describe('applyReferenceDensities', () => {
 })
 
 describe('the confidence badge', () => {
-  it('is high when every ingredient matched, medium when some did, low when none did', () => {
-    expect(confidenceFromMatches(3, 3)).toBe('high')
-    expect(confidenceFromMatches(1, 3)).toBe('medium')
-    expect(confidenceFromMatches(0, 3)).toBe('low')
-    expect(confidenceFromMatches(0, 0)).toBe('low')
+  // A meal as the routes hold it after `applyReferenceDensities`: `estimated` marks the model's numbers.
+  const matched = (name: string, weightG: number, kcal: number) => ing(name, { weightG, caloriesPer100g: kcal })
+  const guessed = (name: string, weightG: number, kcal: number) => ing(name, { weightG, caloriesPer100g: kcal, estimated: true })
+
+  it('is high when every ingredient matched', () => {
+    expect(matchConfidence([matched('banana', 100, 89), matched('olive oil', 10, 884)])).toBe('high')
   })
 
-  it('is low whenever sanitiseNutrition corrected something', () => {
-    // 40 g of fat in a 10 g serving cannot be, and the sanitiser caps it.
+  it('is medium when the matched ingredients carry at least half of the meal\'s calories', () => {
+    expect(matchConfidence([matched('olive oil', 30, 884), guessed('house sauce', 100, 200)])).toBe('medium')   // 265 of 465
+    expect(matchConfidence([matched('a', 100, 300), guessed('b', 100, 300)])).toBe('medium')                      // exactly half
+  })
+
+  it('is low when the matched ingredients carry less than half, however many there are', () => {
+    // A matched garnish beside an unmatched 400 kcal ingredient used to read "medium" by count.
+    expect(matchConfidence([matched('cucumber', 20, 15), guessed('lasagne', 200, 200)])).toBe('low')
+    expect(matchConfidence([matched('a', 10, 100), matched('b', 10, 100), matched('c', 10, 100), guessed('d', 200, 200)])).toBe('low')
+  })
+
+  it('is low when none matched, when there is nothing to weigh, and when nothing carries calories', () => {
+    expect(matchConfidence([guessed('lasagne', 200, 200)])).toBe('low')
+    expect(matchConfidence([])).toBe('low')
+    expect(matchConfidence([matched('water', 250, 0), guessed('herbs', 5, 0)])).toBe('low')
+  })
+
+  it('is low whenever sanitiseNutrition corrected something, even with every ingredient matched', () => {
+    const all = [matched('banana', 100, 89)]
+    expect(matchConfidence(all, { corrected: true })).toBe('low')
+    expect(matchConfidence(all, { corrected: false })).toBe('high')
+  })
+
+  it('reads the same for a whole recipe and for one serving of it', () => {
+    const recipe = [matched('olive oil', 30, 884), guessed('house sauce', 100, 200)]
+    const serving = recipe.map(i => ({ ...i, weightG: i.weightG / 4 }))
+    expect(matchConfidence(serving)).toBe(matchConfidence(recipe))
+  })
+
+  it('learns of a sanitiser correction from what sanitiseNutrition does to a confidence it is given', () => {
+    // 40 g of fat in a 10 g serving cannot be, and the sanitiser caps it and lowers the confidence.
     const wrong = sanitiseNutrition({ servingSizeG: 10, calories: 360, proteinG: 0, carbsG: 0, fatG: 40, confidence: 'high' })
-    expect(confidenceAfterSanitise('high', wrong.confidence)).toBe('low')
+    expect(wrong.confidence).not.toBe('high')
     const fine = applyReferenceDensities([ing('banana')])
-    const t = sumIngredients(fine.ingredients)
-    const clean = sanitiseNutrition({ ...t, confidence: 'high' })
-    expect(confidenceAfterSanitise('high', clean.confidence)).toBe('high')
+    const clean = sanitiseNutrition({ ...sumIngredients(fine.ingredients), confidence: 'high' })
+    expect(clean.confidence).toBe('high')
+  })
+})
+
+describe('a saved barcode food of a state-dependent name', () => {
+  // A bag of dry rice scanned and saved as "Rice" is about 360 kcal per 100 g. The model writes
+  // "Rice 200 g" for a cooked plate, so the saved food's numbers would be three times the plate's.
+  const dryRice = saved({ id: 'bag', name: 'Rice', servingSizeG: 100, calories: 360, proteinG: 7, carbsG: 79, fatG: 0.6 })
+
+  it('never resolves, so the ingredient stays the model\'s and is marked estimated', () => {
+    expect(resolveIngredientDensity('Rice', { savedFoods: [dryRice] })).toBeNull()
+    const out = applyReferenceDensities([ing('Rice', { weightG: 200, caloriesPer100g: 130 })], { savedFoods: [dryRice] })
+    expect(out.matched).toBe(0)
+    expect(out.ingredients[0]).toMatchObject({ caloriesPer100g: 130, estimated: true })
+  })
+
+  it.each(STATE_DEPENDENT_FOOD_KEYS)('never resolves for the name "%s"', key => {
+    expect(resolveIngredientDensity(key, { savedFoods: [saved({ name: key })] })).toBeNull()
+  })
+
+  it('still resolves a barcode food whose name says the state, or is not on the list', () => {
+    const cooked = saved({ id: 'pouch', name: 'White rice, cooked', servingSizeG: 250, calories: 325 })
+    expect(resolveIngredientDensity('white rice, cooked', { savedFoods: [cooked] })).toMatchObject({ source: 'saved-food', ref: 'pouch', caloriesPer100g: 130 })
+    expect(resolveIngredientDensity('Cheddar', { savedFoods: [saved({})] })?.source).toBe('saved-food')
   })
 })
