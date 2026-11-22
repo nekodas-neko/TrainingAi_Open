@@ -569,18 +569,6 @@ export class WorkoutJournalStore {
     })).catch(() => undefined);
   };
 
-  rateSet = (workoutId: string, exerciseId: string, setId: string, rpe: number) =>
-    this.edit((data) =>
-      replaceWorkout(data, workoutId, (workout) =>
-        replaceSet(workout, exerciseId, setId, (set) => {
-          if (!Number.isInteger(rpe) || rpe < 5 || rpe > 10) {
-            throw new Error('Use an effort rating from 5 to 10.');
-          }
-          return { ...set, rpe, rpeSource: 'rated' };
-        }),
-      ),
-    );
-
   resolveSuggestion = (
     workoutId: string,
     exerciseId: string,

@@ -179,7 +179,7 @@ test('finish validation prevents empty workouts, incomplete running sets and inv
   assert.equal(f.controller.getSnapshot().data.workouts[0].status, 'active');
 });
 
-test('prescribed loads, rated effort and accepted back-off survive reopening and preserve the original targets', async (t) => {
+test('prescribed loads, a rated set from an earlier build and an accepted back-off survive reopening and preserve the original targets', async (t) => {
   const f = await setup(t);
   Object.assign(f.response.exercises[0], {
     estimated1rm: 95,
@@ -208,10 +208,23 @@ test('prescribed loads, rated effort and accepted back-off survive reopening and
   const [first, second] = exercise.sets;
   f.controller.updateSet(id, exerciseId, first.id, 'weight', '55');
   f.controller.updateSet(id, exerciseId, first.id, 'reps', '6');
-  assert.equal(await f.controller.rateSet(id, exerciseId, first.id, 11), false);
-  assert.equal(await f.controller.rateSet(id, exerciseId, first.id, 10), true);
   await f.controller.recordSet(id, exerciseId, first.id);
   workout = f.controller.getSnapshot().data.workouts[0];
+  // #4061: the set card has no RPE row, so a set logged now is never rated and never offers a cut.
+  assert.equal(workout.exercises[0].sets[0].rpeSource, 'expected');
+  assert.equal(loadSuggestion(workout, workout.exercises[0], workout.exercises[0].sets[1]), null);
+  // A journal from an earlier build can still hold a rated set; it keeps working as before.
+  f.controller.cancel();
+  const journal = readJournal(await f.scope.get('workout-journal.v1'), f.connection);
+  journal.workouts[0].exercises[0].sets[0] = {
+    ...journal.workouts[0].exercises[0].sets[0],
+    rpe: 10,
+    rpeSource: 'rated',
+  };
+  await f.scope.set('workout-journal.v1', JSON.stringify(journal));
+  const earlier = new WorkoutJournalStore(f.scope, f.connection, f.uuid, f.clock);
+  await earlier.initialize();
+  workout = earlier.getSnapshot().data.workouts[0];
   const suggestion = loadSuggestion(
     workout,
     workout.exercises[0],
@@ -227,11 +240,8 @@ test('prescribed loads, rated effort and accepted back-off survive reopening and
   assert.ok(
     loadSuggestion(workout, { ...workout.exercises[0], deloaded: true }, nextSet),
   );
-  assert.equal(
-    await f.controller.resolveSuggestion(id, exerciseId, second.id, true),
-    true,
-  );
-  f.controller.cancel();
+  assert.equal(await earlier.resolveSuggestion(id, exerciseId, second.id, true), true);
+  earlier.cancel();
   const restored = new WorkoutJournalStore(f.scope, f.connection, f.uuid, f.clock);
   await restored.initialize();
   workout = restored.getSnapshot().data.workouts[0];
@@ -270,13 +280,13 @@ test('bodyweight and baseline logging keep rep targets, signed load and effort s
   assert.equal(isAmrap(f.controller.getSnapshot().data.workouts[0], exercise, 1), true);
   assert.equal(formatSetLoad(exercise, first), '8 reps');
   f.controller.updateSet(id, exerciseId, first.id, 'weight', '-15');
-  await f.controller.rateSet(id, exerciseId, first.id, 8);
   await f.controller.recordSet(id, exerciseId, first.id);
   const workout = f.controller.getSnapshot().data.workouts[0];
   assert.equal(formatSetLoad(exercise, workout.exercises[0].sets[0]), '-15 kg × 8 reps');
   assert.equal(loadSuggestion(workout, workout.exercises[0], second), null);
   assert.equal(exerciseResult(workout, workout.exercises[0]).repMax, 8);
-  assert.equal(exerciseResult(workout, workout.exercises[0]).ratedRpe, 8);
+  // #4061: no RPE row, so the set keeps its pre-filled value and nothing reads it as rated.
+  assert.equal(exerciseResult(workout, workout.exercises[0]).ratedRpe, null);
   const result = workoutResult(workout);
   assert.equal(result.timedSetSeconds, null);
   assert.equal(result.warmupSeconds, null);

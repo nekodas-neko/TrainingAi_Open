@@ -340,14 +340,6 @@ export const anatomyColors = {
     outline: 'rgba(128,128,128,0.3)',
   },
 };
-export const effortColors: Record<number, string> = {
-  5: '#22c55e',
-  6: '#84cc16',
-  7: '#eab308',
-  8: '#f59e0b',
-  9: '#f97316',
-  10: '#ef4444',
-};
 export const sessionTones = {
   light: ['#b45309', '#15803d', '#4338ca', '#1d4ed8', '#7e22ce', '#b91c1c'],
   dark: ['#fbbf24', '#4ade80', '#818cf8', '#60a5fa', '#c084fc', '#f87171'],
