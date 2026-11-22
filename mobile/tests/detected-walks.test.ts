@@ -71,6 +71,32 @@ test('a detection overlapping a recorded activity is not offered, even a partial
   assert.deepEqual(visibleWalks([walk], [], [{ startMs: at('09:00'), endMs: now }]), []);
 });
 
+test('recordedSpans places each stored activity by the shared window rule', () => {
+  const span = (payload: Record<string, unknown>) =>
+    recordedSpans([{ payload: { date: '2026/10/12', ...payload } }], tz);
+  // Slash dates and HH:MM:SS both read.
+  assert.deepEqual(span({ startTime: '09:10:00', endTime: '09:32:00' }), [{ startMs: at('09:10'), endMs: at('09:32') }]);
+  // No end: start + duration. No start: nothing.
+  assert.deepEqual(span({ startTime: '09:10', durationMin: 20 }), [{ startMs: at('09:10'), endMs: at('09:30') }]);
+  assert.deepEqual(span({ durationMin: 20 }), []);
+  // An overnight log is held as a span, ending the next local day.
+  assert.deepEqual(span({ startTime: '23:30', endTime: '00:20' }), [
+    { startMs: at('23:30'), endMs: Date.parse('2026-10-13T00:20:00+10:00') },
+  ]);
+  // End equal to start: nothing without a duration, start + duration with one.
+  assert.deepEqual(span({ startTime: '15:50', endTime: '15:50' }), []);
+  assert.deepEqual(span({ startTime: '15:50', endTime: '15:50', durationMin: 45 }), [
+    { startMs: at('15:50'), endMs: at('16:35') },
+  ]);
+  // A typo (end 10 minutes before start) must not blank the phone's day: no duration, no span;
+  // a duration that disagrees puts the window at start + duration, unless it is implausible.
+  assert.deepEqual(span({ startTime: '15:50', endTime: '15:40' }), []);
+  assert.deepEqual(span({ startTime: '15:50', endTime: '15:40', durationMin: 20 }), [
+    { startMs: at('15:50'), endMs: at('16:10') },
+  ]);
+  assert.deepEqual(span({ startTime: '15:50', endTime: '15:40', durationMin: 5000 }), []);
+});
+
 test('two detections over the same minutes show once', () => {
   const twin = { startMs: at('09:15'), endMs: at('09:40'), durationMin: 25 };
   assert.equal(visibleWalks([walk, twin], [], []).length, 1);
