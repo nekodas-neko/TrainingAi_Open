@@ -101,6 +101,25 @@ jobs:
       - name: Android NDK
         uses: ./.github/actions/android-ndk
 
+      # Heap, heap log and the one-retry helper: one copy, shared with the other Android build.
+      - name: Gradle heap and retry helper
+        uses: ./.github/actions/android-ndk/gradle
+
+      # The key is built only from committed files that decide dependencies. Never from
+      # mobile/android/**: prebuild generates it, with the minute-based ANDROID_VERSION_CODE in it,
+      # so a key over it changes every run and saves a new entry each time.
+      # A pull request cannot read another PR's cache, only its own and main's. This workflow runs on
+      # pushes to main, so its cache is what a new PR's compile job falls back to (restore-keys).
+      - name: Restore the Gradle cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-side-by-side-${{ hashFiles('mobile/pnpm-lock.yaml', 'mobile/package.json', 'mobile/modules/*/android/build.gradle') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-side-by-side-
+
       # The one thing this workflow must never do is build the real app's ID.
       - name: Check the build is the side-by-side app
         run: |
@@ -109,7 +128,7 @@ jobs:
             echo "::error::The generated project is not $PACKAGE:"; grep -n applicationId android/app/build.gradle; exit 1; }
 
       - name: Compile the release APK
-        run: ./gradlew :app:assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a
+        run: $RUNNER_TEMP/gradle-retry.sh ./gradlew :app:assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a
         working-directory: mobile/android
 
       - name: Get the signing key
