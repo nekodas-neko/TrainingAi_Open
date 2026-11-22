@@ -126,7 +126,7 @@ import * as social from './slices/social'
 import * as prog from './slices/programs'
 import * as period from './slices/periodization'
 import { getSessionReadLogs } from './slices/session-read'
-import { listExercisePreferences, consumeLiftOneShot, type ClearedOneShot } from './slices/exercise-preferences'
+import { listExercisePreferences, listStaleOneShotStamps, consumeLiftOneShot, type ClearedOneShot } from './slices/exercise-preferences'
 import * as userStatsSlice from './slices/user-stats'
 import * as oura from './slices/oura'
 import { readRawFrames, readRecentRawFrames, DS_BUCKET_SPAN } from './slices/oura-raw-frames'
@@ -8727,29 +8727,38 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     const out = await listExercisePreferences(this.db, userId, exerciseNames, cleared)
     // An expired one-shot is still stamped on the lift's stored plans (#4007): take it out, right after
     // the clear. A failure is logged and never fails the read.
-    for (const c of cleared) await this.restateSpentOneShot(this.db, userId, c.exerciseName, new Date(c.setAtMs))
+    for (const c of cleared) await this.restateSpentOneShot(userId, c.exerciseName, new Date(c.setAtMs))
+    // A restate that failed earlier (or a step stamped on a plan the clear above missed) left a plan
+    // carrying a one-shot the row no longer holds: retry it here. The check is a read; nothing is
+    // written unless something is stale, and the read itself never fails on it.
+    try {
+      for (const c of await listStaleOneShotStamps(this.db, userId, exerciseNames, out)) {
+        await this.restateSpentOneShot(userId, c.exerciseName, new Date(c.setAtMs))
+      }
+    } catch (err) {
+      console.error('[lift-preference] looking for stored plans with a spent one-shot failed:', err)
+    }
     return out
   }
 
-  /** Restate the stored plans that still carry a spent one-shot (#4007). Runs in its own savepoint when
-   *  given a transaction, and never throws: the log or read that spent the step must not fail on it. */
-  private async restateSpentOneShot(db: typeof this.db, userId: string, exerciseName: string, spentAt: Date) {
+  /** Restate the stored plans that still carry a spent one-shot (#4007). Never throws: the log or read
+   *  that spent the step must not fail on it. It runs on no transaction of its own, so no path holds one
+   *  pooled connection while another is awaited: each read and each guarded plan update is a short
+   *  statement on the pool, and a plan changed since it was read is left alone by its own guard. */
+  private async restateSpentOneShot(userId: string, exerciseName: string, spentAt: Date) {
     try {
       const { restateSpentOneShot } = await import('@/lib/coach/domains/lift-preference')
-      await db.transaction(async sp => { await restateSpentOneShot(sp as unknown as typeof this.db, this, userId, exerciseName, spentAt) })
+      await restateSpentOneShot(this.db, this, userId, exerciseName, spentAt)
     } catch (err) {
       console.error('[lift-preference] restating stored plans after a spent one-shot failed:', err)
     }
   }
-  // The consume and the restate of the lift's other stored plans commit together; the restate runs in a
-  // savepoint, so a failure there is logged and the consume still stands (#4007).
+  // The consume is one conditional UPDATE, atomic on its own, so it needs no transaction. The restate runs
+  // after it has committed; if that fails, the next preferences read retries it (#4007).
   async consumeLiftOneShot(userId: string, exerciseName: string, servedSetAt: Date) {
-    return this.db.transaction(async tx => {
-      const t = tx as unknown as typeof this.db
-      const took = await consumeLiftOneShot(t, userId, exerciseName, servedSetAt)
-      if (took) await this.restateSpentOneShot(t, userId, exerciseName, servedSetAt)
-      return took
-    })
+    const took = await consumeLiftOneShot(this.db, userId, exerciseName, servedSetAt)
+    if (took) await this.restateSpentOneShot(userId, exerciseName, servedSetAt)
+    return took
   }
   async getSetTimingRows(userId: string, exerciseNames: string[]) { return period.getSetTimingRows(this.db, userId, exerciseNames) }
   async getExercise1rmHistory(userId: string, exerciseNames: string[], tz: string, windowDays?: number) { return period.getExercise1rmHistory(this.db, userId, exerciseNames, tz, windowDays) }

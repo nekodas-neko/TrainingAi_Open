@@ -92,6 +92,37 @@ export async function listExercisePreferences(
 }
 
 /**
+ * The one-shot times that stored plans still carry for these lifts although the lift's row no longer
+ * holds them (#4007): a step used up by a log, or expired, whose restate of the other plans failed.
+ * `live` is what `listExercisePreferences` just read, so a time that is not the row's own (to the 2 ms
+ * the consume allows) is stale. One read, owner-scoped, no write and no model call: the caller restates
+ * only when this returns something, so a read with nothing stale writes nothing.
+ */
+export async function listStaleOneShotStamps(
+  db: Db, userId: string, exerciseNames: string[], live: Map<string, LiftPreferenceRow>,
+): Promise<ClearedOneShot[]> {
+  if (exerciseNames.length === 0) return []
+  const res = await db.execute(sql`
+    SELECT DISTINCT e->>'name' AS name, e->'liftPreference'->>'oneShotSetAt' AS set_at
+      FROM session_periodization sp
+     CROSS JOIN LATERAL jsonb_array_elements(
+             CASE WHEN jsonb_typeof(sp.prescription->'exercises') = 'array' THEN sp.prescription->'exercises' ELSE '[]'::jsonb END) AS e
+     WHERE sp.user_id = ${userId}
+       AND e->'liftPreference'->>'oneShotSetAt' IS NOT NULL
+       AND e->>'name' = ANY(${sql.raw('ARRAY[')}${sql.join(exerciseNames.map(n => sql`${n}`), sql`, `)}${sql.raw(']::text[]')})
+  `)
+  const out: ClearedOneShot[] = []
+  for (const r of res.rows as { name: string; set_at: string }[]) {
+    const stamped = new Date(r.set_at).getTime()
+    if (Number.isNaN(stamped)) continue
+    const own = live.get(r.name)?.oneShotSetAt?.getTime()
+    if (own != null && Math.abs(own - stamped) < 2) continue
+    out.push({ exerciseName: r.name, setAtMs: stamped })
+  }
+  return out
+}
+
+/**
  * Consume the lift's one-shot, once, for a log of a plan that carried it: null its three columns in ONE
  * conditional write, only while the stored `one_shot_set_at` is the very value the log presents
  * (`servedSetAt`, the `liftPreference.oneShotSetAt` its plan recorded; the client echoes it in the log
