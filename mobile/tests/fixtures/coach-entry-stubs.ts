@@ -42,7 +42,11 @@ export const ActionMenu = ({ visible, title, actions }: Props) =>
     }),
   );
 export const slopTo = () => 0;
-const anyValue: Record<string, unknown> = new Proxy({}, { get: () => anyValue });
+// Any theme token: nested lookups work, and arithmetic on one gives a number.
+const anyValue: Record<string | symbol, unknown> = new Proxy(
+  {},
+  { get: (_t, key) => (key === Symbol.toPrimitive ? () => 8 : anyValue) },
+);
 export const useTheme = () => ({ theme: anyValue });
 export const useCoachLaunch = () => (request?: unknown) => {
   launches.push(request ?? {});

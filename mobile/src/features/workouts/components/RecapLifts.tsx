@@ -4,10 +4,16 @@ import { useCoachLaunch } from '../../coach/CoachProvider';
 import type { WorkoutRecord } from '../logging/workout';
 
 /** The lifts of a finished workout that "Adjust" can open the Coach about: one row per exercise
- *  the program holds, without the archived and re-logged copies. */
+ *  with a set done, without the archived and re-logged copies. */
 export function recapLifts(workout: Pick<WorkoutRecord, 'exercises'>) {
   return workout.exercises
-    .filter((exercise) => !exercise.retired && !exercise.relogOf && !exercise.skipped)
+    .filter(
+      (exercise) =>
+        !exercise.retired &&
+        !exercise.relogOf &&
+        !exercise.skipped &&
+        exercise.sets.some((set) => set.completedAt != null),
+    )
     .map((exercise) => ({ sessionExerciseId: exercise.id, name: exercise.name }));
 }
 

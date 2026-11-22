@@ -31,7 +31,8 @@
  *   --out DIR         output folder (default: $TMPDIR/trainingai-web-screens)
  *   --screens a,b     only these screens (see --list)
  *   --click FILE      a JSON click script, run after the screens (format below). Besides the
- *                     steps below: {"tapLabel": "More for Row"} taps by accessible label, and
+ *                     steps below: {"tapLabel": "More for Row"} taps by accessible label,
+ *                     "index": N on a tap picks the Nth visible match (from 0), and
  *                     {"fulfill": {"path": "/api/coach", "file": "reply.txt"}} answers that path
  *                     from a file (relative to the script) from then on, so no model is called.
  *   --server URL      the Next server (default http://localhost:3000)
@@ -686,7 +687,7 @@ async function main() {
           await settle(page, options.settle);
         } else if (step.tap) {
           const target = page.getByText(step.tap, { exact: step.exact !== false });
-          const visible = target.filter({ visible: true }).first();
+          const visible = target.filter({ visible: true }).nth(step.index ?? 0);
           await visible.click({ timeout: 15_000 });
           await settle(page, options.settle);
         } else if (step.tapLabel) {

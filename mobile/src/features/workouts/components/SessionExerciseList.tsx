@@ -1,12 +1,12 @@
-import type { ReactNode } from 'react';
-import { View } from 'react-native';
-import { TouchSurface } from '../../../shared/ui/TouchSurface';
-import { AppText, Badge, Card, Stack } from '../../../shared/ui';
-import { useTheme } from '../../../shared/theme/ThemeProvider';
-import type { ExercisePreview } from '../catalog';
-import { ExerciseThumbnail } from './ExerciseHeading';
-import { formatSetLoad } from '../logging/targets';
-import { normalizeMuscle } from '@trainingai/shared/muscles';
+import type { ReactNode } from "react";
+import { View } from "react-native";
+import { TouchSurface } from "../../../shared/ui/TouchSurface";
+import { AppText, Badge, Card, Stack } from "../../../shared/ui";
+import { useTheme } from "../../../shared/theme/ThemeProvider";
+import type { ExercisePreview } from "../catalog";
+import { ExerciseThumbnail } from "./ExerciseHeading";
+import { formatSetLoad } from "../logging/targets";
+import { normalizeMuscle } from "@trainingai/shared/muscles";
 
 export function SessionExerciseList({
   exercises,
@@ -33,56 +33,81 @@ export function SessionExerciseList({
           ...(exercise.secondaryMuscles ?? []),
         ].some((muscle) => injuredMuscles.includes(normalizeMuscle(muscle)));
         return (
-          <TouchSurface
-            key={exercise.id}
-            accessibilityRole={onSelect ? 'button' : undefined}
-            accessibilityLabel={`${exercise.name}${completed ? ', completed' : ''}`}
-            onPress={onSelect ? () => onSelect(exercise) : undefined}
-          >
-            <Card
-              style={{
-                padding: theme.spacing.md,
-                borderColor: completed ? theme.anatomy.main : theme.colors.border,
-              }}
+          <View key={exercise.id}>
+            <TouchSurface
+              accessibilityRole={onSelect ? "button" : undefined}
+              accessibilityLabel={`${exercise.name}${completed ? ", completed" : ""}`}
+              onPress={onSelect ? () => onSelect(exercise) : undefined}
             >
-              <Stack direction="row" align="center" gap="sm">
-                <AppText variant="micro" tone={completed ? 'brand' : 'muted'}>
-                  {completed ? '✓' : index + 1}
-                </AppText>
-                <ExerciseThumbnail compact name={exercise.name} />
-                <View style={{ flex: 1 }}>
-                  <AppText variant="label">{exercise.name}</AppText>
-                  {onSelect ? (
-                    <>
+              <Card
+                style={{
+                  padding: theme.spacing.md,
+                  // Room for the trailing control, which sits over the card rather than inside the
+                  // row's own touch surface (no control nested in another).
+                  ...(trailing && {
+                    paddingRight: theme.spacing.md + theme.sizes.touchTarget,
+                  }),
+                  borderColor: completed
+                    ? theme.anatomy.main
+                    : theme.colors.border,
+                }}
+              >
+                <Stack direction="row" align="center" gap="sm">
+                  <AppText variant="micro" tone={completed ? "brand" : "muted"}>
+                    {completed ? "✓" : index + 1}
+                  </AppText>
+                  <ExerciseThumbnail compact name={exercise.name} />
+                  <View style={{ flex: 1 }}>
+                    <AppText variant="label">{exercise.name}</AppText>
+                    {onSelect ? (
+                      <>
+                        <AppText variant="micro" tone="brand">
+                          {exercise.setCount} sets
+                          {exercise.style ? ` · ${exercise.style}` : ""}
+                        </AppText>
+                        <AppText variant="micro" tone="muted">
+                          {exercise.lastReps?.length
+                            ? `Last: ${exercise.lastReps.map((reps, index) => formatSetLoad(exercise, { weight: String(exercise.lastWeights[index] ?? exercise.lastWeights.at(-1) ?? 0), reps: String(reps) })).join(", ")}${exercise.lastDate ? ` · ${exercise.lastDate}` : ""}`
+                            : "No previous data"}
+                        </AppText>
+                      </>
+                    ) : (
                       <AppText variant="micro" tone="brand">
-                        {exercise.setCount} sets{exercise.style ? ` · ${exercise.style}` : ''}
+                        {(exercise.mainMuscles?.length
+                          ? exercise.mainMuscles
+                          : exercise.muscles
+                        ).join(", ")}
                       </AppText>
-                      <AppText variant="micro" tone="muted">
-                        {exercise.lastReps?.length
-                          ? `Last: ${exercise.lastReps.map((reps, index) => formatSetLoad(exercise, { weight: String(exercise.lastWeights[index] ?? exercise.lastWeights.at(-1) ?? 0), reps: String(reps) })).join(', ')}${exercise.lastDate ? ` · ${exercise.lastDate}` : ''}`
-                          : 'No previous data'}
-                      </AppText>
-                    </>
-                  ) : (
-                    <AppText variant="micro" tone="brand">
-                      {(exercise.mainMuscles?.length
-                        ? exercise.mainMuscles
-                        : exercise.muscles
-                      ).join(', ')}
-                    </AppText>
-                  )}
-                  {exercise.deloaded && <Badge label="Deload" />}
-                  {(injured || exercise.supersetGroup != null) && (
-                    <Stack direction="row" wrap gap="xs">
-                      {injured && <Badge label="Recorded injury" tone="heart" />}
-                      {exercise.supersetGroup != null && <Badge label="Superset" />}
-                    </Stack>
-                  )}
-                </View>
-                {trailing?.(exercise)}
-              </Stack>
-            </Card>
-          </TouchSurface>
+                    )}
+                    {exercise.deloaded && <Badge label="Deload" />}
+                    {(injured || exercise.supersetGroup != null) && (
+                      <Stack direction="row" wrap gap="xs">
+                        {injured && (
+                          <Badge label="Recorded injury" tone="heart" />
+                        )}
+                        {exercise.supersetGroup != null && (
+                          <Badge label="Superset" />
+                        )}
+                      </Stack>
+                    )}
+                  </View>
+                </Stack>
+              </Card>
+            </TouchSurface>
+            {trailing && (
+              <View
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  bottom: 0,
+                  right: theme.spacing.xs,
+                  justifyContent: "center",
+                }}
+              >
+                {trailing(exercise)}
+              </View>
+            )}
+          </View>
         );
       })}
     </Stack>

@@ -139,7 +139,9 @@ function Conversation({
         }}
         scrollEventThrottle={100}
         onContentSizeChange={() => {
-          if (!history && nearBottom.current) scroll.current?.scrollToEnd({ animated: false });
+          // An empty chat stays at the top, so the context line and the first buttons show.
+          if (!history && nearBottom.current && chat.messages.length > 0)
+            scroll.current?.scrollToEnd({ animated: false });
         }}
       >
         {history ? (

@@ -70,7 +70,7 @@ test('the "…" menu leads with "Ask Coach about this lift", then the two shortc
     { context: lift, chip: 'swap' },
   ]);
   // Ids only: nothing the client says about the lift goes with it.
-  assert.deepEqual(liftMenuRequests(LIFT).map((r: { request: { context: object } }) => Object.keys(r.request.context)), [
+  assert.deepEqual(liftMenuRequests(LIFT).map((r: { request: { context?: object } }) => Object.keys(r.request.context ?? {})), [
     ['origin', 'sessionExerciseId'],
     ['origin', 'sessionExerciseId'],
     ['origin', 'sessionExerciseId'],
@@ -82,7 +82,7 @@ test('entry 1: each exercise row in a workout session carries its own "…"', ()
   const exercise = (id: string, name: string) => ({
     id, name, muscles: [], mainMuscles: [], secondaryMuscles: [], setCount: 3, style: null,
     lastReps: [], lastWeights: [], lastDate: null, deloaded: false, supersetGroup: null,
-  });
+  }) as never;
   const html = renderToStaticMarkup(
     createElement(SessionExerciseList, {
       exercises: [exercise(LIFT, 'Cable Pulldown'), exercise(OTHER, 'Row')],
@@ -111,16 +111,19 @@ test('entry 2: "Change today" on the session card opens the Coach about that ses
   assert.deepEqual(launches, [{ context: { origin: 'session', programSessionId: SESSION } }]);
 });
 
-test('entry 3: "Adjust" beside each lift on the recap, without archived or re-logged copies', () => {
+test('entry 3: "Adjust" beside each lift done on the recap, without archived, re-logged or untouched ones', () => {
   reset();
+  const done = [{ completedAt: 1 }];
   const workout = {
     exercises: [
-      { id: LIFT, name: 'Cable Pulldown', retired: false, relogOf: null, skipped: false },
-      { id: OTHER, name: 'Row', retired: false, relogOf: null, skipped: false },
-      { id: '10000000-0000-4000-8000-000000000009', name: 'Row', retired: false, relogOf: OTHER, skipped: false },
-      { id: '10000000-0000-4000-8000-000000000008', name: 'Curl', retired: true, relogOf: null, skipped: false },
+      { id: LIFT, name: 'Cable Pulldown', retired: false, relogOf: null, skipped: false, sets: done },
+      { id: OTHER, name: 'Row', retired: false, relogOf: null, skipped: false, sets: done },
+      { id: '10000000-0000-4000-8000-000000000009', name: 'Row', retired: false, relogOf: OTHER, skipped: false, sets: done },
+      { id: '10000000-0000-4000-8000-000000000008', name: 'Curl', retired: true, relogOf: null, skipped: false, sets: done },
+      // Finished early before any set of it: nothing to adjust from this workout.
+      { id: '10000000-0000-4000-8000-000000000007', name: 'Press', retired: false, relogOf: null, skipped: false, sets: [{ completedAt: null }] },
     ],
-  };
+  } as never;
   assert.deepEqual(recapLifts(workout).map((l: { name: string }) => l.name), ['Cable Pulldown', 'Row']);
   const html = renderToStaticMarkup(createElement(RecapLifts, { workout }));
   assert.match(html, /Your lifts/);
