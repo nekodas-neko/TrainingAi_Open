@@ -5,6 +5,7 @@ import { HomeSection, HiddenHomeSections } from '../components/HomeSection';
 import { HomeHeader } from '../components/HomeHeader';
 import { HomeEnergy } from '../components/HomeEnergy';
 import { UnusualDayCard } from '../components/UnusualDayCard';
+import { WeeklyCheckin } from '../components/WeeklyCheckin';
 import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { getScheduledSessionsPerWeek } from '@trainingai/shared/schedule-utils';
@@ -239,6 +240,7 @@ export function HomeScreen(navigation: HomeNavigation) {
               openWeek={navigation.openWeek}
               openReview={() => navigation.openNutrition(true)}
             />
+            <WeeklyCheckin />
             <SortableStack
               order={sections}
               enabled={editing}
