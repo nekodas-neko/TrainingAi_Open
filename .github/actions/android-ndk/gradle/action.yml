@@ -1,0 +1,46 @@
+name: Android Gradle set-up
+description: >
+  Gives the Gradle build a 4 GiB heap, logs the heap the build JVM really got, and installs
+  $RUNNER_TEMP/gradle-retry.sh, which runs a Gradle command and retries it once, only when its log
+  shows a dependency or plugin could not be downloaded or resolved. Run it after `expo prebuild`
+  (which writes android/gradle.properties with a 2 GiB heap that D8 ran out of in
+  :app:mergeExtDexRelease, #4025) and before any Gradle step. Used by native-side-by-side.yml and
+  mobile.yml, so a fix to the heap or the retry lands in both. It lives under android-ndk/ so the
+  path filters that already watch that folder also watch this one.
+
+runs:
+  using: composite
+  steps:
+    - name: Gradle heap and retry helper
+      shell: bash
+      run: |
+        set -euo pipefail
+        # The user-level gradle.properties wins over the project's, so prebuild cannot overwrite it.
+        # The runner has 16 GB.
+        mkdir -p "$HOME/.gradle/init.d"
+        echo 'org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g' >> "$HOME/.gradle/gradle.properties"
+        cat > "$HOME/.gradle/init.d/log-heap.gradle" <<'INIT'
+        gradle.projectsLoaded {
+          println "CI heap check: Gradle JVM max heap ${Runtime.runtime.maxMemory().intdiv(1048576)} MiB, args ${java.lang.management.ManagementFactory.runtimeMXBean.inputArguments}"
+        }
+        INIT
+        # Retries only a failure to fetch something from a repository: a 429 or 5xx from Maven
+        # Central (#4025), or a plugin or dependency "not found in any of the following sources" /
+        # "Could not resolve ..." (the foojay plugin on PR #4020, run 45032069830). A compile error
+        # or a failing test says none of these. Cost of a miss: a plugin that is genuinely mistyped
+        # or removed upstream gets one more 60-second attempt, then fails the same way.
+        cat > "$RUNNER_TEMP/gradle-retry.sh" <<'RETRY'
+        #!/usr/bin/env bash
+        log="$(mktemp)"
+        "$@" 2>&1 | tee "$log"
+        rc=${PIPESTATUS[0]}
+        if [ "$rc" -ne 0 ] && grep -qE 'Could not (GET|HEAD) |Received status code (429|5[0-9]{2}) from server|was not found in any of the following sources|could not resolve plugin artifact|Could not resolve ' "$log"; then
+          echo "::warning::A dependency or plugin could not be downloaded or resolved; trying once more in 60 seconds."
+          sleep 60
+          "$@"
+          rc=$?
+        fi
+        exit "$rc"
+        RETRY
+        chmod +x "$RUNNER_TEMP/gradle-retry.sh"
+        free -g | head -2

@@ -138,13 +138,35 @@ jobs:
       - run: pnpm exec expo prebuild --platform android --no-install
       - name: Android NDK
         uses: ./.github/actions/android-ndk
+      # Heap, heap log and the one-retry helper: one copy, shared with the other Android build.
+      - name: Gradle heap and retry helper
+        uses: ./.github/actions/android-ndk/gradle
+
+      # The key is built only from committed files that decide dependencies. Never from
+      # mobile/android/**: prebuild generates it, with the minute-based ANDROID_VERSION_CODE in it,
+      # so a key over it changes every run and saves a new entry each time.
+      # A new PR has no cache of its own and mobile.yml never runs on main, so the first run falls
+      # back to the cache the Preview build saves on main (restore-keys, second line). Most
+      # dependencies are shared; test-only ones (robolectric) still download once, which the retry
+      # covers.
+      - name: Restore the Gradle cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-compile-${{ hashFiles('mobile/pnpm-lock.yaml', 'mobile/package.json', 'mobile/modules/*/android/build.gradle') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-compile-
+            gradle-${{ runner.os }}-side-by-side-
+
       - name: Compile unpublished development APK
-        run: ./gradlew :app:assembleDebug --no-daemon
+        run: $RUNNER_TEMP/gradle-retry.sh ./gradlew :app:assembleDebug --no-daemon
         working-directory: mobile/android
       # The local modules' JVM unit tests (PipStateTest and any that follow). Every module under
       # mobile/modules is listed, so a module that adds tests is covered without editing this.
       - name: Native module unit tests
         run: |
           tasks=$(for dir in ../modules/*/android; do echo ":$(basename "$(dirname "$dir")"):testDebugUnitTest"; done)
-          ./gradlew $tasks --no-daemon
+          "$RUNNER_TEMP/gradle-retry.sh" ./gradlew $tasks --no-daemon
         working-directory: mobile/android
