@@ -139,7 +139,13 @@ export function NavLayer({
     }
   }
   useLayoutEffect(() => {
-    if (!part || part.role === 'under') return;
+    if (!part) {
+      // Released (landed, or by the guard): nothing of the old motion is left to carry on from.
+      running.current?.animation.stop();
+      running.current = null;
+      return;
+    }
+    if (part.role === 'under') return;
     const entering = part.role === 'slide-in' || part.role === 'fade-in';
     const slides = part.role === 'slide-in' || part.role === 'slide-out';
     // A layer already moving carries on from where it is, so Back mid-open slides out from there,
