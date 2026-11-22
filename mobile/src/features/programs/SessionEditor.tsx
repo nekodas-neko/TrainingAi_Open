@@ -97,8 +97,10 @@ export function SessionEditor({
           variant="surface"
           onPress={() => setChoosing(item.id!)}
         />
-        {/* #3896 D7 / 8c A: under the AI plan the "Progression set" picker becomes "Rep range". */}
-        {draft.phaseMode !== 'ai_dynamic' && (
+        {/* #3896 D7 / 8c A: under the AI plan the "Progression set" picker becomes "Rep range". A
+            lift that already has a set keeps the picker ("Used when the AI plan is off"), so it can
+            still be changed or cleared there (#3896 review). */}
+        {(draft.phaseMode !== 'ai_dynamic' || !!item.styleId) && (
           <Picker
             label={progressionSetLabel(draft.phaseMode)}
             value={item.styleId ?? ''}
