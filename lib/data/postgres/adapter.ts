@@ -34,6 +34,8 @@ import { inSequence } from './in-sequence'
 import { pageWithTies } from './sync-page'
 
 /** Q-481 — at most one `applied_mutations` prune per day per process. */
+/** Spent one-offs whose stored plans one preferences read restates; the rest wait for the next read (#4007). */
+const MAX_RESTATES_PER_READ = 3
 const APPLIED_MUTATIONS_PRUNE_THROTTLE_MS = 24 * 60 * 60 * 1000
 import { measuredAtMs, cadenceSecFromDs, decodeEventBody, hexToBytes, eventName, motionLowIntensity } from '@/lib/oura-ble/decode'
 
@@ -126,7 +128,7 @@ import * as social from './slices/social'
 import * as prog from './slices/programs'
 import * as period from './slices/periodization'
 import { getSessionReadLogs } from './slices/session-read'
-import { listExercisePreferences, listStaleOneShotStamps, consumeLiftOneShot, type ClearedOneShot } from './slices/exercise-preferences'
+import { listExercisePreferences, consumeLiftOneShot, type ClearedOneShot } from './slices/exercise-preferences'
 import * as userStatsSlice from './slices/user-stats'
 import * as oura from './slices/oura'
 import { readRawFrames, readRecentRawFrames, DS_BUCKET_SPAN } from './slices/oura-raw-frames'
@@ -8715,19 +8717,21 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async getSessionReadLogs(userId: string, from: Date, to: Date) { return getSessionReadLogs(this.db, userId, from, to) }
   async listExercisePreferences(userId: string, exerciseNames: string[]) {
     const cleared: ClearedOneShot[] = []
-    const out = await listExercisePreferences(this.db, userId, exerciseNames, cleared)
-    // An expired one-shot is still stamped on the lift's stored plans (#4007): take it out, right after
-    // the clear. A failure is logged and never fails the read.
-    for (const c of cleared) await this.restateSpentOneShot(userId, c.exerciseName, new Date(c.setAtMs))
-    // A restate that failed earlier (or a step stamped on a plan the clear above missed) left a plan
-    // carrying a one-shot the row no longer holds: retry it here. The check is a read; nothing is
-    // written unless something is stale, and the read itself never fails on it.
+    const stale: ClearedOneShot[] = []
+    const out = await listExercisePreferences(this.db, userId, exerciseNames, cleared, stale)
+    // A one-shot the row no longer holds can still be stamped on stored plans (#4007): one just expired
+    // (cleared above), or one used up whose restate failed (`stale`, found by the same select). Take it
+    // out. At most MAX_RESTATES_PER_READ per read keeps this off the request path; the rest wait for the
+    // next read. Nothing here can change or fail the read's result.
     try {
-      for (const c of await listStaleOneShotStamps(this.db, userId, exerciseNames, out)) {
-        await this.restateSpentOneShot(userId, c.exerciseName, new Date(c.setAtMs))
-      }
+      const seen = new Set<string>()
+      const work = [...cleared, ...stale].filter(c => {
+        const key = `${c.exerciseName}\u0000${Math.round(c.setAtMs)}`
+        return seen.has(key) ? false : (seen.add(key), true)
+      }).slice(0, MAX_RESTATES_PER_READ)
+      for (const c of work) await this.restateSpentOneShot(userId, c.exerciseName, new Date(c.setAtMs))
     } catch (err) {
-      console.error('[lift-preference] looking for stored plans with a spent one-shot failed:', err)
+      console.error('[lift-preference] restating stored plans with a spent one-shot failed:', err)
     }
     return out
   }

@@ -22,14 +22,30 @@ interface PreferenceSqlRow {
   sets_delta: number | null
   one_shot_set_at: Date | string | null
   one_shot_expired: boolean
+  stale_stamps: string[] | null
 }
 
 /** The user's live preferences for these lifts, keyed by the name the caller passed. One query. */
 /** A one-shot the expiry clear just took off a row: the lift, and the `one_shot_set_at` it carried (ms). */
 export interface ClearedOneShot { exerciseName: string; setAtMs: number }
 
+/**
+ * A row whose one-off columns are empty but that was written in the last this-many days may belong to
+ * a lift whose one-off was just used up: a stored plan can still carry its stamp if the restate that
+ * follows the consume failed (#4007). Only such a row is checked against the stored plans, inside the
+ * one preferences query, so a person with no preferences, a live one-off, or lasting preferences last
+ * touched longer ago pays nothing extra. A stamp left past the window is gone when the plan is next
+ * remade (generation applies the lift's preference as it is then).
+ */
+export const STALE_STAMP_RETRY_DAYS = 7
+
+/**
+ * `stale` (optional) receives the one-off times that a lift's stored plans still carry although its
+ * row no longer holds one (#4007): found by the same single select that reads the preferences, so the
+ * check adds no query. The caller restates those plans.
+ */
 export async function listExercisePreferences(
-  db: Db, userId: string, exerciseNames: string[], cleared?: ClearedOneShot[],
+  db: Db, userId: string, exerciseNames: string[], cleared?: ClearedOneShot[], stale?: ClearedOneShot[],
 ): Promise<Map<string, LiftPreferenceRow>> {
   const out = new Map<string, LiftPreferenceRow>()
   if (exerciseNames.length === 0) return out
@@ -66,7 +82,20 @@ export async function listExercisePreferences(
     SELECT lifts.lift,
            COALESCE(lifts.lib_id IS NOT NULL AND p.exercise_id = lifts.lib_id, false) AS by_id,
            p.rep_min, p.rep_max, p.rest_sec, p.next_load_step, p.sets_delta, p.one_shot_set_at,
-           COALESCE(p.one_shot_set_at < now() - make_interval(days => ${ONE_SHOT_TTL_DAYS}), false) AS one_shot_expired
+           COALESCE(p.one_shot_set_at < now() - make_interval(days => ${ONE_SHOT_TTL_DAYS}), false) AS one_shot_expired,
+           CASE WHEN ${stale ? sql`true` : sql`false`}
+                 AND p.one_shot_set_at IS NULL
+                 AND p.updated_at > now() - make_interval(days => ${STALE_STAMP_RETRY_DAYS})
+                THEN ARRAY(
+                  SELECT DISTINCT e->'liftPreference'->>'oneShotSetAt'
+                    FROM session_periodization sp
+                   CROSS JOIN LATERAL jsonb_array_elements(
+                           CASE WHEN jsonb_typeof(sp.prescription->'exercises') = 'array' THEN sp.prescription->'exercises' ELSE '[]'::jsonb END) AS e
+                   WHERE sp.user_id = ${userId}
+                     AND e->>'name' = lifts.lift
+                     AND e->'liftPreference'->>'oneShotSetAt' IS NOT NULL)
+                ELSE ARRAY[]::text[]
+           END AS stale_stamps
     FROM lifts
     JOIN exercise_preferences p
       ON p.user_id = ${userId}
@@ -87,37 +116,10 @@ export async function listExercisePreferences(
       setsDelta: r.one_shot_expired || r.sets_delta == null ? null : Number(r.sets_delta),
       oneShotSetAt: r.one_shot_expired || r.one_shot_set_at == null ? null : new Date(r.one_shot_set_at),
     })
-  }
-  return out
-}
-
-/**
- * The one-shot times that stored plans still carry for these lifts although the lift's row no longer
- * holds them (#4007): a step used up by a log, or expired, whose restate of the other plans failed.
- * `live` is what `listExercisePreferences` just read, so a time that is not the row's own (to the 2 ms
- * the consume allows) is stale. One read, owner-scoped, no write and no model call: the caller restates
- * only when this returns something, so a read with nothing stale writes nothing.
- */
-export async function listStaleOneShotStamps(
-  db: Db, userId: string, exerciseNames: string[], live: Map<string, LiftPreferenceRow>,
-): Promise<ClearedOneShot[]> {
-  if (exerciseNames.length === 0) return []
-  const res = await db.execute(sql`
-    SELECT DISTINCT e->>'name' AS name, e->'liftPreference'->>'oneShotSetAt' AS set_at
-      FROM session_periodization sp
-     CROSS JOIN LATERAL jsonb_array_elements(
-             CASE WHEN jsonb_typeof(sp.prescription->'exercises') = 'array' THEN sp.prescription->'exercises' ELSE '[]'::jsonb END) AS e
-     WHERE sp.user_id = ${userId}
-       AND e->'liftPreference'->>'oneShotSetAt' IS NOT NULL
-       AND e->>'name' = ANY(${sql.raw('ARRAY[')}${sql.join(exerciseNames.map(n => sql`${n}`), sql`, `)}${sql.raw(']::text[]')})
-  `)
-  const out: ClearedOneShot[] = []
-  for (const r of res.rows as { name: string; set_at: string }[]) {
-    const stamped = new Date(r.set_at).getTime()
-    if (Number.isNaN(stamped)) continue
-    const own = live.get(r.name)?.oneShotSetAt?.getTime()
-    if (own != null && Math.abs(own - stamped) < 2) continue
-    out.push({ exerciseName: r.name, setAtMs: stamped })
+    for (const at of r.stale_stamps ?? []) {
+      const ms = new Date(at).getTime()
+      if (!Number.isNaN(ms)) stale?.push({ exerciseName: r.lift, setAtMs: ms })
+    }
   }
   return out
 }

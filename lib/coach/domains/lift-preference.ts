@@ -183,8 +183,32 @@ interface Context {
   plans: StoredPlan[]
 }
 
-/** Every fact the preview and the apply compute from, read once, owner-scoped by the target's program. */
-async function readContext(db: Db, reads: BasisReads, userId: string, target: TargetRow): Promise<Context> {
+/** The three pool reads the bar's basis comes from (1RM history, estimates, records) for one lift. */
+export interface BasisInputs {
+  lastReal: Awaited<ReturnType<BasisReads['getLastRealOneRmBatch']>>
+  estimates: Awaited<ReturnType<BasisReads['getExerciseEstimates']>>
+  prs: Awaited<ReturnType<BasisReads['listPersonalRecords']>>
+}
+async function readBasisInputs(reads: BasisReads, userId: string, name: string): Promise<BasisInputs> {
+  const [lastReal, estimates, prs] = await Promise.all([
+    reads.getLastRealOneRmBatch(userId, [name]),
+    reads.getExerciseEstimates(userId).catch(() => []),
+    reads.listPersonalRecords(userId),
+  ])
+  return { lastReal, estimates, prs }
+}
+function basisKgOf(b: BasisInputs, name: string): number | null {
+  return resolveWorkingBasisWithSource({
+    lastNonDeload1rm: b.lastReal.get(name)?.estimated1rm,
+    seedEstimate: b.estimates.find(e => e.exerciseName === name)?.estimated1rm,
+    allTimePr1rm: b.prs.get(name),
+  }).kg
+}
+
+/** Every fact the preview and the apply compute from, read once, owner-scoped by the target's program.
+ *  `getBasis` supplies the basis reads, which go through the pool: the apply passes ones read before
+ *  its transaction opened, so it never waits on a second connection while holding one. */
+async function readContext(db: Db, getBasis: () => Promise<BasisInputs>, userId: string, target: TargetRow): Promise<Context> {
   const name = target.exerciseName
   const [[lib], [program], slotRows] = await Promise.all([
     db.select({ id: s.exerciseLibrary.id, equipment: s.exerciseLibrary.equipment, exerciseType: s.exerciseLibrary.exerciseType })
@@ -236,18 +260,7 @@ async function readContext(db: Db, reads: BasisReads, userId: string, target: Ta
   // The bar's basis, by the resolver and inputs the workout screen uses. Only read when there is a
   // plan to show it on.
   let basisKg: number | null = null
-  if (plans.length > 0) {
-    const [lastReal, estimates, prs] = await Promise.all([
-      reads.getLastRealOneRmBatch(userId, [name]),
-      reads.getExerciseEstimates(userId).catch(() => []),
-      reads.listPersonalRecords(userId),
-    ])
-    basisKg = resolveWorkingBasisWithSource({
-      lastNonDeload1rm: lastReal.get(name)?.estimated1rm,
-      seedEstimate: estimates.find(e => e.exerciseName === name)?.estimated1rm,
-      allTimePr1rm: prs.get(name),
-    }).kg
-  }
+  if (plans.length > 0) basisKg = basisKgOf(await getBasis(), name)
 
   return {
     target,
@@ -527,6 +540,27 @@ async function baseRepsFor(
 // ── A one-shot that was used up or expired (#4007) ───────────────────────────
 
 /**
+ * Takes a spent one-off's record off the lift's rows in a stored plan: `loadStep`, `setsDelta` and
+ * `oneShotSetAt`, for a row whose `oneShotSetAt` is the spent one (to the 2 ms the consume allows). A
+ * lasting `repRange` / `restSec` in the record stays; a record left empty is removed. Nothing else on
+ * the row is read or written, so its sets, reps, rest, load and `deloaded` flag are exactly as stored.
+ * This is the fallback for what `restatePlanRow` cannot do (a deloaded row, a plan whose session no
+ * longer has the lift) and it re-costs nothing. Returns the same object when nothing matched.
+ */
+export function stripSpentOneShotRecord(prescription: AiPrescription, exerciseName: string, spentMs: number): AiPrescription {
+  let changed = false
+  const exercises = prescription.exercises.map(ex => {
+    const rec = ex.liftPreference
+    if (ex.name !== exerciseName || rec?.oneShotSetAt == null || Math.abs(new Date(rec.oneShotSetAt).getTime() - spentMs) >= 2) return ex
+    changed = true
+    const { loadStep: _l, setsDelta: _d, oneShotSetAt: _t, ...lasting } = rec
+    const { liftPreference: _old, ...row } = ex
+    return Object.keys(lasting).length > 0 ? { ...row, liftPreference: lasting } : row
+  })
+  return changed ? { ...prescription, exercises } : prescription
+}
+
+/**
  * A lift's one-shot ("lighter next time", ±1 set) is stamped on every stored plan of the lift (D1).
  * When it is used up — a log of one session consumed it — or expires, the other sessions' stored plans
  * still carry the step, and the person would train it a second time. This restates every stored plan
@@ -554,16 +588,7 @@ export async function restateSpentOneShot(
     .from(s.exerciseLibrary).where(eq(s.exerciseLibrary.name, exerciseName)).limit(1)
   const row = await findRow(db, userId, exerciseName, lib?.id ?? null, false)
   const pref = toPreference(liveColumns(row))
-  const [lastReal, estimates, prs] = await Promise.all([
-    reads.getLastRealOneRmBatch(userId, [exerciseName]),
-    reads.getExerciseEstimates(userId).catch(() => []),
-    reads.listPersonalRecords(userId),
-  ])
-  const basisKg = resolveWorkingBasisWithSource({
-    lastNonDeload1rm: lastReal.get(exerciseName)?.estimated1rm,
-    seedEstimate: estimates.find(e => e.exerciseName === exerciseName)?.estimated1rm,
-    allTimePr1rm: prs.get(exerciseName),
-  }).kg
+  const basisKg = basisKgOf(await readBasisInputs(reads, userId, exerciseName), exerciseName)
 
   let rewritten = 0
   for (const p of plans) {
@@ -579,12 +604,15 @@ export async function restateSpentOneShot(
         eq(s.sessionExercises.exerciseName, exerciseName),
         isNull(s.sessionExercises.deletedAt),
       ))
-    if (slotRows.length === 0) continue
     const prescription = p.prescription as AiPrescription
-    const next = restatePlan({
+    // A full restate re-costs the row, which needs its slot, and skips a deloaded row. When it cannot
+    // run, or leaves the spent record behind, the marker is taken off directly (below), so a stale stamp
+    // is cleared on this call and never found again.
+    const restated = slotRows.length === 0 ? prescription : restatePlan({
       slots: slotRows.map(r => ({ programSessionId: p.programSessionId, sessionName: '', sessionExerciseId: r.id, role: r.role })),
       trainingGoal: slotRows[0].goal, bodyweight: lib?.exerciseType === 'bodyweight', basisKg, equipment: lib?.equipment ?? null,
     }, { programSessionId: p.programSessionId, phase: p.phase as PeriodizationPhase, prescription }, pref)
+    const next = stripSpentOneShotRecord(restated, exerciseName, spentMs)
     if (next === prescription) continue
     const res = await db.update(s.sessionPeriodization)
       .set({ prescription: next as unknown as Record<string, unknown>, updatedAt: new Date() })
@@ -600,6 +628,9 @@ export async function restateSpentOneShot(
 }
 
 // ── The handler ──────────────────────────────────────────────────────────────
+
+/** What `prepare` reads before the apply's transaction: the lift it read for, and its basis inputs. */
+interface PreparedBasis { exerciseName: string; basis: BasisInputs }
 
 export interface LiftPreferenceBefore {
   /** The preference row this change wrote; also the `coach_changes.target_id`. */
@@ -627,7 +658,7 @@ export function liftPreferenceHandler(getReads: () => Promise<StaticReads>, toda
       const target = patch.targetId ? await loadTarget(db, userId, patch.targetId) : null
       if (!target) return { consequences: [], drift: [], target: null }
       const accepted = liftChanges(patch.changes)
-      const ctx = await readContext(db, await getReads(), userId, target)
+      const ctx = await readContext(db, async () => readBasisInputs(await getReads(), userId, target.exerciseName), userId, target)
       const row = await findRow(db, userId, target.exerciseName, ctx.libId, false)
       const current = liveColumns(row)
       const drift = driftOf(current, accepted)
@@ -640,7 +671,17 @@ export function liftPreferenceHandler(getReads: () => Promise<StaticReads>, toda
       return { consequences, drift, target: label, ...(worked.resolved.length > 0 && { resolved: worked.resolved }) }
     },
 
-    async apply(db, userId, patch, accepted) {
+    // Runs before the transaction opens (`applyInTransaction`): the basis reads go through the pool, and
+    // a transaction holds one connection, so they must not be awaited inside it.
+    async prepare(db, userId, patch) {
+      if (!patch.targetId) return null
+      const target = await loadTarget(db, userId, patch.targetId)
+      if (!target) return null
+      const prepared: PreparedBasis = { exerciseName: target.exerciseName, basis: await readBasisInputs(await getReads(), userId, target.exerciseName) }
+      return prepared
+    },
+
+    async apply(db, userId, patch, accepted, prepared) {
       if (!patch.targetId) return { ok: false, reason: 'not_found' }
       const target = await loadTarget(db, userId, patch.targetId)
       if (!target) return { ok: false, reason: 'not_found' }
@@ -650,7 +691,18 @@ export function liftPreferenceHandler(getReads: () => Promise<StaticReads>, toda
       // the card could have described.
       const named = liftChanges(patch.changes)
       if (new Set(named.map(c => c.field)).size !== named.length) return { ok: false, reason: 'invalid', detail: REFUSE_TWICE }
-      const ctx = await readContext(db, await getReads(), userId, target)
+      // The basis was read before the transaction. If the lift under the id is not the one it was read
+      // for (renamed in between), refuse as stale rather than read through the pool in here. The `from`
+      // check below stays inside the transaction, on the row it locks.
+      const before = prepared as PreparedBasis | null | undefined
+      const getBasis = async (): Promise<BasisInputs> => {
+        if (before === undefined) return readBasisInputs(await getReads(), userId, target.exerciseName) // not run by applyInTransaction
+        if (before?.exerciseName !== target.exerciseName) {
+          throw new StaleLiftPreference([{ changeId: changes[0].id, field: 'lift', expected: before?.exerciseName ?? 'the lift as read', actual: 'a lift that changed while applying' }])
+        }
+        return before.basis
+      }
+      const ctx = await readContext(db, getBasis, userId, target)
 
       const row = await findRow(db, userId, target.exerciseName, ctx.libId, true)
       const current = liveColumns(row)

@@ -102,9 +102,11 @@ async function applyInTransaction(
   db: Db, userId: string, patch: CoachPatch, accepted: CoachPatch['changes'], handler: DomainHandler,
 ): Promise<ApplyOutcome> {
   try {
+    // Pool reads the apply needs happen here, before a connection is held for the transaction.
+    const prepared = await handler.prepare?.(db, userId, patch)
     return await db.transaction(async tx => {
       const t = tx as unknown as Db
-      const result = await handler.apply(t, userId, patch, accepted)
+      const result = await handler.apply(t, userId, patch, accepted, prepared)
       if (!result.ok) throw new Refused(result)
       const inserted = await t.insert(s.coachChanges).values({
         userId,
