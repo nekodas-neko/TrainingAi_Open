@@ -177,6 +177,33 @@ const repRangeChange = <T extends z.ZodType<string>>(to: T) =>
     from: z.string().regex(REP_RANGE_TEXT).nullable(),
     to,
   }).strict();
+/**
+ * #4056. A set more or a set fewer, next time. Two schemas from one list of values:
+ *
+ * - `SETS_DELTA` is the strict rule — exactly -1 or 1. It is what a client parses, what the apply
+ *   path checks and what is stored (`exercise_preferences.sets_delta`).
+ * - `SETS_DELTA_FOR_MODEL` is what the `proposeChange` tool's input schema carries. The strict
+ *   union becomes a JSON `enum` of numbers, and Gemini accepts `enum` only on strings: it refused
+ *   every request that offered `lift_preference` with HTTP 400. So the model is shown an integer
+ *   (the AI SDK converts a schema's INPUT side, `io: "input"`) and the pipe runs the strict rule on
+ *   what it sends back, so a 0, a 2 or a "1" is refused exactly as any invalid proposal is.
+ */
+const SETS_DELTA_VALUES = [-1, 1] as const;
+const SETS_DELTA = z.union([z.literal(SETS_DELTA_VALUES[0]), z.literal(SETS_DELTA_VALUES[1])]);
+const SETS_DELTA_FOR_MODEL = z
+  .number()
+  .int()
+  .min(Math.min(...SETS_DELTA_VALUES))
+  .max(Math.max(...SETS_DELTA_VALUES))
+  .describe(`${SETS_DELTA_VALUES.join(' or ')}, never 0`)
+  .pipe(SETS_DELTA);
+const setsDeltaChange = (delta: typeof SETS_DELTA | typeof SETS_DELTA_FOR_MODEL) =>
+  z.object({
+    id: z.string().min(1),
+    field: z.literal('setsDelta'),
+    from: delta.nullable(),
+    to: delta,
+  }).strict();
 const OTHER_LIFT_PREFERENCE_CHANGES = [
   z.object({
     id: z.string().min(1),
@@ -190,12 +217,6 @@ const OTHER_LIFT_PREFERENCE_CHANGES = [
     from: z.enum(['lighter', 'heavier']).nullable(),
     to: z.enum(['lighter', 'heavier']),
   }).strict(),
-  z.object({
-    id: z.string().min(1),
-    field: z.literal('setsDelta'),
-    from: z.union([z.literal(-1), z.literal(1)]).nullable(),
-    to: z.union([z.literal(-1), z.literal(1)]),
-  }).strict(),
 ] as const;
 // #3896 step 5, the lift_preference domain. Strict: a model that adds a weight, a % or a set count
 // to one of these is refused, not ignored — no number the model wrote beyond these reaches the
@@ -203,11 +224,13 @@ const OTHER_LIFT_PREFERENCE_CHANGES = [
 const LIFT_PREFERENCE_CHANGES = [
   repRangeChange(z.union([z.string().regex(REP_RANGE_TEXT), z.enum(REP_RANGE_REQUESTS)])),
   ...OTHER_LIFT_PREFERENCE_CHANGES,
+  setsDeltaChange(SETS_DELTA_FOR_MODEL),
 ] as const;
 /** The same, plus the editor's clear (`REP_RANGE_DEFAULT`), for the patch a client applies. */
 const APPLIED_LIFT_PREFERENCE_CHANGES = [
   repRangeChange(z.union([z.string().regex(REP_RANGE_TEXT), z.enum(REP_RANGE_REQUESTS), z.literal(REP_RANGE_DEFAULT)])),
   ...OTHER_LIFT_PREFERENCE_CHANGES,
+  setsDeltaChange(SETS_DELTA),
 ] as const;
 export const PatchChangeSchema = z.discriminatedUnion('field', [...BASE_PATCH_CHANGES, ...APPLIED_LIFT_PREFERENCE_CHANGES]);
 /**
