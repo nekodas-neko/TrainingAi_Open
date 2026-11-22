@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { View } from 'react-native';
 import { TouchSurface } from '../../../shared/ui/TouchSurface';
 import { AppText, Badge, Card, Stack } from '../../../shared/ui';
@@ -12,11 +13,14 @@ export function SessionExerciseList({
   onSelect,
   completedIds = [],
   injuredMuscles = [],
+  trailing,
 }: {
   exercises: readonly ExercisePreview[];
   onSelect?: (exercise: ExercisePreview) => void;
   completedIds?: string[];
   injuredMuscles?: readonly string[];
+  /** A control at the row's end, such as the lift's "…" Coach menu (#3896 step 7). */
+  trailing?: (exercise: ExercisePreview) => ReactNode;
 }) {
   const { theme } = useTheme();
   return (
@@ -75,6 +79,7 @@ export function SessionExerciseList({
                     </Stack>
                   )}
                 </View>
+                {trailing?.(exercise)}
               </Stack>
             </Card>
           </TouchSurface>

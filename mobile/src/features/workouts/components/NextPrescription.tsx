@@ -1,6 +1,7 @@
 import { AppText, Badge, Stack } from '../../../shared/ui';
 import { nextPrescriptionSpec } from '../data/models';
 import { ResourceCard } from './ResourceCard';
+import { LiftCoachMenu } from '../../coach/components/LiftCoachMenu';
 
 export function NextPrescription() {
   return (
@@ -22,8 +23,18 @@ export function NextPrescription() {
               </AppText>
             )}
             {data.exercises?.map((exercise) => (
-              <Stack key={exercise.name} gap="xs">
-                <AppText variant="caption">{exercise.name}</AppText>
+              <Stack key={exercise.sessionExerciseId ?? exercise.name} gap="xs">
+                <Stack direction="row" align="center" justify="space-between">
+                  <AppText variant="caption" style={{ flex: 1 }}>
+                    {exercise.name}
+                  </AppText>
+                  {exercise.sessionExerciseId && (
+                    <LiftCoachMenu
+                      sessionExerciseId={exercise.sessionExerciseId}
+                      name={exercise.name}
+                    />
+                  )}
+                </Stack>
                 <Stack direction="row" wrap gap="xs">
                   {exercise.sets.map((set, index) => (
                     <Badge

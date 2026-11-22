@@ -20,6 +20,8 @@ import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 import { CoachContextSchema } from '@trainingai/shared/coach/context'
 import { getDb, ensureSchema } from '@/lib/data/postgres/client'
 import { resolveCoachContext } from '@/lib/coach/context'
+import { CoachIntentSchema, intentAllowed } from '@trainingai/shared/coach/chips'
+import { intentBlock } from '@/lib/coach/intents'
 
 /**
  * Sized from production, not guessed. The schema caps a conversation at 60 messages but each is
@@ -60,6 +62,12 @@ const BodySchema = z.object({
    * domain this server has not shipped still gets a working Coach; only known gated names count.
    */
   patchDomains: z.array(z.string().max(40)).max(20).optional(),
+  /**
+   * #3896 steps 6 and 7: the Coach button this message came from. An enum only: the instruction it
+   * stands for is the server's (`lib/coach/intents.ts`), and it is refused (400, no model call) unless
+   * it fits the checked context and what the client renders (`intentAllowed`).
+   */
+  intent: CoachIntentSchema.optional(),
 })
 
 // RV-173: the guards belong here for the same reason they belong on every other prose route —
@@ -263,6 +271,15 @@ export async function POST(req: Request) {
 
     // Before the model is called, and refusing rather than dropping: a context id that is not the
     // user's answers the same 404 the apply path gives a foreign target, and nothing is streamed.
+    const intent = parsed.data.intent
+    if (intent && !intentAllowed(intent, {
+      lift: parsed.data.context?.origin === 'exercise' && !!parsed.data.context.sessionExerciseId,
+      liftPreference: scope.patchDomains.includes('lift_preference'),
+      training: scope.readTools === null,
+    })) {
+      return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
+    }
+
     let contextBlock = ''
     if (parsed.data.context) {
       await ensureSchema()
@@ -287,6 +304,7 @@ export async function POST(req: Request) {
       scope.systemSection,
       injuryLine,
       contextBlock,
+      intent ? intentBlock(intent) : '',
     ].filter(Boolean).join('\n\n')
 
     const result = loggedStreamText(

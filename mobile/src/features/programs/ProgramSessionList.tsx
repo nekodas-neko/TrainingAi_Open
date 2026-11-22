@@ -13,6 +13,7 @@ export function ProgramSessionList({
   styles,
   removable = false,
   disabled = false,
+  savedLifts,
 }: {
   draft: ProgramDraft;
   onChange: (draft: ProgramDraft) => void;
@@ -20,6 +21,7 @@ export function ProgramSessionList({
   styles: SavedStyle[];
   removable?: boolean;
   disabled?: boolean;
+  savedLifts?: ReadonlyMap<string, string>;
 }) {
   const value = useMemo(() => identifyProgramDraft(draft, randomUUID), [draft]);
   useEffect(() => {
@@ -42,6 +44,7 @@ export function ProgramSessionList({
             styles={styles}
             handle={handle}
             disabled={disabled}
+            savedLifts={savedLifts}
             onRemove={
               removable
                 ? () =>

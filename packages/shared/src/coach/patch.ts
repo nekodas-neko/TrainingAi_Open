@@ -52,6 +52,10 @@ export const REP_RANGE_TEXT = /^\d{1,2}-\d{1,2}$/;
 /** What the model may ask for instead of naming numbers: code works the range out. */
 export const REP_RANGE_REQUESTS = ['more_reps', 'fewer_reps'] as const;
 export type RepRangeRequest = (typeof REP_RANGE_REQUESTS)[number];
+/** #3896 step 7: the program editor's "Use the program's default", which clears a lift's rep range.
+ *  Accepted by the apply path only: the model's schema (`patchChangeSchemaFor`) never offers it, so
+ *  the Coach's tool JSON is unchanged and the model cannot clear a range on its own. */
+export const REP_RANGE_DEFAULT = 'program_default' as const;
 
 /** How long each lift-preference change lasts. Rep range and rest stay until changed (D2); the load
  *  step and the extra or missing set are the one-shot, for the next workout only. */
@@ -166,16 +170,14 @@ const BASE_PATCH_CHANGES = [
 ] as const;
 /** #3896 step 5: the lift_preference variants, kept apart so a scope that does not offer the domain
  *  can build its `changes` union without them (`patchChangeSchemaFor`). */
-const LIFT_PREFERENCE_CHANGES = [
-  // #3896 step 5, the lift_preference domain. Strict: a model that adds a weight, a % or a set count
-  // to one of these is refused, not ignored — no number the model wrote beyond these reaches the
-  // write. `from` is only ever compared with the stored row, never written.
+const repRangeChange = <T extends z.ZodType<string>>(to: T) =>
   z.object({
     id: z.string().min(1),
     field: z.literal('repRange'),
     from: z.string().regex(REP_RANGE_TEXT).nullable(),
-    to: z.union([z.string().regex(REP_RANGE_TEXT), z.enum(REP_RANGE_REQUESTS)]),
-  }).strict(),
+    to,
+  }).strict();
+const OTHER_LIFT_PREFERENCE_CHANGES = [
   z.object({
     id: z.string().min(1),
     field: z.literal('restSec'),
@@ -195,13 +197,27 @@ const LIFT_PREFERENCE_CHANGES = [
     to: z.union([z.literal(-1), z.literal(1)]),
   }).strict(),
 ] as const;
-export const PatchChangeSchema = z.discriminatedUnion('field', [...BASE_PATCH_CHANGES, ...LIFT_PREFERENCE_CHANGES]);
+// #3896 step 5, the lift_preference domain. Strict: a model that adds a weight, a % or a set count
+// to one of these is refused, not ignored — no number the model wrote beyond these reaches the
+// write. `from` is only ever compared with the stored row, never written.
+const LIFT_PREFERENCE_CHANGES = [
+  repRangeChange(z.union([z.string().regex(REP_RANGE_TEXT), z.enum(REP_RANGE_REQUESTS)])),
+  ...OTHER_LIFT_PREFERENCE_CHANGES,
+] as const;
+/** The same, plus the editor's clear (`REP_RANGE_DEFAULT`), for the patch a client applies. */
+const APPLIED_LIFT_PREFERENCE_CHANGES = [
+  repRangeChange(z.union([z.string().regex(REP_RANGE_TEXT), z.enum(REP_RANGE_REQUESTS), z.literal(REP_RANGE_DEFAULT)])),
+  ...OTHER_LIFT_PREFERENCE_CHANGES,
+] as const;
+export const PatchChangeSchema = z.discriminatedUnion('field', [...BASE_PATCH_CHANGES, ...APPLIED_LIFT_PREFERENCE_CHANGES]);
 /**
  * The change union a scope hands the model. Without `lift_preference` it is built from the same
  * variants `main` had, so the tool JSON of a client that never declares the domain does not grow.
  */
 export function patchChangeSchemaFor(withLiftPreference: boolean) {
-  return withLiftPreference ? PatchChangeSchema : z.discriminatedUnion('field', [...BASE_PATCH_CHANGES]);
+  return withLiftPreference
+    ? z.discriminatedUnion('field', [...BASE_PATCH_CHANGES, ...LIFT_PREFERENCE_CHANGES])
+    : z.discriminatedUnion('field', [...BASE_PATCH_CHANGES]);
 }
 export type PatchChange = z.infer<typeof PatchChangeSchema>;
 export const CoachPatchSchema = z.object({
@@ -251,6 +267,7 @@ export function liftPreferenceValueLabel(field: PatchChange['field'], value: unk
   if (field === 'repRange') {
     if (value === 'more_reps') return 'More reps';
     if (value === 'fewer_reps') return 'Fewer reps';
+    if (value === REP_RANGE_DEFAULT) return 'The program’s default reps';
     return typeof value === 'string' ? `${value.replace('-', '–')} reps` : null;
   }
   if (field === 'restSec') return typeof value === 'number' ? `${value} s` : null;

@@ -160,7 +160,10 @@ node mobile/scripts/web-screens.mjs --click steps.json               # tap, then
   the logger, start a workout from `workout-session` with a click script (that writes a workout to
   the local database).
 - A click script is a JSON array of steps: `{"open": "more"}`, `{"tap": "Data & Sync"}` (exact
-  text; add `"exact": false` for a part), `{"scroll": 600}`, `{"wait": 1000}`, `{"capture": "name"}`.
+  text; add `"exact": false` for a part), `{"scroll": 600}`, `{"wait": 1000}`, `{"capture": "name"}`,
+  `{"tapLabel": "More for Row"}` (an icon-only control, by its accessible label), and
+  `{"fulfill": {"path": "/api/coach", "file": "reply.txt"}}`, which answers that path from a file
+  next to the script from then on: a Coach reply from a fixture, so no model is called.
 - `--serve` signs in, then keeps the proxy running for a person's own browser at
   `http://localhost:8099`; `--verbose` prints the app's console.
 

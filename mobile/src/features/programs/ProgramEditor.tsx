@@ -1,6 +1,6 @@
 import { capitalize } from '@trainingai/shared/format/capitalize';
 import { randomUUID } from 'expo-crypto';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   AppButton,
   AppText,
@@ -41,6 +41,18 @@ export function ProgramEditor({
   const draft = useWorkoutDraft(key, ProgramDraftSchema, initial ?? programDraft(program));
   const action = useWorkoutAction();
   const value = draft.value;
+  // #3896 step 7: the saved program's lifts, which the "Rep range" row can write for.
+  const savedLifts = useMemo(
+    () =>
+      new Map(
+        (program?.sessions ?? []).flatMap((session) =>
+          (session.exercises ?? []).flatMap((exercise) =>
+            exercise.id ? [[exercise.id, exercise.exerciseName] as const] : [],
+          ),
+        ),
+      ),
+    [program],
+  );
   const mode = value.phaseMode === 'ai_dynamic' ? 'ai' : (value.schedule?.type ?? 'auto');
   async function save() {
     await action.run(async () => {
@@ -251,6 +263,7 @@ export function ProgramEditor({
             styles={styles.data?.styles ?? []}
             removable
             disabled={action.busy}
+            savedLifts={savedLifts}
           />
           <AppButton
             title="Add Session"

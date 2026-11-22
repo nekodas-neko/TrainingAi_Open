@@ -23,6 +23,7 @@ import { ChangeRows, Consequences } from '../components/CoachChanges';
 import type { Destination } from '../components/CoachWidget';
 import type { CoachConversation } from '../data/CoachConversation';
 import { failureNotice } from '../../../core/reporting/index.ts';
+import { CoachAboutLine, CoachChips, useCoachAbout, usePendingChip } from '../components/CoachStart';
 export function CoachScreen({
   scope,
   onBack,
@@ -37,6 +38,7 @@ export function CoachScreen({
     <Conversation
       key={scope}
       conversation={coach.conversations[scope]}
+      scope={scope}
       onBack={onBack}
       onNavigate={onNavigate}
     />
@@ -50,10 +52,12 @@ export function CoachScreen({
 }
 function Conversation({
   conversation,
+  scope,
   onBack,
   onNavigate,
 }: {
   conversation: CoachConversation;
+  scope: CoachScope;
   onBack: () => void;
   onNavigate: (destination: Destination) => void;
 }) {
@@ -70,6 +74,18 @@ function Conversation({
     return () => conversation.leave();
   }, [conversation]);
   const lastAssistant = chat.messages.findLastIndex((m) => m.role === 'assistant');
+  // #3896 steps 6-7: the context line and the buttons, chosen by the server for this context.
+  const about = useCoachAbout(scope, state.context);
+  const chips = about.data?.chips;
+  usePendingChip(
+    chips,
+    state.pendingChip,
+    state.ready && !busy && chat.messages.length === 0,
+    conversation.takePendingChip,
+    (chip) => {
+      void conversation.send(chip.message, chip.intent);
+    },
+  );
   function leave() {
     conversation.stop();
     onBack();
@@ -149,6 +165,9 @@ function Conversation({
           />
         ) : (
           <>
+            {state.context && (
+              <CoachAboutLine line={about.data?.about?.line} loading={!about.data && !about.error} />
+            )}
             {chat.messages.length === 0 && (
               <Stack align="center" gap="md" style={{ paddingTop: theme.spacing.xl * 2 }}>
                 <Icon name="coach" color={theme.tones.sleep.foreground} />
@@ -163,24 +182,16 @@ function Conversation({
                   I can look at your data, explain something, or change your program — nothing
                   changes without you confirming it.
                 </AppText>
-                <Stack style={{ alignSelf: 'stretch', paddingTop: theme.spacing.lg }}>
-                  {[
-                    'Change my workout',
-                    'What can I eat instead of rice',
-                    'What’s lagging?',
-                  ].map((s) => (
-                    <AppButton
-                      key={s}
-                      title={s}
-                      variant="surface"
-                      disabled={!state.ready}
-                      style={{ alignItems: 'flex-start' }}
-                      onPress={() => {
-                        void conversation.send(s);
-                      }}
-                    />
-                  ))}
-                </Stack>
+                <CoachChips
+                  chips={chips}
+                  expected={state.context?.origin === 'exercise' ? 6 : scope === 'nutrition' ? 1 : 4}
+                  disabled={!state.ready}
+                  error={about.error}
+                  onRetry={about.refresh}
+                  onPress={(chip) => {
+                    void conversation.send(chip.message, chip.intent);
+                  }}
+                />
               </Stack>
             )}
             <Stack style={{ opacity: state.input.trim() ? 0.6 : 1 }}>
