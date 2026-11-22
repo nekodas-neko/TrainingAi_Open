@@ -110,9 +110,11 @@ test('#3879: the guided screen sends the Android gesture through the system Back
   );
   assert.match(screen, /onBack=\{\(\) => goBack\('header'\)\}/);
   assert.match(screen, /onSystemBack=\{\(\) => goBack\('system'\)\}/);
-  // PageLayout's onBack is what useAndroidBack registers.
-  assert.match(layout, /onBack=\{onSystemBack \?\? onBack\}/);
-  assert.match(layout, /onPress=\{onBack\}/);
+  // The header's Back icon takes onBack; useAndroidBack registers onSystemBack ?? onBack.
+  assert.match(layout, /onBack=\{onBack\}\s+onSystemBack=\{onSystemBack\}/);
+  const page = await readFile(new URL('../src/shared/ui/PageLayout.tsx', import.meta.url), 'utf8');
+  assert.match(page, /useAndroidBack\(onSystemBack \?\? onBack\)/);
+  assert.match(page, /onBack=\{onBack\}/);
 });
 
 // --- #3880 items 1 to 3: one view for history and the done marks ---

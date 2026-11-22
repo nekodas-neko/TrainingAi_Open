@@ -264,7 +264,6 @@ export function GuidedWorkoutScreen({
         }}
         onOptions={() => setPanel('options')}
         onMinimize={closeWorkout}
-        onMuscles={() => setPanel('muscles')}
       />
     );
   } else {
@@ -286,20 +285,12 @@ export function GuidedWorkoutScreen({
               : `${(workout.phaseDetail ?? workout.phase) ? `${workout.phaseDetail ?? workout.phase} · ` : ''}${workout.soloExerciseId ? 'Solo' : `Ex ${visibleIndex + 1}/${visibleExercises.length}`}`
         }
         workout={workout}
-        ring={flow.stage === 'exercise'}
         fillBottom={flow.stage === 'exercise' && !ready && !resting}
         onBack={() => goBack('header')}
         onSystemBack={() => goBack('system')}
         backIcon={flow.stage === 'summary' ? 'forward' : 'back'}
         backLabel={
           flow.stage === 'summary' ? 'Continue to next exercise' : 'Back to session'
-        }
-        titleAction={
-          <IconButton
-            icon="muscles"
-            label="Muscles worked"
-            onPress={() => setPanel('muscles')}
-          />
         }
         actions={
           <Stack direction="row" gap="xs">
@@ -543,6 +534,12 @@ export function GuidedWorkoutScreen({
           </>
         ) : shownPanel === 'options' ? (
           <>
+            <AppButton
+              title="Muscles worked"
+              icon="muscles"
+              variant="surface"
+              onPress={() => setPanel('muscles')}
+            />
             {flow.stage !== 'review' && flow.stage !== 'warmup' && (
               <AppButton
                 title="Exercise details"

@@ -25,7 +25,7 @@ export function canPauseWorkout(workout: WorkoutRecord) {
  * The Total clock, which is also the pause control: tap it to freeze every clock, tap again to
  * resume (#3255). It counts the time the workout was under way, so a pause is not in it.
  */
-export function SessionTimer({ workout }: { workout: WorkoutRecord; ring?: boolean }) {
+export function SessionTimer({ workout }: { workout: WorkoutRecord }) {
   const { theme } = useTheme();
   const journal = useWorkoutJournal();
   const paused = workout.pausedAt !== null;

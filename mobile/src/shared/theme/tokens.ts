@@ -163,10 +163,8 @@ export const typography = {
   },
   // bottom-nav.tsx: text-[10px] font-medium.
   tab: { fontSize: 10, lineHeight: 15, fontWeight: '500' },
-  // screen-header.tsx: text-xl font-bold, the title of every tab page.
+  // screen-header.tsx: text-xl font-bold, the title of every page and all five tabs (#3760).
   pageTitle: { fontSize: 20, lineHeight: 28, fontWeight: '700' },
-  // nutrition-content.tsx: the Nutrition tab's own title, text-[26px] font-semibold leading-none.
-  nutritionTitle: { fontSize: 26, lineHeight: 26, fontWeight: '600', letterSpacing: -0.52 },
   // calendar-widget.tsx: text-xs font-medium, the day digits and the month name.
   calendarDay: { fontSize: 12, lineHeight: 16, fontWeight: '500' },
   // calendar-widget.tsx: text-[10px] font-medium, the weekday row.

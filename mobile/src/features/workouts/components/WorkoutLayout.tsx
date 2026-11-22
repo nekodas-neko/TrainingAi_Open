@@ -1,7 +1,5 @@
 import type { PropsWithChildren, ReactNode } from 'react';
-import { View } from 'react-native';
-import { AppText, IconButton, PageLayout, Stack } from '../../../shared/ui';
-import { useTheme } from '../../../shared/theme/ThemeProvider';
+import { AppText, PageLayout, Stack } from '../../../shared/ui';
 import { SessionTimer } from './WorkoutClocks';
 import type { WorkoutRecord } from '../logging/workout';
 
@@ -13,16 +11,14 @@ export function WorkoutLayout({
   onBack,
   onSystemBack,
   backIcon = 'back',
-  backLabel = 'Back to session',
+  backLabel,
   workout,
-  ring = false,
   actions,
   titleAction,
   footer,
   contentDisabled = false,
   reorderable = false,
   fillBottom = false,
-  centeredTitle = false,
   children,
 }: PropsWithChildren<{
   title: string;
@@ -34,65 +30,39 @@ export function WorkoutLayout({
   /** Android Back, when it must differ from the header button (the summary, #3879). */
   onSystemBack?: () => void;
   backIcon?: 'back' | 'forward';
+  /** "Back" unless Back goes somewhere named: pass "Back to session" only where it does (#3760). */
   backLabel?: string;
   workout?: WorkoutRecord;
-  ring?: boolean;
   actions?: ReactNode;
   titleAction?: ReactNode;
   footer?: ReactNode;
   contentDisabled?: boolean;
   reorderable?: boolean;
   fillBottom?: boolean;
-  /** The title centred between the back button and the actions, with no rule under the header. */
-  centeredTitle?: boolean;
 }>) {
-  const { theme } = useTheme();
   return (
     <PageLayout
       title={title}
-      onBack={onSystemBack ?? onBack}
+      onBack={onBack}
+      onSystemBack={onSystemBack}
+      subtitle={
+        subtitleNode ??
+        (subtitle && (
+          <AppText numberOfLines={1} variant="caption" tone="muted">
+            {subtitle}
+          </AppText>
+        ))
+      }
+      detail={detail}
       scroll
       reorderable={reorderable}
       fillBottom={fillBottom}
-      landing={centeredTitle}
       footer={footer}
-      header={
-        <Stack direction="row" align="center" gap="sm">
-          {onBack && <IconButton icon={backIcon} label={backLabel} onPress={onBack} />}
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <AppText
-              variant={centeredTitle ? 'headerTitle' : ring ? 'caption' : 'heading'}
-              numberOfLines={1}
-              style={{ textAlign: ring || centeredTitle ? 'center' : 'left' }}
-            >
-              {title}
-            </AppText>
-            {subtitleNode ?? (subtitle && (
-              <AppText
-                numberOfLines={1}
-                variant={ring ? 'micro' : 'caption'}
-                tone="muted"
-                style={{ textAlign: ring ? 'center' : 'left' }}
-              >
-                {subtitle}
-              </AppText>
-            ))}
-            {detail && (
-              <AppText variant="caption" tone="muted">
-                {detail}
-              </AppText>
-            )}
-          </View>
-          {titleAction}
-          {centeredTitle ? (
-            // Holds the back button's width on the right so the title stays centred.
-            <View style={{ minWidth: theme.sizes.touchTarget, alignItems: 'flex-end' }}>{actions}</View>
-          ) : (
-            actions
-          )}
-          {workout && <SessionTimer workout={workout} ring={ring} />}
-        </Stack>
-      }
+      backIcon={backIcon}
+      backLabel={backLabel}
+      titleAction={titleAction}
+      actions={actions}
+      headerTrailing={workout && <SessionTimer workout={workout} />}
     >
       {contentDisabled ? (
         <Stack gap="md" pointerEvents="none">

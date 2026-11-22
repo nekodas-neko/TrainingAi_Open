@@ -3,6 +3,7 @@ import { webReference } from './web-reference.ts';
 import { readdir, readFile } from 'node:fs/promises';
 import { test } from 'node:test';
 import { sizes, typography } from '../src/shared/theme/tokens';
+import { headerMetrics } from '../src/shared/ui/headerMetrics.ts';
 
 // #2994. Preview restores the current app's look, so its type tokens are pinned to what the current
 // app's components draw at 384 px, measured in its dark theme (one CSS px is one dp on the S25
@@ -21,13 +22,6 @@ const currentApp: Record<string, Expected> = {
     lineHeight: 28,
     fontWeight: '700',
     source: 'shell/screen-header.tsx h1, text-xl font-bold',
-  },
-  nutritionTitle: {
-    fontSize: 26,
-    lineHeight: 26,
-    fontWeight: '600',
-    letterSpacing: -0.52,
-    source: 'nutrition-content.tsx h1, text-[26px] font-semibold leading-none tracking-[-0.02em]',
   },
   heading: {
     fontSize: 16,
@@ -292,7 +286,8 @@ test('page titles use the page title tokens, never the large value token', async
   const files = new Map((await sources()).map(({ file, text }) => [file, text]));
   const layout = files.get('shared/ui/PageLayout.tsx') ?? '';
   const screen = files.get('shared/ui/Screen.tsx') ?? '';
-  assert.match(layout, /titleVariant = 'pageTitle'/);
+  assert.doesNotMatch(layout, /titleVariant/, 'a page picks no title size of its own (#3760)');
+  assert.equal(headerMetrics.titleVariant, 'pageTitle');
   assert.doesNotMatch(layout, /'title'/, 'PageLayout draws a page title with the 28 px value token');
   assert.doesNotMatch(screen, /'title'/, 'Screen draws a page title with the 28 px value token');
 });

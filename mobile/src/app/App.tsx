@@ -15,7 +15,7 @@ import { LocalStorageProvider } from './providers/LocalStorageProvider';
 import { AppStartupGate } from './providers/AppStartupGate';
 import { useTheme } from '../shared/theme/ThemeProvider';
 import { useGeistFonts } from '../shared/theme/font-loading';
-import { Screen, Notice } from '../shared/ui';
+import { PageLayout, Notice } from '../shared/ui';
 import { useHealthContext } from '../features/health/HealthProvider';
 import { useHealthData } from '../features/health/data/HealthDataProvider';
 import { useHome } from '../features/home/data/HomeProvider';
@@ -183,7 +183,7 @@ function AppShell() {
   const openHealthDetail = (next: HealthDetail) => open({ screen: 'health-detail', detail: next });
   const openPrograms = () => open({ screen: 'programs' });
   const openActivity = () => open({ screen: 'activity-recording' });
-  const fullScreen = !!current && !['health-data', 'settings'].includes(current.screen);
+  const fullScreen = !!current;
   // #3724. Below the server's minimum build, the notice covers the app; the data screen (export
   // and sync health) still opens over it, and the notice carries sign-out itself.
   const tooOld = useTooOldNotice();
@@ -364,10 +364,11 @@ function AppShell() {
       case 'health-data':
       case 'settings':
         return (
-          <Screen
+          <PageLayout
             title={entry.screen === 'health-data' ? deviceHealthName : 'Settings'}
-            backLabel={tab}
             onBack={back}
+            scroll
+            contentStyle={{ paddingBottom: theme.spacing.xxl, gap: theme.spacing.xl }}
           >
             {entry.screen === 'health-data' ? <DataScreen /> : <SettingsScreen />}
             {health.error && entry.screen === 'health-data' && (
@@ -377,7 +378,7 @@ function AppShell() {
                 error
               />
             )}
-          </Screen>
+          </PageLayout>
         );
     }
   }

@@ -239,7 +239,6 @@ export function NutritionScreen({
     <PageLayout
       fillBottom
       title="Nutrition"
-      titleVariant="nutritionTitle"
       subtitle={
         <Stack direction="row" align="center" gap="xxs">
           <View {...swipe.panHandlers}>
