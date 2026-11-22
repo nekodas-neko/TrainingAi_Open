@@ -472,9 +472,9 @@ export async function aggregateSignals(
     perExRpeDelta = perExerciseRpeDelta(setLogs)
     // #4061: the answer on each lift's latest log in the same sessions. A repository without the read,
     // or a failed one, reads as no answer, so the plan falls back to the rated delta as before.
-    latestEfforts = await (async () => repo.getLatestExerciseEfforts?.(userId, last3Ids, exerciseNames))()
+    const read = await (async () => repo.getLatestExerciseEfforts?.(userId, last3Ids, exerciseNames))()
       .catch(err => { console.error('[signals] effort answers read failed (ignored):', err); return undefined })
-      ?? latestEfforts
+    if (read instanceof Map) latestEfforts = read
   }
 
   // Hours since last session

@@ -73,7 +73,6 @@ const LIFTS = [
   { id: 'se-s', name: 'Lift s', role: 'secondary', muscle: 'back', style: 'medium', pct: 72.5, reps: 8 },
   { id: 'se-a', name: 'Lift a', role: 'accessory', muscle: 'biceps', style: 'light', pct: 65, reps: 10 },
 ] as const
-type Lift = (typeof LIFTS)[number]
 const STYLES = LIFTS.map(l => ({
   id: l.style, userId: 'u', name: `Style ${l.style}`,
   sets: [1, 2, 3].map(n => ({ id: `${l.style}-${n}`, styleId: l.style, setNumber: n, pct: l.pct, reps: l.reps, restSec: 150, useFor1rm: true })),
@@ -287,7 +286,7 @@ describe.skipIf(!!process.env.EFFORT_4061_RECORD)('a tapped answer gives the pla
   })
 
   it('reports the counts', () => {
-    console.log(`[4061] identity: ${counts.identity} compared, ${counts.identityDiffered} differed; equivalence: ${counts.equivalence} compared, ${counts.equivalenceDiffered} differed`)
+    console.info(`[4061] identity: ${counts.identity} compared, ${counts.identityDiffered} differed; equivalence: ${counts.equivalence} compared, ${counts.equivalenceDiffered} differed`)
     expect(counts.identityDiffered).toBe(0)
     expect(counts.equivalenceDiffered).toBe(0)
   })

@@ -163,7 +163,7 @@ const LIVE_READERS: Record<string, Carrier> = {
     why: 'reads each lift\'s latest answer and folds it into the lift\'s rpeDelta (#4061)',
     lines: [
       'effortAnswer?: -1 | 0 | 1',
-      'latestEfforts = await (async () => repo.getLatestExerciseEfforts?.(userId, last3Ids, exerciseNames))()',
+      'const read = await (async () => repo.getLatestExerciseEfforts?.(userId, last3Ids, exerciseNames))()',
       'const effortAnswer = tappedEffort(latestEfforts.get(ex.name))',
       '...(effortAnswer !== undefined && { effortAnswer }),',
     ],
