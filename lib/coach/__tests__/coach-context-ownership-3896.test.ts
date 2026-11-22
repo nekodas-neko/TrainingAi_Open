@@ -22,6 +22,9 @@ describe.skipIf(!canRun)('Coach context ownership (#3896)', () => {
   let ctxMod: typeof import('@/lib/coach/context')
   let db: ReturnType<typeof import('@/lib/data/postgres/client').getDb>
   let repo: Awaited<ReturnType<typeof import('@/lib/data').getRepositoryAsync>>
+  // A's workout holding the markers, and A's own session exercise named like B's, so A's blocks can
+  // be read for the markers that B's blocks must not show.
+  const aMarker = { workout: '', legPress: '' }
   const ids: Record<'a' | 'b', { program: string; session: string; exercise: string; workout: string }> = {} as never
 
   /** A program with one session and one exercise, one logged workout of it, and (for A) a stored
@@ -77,6 +80,10 @@ describe.skipIf(!canRun)('Coach context ownership (#3896)', () => {
     const aWorkout = (await pool.query(
       `INSERT INTO workout_sessions (user_id, session_id, session_name, started_at, completed_at) VALUES ($1,$2,'A private day',$3,$3) RETURNING id`,
       [A, ids.a.session, LOGGED_AT])).rows[0].id
+    aMarker.workout = aWorkout
+    aMarker.legPress = (await pool.query(
+      `INSERT INTO session_exercises (session_id, exercise_name, position, exercise_role) VALUES ($1,'Leg Press',1,'secondary') RETURNING id`,
+      [ids.a.session])).rows[0].id
     const aLog = (await pool.query(
       `INSERT INTO exercise_logs (workout_session_id, exercise_name, logged_at, estimated_1rm) VALUES ($1,'Leg Press',$2,200) RETURNING id`,
       [aWorkout, LOGGED_AT])).rows[0].id
@@ -149,6 +156,24 @@ describe.skipIf(!canRun)('Coach context ownership (#3896)', () => {
     }
     const exBlock = await resolve(B, { origin: 'exercise', sessionExerciseId: ids.b.exercise })
     expect((exBlock as { block: string }).block).not.toContain('987.5')
+
+    // Positive controls: the same markers ARE rendered in A's own blocks, so the absences above
+    // mean the scope held rather than that the marker is never written.
+    const blockOf = async (user: string, ctx: unknown) => (await resolve(user, ctx) as { block: string }).block
+    // The recap prints both the workout's name and its set weights.
+    const aRecap = await blockOf(A, { origin: 'recap', workoutId: aMarker.workout })
+    expect(aRecap).toContain('A private day')
+    expect(aRecap).toContain('987.5')
+    // The exercise block prints recent sets under the lift's name: A's own "Leg Press" shows 987.5.
+    expect(await blockOf(A, { origin: 'exercise', sessionExerciseId: aMarker.legPress })).toContain('987.5')
+    // The day block prints workout names only, by design: it carries "A private day" for A but no
+    // weights, so 987.5 has no positive control here (the recap and exercise blocks carry it).
+    expect(await blockOf(A, { origin: 'day', date: day })).toContain('A private day')
+    // The session block lists the session's exercises only, by design: neither marker is ever in it.
+    // A's own rows (including the "Leg Press" B shares a name with) are what it must show.
+    const aSession = await blockOf(A, { origin: 'session', programSessionId: ids.a.session })
+    expect(aSession).toContain('"Leg Press"')
+    expect(aSession).toContain(ids.a.exercise)
   })
 
   it('a quote inside a stored name cannot close the name\'s quotes', async () => {

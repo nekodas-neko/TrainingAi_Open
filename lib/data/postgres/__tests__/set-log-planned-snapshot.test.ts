@@ -29,6 +29,8 @@ describe.skipIf(!canRun)('set_logs planned snapshot (migration 126)', () => {
     // FK cascades from workout_sessions clean up exercise_logs / set_logs.
     await pool.query(`DELETE FROM workout_sessions WHERE user_id = $1`, [TEST_USER_ID])
     await pool.query(`DELETE FROM users WHERE id = $1`, [TEST_USER_ID])
+    // The library is shared by every DB test file: take out the row this file added (#4040).
+    await pool.query(`DELETE FROM exercise_library WHERE name = 'Snapshot Chin'`)
   })
 
   async function readSets(exercise: string) {
@@ -89,6 +91,7 @@ describe.skipIf(!canRun)('set_logs planned snapshot (migration 126)', () => {
   // 14-18 pp overshoot against a target that was never prescribed. Migration 153 adds
   // planned_reps and clears the historical percentages.
   it('records only the rep target for a bodyweight movement, never a planned pct', async () => {
+    await pool.query(`DELETE FROM exercise_library WHERE name = 'Snapshot Chin'`)
     await pool.query(
       `INSERT INTO exercise_library (name, exercise_type) VALUES ('Snapshot Chin', 'bodyweight')
        ON CONFLICT (name) DO UPDATE SET exercise_type = 'bodyweight'`)
