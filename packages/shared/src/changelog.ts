@@ -6,6 +6,21 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.531.0",
+    date: "2026-11-22",
+    changes: [
+      "TrainingAi Preview: a weekly check-in. After your week's last planned session (or from Sunday 5 pm), Home offers a one-minute review: how each main lift felt, whether anything hurt, a lift to swap, and days off or a shorter session next week. Light, pain and a swap are only offered, and nothing happens until you tap. Days off and a shorter session apply as you typed them. Every change can be undone. This needs the new Preview build.",
+      "Both apps: a lift you call Heavy in the check-in gets no more than the heaviest weight you lifted last time, for the week the check-in covers. Heavy with a missed rep also takes one plate step off. This changes how plans are made, only for a lift you answer Heavy on.",
+      "TrainingAi Preview: open the Coach from a lift (the ... on an exercise row, Change today on Home, Adjust on the recap, or the Next workout card). It shows that lift's next sets, reps and weight and offers one tap per change: too heavy, too light, more reps and less weight, swap, it hurt, or why this weight. Nothing changes until you apply it. The program editor has a Rep range row on each saved lift. This needs the new Preview build.",
+      "Both apps: the daily check also suggests rest when readiness is very low, when sleep and HRV have both run well below your usual, or when blood oxygen has run below your usual, using the same cut-offs as the AI plan. This changes when rest is suggested.",
+      "TrainingAi Preview: every screen has the same page header with Back in the same place. Settings and Health Connect now look like About, and Muscles worked on the guided workout moves into the Options menu. This needs the new Preview build.",
+      "Both apps: a workout plan's note names the muscle groups the session leaves under their weekly target, as of when the plan was made. No plan changes.",
+      "Both apps: renaming an exercise onto a name that already has a personal record removes the old name's leftover record, so your record count is right. A record written just after a rename lands under the new name, and a rename that waits too long says busy, try again.",
+      "Both apps: the Next workout card shows the same weight and reps as the session screen for a lift with its own settings. A plan note's minutes wording is no longer garbled by three sentence shapes, and an injury logged through the Coach is dated by your day.",
+      "Behind the scenes: a used-up one-off lift step is cleaned from other stored plans, and tests and the Android build checks are steadier.",
+    ],
+  },
+  {
     version: "1.530.0",
     date: "2026-11-22",
     changes: [
