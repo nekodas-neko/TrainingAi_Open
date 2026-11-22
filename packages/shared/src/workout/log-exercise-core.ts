@@ -14,6 +14,7 @@ import { defaultUseFor1rm } from '@trainingai/shared/workout/default-use-for-1rm
 import type { ProgramPhaseType } from '@trainingai/shared/types/program';
 import type { EditStamp } from '@trainingai/shared/sync/edited-at';
 import type { WorkoutRepository } from '@/lib/data/repository';
+import { logMayConsumeOneShot } from '@trainingai/shared/ai-periodization/lift-preference';
 
 export { LogExercisePayloadSchema } from './log-payload';
 import type { LogExercisePayload } from './log-payload';
@@ -65,7 +66,6 @@ export async function logExerciseWithRepo(
     progressionStyle, plannedWeights, prescriptionBasisKg, styleName, styleId, muscleGroups, workoutStartedAt, warmupEndedAtMs,
     rpeValues, rpeSources, intensityMode, wasOverride, exerciseDeloaded, effort,
   } = payload;
-
 
   // Issue 2721: a stale copy is decided before anything is written, so a superseded push leaves the
   // workout session (and its warm-up end) untouched as well as the log. `logExerciseAndSets` checks
@@ -341,6 +341,22 @@ export async function logExerciseWithRepo(
   })) {
     // #3671: dated by the set, not the upload, so a workout synced after midnight keeps its day.
     isPR = await repo.upsertPersonalRecordIfBetter(userId, exercise, estimated1rm, loggedAt);
+  }
+
+  // #3896: a log of a plan that carried the lift's one-shot ("lighter / heavier next time", ±1 set)
+  // consumes it. The plan records the one-shot's write time (`liftPreference.oneShotSetAt`) and the
+  // client echoes it in the payload; the conditional write clears the row only if it still holds that
+  // exact value, so a log of an older plan, of another session, or of a stale queue entry leaves a
+  // one-shot it never carried alone, and a forged value matches nothing (it is compared, never stored).
+  // A deload or baseline log never carried it, and a re-push of a stored log is not a new one.
+  // Best-effort: the log is already saved, and a failed clear leaves the one-shot for the next log
+  // (or for its expiry) rather than losing the workout.
+  const servedOneShotAt = payload.liftOneShotSetAt ? new Date(payload.liftOneShotSetAt) : null
+  if (!superseded && servedOneShotAt && !Number.isNaN(servedOneShotAt.getTime()) && logMayConsumeOneShot({
+    isNewLog: logged.inserted === true, deloaded: deloadedForEstimate, baseline: isBaseline,
+  })) {
+    await (async () => repo.consumeLiftOneShot(userId, exercise, servedOneShotAt))()
+      .catch(err => console.error('[log-exercise] one-shot clear failed (left for the next log):', err));
   }
 
   return {

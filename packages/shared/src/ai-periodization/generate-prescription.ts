@@ -13,8 +13,8 @@ import { prescriptionExpiresAt } from '@trainingai/shared/ai-periodization/presc
 const RULES_PRESCRIPTION_TTL_MS = 6 * 60 * 60 * 1000
 import { aggregateSignals } from '@trainingai/shared/ai-periodization/signals'
 import { buildSystemPrompt, buildUserPrompt, intensityZoneForRole } from '@trainingai/shared/ai-periodization/prompt'
-import { accessoryTargetRpe, settleAccessory } from '@trainingai/shared/ai-periodization/goal-ranges'
-import { expectedRpe, pctForExpectedRpe } from '@trainingai/shared/ai-periodization/expected-rpe'
+import { settleAccessory } from '@trainingai/shared/ai-periodization/goal-ranges'
+import { pctForExpectedRpe } from '@trainingai/shared/ai-periodization/expected-rpe'
 import {
   applyDeloadFloor,
   canAutoApplyTransition,
@@ -42,11 +42,21 @@ import { PrescriptionSchema } from '@trainingai/shared/ai-periodization/prescrip
 import { reconcilePrescription } from '@trainingai/shared/ai-periodization/reconcile-prescription'
 import { buildPrescriptionShadow } from '@trainingai/shared/ai-periodization/prescription-shadow'
 import { loadSessionReads } from '@trainingai/shared/ai-periodization/session-read-plan'
+import { loadLiftPreferences } from '@trainingai/shared/ai-periodization/lift-preference-read'
+import { clampReps, preferenceAppliesIn, appliedAfterBudgetRest } from '@trainingai/shared/ai-periodization/lift-preference'
+import {
+  applyLiftPreferenceToPlanRow, applyPlanSetsDelta, mergeApplied, secondaryTargetRpe,
+} from '@trainingai/shared/ai-periodization/lift-preference-plan'
+import type { AppliedLiftPreference } from '@trainingai/shared/types/ai-periodization'
 import type { AiPrescription, AiPrescriptionExercise, PeriodizationPhase, PrescriptionGeneratedFor } from '@trainingai/shared/types/ai-periodization'
 import type { PrescriptionSignals } from '@trainingai/shared/ai-periodization/signals'
 import type { WorkoutRepository } from '@/lib/data/repository'
 import { createDedupCache } from '@trainingai/shared/ai-periodization/generation-dedup'
 import { UNCLASSIFIED_EXERCISE_ROLE } from '@trainingai/shared/workout/exercise-role'
+
+function liftPreferenceField(applied: AppliedLiftPreference | undefined): { liftPreference?: AppliedLiftPreference } {
+  return applied ? { liftPreference: applied } : {}
+}
 
 export type GeneratePrescriptionResult =
   | {
@@ -204,13 +214,29 @@ export function buildProgramAsWrittenPrescription(
   // One row per exercise, from its own style. `pct`/`reps`/`restSec` come from the FIRST set —
   // the prescription shape is one triple per exercise, not per set, so a style whose sets differ
   // is represented by its opening set, which is the one the lifter warms into.
-  const planned = withBase.map(ex => ({
+  const asWritten = withBase.map(ex => ({
     ex,
     sets: ex.baseSets.length,
     reps: ex.baseSets[0].reps,
     pct: ex.baseSets[0].pct,
     restSec: ex.baseSets[0].restSec,
   }))
+  // #3896: a lift's preference holds here too, so a failed model call honours it. Reps are clamped
+  // into the range and the load derived the same way as after the model (D3, D4). Not in a deload or
+  // baseline phase: the deload builder reads this for what `Full` reverts to, and a deload's own rows
+  // never carry a preference.
+  const preferencesApply = preferenceAppliesIn({ deload: signals.phase === 'deload', baseline: signals.phase === 'baseline' })
+  const appliedById = new Map<string, AppliedLiftPreference>()
+  const planned = asWritten.map(p => {
+    const lp = preferencesApply ? p.ex.liftPreference : undefined
+    if (!lp) return p
+    const { row, applied } = applyLiftPreferenceToPlanRow(p, lp.preference, {
+      trainingGoal: signals.trainingGoal, phase: signals.phase, role: p.ex.role,
+      bodyweight: p.ex.exerciseType === 'bodyweight', basisKg: lp.basisKg, equipment: p.ex.equipment,
+    })
+    if (Object.keys(applied).length > 0) appliedById.set(p.ex.sessionExerciseId, applied)
+    return row
+  })
 
   const fitted = new Map(
     fitToBudget(
@@ -228,14 +254,28 @@ export function buildProgramAsWrittenPrescription(
     ).map(f => [f.sessionExerciseId, f.sets]),
   )
 
-  const exercises: AiPrescriptionExercise[] = planned.map(p => ({
-    sessionExerciseId: p.ex.sessionExerciseId,
-    name: p.ex.name,
-    sets: fitted.get(p.ex.sessionExerciseId) ?? p.sets,
-    reps: p.reps,
-    pct: p.pct,
-    restSec: p.restSec,
-  }))
+  const exercises: AiPrescriptionExercise[] = planned.map(p => {
+    const fittedSets = fitted.get(p.ex.sessionExerciseId) ?? p.sets
+    // #3896: the one-shot ±1 set goes on after the fit, so the trim cannot undo it.
+    const withDelta = preferencesApply
+      ? applyPlanSetsDelta(fittedSets, p.ex.liftPreference?.preference, { trainingGoal: signals.trainingGoal, phase: signals.phase, role: p.ex.role })
+      : null
+    const applied = withDelta != null
+      ? mergeApplied(appliedById.get(p.ex.sessionExerciseId), {
+          setsDelta: p.ex.liftPreference!.preference.oneShot!.setsDelta!,
+          oneShotSetAt: p.ex.liftPreference!.preference.oneShot!.setAt.toISOString(),
+        })
+      : appliedById.get(p.ex.sessionExerciseId)
+    return {
+      sessionExerciseId: p.ex.sessionExerciseId,
+      name: p.ex.name,
+      sets: withDelta ?? fittedSets,
+      reps: p.reps,
+      pct: p.pct,
+      restSec: p.restSec,
+      ...(applied && { liftPreference: applied }),
+    }
+  })
 
   const { estimatedSessionDurationMin, weeklyVolumeContribution } = prescriptionFigures(exercises, signals)
 
@@ -375,7 +415,9 @@ async function runPrescriptionGeneration(
   // after this exit check does not ask for another generation on every read.
   // #3893: the session read of each exercise's last session, in shadow. It is stored beside the plan
   // and read by nothing that builds it; a failed read stores no read and the plan is unchanged.
-  const sessionReads = await loadSessionReads(repo, userId, activeProgram, validSession, tz).catch(() => null)
+  // #3896: the session's lift preferences, read once for the session read and the plan.
+  const liftPreferences = await loadLiftPreferences(repo, userId, (validSession.exercises ?? []).map(e => e.exerciseName))
+  const sessionReads = await loadSessionReads(repo, userId, activeProgram, validSession, tz, liftPreferences).catch(() => null)
   const storePrescription = (p: AiPrescription, expiresAt: Date, status: 'pending' | 'auto_applied', storeFor: PrescriptionGeneratedFor) =>
     repo.storePrescription(userId, programSessionId, {
       ...p,
@@ -433,7 +475,7 @@ async function runPrescriptionGeneration(
   const budgetOverrideMin = requestedMin != null && requestedMin !== validSession.timeBudgetMinutes
     ? budgetForPreset(validSession.timeBudgetMinutes, durationPreset)
     : undefined
-  const signals = await aggregateSignals(userId, programSessionId, repo, tz, excludeSessionId, budgetOverrideMin, { program: activeProgram })
+  const signals = await aggregateSignals(userId, programSessionId, repo, tz, excludeSessionId, budgetOverrideMin, { program: activeProgram, liftPreferences })
   if (!signals) return { ok: false, error: 'Could not aggregate signals', status: 404 }
   if (programPhase.aligned && programPhase.phase != null) {
     signals.programPhase = { trainingWeeksDone: programPhase.trainingWeeksDone, capWeeks: programPhase.capWeeks }
@@ -665,6 +707,23 @@ async function runPrescriptionGeneration(
   }))
   const preDeloadById = reconciled.preDeloadById
 
+  // #3896: a lift's stored preference, enforced after the model. Nothing the model said gates it; the
+  // prompt only told it the range. Not in a deload or a baseline (design §3a), and never on a row the
+  // per-exercise deload cut. The reps are clamped into the range before autoregulation, which then
+  // judges the lift against the range rather than the goal's band, so it cannot climb back out of it.
+  const preferencesApply = preferenceAppliesIn({
+    deload: isDeloadPlan(state.phase, parsed.phase_action) || parsed.phase === 'deload',
+    baseline: state.phase === 'baseline',
+  })
+  const signalById = new Map(signals.exercises.map(e => [e.sessionExerciseId, e]))
+  const preferenceFor = (id: string) =>
+    preferencesApply && !deloadedIds.has(id) ? signalById.get(id)?.liftPreference : undefined
+  for (const ex of parsed.exercises) {
+    const range = preferenceFor(ex.session_exercise_id)?.preference.repRange
+    if (range) ex.reps = clampReps(ex.reps, range)
+  }
+  const appliedById = new Map<string, AppliedLiftPreference>()
+
   // RPE-based autoregulation — adjust each exercise by the RPE × 1RM quadrant (back off a
   // regressing hard lift, push an easy progressing one). Runs before the time budget so an
   // earned set can steal time from lower-value work rather than overrun the session.
@@ -685,6 +744,12 @@ async function runPrescriptionGeneration(
         rpeDelta: e.rpeDelta,
         rm1Trend: e.rm1Trend,
         repCompletionRate: e.repCompletionRate,
+        ...(preferenceFor(e.sessionExerciseId)?.preference.repRange && {
+          repBand: {
+            repMin: preferenceFor(e.sessionExerciseId)!.preference.repRange!.min,
+            repMax: preferenceFor(e.sessionExerciseId)!.preference.repRange!.max,
+          },
+        }),
       })),
     signals.trainingGoal,
     parsed.phase,
@@ -716,16 +781,34 @@ async function runPrescriptionGeneration(
       // The accessory effort floor is goal-agnostic (RPE ~8). On goals whose primary runs
       // deliberately light in a phase (strength/power accumulation sit near RPE 6), flooring a
       // secondary at RPE 8 would push it ABOVE the main — inverting the role order. Cap the floor
-      // at the main's hardest intended effort for this phase so a secondary can match, never exceed it.
-      const mainEffortCeil = expectedRpe(primaryZone.pctMax, primaryZone.repMin)
-      const secondaryTargetRpe = Math.min(accessoryTargetRpe(signals.trainingGoal), mainEffortCeil)
-      const effortPct = pctForExpectedRpe(secondaryTargetRpe, a.reps)
+      // at the main's hardest intended effort for this phase so a secondary can match, never exceed it
+      // (`secondaryTargetRpe`, shared with a lift preference's load so the two cannot drift).
+      const effortPct = pctForExpectedRpe(secondaryTargetRpe(signals.trainingGoal, parsed.phase), a.reps)
       const primaryCeil = primaryZone.pctMax ?? 85
       ex.pct = Math.min(primaryCeil, Math.max(clampPrescribedPct(a.pct, exZone), effortPct))
     } else {
       // Primary compound: the heavy anchor — phase-relative clamp, still climbs with the block.
       const exZone = intensityZoneForRole(signals.trainingGoal, parsed.phase, role)
       ex.pct = clampPrescribedPct(a.pct, exZone)
+    }
+    // #3896: the lift's preference, over the role's own rule. With a rep range the reps are the
+    // lifter's (autoregulation's climb included, inside the range) and the load is the role's target
+    // effort at those reps (D3, D4); then the preferred rest and any one-shot plate step.
+    const lp = preferenceFor(ex.session_exercise_id)
+    if (lp) {
+      const sig = signalById.get(ex.session_exercise_id)!
+      const { row, applied } = applyLiftPreferenceToPlanRow(
+        { sets: ex.sets, reps: lp.preference.repRange ? a.reps : ex.reps, pct: ex.pct, restSec: ex.rest_sec },
+        lp.preference,
+        {
+          trainingGoal: signals.trainingGoal, phase: parsed.phase, role,
+          bodyweight: sig.exerciseType === 'bodyweight', basisKg: lp.basisKg, equipment: sig.equipment,
+        },
+      )
+      ex.reps = row.reps
+      ex.pct = row.pct
+      ex.rest_sec = row.restSec
+      if (Object.keys(applied).length > 0) appliedById.set(ex.session_exercise_id, applied)
     }
   }
 
@@ -781,6 +864,17 @@ async function runPrescriptionGeneration(
     // session Full trains come out of the one stage that costs this one.
     new Map([...preDeloadById].filter(([id]) => deloadedIds.has(id))),
     parsed.phase,
+    // #3896: the one-shot ±1 set, on the fitted count and costed with the session.
+    (id, sets) => {
+      const lp = preferenceFor(id)
+      const next = applyPlanSetsDelta(sets, lp?.preference, { trainingGoal: signals.trainingGoal, phase: parsed.phase, role: roleById.get(id) ?? UNCLASSIFIED_EXERCISE_ROLE })
+      if (next != null) {
+        appliedById.set(id, mergeApplied(appliedById.get(id), {
+          setsDelta: lp!.preference.oneShot!.setsDelta!, oneShotSetAt: lp!.preference.oneShot!.setAt.toISOString(),
+        })!)
+      }
+      return next
+    },
   )
   for (const ex of parsed.exercises) {
     ex.sets = budget.sets.get(ex.session_exercise_id) ?? ex.sets
@@ -808,6 +902,8 @@ async function runPrescriptionGeneration(
       pct: ex.pct,
       restSec: ex.rest_sec,
       autoregNote: joinNotes(autoreg.notes[ex.session_exercise_id], perExDeload.recentNotes[ex.session_exercise_id]),
+      // The budget's rest (above) wins over a preferred rest, so the record says so.
+      ...liftPreferenceField(appliedAfterBudgetRest(appliedById.get(ex.session_exercise_id), ex.rest_sec)),
       ...(deloadedIds.has(ex.session_exercise_id) && {
         deloaded: true,
         deloadNote: perExDeload.notes[ex.session_exercise_id],

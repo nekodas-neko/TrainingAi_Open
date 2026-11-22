@@ -31,6 +31,9 @@ export const LogExercisePayloadSchema = z.object({
     useFor1rm: z.boolean().optional(),
   })).optional(),
   prescriptionBasisKg: z.number().positive().max(1000).optional(),
+  /** #3896: the `liftPreference.oneShotSetAt` of the plan this log was made from (ISO). Only ever compared
+   *  with the stored one-shot's own write time to decide whether this plan carried it; never stored. */
+  liftOneShotSetAt:     z.string().datetime().max(40).optional(),
   plannedWeights:       z.array(z.number().min(0).max(500).nullable()).max(20).optional(),
   styleName:            z.string().optional(),
   styleId:              z.string().optional(),

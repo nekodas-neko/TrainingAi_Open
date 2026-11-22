@@ -24,6 +24,8 @@ import { rowsOfDeviceInUse, nightAlgorithmVersion } from '@trainingai/shared/hea
 import { answeredMorningScales } from '@trainingai/shared/health/self-report'
 import type { FigureSignals, FigureSignalExercise } from '@trainingai/shared/ai-periodization/prescription-figures'
 import { repCompletionFromSetLogs } from '@trainingai/shared/ai-periodization/rep-completion'
+import type { LiftPreference } from '@trainingai/shared/ai-periodization/lift-preference'
+import { loadLiftPreferences, liftPreferenceBases } from '@trainingai/shared/ai-periodization/lift-preference-read'
 
 export interface PrescriptionSignals {
   trainingGoal: string
@@ -74,6 +76,9 @@ export interface PrescriptionSignals {
      * those exercises rather than inventing a number for them.
      */
     baseSets: Array<{ pct: number; reps: number; restSec: number }>
+    /** #3896: the lift's stored preference, bounded, and the working basis a one-shot plate step is
+     *  taken from. Absent when the lift has none, so a session without one builds the same signals. */
+    liftPreference?: { preference: LiftPreference; basisKg: number | null }
   }>
   phase: string
   sessionsInPhase: number
@@ -283,6 +288,9 @@ export interface AggregateSignalsOptions {
    *  (`getActiveProgramWithStructureStamp`). The signals are then built from the rows the stamp
    *  describes, not from a second read that a change could land between (#3927). */
   program?: Program
+  /** #3896: the session's lift preferences, already read by the caller (generation reads them once for
+   *  the session read and the plan). Absent: read here. */
+  liftPreferences?: ReadonlyMap<string, LiftPreference>
 }
 
 export async function aggregateSignals(
@@ -399,6 +407,12 @@ export async function aggregateSignals(
     ]),
   )
 
+  // #3896: one read for the session's lifts; a lift without a row gets nothing attached below.
+  const liftPreferences = options?.liftPreferences ?? await loadLiftPreferences(repo, userId, exerciseNames)
+  const preferenceBases = liftPreferences.size > 0
+    ? await liftPreferenceBases(repo, userId, liftPreferences, allPrs).catch(() => new Map<string, number | null>())
+    : new Map<string, number | null>()
+
   const exercises = programSession.exercises.map(ex => {
     // Identity/role/trend come from the shared derivation the card also uses — one rule, so the
     // card and the engine can never disagree about a lift's strength trend.
@@ -430,6 +444,9 @@ export async function aggregateSignals(
       transitionSec,
       plateau,
       baseSets: (ex.styleId ? setsByStyleId.get(ex.styleId) : undefined) ?? [],
+      ...(liftPreferences.has(ex.exerciseName) && {
+        liftPreference: { preference: liftPreferences.get(ex.exerciseName)!, basisKg: preferenceBases.get(ex.exerciseName) ?? null },
+      }),
     }
   })
 

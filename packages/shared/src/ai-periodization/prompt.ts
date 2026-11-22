@@ -249,6 +249,7 @@ export function buildUserPrompt(
       ?? `${ex.rm1ChangeKg > 0 ? '+' : ''}${ex.rm1ChangeKg.toFixed(1)} kg`
   }
 
+  const preferencesApply = state.phase !== 'deload' && state.phase !== 'baseline'
   const exerciseLines = signals.exercises.map(ex => {
     const musclesStr = ex.muscleAssignments.length > 0
       ? ex.muscleAssignments.map(ma => `${ma.muscle} (${ma.role})`).join(', ')
@@ -265,11 +266,16 @@ export function buildUserPrompt(
     // render it through the shared helper so the model is given "6 RM", not "118 kg".
     const oneRm = (v: number | null | undefined) =>
       v == null ? 'unknown' : displayOneRm(v, ex.exerciseType).text
+    // #3896: the lifter's own rep range for this lift, so the plan and its reasoning agree with the
+    // clamp code applies after the answer. Code enforces it; this line only keeps the text coherent.
+    // Not said in a deload or baseline, where a preference does not apply. Absent: the line is as before.
+    const range = preferencesApply ? ex.liftPreference?.preference.repRange : null
+    const rangeStr = range ? `, rep_range: ${range.min}-${range.max} (the lifter's choice for this lift; keep reps inside it)` : ''
     return `  - ${ex.name} (id: ${ex.sessionExerciseId}, role: ${ex.role}, muscles: ${musclesStr}, ` +
       `baseline_1rm: ${oneRm(ex.baseline1rm)} [anchor only — do not use for trend], ` +
       `current_1rm: ${oneRm(ex.current1rm)}, ` +
       `rm1_trend: ${ex.rm1Trend} ${rm1Change(ex)}, ` +
-      `avg_set_duration: ${ex.avgSetDurationSec}s, transition_sec: ${ex.transitionSec}${measuredStr})` +
+      `avg_set_duration: ${ex.avgSetDurationSec}s, transition_sec: ${ex.transitionSec}${measuredStr}${rangeStr})` +
       (ex.plateau ? ' [1RM flat ≥3 weeks — consider a stimulus change]' : '')
   }).join('\n')
 
