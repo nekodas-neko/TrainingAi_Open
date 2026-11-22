@@ -18,7 +18,8 @@
 // API route to a tag). It only finds the problem early and makes the recovery re-runnable.
 //
 //   node scripts/release-guards.js drift <sha> <release|hotfix>   exit 1 only in release mode
-//   node scripts/release-guards.js tag <version> <sha>            exit 1 if the tag is elsewhere
+//   node scripts/release-guards.js tag <version> <sha>            exit 1 if the tag is elsewhere, or the
+//                                                                  workflow files drifted since verify
 //   node scripts/release-guards.js release-exists <tag>           exit 0 yes, 1 no, 2 could not tell
 'use strict';
 
@@ -81,9 +82,37 @@ function remoteTagCommit(tag, { remote = 'origin', cwd } = {}) {
   return (peeled || lines[0])[0];
 }
 
-/** 'created' | 'exists' (already at this commit). Throws, with a message, if it is anywhere else. */
-/** @param {string} version @param {string} sha @param {{ remote?: string, cwd?: string }} [opts] @returns {'created' | 'exists'} */
-function ensureTag(version, sha, { remote = 'origin', cwd } = {}) {
+/** Thrown by `ensureTag` when the push would be refused: the workflow files moved after `verify`. */
+class TagDriftError extends Error {
+  /** @param {string} message @param {string[]} files */
+  constructor(message, files) {
+    super(message);
+    this.files = files;
+  }
+}
+
+/** The message for drift found at the tag step, AFTER the deploy: says what state production is in. */
+function lateDriftMessage(files, tag, sha) {
+  const list = files.map((f) => `  ${f}`).join('\n');
+  return (
+    `Production is already serving this release, but ${tag} was NOT created: the workflow files at ` +
+    `${sha.slice(0, 12)} now differ from main's, so GitHub would refuse the tag push.\n${list}\n` +
+    `This usually means a workflow change merged to main after Verify. Recovery: make the tag and ` +
+    `release page yourself, either with \`gh release create ${tag} --target ${sha} --title ${tag} ` +
+    `--generate-notes --notes-start-tag <previous tag>\` or the GitHub form (Releases, Draft a new ` +
+    `release, tag ${tag}, target the commit ${sha.slice(0, 12)}, not main), then "Re-run failed jobs" on ` +
+    `this run. docs/owner-manual.md, "Tag and publish notes fails before the tag was created".`
+  );
+}
+
+/**
+ * 'created' | 'exists' (already at this commit). Throws, with a message, if it is anywhere else.
+ * A tag already at this commit is answered FIRST, before the drift check, so a re-run after the
+ * owner made the tag by hand still passes while the workflow files still differ. Only when the tag
+ * has to be created is main fetched afresh and compared again (`verify`'s comparison is a snapshot).
+ */
+/** @param {string} version @param {string} sha @param {{ remote?: string, cwd?: string, base?: string }} [opts] @returns {'created' | 'exists'} */
+function ensureTag(version, sha, { remote = 'origin', cwd, base = 'origin/main' } = {}) {
   const tag = `v${version}`;
   const full = gitOrThrow(['rev-parse', '--verify', `${sha}^{commit}`], cwd);
   const there = remoteTagCommit(tag, { remote, cwd });
@@ -99,6 +128,9 @@ function ensureTag(version, sha, { remote = 'origin', cwd } = {}) {
   if (local.code === 0 && local.out !== full) {
     throw new Error(`${tag} exists in this checkout at ${local.out.slice(0, 12)}, not at ${full.slice(0, 12)}.`);
   }
+  gitOrThrow(['fetch', '--quiet', remote, 'main'], cwd);
+  const files = workflowDrift(full, { base, cwd });
+  if (files.length > 0) throw new TagDriftError(lateDriftMessage(files, tag, full), files);
   if (local.code !== 0) gitOrThrow(['tag', tag, full], cwd);
   gitOrThrow(['push', remote, `refs/tags/${tag}`], cwd);
   return 'created';
@@ -160,10 +192,11 @@ function main(argv) {
     throw new Error('usage: release-guards.js drift|tag|release-exists ...');
   } catch (e) {
     console.log(`::error::${String(e.message).replace(/\n/g, '%0A')}`);
+    if (e instanceof TagDriftError) summary(`### Released, but the tag was not created\n\n${e.message}`);
     return cmd === 'release-exists' ? 2 : 1;
   }
 }
 
-module.exports = { workflowDrift, driftMessage, remoteTagCommit, ensureTag, releaseExists };
+module.exports = { TagDriftError, workflowDrift, driftMessage, remoteTagCommit, ensureTag, releaseExists };
 
 if (require.main === module) process.exit(main(process.argv.slice(2)));

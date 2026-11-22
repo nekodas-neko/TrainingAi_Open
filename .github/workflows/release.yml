@@ -135,6 +135,9 @@ jobs:
           # commit with no workflow change since, passes. A hotfix branch can differ from main by
           # design and a hotfix ships when production is broken, so there it is a loud warning and
           # the owner makes the tag. The comparison and the messages are in the script.
+          # This is a SNAPSHOT of main taken now. A workflow change that merges to main after this
+          # step and before the tag job is caught again by the tag job, but only after the deploy,
+          # so merge nothing under `.github/workflows/` while a release run is in progress.
           node scripts/release-guards.js drift "$SHA" "$MODE"
 
           echo "mode=$MODE" >> "$GITHUB_OUTPUT"
@@ -251,6 +254,10 @@ jobs:
         # to the notes. At any other commit it fails and nothing is moved. `verify` still refuses
         # an existing tag on a FRESH run, and on "Re-run all jobs", which re-runs `verify`. A
         # "Re-run failed jobs" does not re-run `verify`, so only that path reaches an existing tag.
+        # A tag already at this commit is answered first. Only when it must be created does the
+        # script fetch main again and repeat `verify`'s workflow comparison; if the files now
+        # differ it does not attempt the push, and says production is live and the tag is the
+        # owner's to make.
         run: node scripts/release-guards.js tag "$VERSION" "$SHA"
 
       - name: Publish the release notes

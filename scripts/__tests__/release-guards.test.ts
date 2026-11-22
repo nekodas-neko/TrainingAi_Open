@@ -1,8 +1,8 @@
 // #4051 — the release workflow's guards, tested on throwaway git repositories (a bare "origin" and
 // a clone of it), so no release has to run to prove them.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { execFileSync } from 'node:child_process'
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
+import { execFileSync, spawnSync } from 'node:child_process'
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, chmodSync, readFileSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 
@@ -156,5 +156,142 @@ describe('releaseExists', () => {
     expect(() => guards.releaseExists('v1.2.3', { run: () => ({ code: 1, stderr: 'HTTP 401: Bad credentials' }) })).toThrow(
       /could not tell/,
     )
+  })
+})
+
+// The workflow calls the script as a process and branches on its exit code and its `::error::` /
+// `::warning::` lines, so those are the contract tested here, not only the functions behind them.
+describe('command line (what release.yml runs)', () => {
+  const script = path.resolve(__dirname, '../release-guards.js')
+
+  function run(args: string[], opts: { cwd?: string; pathPrefix?: string; summary?: string } = {}) {
+    const env: NodeJS.ProcessEnv = { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_SYSTEM: '/dev/null' }
+    delete env.GITHUB_STEP_SUMMARY
+    if (opts.summary) env.GITHUB_STEP_SUMMARY = opts.summary
+    if (opts.pathPrefix) env.PATH = `${opts.pathPrefix}${path.delimiter}${process.env.PATH}`
+    const r = spawnSync('node', [script, ...args], { cwd: opts.cwd ?? work, encoding: 'utf8', env })
+    return { code: r.status, out: (r.stdout || '') + (r.stderr || '') }
+  }
+
+  /** A `gh` that answers `release view` with the given exit code and stderr. */
+  function ghStub(code: number, stderr: string): string {
+    const dir = path.join(root, 'bin')
+    mkdirSync(dir, { recursive: true })
+    const file = path.join(dir, 'gh')
+    writeFileSync(file, `#!/bin/sh\necho "${stderr}" >&2\nexit ${code}\n`)
+    chmodSync(file, 0o755)
+    return dir
+  }
+
+  /** `sha` released while main moved on and changed a workflow. Returns the released sha. */
+  function mainDrifted(): string {
+    const released = git(work, 'rev-parse', 'HEAD')
+    commit({ '.github/workflows/ci.yml': 'b' })
+    git(work, 'fetch', '-q', 'origin')
+    return released
+  }
+
+  describe('drift', () => {
+    it('release mode, workflows differ: exits 1 with ::error:: naming the file', () => {
+      const sha = mainDrifted()
+      const r = run(['drift', sha, 'release'])
+      expect(r.code).toBe(1)
+      expect(r.out).toMatch(/^::error::/m)
+      expect(r.out).toContain('.github/workflows/ci.yml')
+    })
+
+    it('hotfix mode, workflows differ: exits 0 with ::warning::', () => {
+      const sha = mainDrifted()
+      const r = run(['drift', sha, 'hotfix'])
+      expect(r.code).toBe(0)
+      expect(r.out).toMatch(/^::warning::/m)
+      expect(r.out).not.toMatch(/::error::/)
+    })
+
+    it('no drift: exits 0 in both modes', () => {
+      const sha = git(work, 'rev-parse', 'HEAD')
+      expect(run(['drift', sha, 'release']).code).toBe(0)
+      expect(run(['drift', sha, 'hotfix']).code).toBe(0)
+    })
+
+    it('rejects an unknown mode', () => {
+      const sha = git(work, 'rev-parse', 'HEAD')
+      expect(run(['drift', sha, 'bogus']).code).toBe(1)
+    })
+  })
+
+  describe('tag', () => {
+    it('absent: creates and pushes it, exit 0', () => {
+      const sha = git(work, 'rev-parse', 'HEAD')
+      expect(run(['tag', '1.2.3', sha]).code).toBe(0)
+      expect(git(origin, 'rev-parse', 'refs/tags/v1.2.3^{commit}')).toBe(sha)
+    })
+
+    it('already at the same commit: exit 0, nothing pushed', () => {
+      const sha = git(work, 'rev-parse', 'HEAD')
+      git(origin, 'tag', 'v1.2.3', sha)
+      const r = run(['tag', '1.2.3', sha])
+      expect(r.code).toBe(0)
+      expect(r.out).toMatch(/nothing to create/)
+    })
+
+    it('at another commit: exit 1 with ::error::, tag untouched', () => {
+      const first = git(work, 'rev-parse', 'HEAD')
+      const second = commit({ 'README.md': 'z' })
+      git(origin, 'tag', 'v1.2.3', first)
+      const r = run(['tag', '1.2.3', second])
+      expect(r.code).toBe(1)
+      expect(r.out).toMatch(/^::error::/m)
+      expect(git(origin, 'rev-parse', 'refs/tags/v1.2.3^{commit}')).toBe(first)
+    })
+
+    it('absent, but main gained a workflow change since verify: no push, exit 1, says what to do', () => {
+      const sha = mainDrifted()
+      const summary = path.join(root, 'summary.md')
+      // The checkout has not seen the new main yet: the step must fetch it itself.
+      git(work, 'update-ref', 'refs/remotes/origin/main', sha)
+      const r = run(['tag', '1.2.3', sha], { summary })
+      expect(r.code).toBe(1)
+      expect(r.out).toMatch(/^::error::/m)
+      expect(r.out).toContain('already serving')
+      expect(r.out).toContain('NOT created')
+      expect(r.out).toContain('.github/workflows/ci.yml')
+      expect(r.out).toContain('Re-run failed jobs')
+      expect(r.out).toContain('owner-manual')
+      expect(git(origin, 'tag', '-l', 'v1.2.3')).toBe('')
+      expect(git(work, 'tag', '-l', 'v1.2.3')).toBe('')
+      const note = readFileSync(summary, 'utf8')
+      expect(note).toContain('tag was not created')
+      expect(note).toContain('.github/workflows/ci.yml')
+    })
+
+    it('already at the same commit while the files still differ: passes (a re-run after a hand-made tag)', () => {
+      const sha = mainDrifted()
+      git(origin, 'tag', 'v1.2.3', sha)
+      const r = run(['tag', '1.2.3', sha])
+      expect(r.code).toBe(0)
+      expect(r.out).not.toMatch(/::error::/)
+    })
+  })
+
+  describe('release-exists', () => {
+    it('exits 0 when gh finds the release', () => {
+      expect(run(['release-exists', 'v1.2.3'], { pathPrefix: ghStub(0, '') }).code).toBe(0)
+    })
+
+    it('exits 1 on gh\'s "release not found"', () => {
+      expect(run(['release-exists', 'v1.2.3'], { pathPrefix: ghStub(1, 'release not found') }).code).toBe(1)
+    })
+
+    it('exits 2 on any other failure, with ::error::', () => {
+      const r = run(['release-exists', 'v1.2.3'], { pathPrefix: ghStub(1, 'HTTP 401: Bad credentials') })
+      expect(r.code).toBe(2)
+      expect(r.out).toMatch(/^::error::/m)
+    })
+  })
+
+  it('an unknown command exits 1', () => {
+    expect(run(['nope']).code).toBe(1)
+    expect(existsSync(script)).toBe(true)
   })
 })

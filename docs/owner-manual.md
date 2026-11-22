@@ -118,6 +118,12 @@ not `main`**: the tag is permanent. Then go back to the release run and **Re-run
 tag and the notes now exist, so those steps skip themselves and *Attach the APK* runs. Or, instead of
 re-running, start **Actions** → **Android** → **Run workflow** → `main`, **release_tag** = `v<version>`.
 (Don't use **Re-run all jobs**: it runs *Verify* again, which refuses a version whose tag exists.)
+**Re-run failed jobs** uses the workflow file of the ORIGINAL run, so a run that started before this
+fix (the 1.531.0 run) cannot be finished that way; for it, make the release by hand and start the
+Android workflow with `release_tag`. A *draft* release is not seen by the "release exists" check, so
+publish it rather than leaving it as a draft. *Verify* compares the workflow files once, so merge
+nothing that changes `.github/workflows/` while a release run is in progress; if one slips in, the tag
+job stops after the deploy with a message saying so, and the recovery is the one above.
 
 **If *Tag and publish notes* fails after the tag was created:** production is already serving the
 release and the tag is permanent, so only the release page is missing. **Code** → **Releases** →
