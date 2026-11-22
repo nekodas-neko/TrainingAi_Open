@@ -111,24 +111,31 @@ const MIN_SETS_SHORT = 1
  * #3767 (owner, 22 Nov, option A): one code-owned sentence naming the muscle groups this session
  * leaves under their weekly target. What the stage knows is the sets logged so far this week plus
  * this session's own planned sets (`weeklyVolumeContribution`); it does NOT know what the week's
- * other sessions will plan, so the sentence says "after this session" and how many sessions are
- * left, and never states a whole-week planned figure.
+ * other sessions will plan, and it does not know which days are left, so it makes no claim about
+ * either. It says when it was true instead: a plan is made on first open and served for up to 7
+ * days, so the sentence is about the moment the plan was made.
  *
  * Only the muscles this session trains are considered: an upper session says nothing about legs.
- * Names are the lowercase canonical muscle names, as the weekly-sets pills show them. Returns ''
- * when there is nothing to say: targets unknown, a deload or baseline session, no time limit with
- * nothing cut (the plan is the program as written, so there is no fit to report on), or no group
- * under. It never touches a prescribed number.
+ * That includes a muscle whose only exercise the time budget dropped: it is still under target, and
+ * the stage's own drop note, in the same text, says the exercise was dropped. A muscle none of the
+ * session's exercises touch is never named. Names are the lowercase canonical muscle names, as the
+ * weekly-sets pills show them. Returns '' when there is nothing to say: targets unknown, a deload or
+ * baseline session, no time limit with nothing cut (the plan is the program as written, so there is
+ * no fit to report on), or no group under. It never touches a prescribed number.
  */
 function weeklyUnderTargetNote(
   signals: PrescriptionSignals,
   contribution: Record<string, number>,
   phase: string | null | undefined,
   fit: { noTimeLimit: boolean; anythingCut: boolean },
+  /** The ids of the exercises in this session (dropped ones included). */
+  sessionExerciseIds: ReadonlySet<string>,
 ): string {
   if (phase === 'deload' || phase === 'baseline') return ''
   if (fit.noTimeLimit && !fit.anythingCut) return ''
-  const trained = new Set(signals.exercises.flatMap(e => e.muscleAssignments.map(m => normalizeMuscle(m.muscle))))
+  const trained = new Set(signals.exercises
+    .filter(e => sessionExerciseIds.has(e.sessionExerciseId))
+    .flatMap(e => e.muscleAssignments.map(m => normalizeMuscle(m.muscle))))
   // The contribution is keyed by the raw lowercased label; the targets by the canonical name.
   const planned = new Map<string, number>()
   for (const [muscle, sets] of Object.entries(contribution)) {
@@ -145,14 +152,11 @@ function weeklyUnderTargetNote(
   short.sort((a, b) => b.sets - a.sets || a.muscle.localeCompare(b.muscle))
   const named = short.slice(0, MAX_NAMED_UNDER_TARGET).map(s => s.muscle)
   const more = short.length - named.length
+  if (short.length === 1) return `When this plan was made, ${named[0]} was under its weekly target.`
   const list = more > 0
     ? `${named.join(', ')} and ${more} more`
-    : named.length === 1 ? named[0] : `${named.slice(0, -1).join(', ')} and ${named[named.length - 1]}`
-  const plural = short.length > 1
-  // Sessions left counts this one; an unknown count leaves the tail off rather than guessing.
-  const after = signals.sessionsLeftThisWeek == null ? null : Math.max(0, signals.sessionsLeftThisWeek - 1)
-  const tail = after == null ? '' : `, with ${after === 0 ? 'no' : after} session${after === 1 ? '' : 's'} left`
-  return `After this session, ${list} ${plural ? 'are' : 'is'} still under target this week${tail}.`
+    : `${named.slice(0, -1).join(', ')} and ${named[named.length - 1]}`
+  return `When this plan was made, ${list} were under their weekly target.`
 }
 
 export function applyBudgetStage(
@@ -316,7 +320,7 @@ export function applyBudgetStage(
   const underTarget = weeklyUnderTargetNote(signals, weeklyVolumeContribution, phase ?? signals.phase, {
     noTimeLimit: fittedBudgetMin === 0,
     anythingCut: droppedIds.size > 0 || activeExercises.some(ex => (sets.get(ex.sessionExerciseId) ?? ex.sets) < ex.sets),
-  })
+  }, new Set(exercises.map(ex => ex.sessionExerciseId)))
   if (underTarget) notes.push(underTarget)
   const budgetNote = notes.map(n => ` ${n}`).join('')
 

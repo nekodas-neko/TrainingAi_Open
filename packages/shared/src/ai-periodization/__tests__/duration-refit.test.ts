@@ -184,10 +184,11 @@ describe('a duration change re-fits the stored plan instead of re-asking the mod
     // #2284: the stored rest was shortened, so without the baseline's copy it would stay short.
     expect(restOf(restored.prescription)).toEqual(restOf(original))
     expect(restored.prescription.droppedExerciseIds ?? []).toEqual([])
-    // The note is rebuilt from the model's own text each time; only the weekly-target sentence (#3767)
-    // is added, and it is code's, not the model's.
-    expect(restored.prescription.reasoning.startsWith(original.reasoning)).toBe(true)
-    expect(restored.prescription.reasoning).not.toMatch(/dropped|run over/)
+    // The note is the model's own text plus the one code-owned weekly-target sentence (#3767);
+    // nothing was dropped or overrun on the way back, so there is no other note.
+    expect(restored.prescription.reasoning).toBe(
+      'Steady accumulation week. When this plan was made, back, quads, biceps and 1 more were under their weekly target.',
+    )
   })
 
   it('never touches reps, load or the phase — only sets, and rest on a shorter day', async () => {

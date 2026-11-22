@@ -115,9 +115,6 @@ export interface PrescriptionSignals {
   repCompletionRate: number | null
   weeklyTargets: Record<string, number>
   weeklyLogged: Record<string, number>
-  /** #3767: sessions the program still has this week, this one included (the same count the per-session
-   *  volume budget divides by). Absent on callers that do not read it. */
-  sessionsLeftThisWeek?: number
   volumeBudgetPerMuscleGroup: Record<string, number>
   acwr: number | null
   sleepTrend: number | null
@@ -556,10 +553,9 @@ export async function aggregateSignals(
 
   const volumeBudgetPerMuscleGroup: Record<string, number> = {}
   const hasAnyTarget = Object.keys(weeklyTargets).length > 0
-  const daysIntoWeek = Math.round((Date.parse(today) - Date.parse(weekStart)) / 86_400_000) // 0..6
-  const sessionsLeftThisWeek = sessionsRemainingThisWeek(program, 7 - daysIntoWeek)
   if (hasAnyTarget) {
-    const sessionsRemaining = sessionsLeftThisWeek
+    const daysIntoWeek = Math.round((Date.parse(today) - Date.parse(weekStart)) / 86_400_000) // 0..6
+    const sessionsRemaining = sessionsRemainingThisWeek(program, 7 - daysIntoWeek)
     const allMuscles = new Set<string>()
     for (const ex of programSession.exercises) {
       for (const mg of ex.muscleGroups) allMuscles.add(normalizeMuscle(mg))
@@ -670,7 +666,6 @@ export async function aggregateSignals(
     repCompletionRate,
     weeklyTargets,
     weeklyLogged,
-    sessionsLeftThisWeek,
     volumeBudgetPerMuscleGroup,
     acwr,
     sleepTrend,
