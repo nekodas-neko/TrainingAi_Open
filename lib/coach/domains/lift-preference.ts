@@ -210,29 +210,29 @@ function basisKgOf(b: BasisInputs, name: string): number | null {
  *  its transaction opened, so it never waits on a second connection while holding one. */
 async function readContext(db: Db, getBasis: () => Promise<BasisInputs>, userId: string, target: TargetRow): Promise<Context> {
   const name = target.exerciseName
-  const [[lib], [program], slotRows] = await Promise.all([
-    db.select({ id: s.exerciseLibrary.id, equipment: s.exerciseLibrary.equipment, exerciseType: s.exerciseLibrary.exerciseType })
-      .from(s.exerciseLibrary)
-      .where(target.exerciseId ? eq(s.exerciseLibrary.id, target.exerciseId) : eq(s.exerciseLibrary.name, name))
-      .limit(1),
-    db.select({ trainingGoal: s.programs.trainingGoal }).from(s.programs)
-      .where(and(eq(s.programs.id, target.programId), eq(s.programs.userId, userId))).limit(1),
-    // D1: the lift in every session of the program it is in, by name (the lift's identity on a slot).
-    db.select({
-      programSessionId: s.programSessions.id,
-      sessionName: s.programSessions.name,
-      sessionExerciseId: s.sessionExercises.id,
-      role: s.sessionExercises.exerciseRole,
-    })
-      .from(s.sessionExercises)
-      .innerJoin(s.programSessions, eq(s.sessionExercises.sessionId, s.programSessions.id))
-      .where(and(
-        eq(s.programSessions.programId, target.programId),
-        eq(s.sessionExercises.exerciseName, name),
-        isNull(s.sessionExercises.deletedAt),
-        isNull(s.programSessions.deletedAt),
-      )),
-  ])
+  // One after another: inside the apply `db` is a single transaction connection, and pg@9 no longer
+  // queues a query issued while another is running on it.
+  const [lib] = await db.select({ id: s.exerciseLibrary.id, equipment: s.exerciseLibrary.equipment, exerciseType: s.exerciseLibrary.exerciseType })
+    .from(s.exerciseLibrary)
+    .where(target.exerciseId ? eq(s.exerciseLibrary.id, target.exerciseId) : eq(s.exerciseLibrary.name, name))
+    .limit(1)
+  const [program] = await db.select({ trainingGoal: s.programs.trainingGoal }).from(s.programs)
+    .where(and(eq(s.programs.id, target.programId), eq(s.programs.userId, userId))).limit(1)
+  // D1: the lift in every session of the program it is in, by name (the lift's identity on a slot).
+  const slotRows = await db.select({
+    programSessionId: s.programSessions.id,
+    sessionName: s.programSessions.name,
+    sessionExerciseId: s.sessionExercises.id,
+    role: s.sessionExercises.exerciseRole,
+  })
+    .from(s.sessionExercises)
+    .innerJoin(s.programSessions, eq(s.sessionExercises.sessionId, s.programSessions.id))
+    .where(and(
+      eq(s.programSessions.programId, target.programId),
+      eq(s.sessionExercises.exerciseName, name),
+      isNull(s.sessionExercises.deletedAt),
+      isNull(s.programSessions.deletedAt),
+    ))
   const sessionIds = [...new Set(slotRows.map(r => r.programSessionId))]
   const periodization = target.phaseMode === 'ai_dynamic' && sessionIds.length > 0
     ? await db.select().from(s.sessionPeriodization).where(and(

@@ -187,7 +187,7 @@ describe('logExerciseFromPayload — ai_dynamic deload PR gate (AI-8)', () => {
     getActiveProgram.mockResolvedValue({ id: 'p1', phaseMode: 'manual' })
     const setEnd = Date.now() - 12 * 3_600_000
     await logExerciseFromPayload('u1', { ...basePayload, setEndTimes: [setEnd] }, TZ)
-    expect(upsertPersonalRecordIfBetter).toHaveBeenCalledWith('u1', 'Bench Press', expect.any(Number), new Date(setEnd))
+    expect(upsertPersonalRecordIfBetter).toHaveBeenCalledWith('u1', 'Bench Press', expect.any(Number), new Date(setEnd), 'el-1')
   })
 })
 
