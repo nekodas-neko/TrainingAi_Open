@@ -1,7 +1,9 @@
 import { isBusyError } from '@trainingai/shared/errors'
 import { toAestDay, weekStartForDay, shiftDateStr, dateStrMidnightInTz } from '@trainingai/shared/date-utils'
 import { DELOAD_FLOOR, type ProgramDeloadCheck } from '@trainingai/shared/ai-periodization/phase-guards'
-import { servePrescriptionState, type ServedPrescriptionState } from '@trainingai/shared/ai-periodization/prescription-expiry'
+import { servePrescriptionState, holdPrescriptionUnderWay, type ServedPrescriptionState } from '@trainingai/shared/ai-periodization/prescription-expiry'
+import type { WorkoutRepository } from '@/lib/data/repository'
+import { isSessionUnderWay } from '@trainingai/shared/ai-periodization/session-under-way'
 import type {
   AiPrescription, PendingTransition, PeriodizationPhase, SessionPeriodization,
 } from '@trainingai/shared/types/ai-periodization'
@@ -185,7 +187,8 @@ export function programDeloadFinished(view: ProgramPhaseView): boolean {
 /**
  * At the cap, a plain "stay" becomes the program's move to the next phase. Recovery actions are
  * left alone, as the per-type ceilings did. The loads stay the current phase's, so (as with the old
- * ceilings) `canAutoApplyTransition` refuses to apply it without a tap.
+ * ceilings) `canAutoApplyTransition` refuses to apply it without a tap. On the AI plan (#3900) the
+ * loads are clamped in the next phase instead (`guardMoveTarget`) and the move applies by itself.
  */
 export function applyProgramPhaseCap(prescription: AiPrescription, view: ProgramPhaseView): AiPrescription {
   const { phase, capWeeks, trainingWeeksDone } = view
@@ -203,6 +206,27 @@ export function applyProgramPhaseCap(prescription: AiPrescription, view: Program
     phaseAction: 'transition_recommended',
     reasoning: `${why} ${prescription.reasoning}`.trim(),
   }
+}
+
+/**
+ * #3900: the move the phase guards will impose on this plan after the model has answered, worked out
+ * BEFORE the loads are clamped, so on the AI plan they can be clamped in the phase the program is
+ * moving to. It is the composition generation applies afterwards, `withProgramMove(applyProgramPhaseCap
+ * (plan, view), programMove, currentPhase)`: the window cap first (a plain stay at the cap becomes the
+ * move to the next phase), then the other session types' agreement (`programMoveTarget`). Null when
+ * neither fires, when the program is not aligned (a waiting program's moves are one type's and wait
+ * for a tap), or when this session type is not on the program's phase.
+ */
+export function guardMoveTarget(
+  view: ProgramPhaseView,
+  programMove: PeriodizationPhase | null,
+  currentPhase: PeriodizationPhase,
+  phaseAction: string,
+): PeriodizationPhase | null {
+  if (!view.aligned || view.phase == null || view.phase !== currentPhase || phaseAction !== 'stay') return null
+  if (view.capWeeks != null && view.trainingWeeksDone >= view.capWeeks) return NEXT_PROGRAM_PHASE[view.phase]
+  if (programMove != null && programMove !== currentPhase) return programMove
+  return null
 }
 
 /**
@@ -579,8 +603,9 @@ export async function readProgramDeloadCheck(
  * (`readProgramDeloadCheck`); with no such program, or a failed read, the type's own count does.
  */
 export async function serveStoredPrescription<T extends Pick<SessionPeriodization, 'prescriptionStatus' | 'prescriptionExpiresAt'>
-  & Partial<Pick<SessionPeriodization, 'prescription' | 'phase' | 'sessionsInPhase'>>>(
-  repo: Pick<ProgramPhaseRepo, 'listSessionPeriodizationForProgram' | 'listProgramCompletions'>,
+  & Partial<Pick<SessionPeriodization, 'prescription' | 'phase' | 'sessionsInPhase' | 'programSessionId'>>>(
+  repo: Pick<ProgramPhaseRepo, 'listSessionPeriodizationForProgram' | 'listProgramCompletions'>
+    & Partial<Pick<WorkoutRepository, 'listUnfinishedLoggedSessions'>>,
   userId: string,
   program: { id: string; phaseMode: string } | null | undefined,
   state: T,
@@ -590,7 +615,12 @@ export async function serveStoredPrescription<T extends Pick<SessionPeriodizatio
   const programDeload = program?.phaseMode === 'ai_dynamic' && state.phase != null
     ? await readProgramDeloadCheck(repo, userId, program.id, { phase: state.phase }, tz, now).catch(() => null)
     : null
-  return servePrescriptionState(state, now, programDeload)
+  const served = servePrescriptionState(state, now, programDeload)
+  // #3900 third review (1): a plan held because its workout is under way is served as the plan, as
+  // `/api/workout-data` drives the bar by it. Read only when the plan would be hidden.
+  if (served.prescriptionAgedOut !== true || program?.phaseMode !== 'ai_dynamic' || state.programSessionId == null) return served
+  if (!(await isSessionUnderWay(repo, userId, state.programSessionId, now))) return served
+  return holdPrescriptionUnderWay(state, now) as ServedPrescriptionState<T>
 }
 
 /** `deloadEndDue`'s program side from a view already read (`syncProgramPhase` returns one). */

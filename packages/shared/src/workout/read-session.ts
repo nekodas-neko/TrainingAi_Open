@@ -34,6 +34,8 @@ export interface ReadSessionInputs {
   /** `ai_dynamic` only: the session's stored periodization, already served (and fitted to the check-in budget where that applies). */
   periodization: SessionPeriodization | null
   programDeload: ProgramDeloadCheck | null
+  /** A workout of this type is under way (`sessionUnderWayCheck`): its plan keeps driving the bar. */
+  underWay?: boolean
   loggedTodayInThisSession: Set<string>
   shared: SharedSessionBuildCtx
 }
@@ -114,7 +116,7 @@ export function readSessionFromStoredState(i: ReadSessionInputs): ReadSessionRes
         new Map(programSession.exercises.map(ex => [ex.id, ex.exerciseRole])),
       )
     : null
-  const aiPrescriptionPending = isAiPrescriptionPending(periodization, { isAiDynamic, isBaselinePhase, programDeload })
+  const aiPrescriptionPending = isAiPrescriptionPending(periodization, { isAiDynamic, isBaselinePhase, programDeload, underWay: i.underWay })
   // An aged-out prescription is pending regeneration, not the plan (#3700).
   const aiDrivesLoad = aiPrescription != null && periodization != null && !aiPrescriptionPending
     && prescriptionDrivesLoad(aiPrescription.phaseAction, periodization.prescriptionStatus)

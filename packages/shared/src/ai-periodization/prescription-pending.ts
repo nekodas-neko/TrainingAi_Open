@@ -1,5 +1,6 @@
 import type { SessionPeriodization } from '@trainingai/shared/types/ai-periodization'
 import { prescriptionAgedOut } from './prescription-expiry'
+import { slotHoldsPlan } from './plan-status'
 import { deloadEndDue, type ProgramDeloadCheck } from './phase-guards'
 
 // True when a fresh AI prescription is being (re)generated for an ai_dynamic session:
@@ -33,9 +34,13 @@ export function isAiPrescriptionPending(
   state: (Pick<SessionPeriodization, 'prescription' | 'prescriptionStatus'>
     & Partial<Pick<SessionPeriodization, 'prescriptionExpiresAt' | 'phase' | 'sessionsInPhase'>>) | null | undefined,
   // `programDeload` (`readProgramDeloadCheck`): an aligned program's deload ends at the program's cap.
-  opts: { isAiDynamic: boolean; isBaselinePhase: boolean; programDeload?: ProgramDeloadCheck | null },
+  // `underWay`: a workout of this type is under way (`isSessionUnderWay`). #3900 second review (1): the plan
+  // it started with keeps driving the bar, so a plan held in the slot is never pending then, whatever its
+  // expiry or deload count says, and nothing regenerates it.
+  opts: { isAiDynamic: boolean; isBaselinePhase: boolean; programDeload?: ProgramDeloadCheck | null; underWay?: boolean },
   now: Date = new Date(),
 ): boolean {
+  if (opts.underWay && state != null && slotHoldsPlan(state)) return false
   return opts.isAiDynamic
     && !opts.isBaselinePhase
     && state != null

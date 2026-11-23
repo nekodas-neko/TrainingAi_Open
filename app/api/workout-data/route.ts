@@ -29,6 +29,9 @@ import { rateLimit } from "@/lib/rate-limit";
 import { estimateProgramSessionMin } from "@trainingai/shared/workout/program-session-duration";
 import { generatePrescriptionForSession } from "@trainingai/shared/ai-periodization/generate-prescription";
 import { fitStoredPlanToCheckinBudget } from "@trainingai/shared/ai-periodization/checkin-plan-budget";
+import { adoptPendingAiPlan } from "@trainingai/shared/ai-periodization/pending-plan-adoption";
+import { isSessionUnderWay, sessionUnderWayCheck } from "@trainingai/shared/ai-periodization/session-under-way";
+import { slotHoldsPlan } from "@trainingai/shared/ai-periodization/plan-status";
 import { regeneratePrescriptionInBackground as regeneratePrescriptionSingleFlight } from "@trainingai/shared/ai-periodization/regenerate-in-background";
 import { loadLiftPreferences } from "@trainingai/shared/ai-periodization/lift-preference-read";
 import { readSessionFromStoredState } from "@trainingai/shared/workout/read-session";
@@ -207,6 +210,9 @@ async function handleWorkoutData(req: NextRequest) {
           [...periodizationBySession.values()].find(s => s?.phase === 'deload'), tz).catch(() => null)
       : null
 
+    // #3900 second review (1): a type with a workout under way keeps the plan it started with.
+    const underWayFor = isAiDynamic ? await sessionUnderWayCheck(repo, userId) : () => false
+
     const perSession: Record<string, {
       exercises: WorkoutExercise[]
       program: typeof program
@@ -229,6 +235,7 @@ async function handleWorkoutData(req: NextRequest) {
         thisSessionCount: sessionCounts.get(programSession.id) ?? 0,
         periodization: aiPeriodizationState,
         programDeload,
+        underWay: underWayFor(programSession.id),
         loggedTodayInThisSession: new Set(
           todayExercises
             .filter(e => e.sessionId === programSession.id)
@@ -284,6 +291,11 @@ async function handleWorkoutData(req: NextRequest) {
           .then(() => repo.getSessionPeriodization(userId, programSession.id))
           // #3890: in the applies-to week, the weekly check-in's shorter session (no model call).
           .then(state => state && fitStoredPlanToCheckinBudget(userId, programSession.id, repo, tz, state))
+          // #3900 review (H): a plan left `pending` from before the AI plan applied every plan by itself.
+          .then(state => state && adoptPendingAiPlan(userId, programSession.id, repo, tz, program, state, {
+            // #3900 second review (2): a poll only reads; it never fires generation (`isPoll`).
+            onRegenerate: isPoll ? undefined : () => regeneratePrescriptionInBackground(userId, programSession.id, repo, tz),
+          }))
       : Promise.resolve(null),
     repo.listPersonalRecords(userId),
     repo.getExerciseEstimates(userId).catch(() => []),
@@ -411,7 +423,16 @@ async function handleWorkoutData(req: NextRequest) {
   const programDeload = isAiDynamic
     ? await readProgramDeloadCheck(repo, userId, program.id, aiPeriodizationState, tz).catch(() => null)
     : null
-  const aiPrescriptionPending = isAiPrescriptionPending(aiPeriodizationState, { isAiDynamic, isBaselinePhase, programDeload })
+  // #3900 second review (1): while a workout of this type is under way (`isSessionUnderWay`, the one
+  // definition generation uses), the plan it started with keeps driving the bar. It is not pending
+  // after its expiry or deload count passes, it does not fall back to the base numbers, and nothing
+  // regenerates it. A signal the person enters mid-workout (a sore, injury or sick check-in) still
+  // lightens the remaining rows exactly as on main (third review, 3, the Orchestrator's call): only
+  // time passing is held back, and a re-plan generation would refuse is done as a lightening instead.
+  const underWay = isAiDynamic && aiPeriodizationState != null && slotHoldsPlan(aiPeriodizationState)
+    ? await isSessionUnderWay(repo, userId, programSession.id)
+    : false
+  const aiPrescriptionPending = isAiPrescriptionPending(aiPeriodizationState, { isAiDynamic, isBaselinePhase, programDeload, underWay })
   const aiDrivesLoad = aiPrescription != null && aiPeriodizationState != null && !aiPrescriptionPending
     && prescriptionDrivesLoad(aiPrescription.phaseAction, aiPeriodizationState.prescriptionStatus)
 
@@ -494,6 +515,7 @@ async function handleWorkoutData(req: NextRequest) {
         prescriptionExpiresAt: aiPeriodizationState.prescriptionExpiresAt,
         sessionsInPhase: aiPeriodizationState.sessionsInPhase,
         programDeload,
+        underWay,
       }
       let reevalResult = reevaluatePrescriptionForToday(aiPrescription, reevalSignals, reevalState)
 

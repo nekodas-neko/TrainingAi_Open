@@ -78,6 +78,11 @@ export async function POST(
     if (served.prescriptionAgedOut) {
       return NextResponse.json({ error: 'This prescription has expired. Reopen the session for a fresh one.' }, { status: 409 })
     }
+    // #3900: on the AI plan a prescribed deload is already the day's plan (`auto_applied`), so the tap
+    // takes what is already taken and writes nothing. No other program kind stores one that way.
+    if (state.prescriptionStatus === 'auto_applied') {
+      return NextResponse.json({ state, prescriptionStatus: 'auto_applied', phaseMoved: false })
+    }
     if (state.prescriptionStatus !== 'pending' && state.prescriptionStatus !== 'accepted') {
       return NextResponse.json({ error: 'This deload offer has already been answered. Reopen the session for a fresh one.' }, { status: 409 })
     }

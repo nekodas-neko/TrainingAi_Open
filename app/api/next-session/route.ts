@@ -6,6 +6,7 @@ import { estimateProgramSessionMin } from "@trainingai/shared/workout/program-se
 import { prescriptionDrivesLoad } from "@trainingai/shared/ai-periodization/apply-prescription";
 import { serveStoredPrescription } from "@trainingai/shared/ai-periodization/program-phase";
 import { fitStoredPlanToCheckinBudget } from "@trainingai/shared/ai-periodization/checkin-plan-budget";
+import { adoptPendingAiPlan } from "@trainingai/shared/ai-periodization/pending-plan-adoption";
 
 export async function GET() {
   const session = await auth();
@@ -23,7 +24,9 @@ export async function GET() {
     const [state, assignments, styles, equipmentByName] = await Promise.all([
       // #3890: in the applies-to week, the weekly check-in's shorter session (no model call).
       repo.getSessionPeriodization(userId, recommendation.session.id)
-        .then(st => st && fitStoredPlanToCheckinBudget(userId, recommendation.session!.id, repo, tz, st)),
+        .then(st => st && fitStoredPlanToCheckinBudget(userId, recommendation.session!.id, repo, tz, st))
+        // #3900 review (H): a plan left `pending` from before the AI plan applied every plan by itself.
+        .then(st => st && adoptPendingAiPlan(userId, recommendation.session!.id, repo, tz, recommendation.program, st)),
       // Q-115-followup: lets the sore-muscle check-in predict the same whole-session escalation
       // computePerExerciseDeload applies server-side, instead of guessing from the flat
       // muscleGroups list (no main/secondary role information).

@@ -96,6 +96,24 @@ const MODERATE_SECONDARY_GOALS = new Set(['powerbuilding'])
 // Shift a primary phase zone down into the moderate band a secondary compound trains in —
 // ~7.5% lighter with ~2 more reps. It still tracks the phase: accumulation → realisation get
 // heavier, deload lighter, always relative to (and below) the primary anchor.
+/**
+ * #3900 review (B): the rest a compound row may carry in a phase on the AI plan, where every plan is
+ * stored applied. The schema allows 30-600 s, so an extreme answer would otherwise reach the bar with
+ * no tap in between. Wide on purpose: it stops an absurd answer and leaves every ordinary one alone
+ * (heavier phases rest longer, as the prompt tells the model). Not rendered into the prompt, which
+ * stays byte-identical for every program kind; the zone table above is the load, rep and set half.
+ */
+const PHASE_REST_SEC: Record<Phase, { restSecMin: number; restSecMax: number }> = {
+  accumulation:    { restSecMin: 60,  restSecMax: 240 },
+  intensification: { restSecMin: 90,  restSecMax: 300 },
+  realisation:     { restSecMin: 120, restSecMax: 360 },
+  deload:          { restSecMin: 60,  restSecMax: 180 },
+}
+
+export function phaseRestBounds(phase: string): { restSecMin: number; restSecMax: number } {
+  return PHASE_REST_SEC[phase as Phase] ?? PHASE_REST_SEC.accumulation
+}
+
 export function secondaryIntensityZone(zone: IntensityZone): IntensityZone {
   return {
     pctMin: Math.max(45, zone.pctMin - 7.5),
