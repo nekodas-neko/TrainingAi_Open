@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { todayInTz } from '@trainingai/shared/date-utils';
+import { formatCount } from '@trainingai/shared/format/number';
 import { lastTwelveMonthLabels } from '../data/year-months';
+import { yearTiles } from '../data/year-tiles';
 import { useWorkoutContext } from '../../workouts/WorkoutProvider';
 import {
   AppText,
@@ -70,20 +72,8 @@ export function YearReviewScreen({ onBack }: { onBack: () => void }) {
           ) : (
             <>
               <Grid columns={2}>
-                {[
-                  ['Sessions', data.sessionCount, ''],
-                  ['Sets', data.totalSets, ''],
-                  ['Volume', data.totalVolumeKg, 'kg'],
-                  ['Training time', Math.round(data.totalMinutes / 60), 'h'],
-                  ['Personal records', data.prCount, ''],
-                  ['Best weekly streak', data.longestWeeklyStreak, 'weeks'],
-                ].map(([label, value, unit]) => (
-                  <MetricTile
-                    key={String(label)}
-                    label={String(label)}
-                    value={String(value)}
-                    unit={String(unit)}
-                  />
+                {yearTiles(data).map(({ label, value, unit }) => (
+                  <MetricTile key={label} label={label} value={value} unit={unit} />
                 ))}
               </Grid>
               <Card>
@@ -117,7 +107,7 @@ export function YearReviewScreen({ onBack }: { onBack: () => void }) {
                   data.topExercises.map((row) => (
                     <Stack key={row.exerciseName}>
                       <AppText variant="label">
-                        {row.exerciseName} · {row.setCount} sets
+                        {row.exerciseName} · {formatCount(row.setCount)} sets
                       </AppText>
                       <AppText variant="caption" tone="muted">
                         {row.first1rm?.toFixed(1) ?? '—'} → {row.last1rm?.toFixed(1) ?? '—'}{' '}

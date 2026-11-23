@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { formatCount } from '@trainingai/shared/format/number';
 import { deltaPct, restByPrescription, type RestSet } from '@trainingai/shared/health/rest-prescription';
 import { AppText, Stack } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
@@ -21,7 +22,7 @@ export function RestPrescriptionSummary({ sets }: { sets: readonly RestSet[] | u
           Your rest vs the plan
         </AppText>
         <AppText variant="micro" tone="muted" style={cell}>
-          {summary.totalSets} sets · 90 days
+          {formatCount(summary.totalSets)} sets · 90 days
         </AppText>
       </Stack>
       <Stack direction="row" gap="sm">

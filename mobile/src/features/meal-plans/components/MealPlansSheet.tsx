@@ -1,3 +1,4 @@
+import { formatCount } from '@trainingai/shared/format/number';
 import {
   CARB_STAPLES,
   FAT_STAPLES,
@@ -648,7 +649,7 @@ export function MealPlansSheet({
                           <AppText variant="heading">{m.name}</AppText>
                           <Badge label={m.source ?? 'Generated'} />
                           <AppText variant="caption" tone="muted">
-                            {m.suggestedTime} · target {Math.round(m.targetCalories)} kcal
+                            {m.suggestedTime} · target {formatCount(m.targetCalories)} kcal
                           </AppText>
                           <MacroComparison
                             label={m.name + ' versus targets'}
@@ -800,7 +801,7 @@ export function MealPlansSheet({
               <Card key={m.id}>
                 <ListRow
                   title={m.name}
-                  subtitle={`${m.suggestedTime ?? ''} · ${m.targetCalories} kcal`}
+                  subtitle={`${m.suggestedTime ?? ''} · ${formatCount(m.targetCalories)} kcal`}
                   onPress={() => {
                     setEdit({ plan: current, meal: m });
                     setInstruction('');
@@ -865,7 +866,7 @@ export function MealPlansSheet({
               <ListRow
                 key={plan.id}
                 title={plan.name}
-                subtitle={`${plan.isActive ? 'Active · ' : ''}${plan.mealsPerDay} meals · ${plan.targetCalories} kcal`}
+                subtitle={`${plan.isActive ? 'Active · ' : ''}${plan.mealsPerDay} meals · ${formatCount(plan.targetCalories)} kcal`}
                 onPress={() => {
                   setSelected(plan);
                   setDay(plan.variants[0]?.dayType ?? 'all');

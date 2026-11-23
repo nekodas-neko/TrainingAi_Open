@@ -24,8 +24,8 @@ export function WeeklyTrainingCard({
   const { sessions, color } = useSessionColors();
   const today = todayInTz(timezone).replace(/-/g, '/');
   const stats = [
-    { label: 'Sessions', value: String(data.totalSessions), unit: 'this week' },
-    { label: 'Sets', value: String(data.totalSets), unit: 'logged' },
+    { label: 'Sessions', value: formatCount(data.totalSessions), unit: 'this week' },
+    { label: 'Sets', value: formatCount(data.totalSets), unit: 'logged' },
     {
       label: 'Volume',
       value: data.totalVolumeKg > 0 ? formatCount(data.totalVolumeKg) : '—',
