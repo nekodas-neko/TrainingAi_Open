@@ -1507,6 +1507,10 @@ export interface WorkoutRepository {
     /** #2253: `rated` or the untouched pre-fill (`expected`); null before #2450 and with no RPE. */
     rpeSource?: import('@trainingai/shared/workout/rpe-source').RpeSource | null
   }>>
+  /** #4061: for each of these lifts (keyed by the name passed), the stored "How did it feel?" answer on its
+   *  latest log among these workout sessions; id match first, then the name. A lift with no log is absent.
+   *  Owner-scoped, read only. Optional: a repository without it reads as no answer. */
+  getLatestExerciseEfforts?(userId: string, workoutSessionIds: string[], exerciseNames: string[]): Promise<Map<string, import('@trainingai/shared/ai-periodization/autoregulation').LatestEffortAnswer>>
   /** #3893: the session read's inputs for the user's workouts started in `[from, to)`, oldest first. Read only. */
   getSessionReadLogs(userId: string, from: Date, to: Date): Promise<import('@trainingai/shared/ai-periodization/session-read').SessionReadLog[]>
   /** #3890: of these session lifts, the ones the saved weekly check-in for the week starting `weekStart`

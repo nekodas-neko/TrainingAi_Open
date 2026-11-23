@@ -1,5 +1,6 @@
 import { roundTo } from '@trainingai/shared/stats'
 import { goalRange } from '@trainingai/shared/ai-periodization/goal-ranges'
+import type { EffortSource, EffortVsPlan } from '@trainingai/shared/workout/effort-vs-plan'
 
 // RPE-based autoregulation.
 //
@@ -24,11 +25,47 @@ const COMPLETION_FLOOR = 0.7 // ≤ this (missed badly) → max cut
 const COMPLETION_CEIL = 0.95 // ≥ this (missed by ~a rep) → min cut
 export const PCT_HARD_FLOOR = 40 // never cut a working set below this %1RM in one step
 
+// #4061 (owner, 23 Nov: "We will gauge from that instead of rpe"): the lifter's tapped answer to
+// "How did it feel?" on a lift's latest log stands in for that lift's rated-RPE delta, through the
+// same rule below, not a second one. The sizes are the smallest deltas that trip each branch:
+//   • Harder = +RPE_DEAD_BAND. It reaches the back-off threshold, so with a miss or a falling 1RM it
+//     cuts exactly as a high rated RPE does (the cut is sized by the reps, never by the delta); alone
+//     it is the healthy hard session, so no cut and no bump.
+//   • Easier = −RPE_DEAD_BAND. It reaches the push threshold but not the −2 that earns a double bump,
+//     so with reps met and a 1RM not falling it adds one rep (or a set at the band top), as a rated
+//     RPE 1.5 below plan does. One tap is a coarser report than several rated sets, so it earns the
+//     smaller step.
+//   • As expected, and every untouched (`default`) answer, is no signal.
+export const TAPPED_HARDER_RPE_DELTA = RPE_DEAD_BAND
+export const TAPPED_EASIER_RPE_DELTA = -RPE_DEAD_BAND
+
+/** The answer on a lift's latest log, as stored (`exercise_logs.effort_vs_plan` / `effort_source`). */
+export interface LatestEffortAnswer { vsPlan: number | null; source: string | null }
+
+/**
+ * The lift's effort signal for `computeRpeAdjustment`. A tapped answer on the latest log wins over
+ * the rated-RPE delta (As expected included, which is no signal); anything else (an untouched
+ * default, no answer) leaves the rated delta exactly as it was, null included.
+ */
+export function effortRpeDelta(ratedDelta: number | null, latest: LatestEffortAnswer | null | undefined): number | null {
+  const tapped = tappedEffort(latest)
+  if (tapped === undefined) return ratedDelta
+  return tapped === 1 ? TAPPED_HARDER_RPE_DELTA : tapped === -1 ? TAPPED_EASIER_RPE_DELTA : null
+}
+
+/** The tapped answer, or undefined when the latest log carries none (untouched, absent, unreadable). */
+export function tappedEffort(latest: LatestEffortAnswer | null | undefined): EffortVsPlan | undefined {
+  if (latest?.source !== ('tapped' satisfies EffortSource)) return undefined
+  return latest.vsPlan === -1 || latest.vsPlan === 0 || latest.vsPlan === 1 ? latest.vsPlan : undefined
+}
+
 export interface AutoregSignal {
   role: string
   rpeDelta: number | null // avg (actual RPE − expected RPE) across the exercise's recent sets
   rm1Trend: 'up' | 'flat' | 'down'
   repCompletionRate: number | null // actual reps ÷ prescribed reps last session (null = unknown)
+  /** #4061: set when `rpeDelta` came from the lifter's tapped answer, so the note says what they said. */
+  effortFromAnswer?: true
 }
 
 export interface AutoregContext {
@@ -63,13 +100,14 @@ export function computeRpeAdjustment(sig: AutoregSignal, ctx: AutoregContext): A
     const completion = sig.repCompletionRate ?? COMPLETION_CEIL // unknown → mildest cut
     const t = clamp((COMPLETION_CEIL - completion) / (COMPLETION_CEIL - COMPLETION_FLOOR), 0, 1)
     const cutPct = BACKOFF_MIN_PCT + (BACKOFF_MAX_PCT - BACKOFF_MIN_PCT) * t
+    const why = sig.effortFromAnswer ? 'it felt harder than expected' : 'RPE ran high'
     return {
       pctMultiplier: 1 - cutPct / 100,
       repDelta: 0,
       setDelta: 0,
       note: missedReps
-        ? `−${roundTo(cutPct, 1)}% load — RPE ran high and you fell short of the prescribed reps`
-        : `−${roundTo(cutPct, 1)}% load — RPE ran high while your 1RM slipped`,
+        ? `−${roundTo(cutPct, 1)}% load — ${why} and you fell short of the prescribed reps`
+        : `−${roundTo(cutPct, 1)}% load — ${why} while your 1RM slipped`,
     }
   }
 

@@ -277,6 +277,8 @@ export function readSession(input: SessionReadInput): SessionRead {
       measuredRests++
       if (prev.hr.recoveredPreset === false || prev.hr.restAdequate === false) unsettledRests++
     }
+    // #4061: Preview no longer rates sets, so new sets add nothing to `easyRated`; the tapped answer is
+    // not read here (shadow only, #4068).
     // Effort per set counts only when the lifter gave it (`'asked'` never reached `set_logs`: #3889 step 2 stored `effort_vs_plan`).
     if (set.rpe != null && isReportedRpe(set.rpeSource)) {
       const pct = set.plannedPct

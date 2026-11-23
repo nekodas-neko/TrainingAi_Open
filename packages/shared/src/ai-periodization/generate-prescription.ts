@@ -791,6 +791,8 @@ async function runPrescriptionGeneration(
         rpeDelta: e.rpeDelta,
         rm1Trend: e.rm1Trend,
         repCompletionRate: e.repCompletionRate,
+        // #4061: the delta came from the lifter's tap, so a cut's note says "felt harder", not "RPE".
+        ...(e.effortAnswer !== undefined && { effortFromAnswer: true as const }),
         ...(preferenceFor(e.sessionExerciseId)?.preference.repRange && {
           repBand: {
             repMin: preferenceFor(e.sessionExerciseId)!.preference.repRange!.min,

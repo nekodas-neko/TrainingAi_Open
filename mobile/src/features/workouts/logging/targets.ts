@@ -78,6 +78,8 @@ export function formatSetLoad(
   return `${prefix}${loadLabel(set.weight)} × ${set.reps} reps`;
 }
 
+// #4061: this only fires after a rated set. Preview's set card no longer has an RPE row, so for new
+// sets it does not appear; whether it should come back is #4068.
 export function loadSuggestion(
   workout: WorkoutRecord,
   exercise: WorkoutExercise,

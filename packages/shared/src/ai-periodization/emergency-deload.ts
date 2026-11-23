@@ -44,6 +44,9 @@ export function emergencyDeloadTrigger(signals: EmergencySignals): EmergencyTrig
   if (signals.acwr !== null && signals.acwr > ACWR_THRESHOLDS.highMax) {
     return { kind: 'training-load', note: 'Deload — your training load is well above your usual', reason: 'your training load is well above your usual' }
   }
+  // #4061: Preview's set card has no RPE row, so its new sets are `rpeSource: 'expected'`, which
+  // `rpeTrendFromSets` reads as exactly on plan. From that data the delta is 0 and this trigger cannot
+  // fire. The others above and below still can. A tapped effort answer does not feed it (#4068).
   if (signals.rpeTrend !== null && signals.rpeTrend.delta > 2.0) {
     return { kind: 'effort', note: 'Deload — sets have been feeling much harder lately', reason: 'your sets have been feeling much harder lately' }
   }
