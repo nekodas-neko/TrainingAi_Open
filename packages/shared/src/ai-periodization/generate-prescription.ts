@@ -1064,8 +1064,21 @@ async function runPrescriptionGeneration(
       },
     ) ?? undefined
     // With the phase it was planned from: a program another session moved meanwhile is left alone.
-    const moved = await repo.advanceProgramPhase(userId, programSessionId, prescription.phase, generatedFor)
-    storeFor = { phase: prescription.phase, phaseStartedAt: moved?.phaseStartedAt ?? generatedFor.phaseStartedAt, structure }
+    try {
+      const moved = await repo.advanceProgramPhase(userId, programSessionId, prescription.phase, generatedFor)
+      storeFor = { phase: prescription.phase, phaseStartedAt: moved?.phaseStartedAt ?? generatedFor.phaseStartedAt, structure }
+    } catch (err) {
+      // #4082 review 2: this runs AFTER the model call, which is paid for. The move gave up waiting for the
+      // person's other write (a check-in, a Coach apply) and wrote nothing (`BusyError`); answering 409 here
+      // threw the plan away and the next open paid for another call. The plan is stored instead, as an
+      // OFFER: pending, the phase it was planned from left as it is, `transition_recommended` as the model
+      // chose it, so the person's tap makes the move (the way a program without auto-apply gets it). No
+      // retry: the move already waited the bounded 4 s for the lock, a second wait only delays the same
+      // answer behind the same holder, and no lock is held across the model call either way. So a busy
+      // move wastes 0 model calls; the cost is one tap instead of an automatic move.
+      if (!isBusyError(err)) throw err
+      prescriptionStatus = 'pending'
+    }
   }
 
   // #3700: a rest-day recommendation is sized on today's readiness and ends at the next local

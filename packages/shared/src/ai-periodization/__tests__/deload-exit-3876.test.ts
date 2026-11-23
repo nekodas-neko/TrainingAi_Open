@@ -16,6 +16,7 @@ import type { PrescriptionSignals } from '../signals'
 import type { WorkoutRepository } from '@/lib/data/repository'
 import { planSwitchOver, programMoveMark, readProgramDeloadCheck, switchOverWait, type PhaseRow, type ProgramCompletion } from '../program-phase'
 import { deloadExitPhase, isDeloadPlan, typeDeloadFinished, DELOAD_FLOOR } from '../phase-guards'
+import { BusyError } from '@trainingai/shared/errors'
 import { isAiPrescriptionPending } from '../prescription-pending'
 import { hidePrescriptionAgedOutOnScreen, prescribedDeloadDefault, servePrescriptionState } from '../prescription-expiry'
 
@@ -182,7 +183,7 @@ type Slot = SessionPeriodization
  */
 function memoryProgram(
   initial: PhaseRow[], completions: ProgramCompletion[], pre: Record<string, PeriodizationPhase | null> = {},
-  opts: { failStore?: boolean; structure?: { value: string } } = {},
+  opts: { failStore?: boolean; structure?: { value: string }; busyMoves?: number; answers?: unknown[] } = {},
 ) {
   let rows: Slot[] = initial.map(r => ({
     ...r, prescription: null, prescriptionStatus: 'consumed', prescriptionExpiresAt: null, prescriptionGeneratedAt: null,
@@ -210,7 +211,7 @@ function memoryProgram(
     },
     listSessionPeriodizationForProgram: async () => rows.map(r => ({ ...r })),
     listProgramCompletions: async (_u: string, _p: string, since: Date) => completions.filter(c => c.completedAt >= since),
-    listModelPhaseAnswers: async () => [],
+    listModelPhaseAnswers: async () => opts.answers ?? [],
     setProgramPhase: async (_u: string, _p: string, phase: PeriodizationPhase, startedAt: Date, pending: PendingTransition | null, opts?: { expect?: unknown }) => {
       const rowsPhased = rows.filter(phased)
       const expect = opts?.expect as { phase: string; phaseStartedAt: Date } | 'switch-over' | undefined
@@ -258,6 +259,8 @@ function memoryProgram(
       return true
     },
     advanceProgramPhase: async (_u: string, id: string, phase: PeriodizationPhase, expected?: { phase: string; phaseStartedAt: Date }) => {
+      // #4082 review 2: the program move gave up waiting for a lock and wrote nothing.
+      if (opts.busyMoves && programMoves.length < opts.busyMoves) { programMoves.push([id, phase]); throw new BusyError() }
       programMoves.push([id, phase])
       await (known.setProgramPhase as (...a: unknown[]) => Promise<boolean>)('u', 'prog', phase, new Date(), null, { expect: expected })
       return { ...find(id) }
@@ -518,6 +521,47 @@ describe('generation, #3877', () => {
     expect(p.stored).toHaveLength(1)
     expect(p.row('c').phase).toBe('accumulation')
     expect(p.row('c').prescription).not.toBeNull()
+  })
+
+  // #4082 review 2: the move after the model call gave up on a lock. The call is paid for, so the plan is
+  // stored as an offer (pending, the phase unchanged) instead of answering 409 and throwing it away.
+  describe('an auto-applied move that is busy after the model call (#4082)', () => {
+    const alignedRows = () => {
+      const mark = programMoveMark('accumulation')
+      const start = at('2026-10-26T00:00:00')
+      return [row('a', 'accumulation', start, 2, { pendingTransition: mark }), row('b', 'accumulation', start, 2, { pendingTransition: mark })]
+    }
+    const history = () => [done('a', '2026-11-16T12:00:00'), done('a', '2026-11-18T12:00:00'), done('b', '2026-11-17T12:00:00'), done('b', '2026-11-19T08:00:00')]
+    // Both types trained this week and voted for the move: the program's move stands (programMoveTarget).
+    const votes = () => ['a', 'b'].map(id => ({ programSessionId: id, phase: 'intensification', phaseAction: 'transition_recommended', createdAt: at('2026-11-17T10:00:00') }))
+    beforeEach(() => {
+      mocks.signals = signals({ autoApplyPrescriptions: true, confidence: 0.9 })
+      mocks.modelAnswer = {
+        ...stayAnswer('intensification'), phase_action: 'transition_recommended',
+        exercises: [{ session_exercise_id: 'x', name: 'Lift x', sets: 4, reps: 4, pct: 85, rest_sec: 180 }],
+      }
+    })
+
+    it('not busy: the move is made and the plan is auto-applied (unchanged behaviour)', async () => {
+      const p = memoryProgram(alignedRows(), history(), {}, { answers: votes() })
+      const r = await p.plan('b')
+      expect(p.programMoves).toEqual([['b', 'intensification']])
+      expect(r.ok && r.prescriptionStatus).toBe('auto_applied')
+      expect(p.row('b').phase).toBe('intensification')
+    })
+
+    it('busy: the plan is stored pending as an offer, the phase is untouched, one model call, no 409', async () => {
+      const p = memoryProgram(alignedRows(), history(), {}, { busyMoves: 1, answers: votes() })
+      const r = await p.plan('b')
+      expect(r.ok).toBe(true)
+      expect(r.ok && r.prescriptionStatus).toBe('pending')
+      expect(r.ok && r.prescription.phaseAction).toBe('transition_recommended')
+      expect(p.programMoves).toHaveLength(1) // tried once: no retry behind the same holder
+      expect(p.row('b').phase).toBe('accumulation')
+      expect(p.row('a').phase).toBe('accumulation')
+      expect(p.stored).toHaveLength(1)
+      expect(p.stored[0]).toMatchObject({ id: 'b', status: 'pending' })
+    })
   })
 })
 

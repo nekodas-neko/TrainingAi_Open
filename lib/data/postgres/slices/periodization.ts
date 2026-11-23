@@ -1,6 +1,6 @@
 import { eq, and, inArray, asc, desc, sql, isNull, gte, lte } from 'drizzle-orm'
 import { NotFoundError, BusyError } from '@trainingai/shared/errors'
-import { lockLiftWrites, tryLockLiftWrites } from '../../../coach/lock-wait'
+import { lockLiftWrites, lockWait } from '../../../coach/lock-wait'
 import { isLockWaitTimeout } from '@/lib/api/route-errors'
 import { trackPendingWrite } from '@/lib/observability/pending-writes'
 import type { getDb } from '../client'
@@ -113,10 +113,16 @@ export async function ensureSessionPeriodization(db: Db, userId: string, program
  * its model call before or after. A wait past `lockWait`, a statement timeout or a deadlock rolls the
  * whole transaction back, so nothing was written: reported once, answered as `BusyError` (409).
  */
-async function withProgramWriteLock<T>(db: Db, userId: string, run: (tx: Tx) => Promise<T>): Promise<T> {
+export async function withProgramWriteLock<T>(db: Db, userId: string, run: (tx: Tx) => Promise<T>): Promise<T> {
   try {
     return await db.transaction(async tx => {
       await lockLiftWrites(tx as never, userId)
+      // #4082 review 2: the row waits after the lift lock are bounded too, by the same `lockWait`, set LOCAL
+      // (it ends with this transaction). Without it they ran to the pool's 15 s `statement_timeout`: past the
+      // lift lock only a lock-free single-statement writer, or a writer on another table's cascade, can hold
+      // one of these rows, for a few ms, so a longer wait means something is wrong, and 4 s answers busy while
+      // the person is still looking. A wait past it is 55P03, answered as `BusyError` like the lift lock's.
+      await tx.execute(sql`SELECT set_config('lock_timeout', ${`${lockWait.ms}ms`}, true)`)
       return run(tx)
     })
   } catch (err) {
@@ -217,7 +223,9 @@ async function joiningPhase(tx: Tx, userId: string, programSessionId: string): P
 }
 
 export async function setBaselineComplete(db: Db, userId: string, programSessionId: string, baseline1rm: Record<string, Baseline1rmEntry>): Promise<SessionPeriodization> {
-  return db.transaction(async tx => {
+  // #4082 review 2: `joiningPhase` locks ALL of the program's plan rows in id order, so this is a
+  // multi-row writer like the phase movers: lift-write lock first, or it cycles with a check-in save.
+  return withProgramWriteLock(db, userId, async tx => {
     const joining = await joiningPhase(tx, userId, programSessionId)
     const [row] = await tx
       .update(s.sessionPeriodization)
@@ -298,7 +306,9 @@ export async function recordBaselineAnchors(
   if (!current || current.baselineComplete) return current ? mapPeriodization(current) : null
 
   const merged = { ...((current.baseline1rm ?? {}) as Record<string, Baseline1rmEntry>), ...anchors }
-  return db.transaction(async tx => {
+  // The completing branch locks every plan row of the program (`joiningPhase`), so it takes the lift-write
+  // lock first (#4082 review 2). The partial branch writes this one row, holds nothing else and needs none.
+  const write = async (tx: Tx): Promise<SessionPeriodization | null> => {
     const joining = complete ? await joiningPhase(tx, userId, programSessionId) : null
     const [row] = await tx
       .update(s.sessionPeriodization)
@@ -318,7 +328,8 @@ export async function recordBaselineAnchors(
       ))
       .returning()
     return row ? mapPeriodization(row) : null
-  })
+  }
+  return complete ? withProgramWriteLock(db, userId, write) : db.transaction(write)
 }
 
 /**
@@ -616,29 +627,34 @@ export async function storePrescription(
 // failed-generation retry ('consumed' + null prescription → fire /prescribe) regenerates
 // a fresh, edit-aware prescription the next time each session is opened.
 export async function clearProgramPrescriptions(db: Db, userId: string, programId: string): Promise<void> {
-  const sessionRows = await db
-    .select({ id: s.programSessions.id })
-    .from(s.programSessions)
-    .where(and(eq(s.programSessions.programId, programId), isNull(s.programSessions.deletedAt)))
-  const sessionIds = sessionRows.map(r => r.id)
-  if (sessionIds.length === 0) return
   // A multi-row update with no stated row order: under the program-write lock, so it cannot cycle with a
   // check-in or a phase move.
-  await withProgramWriteLock(db, userId, async tx => {
-    await tx
-      .update(s.sessionPeriodization)
-      .set({
-        prescription: null,
-        prescriptionStatus: 'consumed',
-        prescriptionGeneratedAt: null,
-        prescriptionExpiresAt: null,
-        updatedAt: new Date(),
-      })
-      .where(and(
-        eq(s.sessionPeriodization.userId, userId),
-        inArray(s.sessionPeriodization.programSessionId, sessionIds),
-      ))
-  })
+  await withProgramWriteLock(db, userId, tx => voidProgramPrescriptionsIn(tx, userId, programId))
+}
+
+/**
+ * The statement behind `clearProgramPrescriptions`, for a caller that already holds the program-write lock
+ * in its own transaction: the program editor's save voids the old plans in the SAME transaction as the
+ * edit (#4082 review 2), so a busy answer means the edit was not saved either.
+ */
+export async function voidProgramPrescriptionsIn(tx: Tx, userId: string, programId: string): Promise<void> {
+  await tx
+    .update(s.sessionPeriodization)
+    .set({
+      prescription: null,
+      prescriptionStatus: 'consumed',
+      prescriptionGeneratedAt: null,
+      prescriptionExpiresAt: null,
+      updatedAt: new Date(),
+    })
+    .where(and(
+      eq(s.sessionPeriodization.userId, userId),
+      inArray(
+        s.sessionPeriodization.programSessionId,
+        tx.select({ id: s.programSessions.id }).from(s.programSessions)
+          .where(and(eq(s.programSessions.programId, programId), isNull(s.programSessions.deletedAt))),
+      ),
+    ))
 }
 
 /** One session's stored plan voided to 'consumed' + no plan, which the open-time trigger regenerates
@@ -747,9 +763,16 @@ export async function reconcileSessionsInPhase(db: Db, userId: string, programId
   // #4082 review: a multi-row update, so it takes the lift-write lock too, but only if it is free right
   // now: it runs on most reads and is self-healing, so it skips rather than queue behind a check-in (and
   // a writer that never waits cannot be one side of a cycle). The next read repairs what it skipped.
-  await db.transaction(async tx => {
-    if (!(await tryLockLiftWrites(tx as never, userId))) return
-    await tx.execute(sql`
+  //
+  // #4082 review 2: the try-lock is part of the same statement (`got`, read by the WHERE only for a row that
+  // really drifted), not a BEGIN / try-lock / UPDATE / COMMIT of its own: this runs on most
+  // `/api/workout-data` reads, and four round trips there was a cost for the common read that has nothing
+  // to repair. One statement is one implicit transaction, so the advisory lock is released with it; a read
+  // with nothing to repair never takes the lock at all, and one that has something costs the same single
+  // round trip it did before the lock. While the lock is held no other lift-lock taker holds any row, and
+  // the lock-free writers hold one row for one statement, so the scan order of the update cannot cycle.
+  await db.execute(sql`
+    WITH got AS (SELECT pg_try_advisory_xact_lock(hashtext('lift_writes:user'), hashtext(${userId})) AS ok)
     UPDATE session_periodization sp
     SET sessions_in_phase = sub.cnt, updated_at = NOW()
     FROM (
@@ -767,9 +790,8 @@ export async function reconcileSessionsInPhase(db: Db, userId: string, programId
       WHERE sp2.user_id = ${userId} AND ps.program_id = ${programId} AND ps.deleted_at IS NULL
       GROUP BY sp2.id
     ) sub
-    WHERE sp.id = sub.id AND sp.sessions_in_phase <> sub.cnt
+    WHERE sp.id = sub.id AND sp.sessions_in_phase <> sub.cnt AND (SELECT ok FROM got)
   `)
-  })
 }
 
 export async function setLastSessionRanPrescription(db: Db, userId: string, programSessionId: string, ranPrescription: boolean): Promise<void> {

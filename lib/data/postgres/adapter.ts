@@ -14,7 +14,7 @@ import { QUANTITY_MULTIPLIER_MIN, QUANTITY_MULTIPLIER_MAX, quantityMultiplierInR
 import { NotFoundError, UserFacingError } from '@trainingai/shared/errors'
 import { eq, and, or, inArray, notInArray, gt, gte, lt, lte, asc, desc, sql, ne, isNotNull, isNull, getTableColumns } from 'drizzle-orm'
 import { getDb, getPool } from './client'
-import { repointStoredExerciseNames } from './exercise-name-tables'
+import { repointStoredExerciseNames, lockCollidingLiftWrites } from './exercise-name-tables'
 import { withUserLock } from './user-lock'
 import { estWorkoutKcal, plausibleSessionActiveMin } from '@trainingai/shared/health/workout-energy'
 import { ouraIdForActivityType } from '@trainingai/shared/health/daily-energy'
@@ -1200,7 +1200,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   // ── Programs ──────────────────────────────────────────────────────────────
   async getActiveProgram(userId: string): Promise<Program | null> { return prog.getActiveProgram(this.db, userId) }
   async listPrograms(userId: string): Promise<Program[]> { return prog.listPrograms(this.db, userId) }
-  async saveProgram(userId: string, program: Program): Promise<Program> { return prog.saveProgram(this.db, userId, program) }
+  async saveProgram(userId: string, program: Program, opts?: { voidPrescriptions?: boolean }): Promise<Program> { return prog.saveProgram(this.db, userId, program, opts) }
   async deleteProgram(userId: string, programId: string): Promise<void> { return prog.deleteProgram(this.db, userId, programId) }
   async removeSessionExercise(userId: string, sessionExerciseId: string): Promise<boolean> { return prog.removeSessionExercise(this.db, userId, sessionExerciseId) }
 
@@ -3206,6 +3206,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
           .where(and(eq(s.exerciseLibrary.name, newName), ne(s.exerciseLibrary.id, id)))
         if (conflict) throw new UserFacingError(`An exercise named "${newName}" already exists`, 409)
       }
+      // First, before any row is locked: the lift-write lock of each person the preference moves collide for.
+      await lockCollidingLiftWrites(tx, oldName, newName)
       await renameSessionExercises(tx, oldName, newName)
       // Issue 2939: a rename is a server-decided edit of the log, so it stamps like the lbs-to-kg fix does;
       // without `clientEditedAt` a stale phone replay puts the old name back. GREATEST never moves a newer
@@ -3233,6 +3235,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
           .where(and(eq(s.exerciseLibrary.name, newName), ne(s.exerciseLibrary.id, entry.id)))
         if (conflict) throw new UserFacingError(`An exercise named "${newName}" already exists`, 409)
 
+        await lockCollidingLiftWrites(tx, oldName, newName)
         await renameSessionExercises(tx, oldName, newName)
         // Issue 2939: a rename is a server-decided edit of the log, so it stamps like the lbs-to-kg fix does;
         // without `clientEditedAt` a stale phone replay puts the old name back. GREATEST never moves a newer

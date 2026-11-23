@@ -715,7 +715,7 @@ export interface WorkoutRepository {
   // ── Programs ───────────────────────────────────────────────────────────────
   getActiveProgram(userId: string): Promise<Program | null>
   listPrograms(userId: string): Promise<Program[]>
-  saveProgram(userId: string, program: Program): Promise<Program>
+  saveProgram(userId: string, program: Program, opts?: { voidPrescriptions?: boolean }): Promise<Program>
   deleteProgram(userId: string, programId: string): Promise<void>
   // Permanently remove a single session exercise (Workout Review "drop permanently").
   // Ownership is enforced by the query (the row's session must belong to a program the

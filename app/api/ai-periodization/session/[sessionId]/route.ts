@@ -9,6 +9,7 @@ import { readProgramDeloadCheck } from '@trainingai/shared/ai-periodization/prog
 import { DEFAULT_TZ } from '@trainingai/shared/date-utils'
 import type { Baseline1rmEntry } from '@trainingai/shared/types/ai-periodization'
 import { invalidUuidResponse } from '@/lib/api/route-errors'
+import { isBusyError } from '@trainingai/shared/errors'
 
 export async function GET(
   _req: NextRequest,
@@ -83,7 +84,12 @@ export async function GET(
     // for the measured path — "a partial baseline stays in `baseline` and keeps what it measured" —
     // and completing on a subset leaves the prescription reading anchors that were never written.
     if (validSession.exercises.every(ex => baseline1rm[ex.id] != null)) {
-      state = await repo.setBaselineComplete(userId, sessionId, baseline1rm)
+      // #4082 review 2: a busy lock is skipped, not an error: this is a self-heal on a read, and the next read
+      // retries it. Anything else is still a fault.
+      state = await repo.setBaselineComplete(userId, sessionId, baseline1rm).catch(err => {
+        if (isBusyError(err)) return state
+        throw err
+      })
     }
   }
 
