@@ -211,11 +211,15 @@ jobs:
           distribution: temurin
           java-version: '21'
 
+      # Heap and download retry, shared with the other Android builds (#4033).
+      - name: Gradle heap and retry helper
+        uses: ./.github/actions/android-ndk/gradle
+
       - name: Sync and assemble the debug APK
         run: |
           mkdir -p www
           npx cap sync android
-          cd android && ./gradlew :app:assembleProdDebug --no-daemon
+          cd android && "$RUNNER_TEMP/gradle-retry.sh" ./gradlew :app:assembleProdDebug --no-daemon
 
       # Q-250. Maestro drives the sign-in the assertion depends on. Installed on the HOST, not in
       # the emulator: it drives the device over adb from outside, the same way the smoke script does.

@@ -260,13 +260,18 @@ jobs:
       - name: Android NDK
         uses: ./.github/actions/android-ndk
 
+      # Heap and download retry, the same step the Preview build uses (#4033). After prebuild, which
+      # writes a 2 GiB heap, and before Gradle. It touches no key and no artifact.
+      - name: Gradle heap and retry helper
+        uses: ./.github/actions/android-ndk/gradle
+
       - name: Compile the release APK
         env:
           EMULATOR_ABI: ${{ inputs.emulator_abi }}
         run: |
           ABIS=arm64-v8a
           if [ "$EMULATOR_ABI" = "true" ]; then ABIS=arm64-v8a,x86_64; fi
-          ./gradlew :app:assembleRelease --no-daemon -PreactNativeArchitectures="$ABIS"
+          "$RUNNER_TEMP/gradle-retry.sh" ./gradlew :app:assembleRelease --no-daemon -PreactNativeArchitectures="$ABIS"
         working-directory: mobile/android
 
       # The key is read only from here on, after every step that runs the checked-out code's build.
