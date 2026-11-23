@@ -5,6 +5,7 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.RectF
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
@@ -41,6 +42,7 @@ class PipWindowView(context: Context, private val frameAt: (Long) -> PipFrame) :
 
   // The rest's length, read by the clock's own tick to count down. Null counts up.
   private var targetSec: Long? = null
+  private var clampAtZero = false
 
   private val gate = PipClockGate()
   private val clockView = Chronometer(context).apply {
@@ -107,12 +109,12 @@ class PipWindowView(context: Context, private val frameAt: (Long) -> PipFrame) :
   private val load = text(18f, TEXT, bold = true, mono = true).apply { maxLines = 1 }
   private val loadLabel = text(10f, MUTED).apply { maxLines = 1 }
   private val segments = SegmentsView(context)
-  private val heartDot = DotView(context)
+  private val heartIcon = HeartView(context)
   private val heart = text(11f, MUTED).apply { maxLines = 1; ellipsize = TextUtils.TruncateAt.END }
   private val footer = LinearLayout(context).apply {
     orientation = LinearLayout.HORIZONTAL
     gravity = Gravity.CENTER_VERTICAL
-    addView(heartDot, LinearLayout.LayoutParams(dp(6f), dp(6f)).apply { rightMargin = dp(5f) })
+    addView(heartIcon, LinearLayout.LayoutParams(dp(8f), dp(8f)).apply { rightMargin = dp(5f) })
     addView(heart, LinearLayout.LayoutParams(0, WRAP, 1f))
   }
   private val body = LinearLayout(context).apply {
@@ -202,10 +204,11 @@ class PipWindowView(context: Context, private val frameAt: (Long) -> PipFrame) :
     load.visibility = if (frame.load == null) GONE else VISIBLE
     loadLabel.text = frame.loadLabel ?: ""
     loadLabel.visibility = if (frame.loadLabel == null || frame.load == null) GONE else VISIBLE
-    segments.set(frame.sets, frame.setsDone, frame.current, frame.setColors, color)
+    segments.set(frame.sets, frame.setsDone, frame.current, frame.accent)
     bindHeart(frame.hr)
 
     targetSec = frame.targetSec
+    clampAtZero = frame.clampAtZero
     count(frame.countsFrom)
     setPulse(frame.pulse)
   }
@@ -221,11 +224,12 @@ class PipWindowView(context: Context, private val frameAt: (Long) -> PipFrame) :
     placeholderName.visibility = if (shown.isEmpty()) GONE else VISIBLE
     hint.visibility = if (frame.hint) VISIBLE else GONE
     targetSec = null
+    clampAtZero = false
     count(null)
     setPulse(false)
   }
 
-  // A zone-coloured dot, the heart rate and the zone word; "Strap: no reading" once the reading is
+  // A small red heart, the heart rate and the zone word (the zone is written, not coloured); "Strap: no reading" once the reading is
   // too old; nothing with no strap.
   private fun bindHeart(hr: PipHeartView?) {
     if (hr == null) {
@@ -233,15 +237,14 @@ class PipWindowView(context: Context, private val frameAt: (Long) -> PipFrame) :
       return
     }
     footer.visibility = VISIBLE
-    val zone = hr.zoneColor?.let { parse(it) }
     if (hr.bpm == null) {
       heart.text = "Strap: no reading"
-      heartDot.visibility = GONE
+      heartIcon.visibility = GONE
       return
     }
-    heartDot.visibility = VISIBLE
-    heartDot.color = zone ?: MUTED
-    heartDot.invalidate()
+    heartIcon.visibility = VISIBLE
+    heartIcon.color = parse(hr.heartColor) ?: parse(PipPresenter.HEART_COLOR) ?: MUTED
+    heartIcon.invalidate()
     heart.text = listOfNotNull("${hr.bpm} bpm", hr.zoneName).joinToString(" · ")
   }
 
@@ -249,7 +252,7 @@ class PipWindowView(context: Context, private val frameAt: (Long) -> PipFrame) :
   private fun count(fromMs: Long?) {
     if (fromMs == null) {
       gate.count(clock, null)
-      clockView.text = PipPresenter.restClockText(0, targetSec)
+      clockView.text = PipPresenter.restClockText(0, targetSec, clampAtZero)
       return
     }
     val base = PipPresenter.elapsedBase(fromMs, System.currentTimeMillis(), SystemClock.elapsedRealtime())
@@ -261,7 +264,7 @@ class PipWindowView(context: Context, private val frameAt: (Long) -> PipFrame) :
 
   private fun format(view: Chronometer) {
     val seconds = maxOf(0L, (SystemClock.elapsedRealtime() - view.base) / 1000)
-    view.text = PipPresenter.restClockText(seconds, targetSec)
+    view.text = PipPresenter.restClockText(seconds, targetSec, clampAtZero)
   }
 
   override fun onDetachedFromWindow() {
@@ -324,45 +327,34 @@ class PipWindowView(context: Context, private val frameAt: (Long) -> PipFrame) :
   }
 
   /**
-   * One 5 dp bar per set: done sets in their set colours, the current or next one in the state's
-   * colour (pulsing while it runs), the rest dim.
+   * One 5 dp bar per set, in one colour: done sets and the current or next one (pulsing while it
+   * runs) in the app's accent, the sets still to come in the muted track colour.
    */
   private inner class SegmentsView(context: Context) : View(context) {
     var pulseAlpha = 1f
-    private var sets = 0
-    private var done = 0
     private var current: Int? = null
     // Parsed once per state, not per segment per frame: the pulse redraws this many times a second.
-    private var colors: List<Int?> = emptyList()
-    private var stateColor = Color.WHITE
+    private var colors: List<Int> = emptyList()
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val rect = RectF()
-    private var parsedFrom: List<String>? = null
 
-    fun set(sets: Int, done: Int, current: Int?, colors: List<String>, stateColor: Int) {
-      this.sets = sets
-      this.done = done
+    fun set(sets: Int, done: Int, current: Int?, accent: String) {
       this.current = current
-      if (colors != parsedFrom) {
-        parsedFrom = colors
-        this.colors = colors.map { parse(it) }
+      val fill = parse(accent) ?: Color.parseColor(PipPresenter.DEFAULT_ACCENT)
+      colors = List(minOf(sets, MAX_SEGMENTS)) { index ->
+        PipPresenter.segmentColor(index, done, current, accent)?.let { fill } ?: SEGMENT_OFF
       }
-      this.stateColor = stateColor
       invalidate()
     }
 
     override fun onDraw(canvas: Canvas) {
-      val count = minOf(sets, MAX_SEGMENTS)
+      val count = colors.size
       if (count <= 0) return
       val gap = 3f * density
       val each = (width - gap * (count - 1)) / count
       val radius = height / 2f
       for (index in 0 until count) {
-        paint.color = when {
-          index == current -> stateColor
-          index < done -> colors.getOrNull(index) ?: stateColor
-          else -> SEGMENT_OFF
-        }
+        paint.color = colors[index]
         if (index == current) paint.alpha = (pulseAlpha * 255).toInt()
         val left = index * (each + gap)
         rect.set(left, 0f, left + each, height.toFloat())
@@ -371,14 +363,22 @@ class PipWindowView(context: Context, private val frameAt: (Long) -> PipFrame) :
     }
   }
 
-  /** The heart rate's zone-coloured dot. */
-  private inner class DotView(context: Context) : View(context) {
+  /** The heart beside the reading: a filled heart in the heart-rate red, in the box the dot had. */
+  private inner class HeartView(context: Context) : View(context) {
     var color = MUTED
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val path = Path()
 
     override fun onDraw(canvas: Canvas) {
       paint.color = color
-      canvas.drawCircle(width / 2f, height / 2f, minOf(width, height) / 2f, paint)
+      val w = width.toFloat()
+      val h = height.toFloat()
+      path.reset()
+      path.moveTo(w / 2f, h)
+      path.cubicTo(-w * 0.15f, h * 0.55f, w * 0.1f, -h * 0.1f, w / 2f, h * 0.3f)
+      path.cubicTo(w * 0.9f, -h * 0.1f, w * 1.15f, h * 0.55f, w / 2f, h)
+      path.close()
+      canvas.drawPath(path, paint)
     }
   }
 

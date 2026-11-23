@@ -28,8 +28,6 @@ export type WorkoutStatusPayload = {
   setsDone: number;
   /** The exercise Next moves to, from the exercise summary; null when Next ends the workout. */
   nextUp: string | null;
-  /** `#rrggbb` per set of this exercise, for the window's dots; the window's copy alone, like `hr`. */
-  setColors: string[] | null;
   /** When the current pause began; null unless `phase` is "paused". */
   pausedAt: number | null;
   // #3734: where the lifter is in the session, and the clock when nothing else runs.
@@ -49,6 +47,14 @@ export type WorkoutStatusPayload = {
   effortAsk: { until: number; answer: -1 | 0 | 1 } | null;
   /** The app's accent as `#rrggbb` for the always-dark window; the window's copy alone. */
   accent: string | null;
+  /** The heart-rate red as `#rrggbb` for the window's heart; the window's copy alone. */
+  heartColor: string | null;
+  /**
+   * The load / warm-up step's countdown, as the preparation screen shows it: when it began and how
+   * long it is. Null when that screen shows none; only the "ready" phase reads it.
+   */
+  readyStartedAt: number | null;
+  readySeconds: number | null;
   /**
    * The strap's latest reading, for the window only: the notification never reads it, and
    * `workoutStatusFor` leaves it null so a reading every second is not a status change.

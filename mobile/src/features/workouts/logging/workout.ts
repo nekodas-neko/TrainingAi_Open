@@ -107,7 +107,6 @@ const workoutSchema = z.object({
   warmupGoalSource: z.enum(['budget', 'default', 'selected']).default('default'),
   timers: timerPreferencesSchema.default(defaultTimers),
   restAnchor: reference.extend({ startedAt: timestamp }).nullable().default(null),
-  restAdjustmentSeconds: z.number().int().min(-86400).max(86400).default(0),
   soloExerciseId: z.uuid().nullable().default(null),
   hubReturnStage: z.enum(['warmup', 'exercise', 'summary']).nullable().default(null),
   intensityMode: z.enum(['full', 'deload']).default('full'),

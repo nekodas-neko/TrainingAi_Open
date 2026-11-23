@@ -319,3 +319,35 @@ test('only the guided session keeps "Back to session"; screens that name a place
     assert.doesNotMatch(await read(file), /Back to session/, file);
   }
 });
+
+// #4058: a long subtitle wraps at its " · " separators instead of ending in an ellipsis.
+test('a long subtitle wraps at " · " and is never cut off; the title stays one line', () => {
+  const html = render(WorkoutLayout, {
+    title: 'Lower',
+    subtitle: 'Accumulation · Session 1 · Ex 1/6',
+    onBack: noop,
+    actions: createElement('i', null, 'ACT'),
+    workout: {},
+  });
+  const subtitle = [...html.matchAll(/<span data-ui="AppText" data-variant="caption"([^>]*)>([^<]*)<\/span>/g)];
+  assert.equal(subtitle.length, 1);
+  assert.doesNotMatch(subtitle[0]![1]!, /data-lines/, 'no line cap on the subtitle');
+  // Breaks are possible after each dot and nowhere inside a part.
+  const text = subtitle[0]![2]!;
+  assert.equal(text, 'Accumulation · Session 1 · Ex 1/6');
+  assert.equal(text.replace(/ /g, ' '), 'Accumulation · Session 1 · Ex 1/6');
+  assert.match(html, /data-variant="pageTitle" data-lines="1"/);
+});
+
+test('a subtitle with no separator, and the page header\'s own, render as before (#4058)', () => {
+  const plain = render(WorkoutLayout, { title: 'Upper', subtitle: 'Set summary', onBack: noop });
+  assert.match(plain, />Set summary</);
+  const bar = render(PageHeader, { title: 'Admin', subtitle: '3 users · 2 invites', onBack: noop });
+  assert.match(bar, /3 users · 2 invites/);
+  assert.equal(
+    render(PageHeader, { title: 'More', subtitle: 'Profile, achievements & settings' }).includes(
+      'Profile, achievements &amp; settings',
+    ),
+    true,
+  );
+});

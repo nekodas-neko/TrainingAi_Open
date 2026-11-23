@@ -5,8 +5,9 @@ import type { WorkoutStatusPayload } from '../../../integrations/workout-status/
 import type { WorkoutJournalStore } from '../logging/WorkoutJournalStore';
 import type { WorkoutRecord } from '../logging/workout';
 import { workoutStatusFor } from '../status/workout-status';
-import { pipCommand, pipPhaseFor, pipSetColor, pipSetColors, type PipAction } from './pip';
+import { pipCommand, pipPhaseFor, type PipAction } from './pip';
 import { effortQuestionWindow } from '../logging/effort';
+import { pipHeartColor } from './pip-accent';
 
 export type PipHeartRate = NonNullable<WorkoutStatusPayload['hr']>;
 /** At most one heart-rate update a second reaches the window (#3266). */
@@ -34,7 +35,6 @@ export function createPipReporter(
     if (closed || !native || !workout) return;
     const phase = pipPhaseFor(workout);
     const status = workoutStatusFor(workout);
-    const setColor = pipSetColor(workout);
     const asked = effortQuestionWindow(workout, now());
     if (asked && !workout.exercises.find((x) => x.id === asked.exerciseId)?.effortShown) {
       onEffortAsked(asked.exerciseId);
@@ -42,14 +42,14 @@ export function createPipReporter(
     const withHr = status && {
       ...status,
       hr,
-      setColors: pipSetColors(workout),
       effortAsk: asked && { until: asked.until, answer: asked.answer },
       accent,
+      heartColor: pipHeartColor,
     };
-    const key = JSON.stringify([phase, withHr, setColor]);
+    const key = JSON.stringify([phase, withHr]);
     if (key === last) return;
     last = key;
-    native.setPhase(phase, withHr, setColor);
+    native.setPhase(phase, withHr);
   }
   return {
     update(next: WorkoutRecord) {
@@ -80,7 +80,7 @@ export function createPipReporter(
     close() {
       if (closed) return;
       closed = true;
-      native?.setPhase('idle', null, null);
+      native?.setPhase('idle', null);
     },
   };
 }
@@ -127,7 +127,6 @@ export function runPipAction(
     | 'startSet'
     | 'advanceExercise'
     | 'showSession'
-    | 'adjustRest'
     | 'pause'
     | 'resume'
     | 'answerEffort'
@@ -141,8 +140,7 @@ export function runPipAction(
     void controller.answerEffort(workout.id, command.exerciseId, command.value);
     return;
   }
-  if (command.type === 'restPlus') void controller.adjustRest(workout.id, 30);
-  else if (command.type === 'pause') void controller.pause(workout.id);
+  if (command.type === 'pause') void controller.pause(workout.id);
   else if (command.type === 'resume') void controller.resume(workout.id);
   else if (command.type === 'reps')
     controller.updateSet(workout.id, command.exerciseId, command.setId, 'reps', command.value);
