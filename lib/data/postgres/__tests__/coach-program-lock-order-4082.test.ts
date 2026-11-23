@@ -134,6 +134,7 @@ describe.skipIf(!canRun)('program-phase writers in the lift-write lock order (#4
     if (!pool) return
     await pool.query(`DROP TRIGGER IF EXISTS test_4082c_gate ON session_periodization`).catch(() => undefined)
     await pool.query(`DROP FUNCTION IF EXISTS test_4082c_gate()`).catch(() => undefined)
+    await pool.query(`DELETE FROM error_events WHERE url = 'periodization/program-write' AND user_id = $1`, [U])
     await pool.query(`DELETE FROM users WHERE id = $1`, [U])
     await pool.query(`DELETE FROM exercise_library WHERE id = ANY($1::uuid[]) OR name = ANY($2)`, [libIds, [SQ, BP]])
   })
@@ -141,9 +142,20 @@ describe.skipIf(!canRun)('program-phase writers in the lift-write lock order (#4
   beforeEach(async () => {
     reportServerError.mockClear()
     lockWait.ms = wasWait
+    await pool.query(`DELETE FROM error_events WHERE url = 'periodization/program-write' AND user_id = $1`, [U])
     await pool.query(`DELETE FROM users WHERE id = $1`, [U])
     await pool.query(`INSERT INTO users (id, email, password_hash, timezone) VALUES ($1,$2,'x',$3)`, [U, `q4082c-${U}@example.com`, TZ])
   })
+
+  /** Busy program writes are recorded straight to `error_events` (the slice cannot import `reportServerError`). */
+  const busyEvents = async (n: number) => {
+    const deadline = Date.now() + 3000
+    for (;;) {
+      const c = (await pool.query(`SELECT count(*)::int AS n FROM error_events WHERE user_id = $1 AND url = 'periodization/program-write'`, [U])).rows[0].n as number
+      if (c === n || Date.now() > deadline) return c
+      await new Promise(r => setTimeout(r, 20))
+    }
+  }
 
   const waitUntil = async (what: string, test: () => Promise<boolean>) => {
     const deadline = Date.now() + 8000
@@ -242,7 +254,7 @@ describe.skipIf(!canRun)('program-phase writers in the lift-write lock order (#4
         await other.query('ROLLBACK').catch(() => undefined)
         other.release()
       }
-      expect(reportServerError).toHaveBeenCalledTimes(1)
+      expect(await busyEvents(1)).toBe(1)
       expect((await plans()).map(p => [p.phase, p.voided])).toEqual([['accumulation', false], ['accumulation', false]])
       // And the same call goes through once the lock is free.
       await mover()

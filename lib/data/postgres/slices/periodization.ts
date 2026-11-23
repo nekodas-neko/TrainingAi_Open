@@ -2,7 +2,7 @@ import { eq, and, inArray, asc, desc, sql, isNull, gte, lte } from 'drizzle-orm'
 import { NotFoundError, BusyError } from '@trainingai/shared/errors'
 import { lockLiftWrites, tryLockLiftWrites } from '../../../coach/lock-wait'
 import { isLockWaitTimeout } from '@/lib/api/route-errors'
-import { reportServerError } from '@/lib/observability'
+import { trackPendingWrite } from '@/lib/observability/pending-writes'
 import type { getDb } from '../client'
 import * as s from '../schema'
 import { shiftDateStr, dateStrMidnightInTz } from '@trainingai/shared/date-utils'
@@ -121,7 +121,14 @@ async function withProgramWriteLock<T>(db: Db, userId: string, run: (tx: Tx) => 
     })
   } catch (err) {
     if (isLockWaitTimeout(err)) {
-      reportServerError(err, { userId, url: 'periodization/program-write' })
+      // Written straight to `error_events` with the same handle: `reportServerError` reaches the database
+      // through `@/lib/data`, which would make this slice import its own composition root (as `oura.ts`'s
+      // `recordPruneFailure`). Only the code and a fixed text, never the failed statement's parameters.
+      const code = [err, (err as { cause?: unknown })?.cause].map(e => (e as { code?: unknown } | null)?.code).find(c => typeof c === 'string')
+      trackPendingWrite(db.insert(s.errorEvents).values({
+        userId, source: 'server', message: `program write gave up on a lock (${code ?? 'lock wait'}); nothing was written`,
+        stack: null, url: 'periodization/program-write', userAgent: null,
+      }).catch(e => console.error('[periodization] could not record the busy write:', e)))
       throw new BusyError()
     }
     throw err
