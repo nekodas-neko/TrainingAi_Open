@@ -9,10 +9,10 @@ import { createElement, type ReactElement } from 'react';
 const at = (path: string) => new URL(path, import.meta.url).href;
 const parents = new Map([
   [at('../src/features/coach/components/LiftCoachMenu.tsx'), ['../../../shared/ui', '../CoachProvider']],
-  [at('../src/features/workouts/components/NextPrescription.tsx'), ['../../../shared/ui', './ResourceCard']],
+  [at('../src/features/workouts/components/NextPrescription.tsx'), ['../../../shared/ui', './ResourceCard', '../logging/WorkoutJournalProvider']],
   [at('../src/features/workouts/components/RecapLifts.tsx'), ['../../../shared/ui', '../../../shared/theme/ThemeProvider', '../../coach/CoachProvider']],
   [at('../src/features/home/components/ChangeTodayButton.tsx'), ['../../../shared/ui', '../../../shared/ui/touchSlop', '../../../shared/theme/ThemeProvider', '../../coach/CoachProvider']],
-  [at('../src/features/workouts/components/SessionExerciseList.tsx'), ['react-native', '../../../shared/ui', '../../../shared/ui/TouchSurface', '../../../shared/theme/ThemeProvider', './ExerciseHeading', '../logging/targets']],
+  [at('../src/features/workouts/components/SessionExerciseList.tsx'), ['react-native', '../../../shared/ui', '../../../shared/ui/TouchSurface', '../../../shared/theme/ThemeProvider', './ExerciseHeading', '../logging/targets', '../logging/WorkoutJournalProvider']],
 ]);
 const stubs = at('./fixtures/coach-entry-stubs.ts');
 registerHooks({

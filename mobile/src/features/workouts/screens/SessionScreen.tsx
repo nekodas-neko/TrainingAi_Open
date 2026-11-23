@@ -43,7 +43,7 @@ export function SessionScreen({
   const injuries = useWorkoutResource(injurySpec);
   const injuredMuscles = activeInjuredMuscles(injuries.data ?? []).map(normalizeMuscle);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [historyName, setHistoryName] = useState<string | null>(null);
+  const [historyLift, setHistoryLift] = useState<{ name: string; id: string } | null>(null);
   const original = workout.catalog?.program?.sessions.find(
     (session) => session.id === sessionId,
   );
@@ -211,17 +211,19 @@ export function SessionScreen({
                 <AppButton
                   title="Exercise history"
                   variant="surface"
-                  onPress={() => setHistoryName(selected.name)}
+                  onPress={() => setHistoryLift({ name: selected.name, id: selected.id })}
                 />
               </>
             )}
           </Sheet>
           <Sheet
-            visible={historyName !== null}
-            title={historyName ?? 'Exercise history'}
-            onClose={() => setHistoryName(null)}
+            visible={historyLift !== null}
+            title={historyLift?.name ?? 'Exercise history'}
+            onClose={() => setHistoryLift(null)}
           >
-            {historyName && <ExerciseHistory name={historyName} />}
+            {historyLift && (
+              <ExerciseHistory name={historyLift.name} sessionExerciseId={historyLift.id} />
+            )}
           </Sheet>
         </>
       )}
