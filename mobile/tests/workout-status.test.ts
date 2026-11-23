@@ -55,7 +55,6 @@ function workout(extra: Partial<WorkoutRecord> = {}): WorkoutRecord {
     sessionName: 'Upper body',
     status: 'active',
     startedAt: T0,
-    restAdjustmentSeconds: 0,
     restAnchor: null,
     rest: null,
     runningSet: null,

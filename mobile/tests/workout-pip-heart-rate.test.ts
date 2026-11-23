@@ -30,7 +30,6 @@ function resting(): WorkoutRecord {
     startedAt: Date.UTC(2026, 9, 19, 8),
     pausedAt: null,
     pausedMs: 0,
-    restAdjustmentSeconds: 0,
     restAnchor: null,
     rest: { exerciseId: ids.bench, setId: ids.set(1), startedAt: 1_000, endsAt: 91_000 },
     runningSet: null,
