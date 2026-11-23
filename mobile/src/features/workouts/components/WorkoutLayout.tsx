@@ -1,5 +1,6 @@
 import type { PropsWithChildren, ReactNode } from 'react';
 import { AppText, PageLayout, Stack } from '../../../shared/ui';
+import { breakAtSeparators } from '../../../shared/ui/PageHeader';
 import { SessionTimer } from './WorkoutClocks';
 import type { WorkoutRecord } from '../logging/workout';
 
@@ -48,8 +49,8 @@ export function WorkoutLayout({
       subtitle={
         subtitleNode ??
         (subtitle && (
-          <AppText numberOfLines={1} variant="caption" tone="muted">
-            {subtitle}
+          <AppText variant="caption" tone="muted">
+            {breakAtSeparators(subtitle)}
           </AppText>
         ))
       }

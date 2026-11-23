@@ -40,7 +40,6 @@ import expo.modules.kotlin.modules.ModuleDefinition
 class PictureInPictureModule : Module() {
   @Volatile private var phase = PipPolicy.IDLE
   @Volatile private var status: PipStatus? = null
-  @Volatile private var setColor: String? = null
   // Where the on-screen set card or rest ring is, in window pixels: the window shrinks out of it.
   @Volatile private var sourceRect: Rect? = null
   private var windowView: PipWindowView? = null
@@ -74,12 +73,11 @@ class PictureInPictureModule : Module() {
         context.packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)
     }
 
-    Function("setPhase") { next: String, payload: Map<String, Any?>?, color: String? ->
+    Function("setPhase") { next: String, payload: Map<String, Any?>? ->
       phase = next
       // Kept for any phase: one that cannot open the window can still arrive while it is open,
       // such as "done" after Next on the last exercise, and the window must not go blank.
       status = PipPresenter.fromMap(payload)
-      setColor = PipPresenter.color(color)
       main.post { runCatching { windowView?.render() } }
       val activity = appContext.currentActivity ?: return@Function
       watch(activity)
@@ -175,7 +173,7 @@ class PictureInPictureModule : Module() {
     val activity = appContext.currentActivity ?: return
     val content = activity.findViewById<ViewGroup>(android.R.id.content) ?: return
     val view = windowView
-      ?: PipWindowView(activity) { now -> PipPresenter.present(phase, status, setColor, now) }
+      ?: PipWindowView(activity) { now -> PipPresenter.present(phase, status, now) }
         .also { windowView = it }
     if (view.parent !== content) {
       (view.parent as? ViewGroup)?.removeView(view)
@@ -272,7 +270,6 @@ class PictureInPictureModule : Module() {
   private fun icon(key: String) = when (key) {
     "minus" -> R.drawable.pip_minus
     "plus" -> R.drawable.pip_plus
-    "plus30" -> R.drawable.pip_plus30
     "start" -> R.drawable.pip_start
     "pause" -> R.drawable.pip_pause
     "resume" -> R.drawable.pip_resume
@@ -289,7 +286,6 @@ class PictureInPictureModule : Module() {
     private const val REPS_DOWN = "com.trainingai.pip.REPS_DOWN"
     private const val REPS_UP = "com.trainingai.pip.REPS_UP"
     private const val LOG = "com.trainingai.pip.LOG"
-    private const val REST_PLUS = "com.trainingai.pip.REST_PLUS"
     private const val PAUSE = "com.trainingai.pip.PAUSE"
     private const val RESUME = "com.trainingai.pip.RESUME"
     private const val EFFORT_EASIER = "com.trainingai.pip.EFFORT_EASIER"
@@ -299,7 +295,7 @@ class PictureInPictureModule : Module() {
     // The action JS is told, by the intent that carries it.
     private val INTENTS = linkedMapOf(
       "repsDown" to REPS_DOWN, "repsUp" to REPS_UP, "log" to LOG,
-      "restPlus" to REST_PLUS, "pause" to PAUSE, "resume" to RESUME,
+      "pause" to PAUSE, "resume" to RESUME,
       "effortEasier" to EFFORT_EASIER, "effortAsExpected" to EFFORT_AS_EXPECTED, "effortHarder" to EFFORT_HARDER,
     )
     private val ACTIONS = INTENTS.entries.associate { (action, intent) -> intent to action }

@@ -118,7 +118,7 @@ export function WorkoutTimerControls({
           Start Set remains your choice.
         </AppText>
         <AppText variant="caption" tone="muted">
-          Between-set rest stays enabled. Use its adjustment controls during rest; the
+          Between-set rest stays enabled and follows how long you actually rest; the
           prescription stays unchanged. Exercise summaries have no deadline.
         </AppText>
         <AppButton

@@ -46,7 +46,7 @@ async function setup(t: { after(fn: () => void): void }, styleLess = false, firs
   };
 }
 // Starts a workout and records both sets of its exercise, ending on the exercise summary.
-async function finishExercise(f: Awaited<ReturnType<typeof setup>>, adjust = 0) {
+async function finishExercise(f: Awaited<ReturnType<typeof setup>>) {
   const id = (await f.controller.start(f.session, programId, true))!;
   await f.controller.beginExercises(id);
   const active = () => f.controller.getSnapshot().data.workouts[0];
@@ -54,9 +54,6 @@ async function finishExercise(f: Awaited<ReturnType<typeof setup>>, adjust = 0) 
   await f.controller.startSet(id, exerciseId, first.id);
   f.clock(20_000);
   await f.controller.recordSet(id, exerciseId, first.id);
-  if (adjust) {
-    await f.controller.adjustRest(id, adjust);
-  }
   f.clock(60_000);
   await f.controller.startSet(id, exerciseId, last.id);
   f.clock(25_000);
@@ -95,13 +92,10 @@ test('the last set starts its rest on the exercise summary, kept across a reopen
   assert.deepEqual(saved.workouts[0].rest, workout.rest);
 });
 
-test('a style with no rest gives the last set 90 s, and the rest adjustment still applies', async (t) => {
+test('a style with no rest gives the last set 90 s', async (t) => {
   const plain = await setup(t, true);
   const one = await finishExercise(plain);
   assert.equal(one.active().rest!.endsAt - one.active().rest!.startedAt, 90_000);
-  const adjusted = await setup(t, true);
-  const two = await finishExercise(adjusted, 30);
-  assert.equal(two.active().rest!.endsAt - two.active().rest!.startedAt, 120_000);
 });
 
 test('the summary rest schedules the rest alarm at its end, in the foreground and background', async (t) => {

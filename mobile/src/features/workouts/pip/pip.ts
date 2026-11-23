@@ -1,4 +1,3 @@
-import { CATEGORICAL_PALETTE, categoricalColor } from '@trainingai/shared/chart-colors';
 import { workoutFlow } from '../logging/flow.ts';
 import type { WorkoutExercise, WorkoutRecord } from '../logging/workout.ts';
 import type { EffortVsPlan } from '@trainingai/shared/workout/effort-vs-plan';
@@ -37,7 +36,6 @@ export type PipAction =
   | 'repsDown'
   | 'repsUp'
   | 'log'
-  | 'restPlus'
   | 'pause'
   | 'resume'
   | 'effortEasier'
@@ -94,34 +92,7 @@ function repsOf(set: WorkoutSet, first?: WorkoutSet) {
   return set.planned?.reps ?? (firstReps !== null && Number.isInteger(firstReps) ? firstReps : 10);
 }
 
-/**
- * The running set's arc colour, as the current app's setColor(currentSet); null outside a set.
- * Everything else the window draws comes from the workout status payload (workoutStatusFor), the
- * same one the notification reads (#3266).
- */
-export function pipSetColor(workout: WorkoutRecord | null): string | null {
-  if (!workout || workoutPhaseOf(workout) !== 'set') return null;
-  const { exercise } = current(workout);
-  if (!exercise) return null;
-  return hexColor(done(exercise));
-}
-
-/** Each set's colour in order, for the window's dots; the running set's is `pipSetColor`. */
-export function pipSetColors(workout: WorkoutRecord | null): string[] | null {
-  if (!workout || !allowsPip(pipPhaseFor(workout))) return null;
-  const { exercise } = current(workout);
-  if (!exercise) return null;
-  return exercise.sets.map((_, index) => hexColor(index));
-}
-
-// Past the six-colour table the palette is oklch, which Android cannot parse.
-function hexColor(index: number) {
-  const color = categoricalColor(index);
-  return /^#[\da-f]{6}$/i.test(color) ? color : CATEGORICAL_PALETTE[index % CATEGORICAL_PALETTE.length];
-}
-
 export type PipCommand =
-  | { type: 'restPlus' }
   | { type: 'pause' }
   | { type: 'resume' }
   | { type: 'reps'; exerciseId: string; setId: string; value: string }
@@ -157,8 +128,6 @@ export function pipCommand(
   if (!exercise) return null;
   if (action === 'pause')
     return phase === 'set' || phase === 'rest' || phase === 'ready' ? { type: 'pause' } : null;
-  // +30 s moves a timed rest's end; an untimed rest has none to move.
-  if (action === 'restPlus') return phase === 'rest' && workout.rest ? { type: 'restPlus' } : null;
   if (phase === 'set') {
     const set = exercise.sets.find((x) => x.id === workout.runningSet?.setId);
     if (!set) return null;

@@ -15,10 +15,10 @@ class PipCardTest {
   private val base = PipStatus(
     exerciseName = "Incline press", phase = "ready", sets = 2, setsDone = 0, load = "27.5 kg × 7",
     sessionName = "Push A", exerciseIndex = 2, exerciseCount = 5, workoutFrom = t0 - 600_000,
-    setColors = listOf("#60a5fa", "#f472b6"), accent = accent,
+    accent = accent,
   )
   private fun card(phase: String, status: PipStatus, now: Long = t0) =
-    PipPresenter.present(phase, status, null, now) as PipFrame.Card
+    PipPresenter.present(phase, status, now) as PipFrame.Card
 
   @Test fun `the window is 3 to 4 in every state`() {
     for (phase in listOf("ready", "set", "rest", "complete", "summary", "paused", "pre", "done", PipPolicy.IDLE, null)) {
@@ -43,6 +43,43 @@ class PipCardTest {
     assertEquals(0, c.current)
   }
 
+  @Test fun `Ready with the preparation countdown shows that timer, and the workout's time beneath`() {
+    val prep = base.copy(readyStartedAt = t0 - 20_000, readySeconds = 90, workoutFrom = t0 - 574_000)
+    val c = card("ready", prep, t0)
+    assertEquals(t0 - 20_000, c.countsFrom)
+    assertEquals(90L, c.targetSec)
+    assertTrue(c.clampAtZero)
+    assertEquals("9:34 workout time", c.clockLabel)
+    assertEquals("Set 1 of 2", c.setLine)
+    assertEquals("first set", c.loadLabel)
+    // The line beneath moves with the workout's time, not the step's.
+    assertEquals("9:44 workout time", card("ready", prep, t0 + 10_000).clockLabel)
+  }
+
+  @Test fun `the preparation clock stops at 0 00 instead of counting past it`() {
+    assertEquals("1:10", PipPresenter.restClockText(20, 90, clampAtZero = true))
+    assertEquals("0:00", PipPresenter.restClockText(90, 90, clampAtZero = true))
+    assertEquals("0:00", PipPresenter.restClockText(400, 90, clampAtZero = true))
+    assertEquals("+0:10", PipPresenter.restClockText(100, 90))
+  }
+
+  @Test fun `Ready with no preparation countdown keeps the workout's clock and invents none`() {
+    val c = card("ready", base.copy(readyStartedAt = null, readySeconds = null), t0)
+    assertNull(c.targetSec)
+    assertEquals(false, c.clampAtZero)
+    assertEquals("workout time", c.clockLabel)
+    assertEquals(t0 - 600_000, c.countsFrom)
+  }
+
+  @Test fun `the heart beside the reading is the app's red in every zone`() {
+    val reading = PipHeartRate(bpm = 88, zoneName = "Recovery", zoneColor = "#3b82f6", at = t0)
+    assertEquals(PipPresenter.HEART_COLOR, card("ready", base.copy(hr = reading), t0).hr!!.heartColor)
+    assertEquals("#f87171", card("ready", base.copy(hr = reading, heartColor = "#f87171"), t0).hr!!.heartColor)
+    val hot = reading.copy(zoneName = "Peak", zoneColor = "#ef4444")
+    assertEquals("#f87171", card("rest", base.copy(phase = "resting", hr = hot, heartColor = "#f87171"), t0).hr!!.heartColor)
+    assertEquals("Recovery", card("ready", base.copy(hr = reading), t0).hr!!.zoneName)
+  }
+
   @Test fun `Lifting counts this set up, in green, with no load label, and pulses`() {
     val c = card("set", base.copy(phase = "working", setStartedAt = t0 - 20_000))
     assertEquals(PipCardState.LIFTING, c.state)
@@ -56,6 +93,27 @@ class PipCardTest {
     val untimed = card("set", base.copy(phase = "working"))
     assertEquals(t0 - 600_000, untimed.countsFrom)
     assertEquals("workout time", untimed.clockLabel)
+  }
+
+  @Test fun `the set bar is one colour at five sets with four done`() {
+    val five = base.copy(phase = "resting", sets = 5, setsDone = 4, restStartedAt = t0, restEndsAt = t0 + 90_000)
+    val c = card("rest", five, t0)
+    assertEquals(accent, c.accent)
+    // Four done and the next set in the accent, nothing past it: no per-set hue.
+    val colors = (0 until 5).map { PipPresenter.segmentColor(it, c.setsDone, c.current, c.accent) }
+    assertEquals(listOf(accent, accent, accent, accent, accent), colors)
+    // At the same five sets with two done, the sets still to come are the muted track (null).
+    val early = card("rest", five.copy(setsDone = 2), t0)
+    assertEquals(
+      listOf(accent, accent, accent, null, null),
+      (0 until 5).map { PipPresenter.segmentColor(it, early.setsDone, early.current, early.accent) },
+    )
+    // An app that sends no accent draws the window's own green.
+    assertEquals(PipPresenter.DEFAULT_ACCENT, card("rest", five.copy(accent = null), t0).accent)
+    // The lifting card keeps the accent for its running set rather than the lime state colour.
+    val lifting = card("set", five.copy(phase = "working", setStartedAt = t0), t0)
+    assertEquals(accent, lifting.accent)
+    assertEquals(true, lifting.pulse)
   }
 
   @Test fun `Resting counts the rest down in the accent and the bar drains`() {
@@ -163,9 +221,9 @@ class PipCardTest {
   }
 
   @Test fun `the warm-up, the review and no data show the placeholder, never a blank window`() {
-    assertEquals(PipFrame.Placeholder("Upper body", false), PipPresenter.present("done", PipStatus("Upper body", "ready"), null, t0))
-    assertEquals(PipFrame.Placeholder("Upper body", false), PipPresenter.present("pre", PipStatus("Upper body", "ready"), null, t0))
-    assertEquals(PipFrame.Placeholder("", false), PipPresenter.present("rest", null, null, t0))
+    assertEquals(PipFrame.Placeholder("Upper body", false), PipPresenter.present("done", PipStatus("Upper body", "ready"), t0))
+    assertEquals(PipFrame.Placeholder("Upper body", false), PipPresenter.present("pre", PipStatus("Upper body", "ready"), t0))
+    assertEquals(PipFrame.Placeholder("", false), PipPresenter.present("rest", null, t0))
   }
 
   @Test fun `for the first seconds after the last set the buttons answer how it felt, then go back`() {
@@ -184,7 +242,7 @@ class PipCardTest {
     assertEquals(listOf("log"), actions("summary", t0 + 20_000))
     assertNull(PipPresenter.subtitle("summary", asked, t0 + 20_000))
     // Only after the last set: no other phase asks, whatever the payload says.
-    assertEquals(listOf("restPlus", "log", "pause"), actions("rest", t0 + 1_000))
+    assertEquals(listOf("log", "pause"), actions("rest", t0 + 1_000))
     assertEquals(listOf("log"), PipPresenter.buttons("summary", asked.copy(effortUntil = null), t0).map { it.action })
     assertTrue(PipPresenter.EFFORT_BUTTONS.size <= PipPolicy.MAX_ACTIONS)
   }

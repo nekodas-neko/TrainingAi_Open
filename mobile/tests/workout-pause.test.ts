@@ -118,7 +118,6 @@ test('nothing is logged, started or skipped under a pause (#3255)', async (t) =>
   const state = JSON.stringify(f.workout());
   assert.equal(await f.controller.startSet(id, exerciseId, second.id), false);
   assert.equal(await f.controller.skipRest(id), false);
-  assert.equal(await f.controller.adjustRest(id, 30), false);
   assert.equal(await f.controller.advanceExercise(id), false);
   assert.equal(await f.controller.showSession(id), false);
   assert.match(f.controller.getSnapshot().message ?? '', /paused/);
@@ -215,34 +214,28 @@ test('under a pause the window answers to Resume alone (#3255)', async (t) => {
   const f = await setup(t);
   const id = await resting(f);
   const running = f.workout();
-  assert.deepEqual(pipCommand(running, 'restPlus'), { type: 'restPlus' });
   assert.deepEqual(pipCommand(running, 'pause'), { type: 'pause' });
   assert.equal(pipCommand(running, 'resume'), null, 'nothing to resume');
   await f.controller.pause(id);
   const paused = f.workout();
-  for (const action of ['log', 'repsUp', 'repsDown', 'restPlus', 'pause'] as const)
+  for (const action of ['log', 'repsUp', 'repsDown', 'pause'] as const)
     assert.equal(pipCommand(paused, action), null, action);
   assert.deepEqual(pipCommand(paused, 'resume'), { type: 'resume' });
 });
 
-test('+30 s needs a timed rest, and Pause is for a set or a rest only (#3255)', async (t) => {
+test('Pause is for a set or a rest only (#3255)', async (t) => {
   const f = await setup(t);
   const id = await resting(f);
   const untimed = { ...f.workout(), rest: null };
-  assert.equal(pipCommand(untimed, 'restPlus'), null);
   assert.deepEqual(pipCommand(untimed, 'pause'), { type: 'pause' });
   const summary = { ...f.workout(), flow: { stage: 'summary' as const, exerciseId } };
   assert.equal(pipCommand(summary, 'pause'), null, 'between exercises the button is Next');
   void id;
 });
 
-test('window buttons pause, resume and add 30 s through the journal (#3255)', async (t) => {
+test('window buttons pause and resume through the journal (#3255)', async (t) => {
   const f = await setup(t);
   const id = await resting(f);
-  const before = f.workout().rest!.endsAt;
-  runPipAction(f.workout(), f.controller, 'restPlus');
-  await new Promise((resolve) => setTimeout(resolve, 20));
-  assert.equal(f.workout().rest!.endsAt, before + 30_000);
   runPipAction(f.workout(), f.controller, 'pause');
   await new Promise((resolve) => setTimeout(resolve, 20));
   assert.notEqual(f.workout().pausedAt, null);

@@ -30,7 +30,6 @@ const workout = {
   startedAt: Date.now() - 600_000,
   pausedAt: null,
   pausedMs: 0,
-  restAdjustmentSeconds: 0,
   restAnchor: null,
   rest: null,
   runningSet: null,
