@@ -45,12 +45,21 @@ describe('RV-76 — muscles leave the model schemas and stay in the request sche
     expect(fields).toContain('exerciseRole')
   })
 
-  for (const file of ['app/api/generate-program/route.ts', 'app/api/builder-chat/route.ts']) {
-    it(`${file} asks the model for the shared shape and declares no exercise schema of its own`, () => {
+  // #4060: the two model-output schemas moved out of their routes (to model-output-schemas.ts), so the
+  // source check reads that module, and each route is checked to import rather than redeclare.
+  const MODULE = 'packages/shared/src/workout/model-output-schemas.ts'
+  it(`${MODULE} builds both from the shared shape and declares no exercise schema of its own`, () => {
+    const src = read(MODULE)
+    // generate-program omits the session name since #3751 (code names the sessions from the split).
+    expect(src).toMatch(/sessions: z\.array\(ModelSessionSchema\.omit\(\{ name: true \}\)\)/)
+    expect(src).toMatch(/sessions: z\.array\(ModelSessionSchema\)/)
+    expect(src).not.toMatch(/exerciseRole: z\.enum/)
+  })
+  for (const [file, name] of [['app/api/generate-program/route.ts', 'GeneratedProgramModelSchema'], ['app/api/builder-chat/route.ts', 'BuilderChatObjectSchema']]) {
+    it(`${file} imports ${name} and declares no model schema of its own`, () => {
       const src = read(file)
-      // generate-program omits the session name since #3751 (code names the sessions from the split).
-      expect(src).toMatch(/sessions: z\.array\(ModelSessionSchema(\.omit\(\{ name: true \}\))?\)/)
-      expect(src).not.toMatch(/exerciseRole: z\.enum/)
+      expect(src).toMatch(new RegExp(`import \\{[^}]*\\b${name}\\b[^}]*\\} from '@trainingai/shared/workout/model-output-schemas'`))
+      expect(src).not.toMatch(/ModelSessionSchema|exerciseRole: z\.enum/)
     })
   }
 

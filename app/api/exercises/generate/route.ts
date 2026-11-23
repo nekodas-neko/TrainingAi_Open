@@ -12,6 +12,7 @@ import { getRepository } from '@/lib/data'
 import { buildExerciseNameResolver } from '@trainingai/shared/workout/exercise-name-resolver'
 import { equipmentLedByName } from '@trainingai/shared/workout/equipment'
 import { isAdminUser } from '@/lib/admin'
+import { ExerciseGenSchema } from '@trainingai/shared/workout/model-output-schemas'
 
 // One exercise name, capped at 120 characters by the schema below.
 const MAX_BODY_BYTES = 4 * 1024
@@ -25,16 +26,6 @@ const RequestSchema = z.object({
    */
   refresh: z.literal(true).optional(),
 }).strict()
-
-const MUSCLES = ['Chest', 'Shoulders', 'Triceps', 'Biceps', 'Forearms', 'Upper Back', 'Lats', 'Lower Back', 'Traps', 'Core', 'Quads', 'Hamstrings', 'Glutes', 'Calves', 'Adductors'] as const
-const EQUIPMENT = ['barbell', 'dumbbell', 'cable', 'kettlebell', 'machine', 'bodyweight'] as const
-
-const ExerciseGenSchema = z.object({
-  normalizedName: z.string(),
-  instructions: z.string(),
-  muscles: z.array(z.object({ muscle: z.enum(MUSCLES), role: z.enum(['main', 'secondary']) })).min(1),
-  equipment: z.array(z.enum(EQUIPMENT)).min(1),
-})
 
 const SYSTEM_PROMPT = `You are a fitness expert. Given an exercise name, return:
 - normalizedName: the full proper name in Title Case — expand abbreviations (DB → Dumbbell, BB → Barbell, RDL → Romanian Deadlift, OHP → Overhead Press, etc.). If the input doesn't already specify equipment, prefix the name with the single most common equipment used to perform it (e.g. "Hip Thrust" → "Barbell Hip Thrust", "Bicep Curl" → "Dumbbell Bicep Curl", "Lateral Raise" → "Dumbbell Lateral Raise", "Leg Press" → "Machine Leg Press"). Only omit the prefix for exercises that are inherently bodyweight (e.g. "Push-Up", "Pull-Up", "Plank").

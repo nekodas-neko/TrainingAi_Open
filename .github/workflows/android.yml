@@ -149,10 +149,16 @@ jobs:
           fi
           echo "Stable debug key restored; APKs will upgrade in place."
 
+      # Heap and download retry, the same step the native app's builds use (#4033). Before the first
+      # Gradle step. This project's committed android/gradle.properties says -Xmx1536m; the
+      # user-level file this writes wins over it. It touches no key and no artifact.
+      - name: Gradle heap and retry helper
+        uses: ./.github/actions/android-ndk/gradle
+
       # The unit tests cover src/main, which both flavours share, so one variant runs them.
       - name: Kotlin unit tests
         working-directory: android
-        run: ./gradlew :app:testProdDebugUnitTest --no-daemon
+        run: $RUNNER_TEMP/gradle-retry.sh ./gradlew :app:testProdDebugUnitTest --no-daemon
 
       # #2367. Reads what each APK will actually package — the merged manifest and the merged
       # Capacitor assets — and fails if TrainingAi Dev regains a ring, strap or scale service or
@@ -164,7 +170,7 @@ jobs:
       # APK depends on them too, so a local build cannot skip them; this step only names the failure.
       - name: Check the Dev app cannot reach the ring, strap or scale
         working-directory: android
-        run: ./gradlew :app:verifyDevDebugFlavour :app:verifyProdDebugFlavour --no-daemon
+        run: $RUNNER_TEMP/gradle-retry.sh ./gradlew :app:verifyDevDebugFlavour :app:verifyProdDebugFlavour --no-daemon
 
       # #2840. The override must be honoured, and with it unset the code must be exactly the
       # formula that shipped before. Gradle only configures here (no build), so it is cheap enough
@@ -184,7 +190,7 @@ jobs:
 
       - name: Assemble both debug APKs
         working-directory: android
-        run: ./gradlew :app:assembleProdDebug :app:assembleDevDebug --no-daemon
+        run: $RUNNER_TEMP/gradle-retry.sh ./gradlew :app:assembleProdDebug :app:assembleDevDebug --no-daemon
 
       # Flavours moved the outputs to apk/<flavour>/debug/app-<flavour>-debug.apk. The real app keeps
       # the name it has always been published under: the More -> update card and Download APK find it
