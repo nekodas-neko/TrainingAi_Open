@@ -78,6 +78,18 @@ export function isLockWaitTimeout(err: unknown): boolean {
   return false
 }
 
+/**
+ * #4080: only the bounded lock wait's own timeout (55P03), never the statement timeout. For a Coach
+ * handler that is not wrapped in a transaction, 55P03 means the wait failed before any write, while a
+ * 57014 can land after one.
+ */
+export function isBoundedLockTimeout(err: unknown): boolean {
+  for (let e: unknown = err, depth = 0; e && typeof e === 'object' && depth < 5; e = (e as { cause?: unknown }).cause, depth++) {
+    if ((e as { code?: unknown }).code === '55P03') return true
+  }
+  return false
+}
+
 /** The 409 a rename answers when it timed out waiting for a lock; nothing was changed. */
 export function renameBusyResponse(): NextResponse {
   return NextResponse.json({ error: 'The exercise is busy right now. Nothing was changed; try the rename again in a moment.' }, { status: 409 })

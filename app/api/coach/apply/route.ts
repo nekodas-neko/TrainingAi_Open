@@ -7,6 +7,7 @@ import { CoachPatchSchema, hasUniqueChangeIds } from '@/lib/coach/patch'
 import { applyCoachPatch } from '@/lib/coach/apply'
 import { DEFAULT_TZ, todayInTz } from '@trainingai/shared/date-utils'
 import { errorLog } from '@trainingai/shared/logger'
+import { reportServerError } from '@/lib/observability'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 
 // A patch of at most 8 changes plus up to 8 accepted ids. 256 KB is far past any real patch.
@@ -84,6 +85,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ changeId: result.changeId, summary: result.summary })
   } catch (error) {
     errorLog(error, 'API /coach/apply')
+    // A timeout after a non-transactional write lands here with the outcome unknown; it must be seen.
+    reportServerError(error, { userId, url: '/api/coach/apply' })
     return NextResponse.json({ error: 'Apply failed' }, { status: 500 })
   }
 }

@@ -306,6 +306,66 @@ describe.skipIf(!canRun)('concurrent Coach applies on a missing row (#4076)', ()
     })
   })
 
+  // ── What "nothing was changed" may claim (#4080 second review) ─────────────────────────────────
+  // A statement timeout (57014) is a refusal only where one transaction wraps the whole apply. The other
+  // handlers write on the pool first, so the same timeout on the `coach_changes` insert leaves the value
+  // changed with no history row: it must stay an error. The timeout is simulated after the write by a
+  // trigger that raises 57014 on the history insert for this user only.
+  describe('a statement timeout after the write', () => {
+    beforeAll(async () => {
+      await pool.query(`CREATE OR REPLACE FUNCTION q4080_history_timeout() RETURNS trigger LANGUAGE plpgsql AS $f$
+        BEGIN
+          IF NEW.user_id = '${USER}' THEN
+            RAISE EXCEPTION 'canceling statement due to statement timeout' USING ERRCODE = '57014';
+          END IF;
+          RETURN NEW;
+        END $f$`)
+    })
+    beforeEach(async () => {
+      await pool.query(`DROP TRIGGER IF EXISTS q4080_history_timeout ON coach_changes`)
+      await pool.query(`CREATE TRIGGER q4080_history_timeout BEFORE INSERT ON coach_changes FOR EACH ROW EXECUTE FUNCTION q4080_history_timeout()`)
+    })
+    afterAll(async () => {
+      if (!pool) return
+      await pool.query(`DROP TRIGGER IF EXISTS q4080_history_timeout ON coach_changes`)
+      await pool.query(`DROP FUNCTION IF EXISTS q4080_history_timeout()`)
+      await pool.query(`DELETE FROM nutrition_targets WHERE user_id = $1`, [USER])
+    })
+
+    it('transactional (lift preference): refused as busy, the preference write rolled back, reported once', async () => {
+      const out = await applyLift(rest('x', 60))
+      expect(out).toEqual({ ok: false, reason: 'busy' })
+      expect(await prefRows()).toEqual([])
+      expect(await historyCount()).toBe(0)
+      expect(reportServerError).toHaveBeenCalledTimes(1)
+    })
+
+    it('not transactional (nutrition targets): NOT reported as "nothing was changed" — it throws, and the route answers 500 and reports it', async () => {
+      await pool.query(`DELETE FROM nutrition_targets WHERE user_id = $1`, [USER])
+      await pool.query(`INSERT INTO nutrition_targets (user_id, calories, protein_g, carbs_g, fat_g) VALUES ($1, 2000, 150, 200, 60)`, [USER])
+      const patch = { domain: 'nutrition_targets', targetId: null, changes: [{ id: 'n', field: 'calories', from: 2000, to: 2200 }] }
+      // The apply itself: no `busy` refusal. The error surfaces with its code.
+      await expect(apply.applyCoachPatch(db, USER, patch as never, ['n'], '2026-11-22', TZ)).rejects.toMatchObject({ cause: { code: '57014' } })
+      // The write did commit and there is no history row: which is exactly why it must not say nothing changed.
+      expect((await pool.query(`SELECT calories FROM nutrition_targets WHERE user_id = $1`, [USER])).rows[0].calories).toBe(2200)
+      expect(await historyCount()).toBe(0)
+
+      await pool.query(`UPDATE nutrition_targets SET calories = 2000 WHERE user_id = $1`, [USER])
+      const { POST } = await import('@/app/api/coach/apply/route')
+      reportServerError.mockClear()
+      const res = await POST(new Request('http://localhost/api/coach/apply', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ patch, acceptedChangeIds: ['n'] }),
+      }))
+      expect(res.status).toBe(500)
+      const body = await res.json()
+      expect(body).toEqual({ error: 'Apply failed' })
+      expect(JSON.stringify(body)).not.toMatch(/nothing was changed/i)
+      expect(body.busy).toBeUndefined()
+      expect(reportServerError).toHaveBeenCalledTimes(1)
+    })
+  })
+
   // ── An apply that races an undo of the change it follows ───────────────────────────────────────
   describe('an apply against an undo of the same change', () => {
     /** The db with the undo's transaction held back until `go`: the undo has read its record and the

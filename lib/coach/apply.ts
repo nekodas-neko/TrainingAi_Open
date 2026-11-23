@@ -10,7 +10,7 @@ import { programPhaseHandler } from './domains/program-phase'
 import { earlyDeloadHandler } from './domains/early-deload'
 import { liftPreferenceHandler, StaleLiftPreference, type LiftPreferenceSource } from './domains/lift-preference'
 import { DEFAULT_TZ, todayInTz } from '@trainingai/shared/date-utils'
-import { isLockWaitTimeout } from '@/lib/api/route-errors'
+import { isLockWaitTimeout, isBoundedLockTimeout } from '@/lib/api/route-errors'
 import { reportServerError } from '@/lib/observability'
 
 export type { ApplyOutcome } from './domains/types'
@@ -76,11 +76,16 @@ export async function applyCoachPatch(
     if (handler.transactional) return await applyInTransaction(db, userId, patch, accepted, handler)
     return await applyOutsideTransaction(db, userId, patch, accepted, handler)
   } catch (err) {
-    // #4080: gave up waiting for a lock (our bounded wait, or the statement timeout it stays under).
-    // The transaction or savepoint that was waiting has rolled back, so nothing is written. A caller
-    // that holds its own transaction (the weekly check-in) gets the refusal and fails as a whole.
+    // #4080: gave up waiting for a lock. Whether "nothing was changed" is true depends on what wrapped
+    // the apply. A transactional handler (lift preference) runs wholly inside one transaction, or a
+    // savepoint in a caller's, so a lock timeout (55P03) or a statement timeout (57014) anywhere in it
+    // rolls everything back. The others run through `applyOutsideTransaction`: their write can commit
+    // on the pool before the `coach_changes` insert or a later statement hits 57014, so a 57014 there
+    // leaves the outcome unknown and must stay an error. Only 55P03 is a refusal for them: it can only
+    // come from `withBoundedLockWait`, which runs before any write. A caller that holds its own
+    // transaction (the weekly check-in) gets the refusal and fails as a whole.
     // Reported, so a lock that stays held shows up: 57014 is also any slow statement.
-    if (isLockWaitTimeout(err)) {
+    if (handler.transactional ? isLockWaitTimeout(err) : isBoundedLockTimeout(err)) {
       reportServerError(err, { userId, url: '/api/coach/apply' })
       return { ok: false, reason: 'busy' }
     }
