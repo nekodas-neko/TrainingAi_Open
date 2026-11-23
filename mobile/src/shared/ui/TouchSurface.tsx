@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'react';
-import { Animated, Platform, type PressableProps } from 'react-native';
+import { Animated, Platform, type PressableProps, type PressableStateCallbackType } from 'react-native';
 import { Pressable } from './Pressable';
 import { dimsOnPress, type PressFeedback } from './pressFeedback';
+import { splitTouchSurfaceStyle } from './touchSurfaceLayout';
 import { useReducedMotion } from './useReducedMotion';
 
 /**
@@ -32,8 +33,14 @@ export function TouchSurface({
         useNativeDriver: Platform.OS !== 'web',
       }).start();
   }
+  // The wrapper is the parent's child, so the caller's placement keys (flex, margins, width,
+  // alignSelf) go on it; the Pressable inside fills it and keeps the look (#4067).
+  const split = typeof style === 'function' ? null : splitTouchSurfaceStyle(style);
+  const innerStyle: PressableProps['style'] = split
+    ? [{ flexGrow: 1 }, split.inner]
+    : (state) => [{ flexGrow: 1 }, (style as (s: PressableStateCallbackType) => unknown)(state)] as never;
   return (
-    <Animated.View style={{ transform: [{ scale }], flexGrow: fill ? 1 : 0 }}>
+    <Animated.View style={[{ transform: [{ scale }], flexGrow: fill ? 1 : 0 }, split?.outer]}>
       <Pressable
         {...props}
         onPressIn={(event) => {
@@ -44,7 +51,7 @@ export function TouchSurface({
           animate(1);
           onPressOut?.(event);
         }}
-        style={style}
+        style={innerStyle}
       >
         {children}
       </Pressable>
