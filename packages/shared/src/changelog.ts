@@ -11,6 +11,9 @@ export const CHANGELOG: ChangelogEntry[] = [
     changes: [
       "TrainingAi Preview: the Coach answers again. Every Coach message sent from Preview had failed since 1.530.0, because the AI provider refused one field of the lift change options. No new Preview build is needed for this.",
       "TrainingAi Preview: the Next workout card shows the same weight and reps as the session screen for every kind of program and phase.",
+      "TrainingAi Preview: the set card no longer has the 6 to 10 RPE row. A lift is rated once, by How did it feel? after its last set, with As expected already selected. This needs the new Preview build.",
+      "Both apps: a tapped Harder or Easier answer now adjusts the next plan in RPE's place. Harder with a missed rep or a falling 1RM cuts the load, Harder alone changes nothing, and Easier with your reps met adds a rep. As expected, or an untouched answer, changes nothing. This changes how plans are made, only for a lift you answer Harder or Easier on.",
+      "TrainingAi Preview: fixes from a workout on the phone. The rest screen and the picture-in-picture window lose their 30 second buttons, the picture-in-picture set bar is one colour, it shows the preparation countdown and a red heart, a long header subtitle wraps instead of being cut off, skipping the last exercise no longer finishes the workout, and a lift with no estimate no longer shows 0 RM. These need the new Preview build.",
       "TrainingAi Preview: four small weekly check-in fixes. These need the new Preview build.",
       "Behind the scenes: a test now checks every option list the AI is given against what the provider accepts, without calling it.",
     ],
