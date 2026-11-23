@@ -163,12 +163,23 @@ async function createMissingExercise(
     ? (equipmentChange.to as string).split(',').map(e => e.trim()).filter(Boolean)
     : []
 
+  // #4076: the caller read the library, found no `name`, and inserts here. A second apply landing in
+  // between (an admin's double tap) used to fail this insert on the unique name as a raw 500. The
+  // loser now takes the row the first one made, which is what a swap to that name should land on.
   const [created] = await db
     .insert(s.exerciseLibrary)
     .values({ name, muscles, equipment, createdBy: userId })
+    .onConflictDoNothing({ target: s.exerciseLibrary.name })
     .returning({ id: s.exerciseLibrary.id })
+  if (created) return { id: created.id, muscles }
 
-  return { id: created.id, muscles }
+  const [won] = await db
+    .select({ id: s.exerciseLibrary.id, muscles: s.exerciseLibrary.muscles, mergedInto: s.exerciseLibrary.mergedInto })
+    .from(s.exerciseLibrary)
+    .where(eq(s.exerciseLibrary.name, name))
+    .limit(1)
+  if (!won || won.mergedInto) return { error: `"${name}" has been merged into another exercise` }
+  return { id: won.id, muscles: (won.muscles as { muscle: string }[] | null) ?? [] }
 }
 
 export const sessionExerciseHandler: DomainHandler = {

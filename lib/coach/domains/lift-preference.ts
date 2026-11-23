@@ -104,6 +104,24 @@ async function findRow(db: Db, userId: string, name: string, libId: string | nul
   return r ? rowOf(r) : null
 }
 
+/**
+ * #4076: serialise writers of one lift's preference for the rest of the transaction.
+ *
+ * `findRow ... FOR UPDATE` locks a row that exists; for a lift with no row yet it locks nothing, so two
+ * applies both read "no preference", both insert, and the second hit the *other* unique index
+ * (`user_id, exercise_id`, which `ON CONFLICT ... lift_key` does not arbitrate) as a raw duplicate-key
+ * error — a 500 on a double tap. The advisory lock is taken before that read, so the second apply waits
+ * for the first to commit, then reads its row and is refused as stale with the card's usual refusal.
+ *
+ * One lock per unique key the row can collide on (the name, then the library id), always in that order,
+ * so two applies that share only the library id still queue and none can wait on the other in a cycle.
+ * A hash collision only makes two unrelated lifts queue; it cannot let two writers of one lift through.
+ */
+export async function lockLiftPreference(db: Db, userId: string, name: string, libId: string | null): Promise<void> {
+  await db.execute(sql`SELECT pg_advisory_xact_lock(hashtext('exercise_preferences:name'), hashtext(${`${userId}:${name}`}))`)
+  if (libId) await db.execute(sql`SELECT pg_advisory_xact_lock(hashtext('exercise_preferences:lib'), hashtext(${`${userId}:${libId}`}))`)
+}
+
 async function rowById(db: Db, userId: string, id: string, lock: boolean): Promise<PrefRow | null> {
   const res = await db.execute(sql`
     SELECT p.id, p.exercise_id, p.exercise_name, p.rep_min, p.rep_max, p.rest_sec, p.next_load_step, p.sets_delta,
@@ -751,6 +769,8 @@ export function liftPreferenceHandler(
       }
       const ctx = await readContext(db, getBasis, userId, target)
 
+      // Before the read: a lift with no row has nothing for FOR UPDATE to lock (#4076).
+      await lockLiftPreference(db, userId, target.exerciseName, ctx.libId)
       const row = await findRow(db, userId, target.exerciseName, ctx.libId, true)
       const current = liveColumns(row)
       const drift = driftOf(current, changes)
