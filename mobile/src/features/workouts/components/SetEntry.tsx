@@ -12,7 +12,7 @@ import {
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import type { WorkoutExercise, WorkoutRecord, WorkoutSet } from '../logging/workout';
 import { useWorkoutJournal } from '../logging/WorkoutJournalProvider';
-import { isAmrap, weightStep } from '../logging/targets';
+import { isAmrap, isUnloadedSet, weightStep } from '../logging/targets';
 import { displayLoad, loadLabel, storedLoad } from '../logging/preferences';
 import { EffortPicker } from './EffortPicker';
 import { VoiceLogButton } from './VoiceLogButton';
@@ -180,7 +180,12 @@ export function SetEntry({
         </View>
       )}
       {voiceEngine && (
-        <VoiceLogButton engine={voiceEngine} onResult={applyVoice} disabled={journal.busy} />
+        <VoiceLogButton
+          engine={voiceEngine}
+          onResult={applyVoice}
+          disabled={journal.busy}
+          unloaded={isUnloadedSet(exercise, set)}
+        />
       )}
       <EffortPicker
         set={set}

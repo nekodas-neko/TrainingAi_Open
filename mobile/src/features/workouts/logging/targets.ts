@@ -58,11 +58,19 @@ export function isAmrap(
   );
 }
 
+/** A bodyweight set with no load added or taken off: the card shows reps alone. */
+export function isUnloadedSet(
+  exercise: Pick<WorkoutExercise, 'exerciseType'>,
+  set: Pick<WorkoutSet, 'weight'>,
+) {
+  return exercise.exerciseType === 'bodyweight' && Number(set.weight) === 0;
+}
+
 export function formatSetLoad(
   exercise: Pick<WorkoutExercise, 'exerciseType'>,
   set: Pick<WorkoutSet, 'weight' | 'reps'>,
 ) {
-  if (exercise.exerciseType === 'bodyweight' && Number(set.weight) === 0) {
+  if (isUnloadedSet(exercise, set)) {
     return `${set.reps} reps`;
   }
   const prefix =
