@@ -77,8 +77,13 @@ export async function GET(
     const allPrs = await repo.listPersonalRecords(userId)
     const baseline1rm: Record<string, Baseline1rmEntry> = {}
     for (const ex of validSession.exercises) {
+      // #4098: a measured anchor (a baseline workout's AMRAP, stored by the partial write when the completing
+      // write was busy) is kept; a personal record only fills what was not measured.
+      const measured = state.baseline1rm?.[ex.id]
       const pr = allPrs.get(ex.exerciseName)
-      if (pr != null) {
+      if (measured != null) {
+        baseline1rm[ex.id] = measured
+      } else if (pr != null) {
         baseline1rm[ex.id] = { kg: pr, source: 'personal_record' }
       }
     }
@@ -88,7 +93,7 @@ export async function GET(
     if (validSession.exercises.every(ex => baseline1rm[ex.id] != null)) {
       // #4082 review 2: a busy lock is skipped, not an error: this is a self-heal on a read, and the next read
       // retries it. Anything else is still a fault.
-      state = await repo.setBaselineComplete(userId, sessionId, baseline1rm).catch(err => {
+      state = await repo.setBaselineComplete(userId, sessionId, baseline1rm, { read: true }).catch(err => {
         if (isBusyError(err)) return state
         throw err
       })

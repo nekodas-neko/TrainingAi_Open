@@ -4,6 +4,7 @@
 // `/api/readiness-score` on the dev bundler (#3911), and
 // `lib/health/__tests__/data-layer-readiness-cycle.test.ts` fails if one comes back.
 import type { WorkoutRepository } from '@/lib/data/repository'
+import { isBusyError } from '@trainingai/shared/errors'
 export { CompleteWorkoutPayloadSchema } from './complete-payload'
 import type { CompleteWorkoutPayload } from './complete-payload'
 export type { CompleteWorkoutPayload } from './complete-payload'
@@ -88,7 +89,17 @@ async function recordBaselineAnchorsFrom(
   const covered = new Set([...Object.keys(existing?.baseline1rm ?? {}), ...Object.keys(anchors)])
   const complete = programSession.exercises.every(ex => covered.has(ex.id))
 
-  await repo.recordBaselineAnchors(userId, programSessionId, anchors, complete)
+  try {
+    await repo.recordBaselineAnchors(userId, programSessionId, anchors, complete)
+  } catch (err) {
+    if (!complete || !isBusyError(err)) throw err
+    // #4098: the completing write gave up on the lift-write lock (a check-in or a Coach apply held it past
+    // the wait) and rolled back, anchors included. Keep what was measured: the partial write takes no lock
+    // and stores the anchors without leaving `baseline`; the session read's self-heal completes the phase
+    // from them (it keeps a measured anchor over a personal record). Not delayed or failed by it: this
+    // whole function already runs after the workout is stored, fire-and-forget.
+    await repo.recordBaselineAnchors(userId, programSessionId, anchors, false)
+  }
 }
 
 // Shared by the web route (app/api/complete-workout) and the offline outbox

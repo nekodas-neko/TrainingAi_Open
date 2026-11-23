@@ -8683,7 +8683,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   // ── AI Periodization (delegated to slices/periodization.ts) ─────────────────
   async getSessionPeriodization(userId: string, programSessionId: string) { return period.getSessionPeriodization(this.db, userId, programSessionId) }
   async ensureSessionPeriodization(userId: string, programSessionId: string) { return period.ensureSessionPeriodization(this.db, userId, programSessionId) }
-  async setBaselineComplete(userId: string, programSessionId: string, baseline1rm: Record<string, Baseline1rmEntry>) { return period.setBaselineComplete(this.db, userId, programSessionId, baseline1rm) }
+  async setBaselineComplete(userId: string, programSessionId: string, baseline1rm: Record<string, Baseline1rmEntry>, mode?: { read?: boolean }) { return period.setBaselineComplete(this.db, userId, programSessionId, baseline1rm, mode) }
   async getSessionExercise1rms(userId: string, workoutSessionId: string) { return period.getSessionExercise1rms(this.db, userId, workoutSessionId) }
   async recordBaselineAnchors(userId: string, programSessionId: string, anchors: Record<string, Baseline1rmEntry>, complete: boolean) { return period.recordBaselineAnchors(this.db, userId, programSessionId, anchors, complete) }
   async revertAutoAdoptedBaseline(userId: string, programSessionId: string) { return period.revertAutoAdoptedBaseline(this.db, userId, programSessionId) }
@@ -8691,8 +8691,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async exitDeload(userId: string, programSessionId: string, newPhase: PeriodizationPhase, deloadStartedAt: Date) { return period.exitDeload(this.db, userId, programSessionId, newPhase, deloadStartedAt) }
   async advanceProgramPhase(userId: string, programSessionId: string, newPhase: PeriodizationPhase, expected?: { phase: PeriodizationPhase; phaseStartedAt: Date }) { return period.advanceProgramPhase(this.db, userId, programSessionId, newPhase, expected) }
   async setProgramPhase(userId: string, programId: string, phase: PeriodizationPhase, startedAt: Date, pendingTransition: PendingTransition | null, opts?: import('@trainingai/shared/ai-periodization/program-phase').ProgramMoveOptions) { return period.setProgramPhase(this.db, userId, programId, phase, startedAt, pendingTransition, opts) }
-  async setProgramPendingTransition(userId: string, programId: string, decide: import('@trainingai/shared/ai-periodization/program-phase').DecidePending) { return period.setProgramPendingTransition(this.db, userId, programId, decide) }
-  async realignProgramPhase(userId: string, programId: string, decide: import('@trainingai/shared/ai-periodization/program-phase').DecideTarget) { return period.realignProgramPhase(this.db, userId, programId, decide) }
+  async setProgramPendingTransition(userId: string, programId: string, decide: import('@trainingai/shared/ai-periodization/program-phase').DecidePending, mode?: { read?: boolean }) { return period.setProgramPendingTransition(this.db, userId, programId, decide, mode) }
+  async realignProgramPhase(userId: string, programId: string, decide: import('@trainingai/shared/ai-periodization/program-phase').DecideTarget, mode?: { read?: boolean }) { return period.realignProgramPhase(this.db, userId, programId, decide, mode) }
   async listProgramCompletions(userId: string, programId: string, since: Date) { return period.listProgramCompletions(this.db, userId, programId, since) }
   async listModelPhaseAnswers(userId: string, programSessionIds: string[], since: Date) { return period.listModelPhaseAnswers(this.db, userId, programSessionIds, since) }
   async recordPrescriptionShadow(userId: string, programSessionId: string, shadow: import('@trainingai/shared/ai-periodization/prescription-shadow').PrescriptionShadow): Promise<void> {

@@ -473,6 +473,9 @@ export interface ProgramMoveOptions {
   /** Session types whose plans are voided even when they hold a one-day deload. */
   voidAll?: string[]
   expect?: ProgramMoveExpectation
+  /** #4098: a repair made on a READ path. It skips (`BusyError`) when the person's lift lock is not free,
+   *  instead of waiting the write's 4 s. */
+  read?: boolean
 }
 
 /** Worked out from the rows read under the program's row lock, never from an earlier read: a move
@@ -518,10 +521,10 @@ export interface ProgramPhaseRepo {
   ): Promise<boolean | void>
   /** Under the program's row lock, writes `decide(lockedRows)` on every phased row, leaving phase,
    *  start and plans alone; writes nothing when it returns null. */
-  setProgramPendingTransition(userId: string, programId: string, decide: DecidePending): Promise<void>
+  setProgramPendingTransition(userId: string, programId: string, decide: DecidePending, mode?: { read?: boolean }): Promise<void>
   /** Under the program's row lock, puts every phased row on `decide(lockedRows)` (nothing when
    *  null); only rows that differed lose their plans. */
-  realignProgramPhase(userId: string, programId: string, decide: DecideTarget): Promise<void>
+  realignProgramPhase(userId: string, programId: string, decide: DecideTarget, mode?: { read?: boolean }): Promise<void>
   voidSessionPrescription(userId: string, programSessionId: string): Promise<void>
 }
 
@@ -545,6 +548,9 @@ export async function syncProgramPhase(
   programId: string,
   tz: string,
   now: Date = new Date(),
+  /** #4098: `read: true` from a READ path (a GET): each repair try-locks and is skipped when busy, so the read
+   *  never waits the write's 4 s. A write path (the transition route, a generation) leaves it off. */
+  mode: { read?: boolean } = {},
 ): Promise<ProgramPhaseView> {
   await repo.reconcileSessionsInPhase(userId, programId)
   let rows = await repo.listSessionPeriodizationForProgram(userId, programId)
@@ -559,16 +565,16 @@ export async function syncProgramPhase(
   // Every write below re-decides from the rows it locks (`DecidePending`, `DecideTarget`, the
   // switch's `expect`); this read only says which write to try.
   if (plan.kind === 'aligned' && plan.mark) {
-    await whenFree(() => repo.setProgramPendingTransition(userId, programId, firstReadMark))
+    await whenFree(() => repo.setProgramPendingTransition(userId, programId, firstReadMark, mode))
     rows = await repo.listSessionPeriodizationForProgram(userId, programId)
   }
   if (plan.kind === 'waiting') {
-    if (plan.stamp) await whenFree(() => repo.setProgramPendingTransition(userId, programId, waitingStampFor(completions, tz, now)))
+    if (plan.stamp) await whenFree(() => repo.setProgramPendingTransition(userId, programId, waitingStampFor(completions, tz, now), mode))
     for (const r of phasedRows(rows).filter(staleTypeMoveOffer)) await repo.voidSessionPrescription(userId, r.programSessionId)
   }
   if (plan.kind === 'realign' || plan.kind === 'switch') {
-    if (plan.kind === 'realign') await whenFree(() => repo.realignProgramPhase(userId, programId, realignTargetFor(completions, tz, now)))
-    else await whenFree(() => repo.setProgramPhase(userId, programId, 'accumulation', plan.startsAt, switchOverPendingTransition(), { expect: 'switch-over' }))
+    if (plan.kind === 'realign') await whenFree(() => repo.realignProgramPhase(userId, programId, realignTargetFor(completions, tz, now), mode))
+    else await whenFree(() => repo.setProgramPhase(userId, programId, 'accumulation', plan.startsAt, switchOverPendingTransition(), { expect: 'switch-over', read: mode.read }))
     await repo.reconcileSessionsInPhase(userId, programId)
     rows = await repo.listSessionPeriodizationForProgram(userId, programId)
     completions = await completionsFor(repo, userId, programId, rows, tz)

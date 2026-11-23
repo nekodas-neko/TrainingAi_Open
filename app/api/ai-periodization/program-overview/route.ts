@@ -19,7 +19,7 @@ export async function GET() {
   // Self-heal the per-session phase counts from the real workout history before reading
   // them, so directly-inserted/deleted test sessions can't leave a stale "N sessions". #3766: the
   // same step runs the switch-over to one program phase when it is due, so the list shows it.
-  const programDeload = programDeloadCheckOf(await syncProgramPhase(repo, userId, program.id, tz))
+  const programDeload = programDeloadCheckOf(await syncProgramPhase(repo, userId, program.id, tz, new Date(), { read: true }))
   const states = await repo.listSessionPeriodizationForProgram(userId, program.id)
 
   const today = todayInTz(tz)

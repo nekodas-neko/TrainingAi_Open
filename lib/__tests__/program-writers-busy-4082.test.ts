@@ -69,7 +69,8 @@ describe('the program editor save (#4082 review 2)', () => {
     saveProgram.mockRejectedValueOnce(new BusyError())
     const res = await call(postProgram, 'POST', { program: { ...PROGRAM, id: PROGRAM_ID } })
     expect(res.status).toBe(409)
-    expect(await res.json()).toMatchObject({ error: expect.stringContaining('try again') })
+    // #4098: and it says it is busy, so a queued native save retries it instead of counting a refusal.
+    expect(await res.json()).toMatchObject({ error: expect.stringContaining('try again'), busy: true })
     expect(reportServerError).not.toHaveBeenCalled()
     // The same save goes through once the other writer is done.
     expect((await call(postProgram, 'POST', { program: { ...PROGRAM, id: PROGRAM_ID } })).status).toBe(200)
@@ -81,6 +82,7 @@ describe('the program delete (#4082 review 2)', () => {
     deleteProgram.mockRejectedValueOnce(new BusyError())
     const busy = await call(deleteProgramRoute, 'DELETE', { id: PROGRAM_ID })
     expect(busy.status).toBe(409)
+    expect(await busy.json()).toMatchObject({ busy: true })
     deleteProgram.mockRejectedValueOnce(new Error('connection lost'))
     await expect(call(deleteProgramRoute, 'DELETE', { id: PROGRAM_ID })).rejects.toThrow('connection lost')
     expect((await call(deleteProgramRoute, 'DELETE', { id: PROGRAM_ID })).status).toBe(200)

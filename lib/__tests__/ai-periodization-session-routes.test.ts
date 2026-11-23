@@ -676,6 +676,22 @@ describe('GET …/session/[sessionId] — the stale-baseline auto-heal', () => {
     })
   })
 
+  // #4098: a baseline workout finished while the lock was busy stored its measured anchors by the partial
+  // write. The self-heal completes from them: a personal record only fills what was not measured.
+  it('keeps a measured anchor over a personal record, and asks for the read mode (a busy lock is skipped)', async () => {
+    ensureSessionPeriodization.mockResolvedValue(state({
+      phase: 'baseline', baselineComplete: false, baseline1rm: { [SQUAT]: { kg: 135, source: 'amrap' } },
+    }))
+    loggedSincePhaseStart()
+    listPersonalRecords.mockResolvedValue(new Map([['Squat', 120], ['Curl', 30]]))
+    await getSession()
+    expect(setBaselineComplete.mock.calls[0][2]).toEqual({
+      [SQUAT]: { kg: 135, source: 'amrap' },
+      [CURL]: { kg: 30, source: 'personal_record' },
+    })
+    expect(setBaselineComplete.mock.calls[0][3]).toEqual({ read: true })
+  })
+
   // BF-143 ①. The owner rebuilt a session inside an existing program and it never asked for an
   // AMRAP: the old condition asked whether these exercise NAMES had ever been logged, which is true
   // of every recreated session. The logs must be newer than the phase clock to mean "interrupted".

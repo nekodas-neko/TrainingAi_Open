@@ -1,6 +1,6 @@
 import { eq, and, inArray, asc, desc, sql, isNull, gte, lte } from 'drizzle-orm'
 import { NotFoundError, BusyError } from '@trainingai/shared/errors'
-import { lockLiftWrites, lockWait } from '../../../coach/lock-wait'
+import { lockLiftWrites, lockWait, readLockWait, tryLiftWrites } from '../../../coach/lock-wait'
 import { isLockWaitTimeout } from '@/lib/api/route-errors'
 import { trackPendingWrite } from '@/lib/observability/pending-writes'
 import type { getDb } from '../client'
@@ -100,6 +100,10 @@ export async function ensureSessionPeriodization(db: Db, userId: string, program
   return existing!
 }
 
+/** #4098: `read: true` is a caller on a READ path: it skips its repair when the lock is not free (`BusyError`)
+ *  instead of waiting the write's 4 s. A write leaves it off. */
+export type LockMode = { read?: boolean }
+
 /**
  * #4082 review: one transaction for a writer that updates SEVERAL of a program's stored-plan rows, holding
  * the person's lift-write lock (`lockLiftWrites`, the one a Coach apply and a weekly check-in take first).
@@ -115,9 +119,18 @@ export async function ensureSessionPeriodization(db: Db, userId: string, program
  * its model call before or after. A wait past `lockWait`, a statement timeout or a deadlock rolls the
  * whole transaction back, so nothing was written: reported once, answered as `BusyError` (409).
  */
-export async function withProgramWriteLock<T>(db: Db, userId: string, run: (tx: Tx) => Promise<T>): Promise<T> {
+export async function withProgramWriteLock<T>(db: Db, userId: string, run: (tx: Tx) => Promise<T>, mode: LockMode = {}): Promise<T> {
+  const read = mode.read === true
   try {
     return await db.transaction(async tx => {
+      if (read) {
+        // #4098: a repair on a READ never waits for a writer: the lift lock is try-locked, the row waits are
+        // `readLockWait`, and a miss is a `BusyError` the caller skips (the next read repairs). Not reported:
+        // it is the expected answer while a check-in or a Coach apply holds the lock, and nothing failed.
+        if (!(await tryLiftWrites(tx as never, userId))) throw new BusyError()
+        await tx.execute(sql`SELECT set_config('lock_timeout', ${`${readLockWait.ms}ms`}, true)`)
+        return run(tx)
+      }
       await lockLiftWrites(tx as never, userId)
       // #4082 review 2: the row waits after the lift lock are bounded too, by the same `lockWait`, set LOCAL
       // (it ends with this transaction). Without it they ran to the pool's 15 s `statement_timeout`: past the
@@ -128,6 +141,7 @@ export async function withProgramWriteLock<T>(db: Db, userId: string, run: (tx: 
       return run(tx)
     })
   } catch (err) {
+    if (isLockWaitTimeout(err) && read) throw new BusyError()
     if (isLockWaitTimeout(err)) {
       // Written straight to `error_events` with the same handle: `reportServerError` reaches the database
       // through `@/lib/data`, which would make this slice import its own composition root (as `oura.ts`'s
@@ -294,7 +308,7 @@ async function joiningPhase(tx: Tx, userId: string, programSessionId: string): P
   return joiningPhaseFor(siblings, new Date())
 }
 
-export async function setBaselineComplete(db: Db, userId: string, programSessionId: string, baseline1rm: Record<string, Baseline1rmEntry>): Promise<SessionPeriodization> {
+export async function setBaselineComplete(db: Db, userId: string, programSessionId: string, baseline1rm: Record<string, Baseline1rmEntry>, mode: LockMode = {}): Promise<SessionPeriodization> {
   // #4082 review 2: `joiningPhase` locks ALL of the program's plan rows in id order, so this is a
   // multi-row writer like the phase movers: lift-write lock first, or it cycles with a check-in save.
   return withProgramWriteLock(db, userId, async tx => {
@@ -316,7 +330,7 @@ export async function setBaselineComplete(db: Db, userId: string, programSession
       ))
       .returning()
     return mapPeriodization(row)
-  })
+  }, mode)
 }
 
 /**
@@ -458,7 +472,7 @@ export async function setProgramPhase(
       ))
     if (toVoid.length > 0) await voidPlans(tx, userId, toVoid, now)
     return true
-  })
+  }, { read: opts.read })
 }
 
 /** 'consumed' + no plan is what the open-time trigger regenerates from (as `clearProgramPrescriptions`). */
@@ -475,7 +489,7 @@ async function voidPlans(tx: Tx, userId: string, rowIds: string[], now: Date): P
  * was not already there has its count reset and its plan voided (a held one-day deload excepted);
  * the others keep their plans and just get the mark.
  */
-export async function realignProgramPhase(db: Db, userId: string, programId: string, decide: DecideTarget): Promise<void> {
+export async function realignProgramPhase(db: Db, userId: string, programId: string, decide: DecideTarget, mode: LockMode = {}): Promise<void> {
   await withProgramWriteLock(db, userId, async tx => {
     const locked = await lockProgramRows(tx, userId, programId)
     const target = decide(locked)
@@ -496,14 +510,14 @@ export async function realignProgramPhase(db: Db, userId: string, programId: str
     await tx.update(s.sessionPeriodization)
       .set({ pendingTransition: pending, updatedAt: now })
       .where(and(eq(s.sessionPeriodization.userId, userId), inArray(s.sessionPeriodization.id, phased.map(r => r.id))))
-  })
+  }, mode)
 }
 
 /** A scheduled move on every phased row of the program, phase, start and plans untouched: the
  *  program's mark on its first read, or the switch-over's waiting stamp and date (#3766). `decide`
  *  works it out from the LOCKED rows, so a switch-over landing after the caller's read is not
  *  overwritten by a waiting stamp; null writes nothing. */
-export async function setProgramPendingTransition(db: Db, userId: string, programId: string, decide: DecidePending): Promise<void> {
+export async function setProgramPendingTransition(db: Db, userId: string, programId: string, decide: DecidePending, mode: LockMode = {}): Promise<void> {
   await withProgramWriteLock(db, userId, async tx => {
     const locked = await lockProgramRows(tx, userId, programId)
     const phased = locked.filter(r => r.baselineComplete && r.phase !== 'baseline')
@@ -513,7 +527,7 @@ export async function setProgramPendingTransition(db: Db, userId: string, progra
     await tx.update(s.sessionPeriodization)
       .set({ pendingTransition: pending as unknown as Record<string, unknown>, updatedAt: new Date() })
       .where(and(eq(s.sessionPeriodization.userId, userId), inArray(s.sessionPeriodization.id, phased.map(r => r.id))))
-  })
+  }, mode)
 }
 
 /** The program move made from one session type's screen or generation: moves the program that

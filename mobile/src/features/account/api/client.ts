@@ -56,7 +56,7 @@ export function isValidationRejection(error: unknown): boolean {
 /**
  * The server answered a write with a 4xx in its own JSON error, so it refused this request itself:
  * 400 and 413 from the validation, 404 for a row it does not hold, 401 and 403 from the auth gates.
- * 429 is the rate limit, which says nothing about the write. A 4xx from a proxy or gateway (an HTML
+ * 429 is the rate limit, and a busy 409 is "try again": neither says anything about the write. A 4xx from a proxy or gateway (an HTML
  * or empty body) is not this and is retried without counting.
  */
 export function isRefusedByServer(error: unknown): error is ApiError {
@@ -65,7 +65,10 @@ export function isRefusedByServer(error: unknown): error is ApiError {
     error.validation &&
     error.status >= 400 &&
     error.status < 500 &&
-    error.status !== 429
+    error.status !== 429 &&
+    // A 409 `busy: true` is "try again", not a refusal of this write (#4098): a queue retries it with
+    // its normal backoff and never counts it toward setting the change aside.
+    !error.busy
   );
 }
 /**

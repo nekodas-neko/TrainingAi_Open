@@ -1434,7 +1434,7 @@ export interface WorkoutRepository {
   getSessionPeriodization(userId: string, programSessionId: string): Promise<SessionPeriodization | null>
   // Creates the row if it doesn't exist yet; otherwise returns the existing row unchanged.
   ensureSessionPeriodization(userId: string, programSessionId: string): Promise<SessionPeriodization>
-  setBaselineComplete(userId: string, programSessionId: string, baseline1rm: Record<string, Baseline1rmEntry>): Promise<SessionPeriodization>
+  setBaselineComplete(userId: string, programSessionId: string, baseline1rm: Record<string, Baseline1rmEntry>, mode?: { read?: boolean }): Promise<SessionPeriodization>
   /** BF-131 — the per-exercise 1RM a completed session already wrote, for the baseline hop. */
   getSessionExercise1rms(userId: string, workoutSessionId: string): Promise<{ exerciseName: string; estimated1rm: number }[]>
   /** BF-131 — merge measured anchors in, completing the phase only when every exercise has one. */
@@ -1453,10 +1453,10 @@ export interface WorkoutRepository {
   setProgramPhase(userId: string, programId: string, phase: PeriodizationPhase, startedAt: Date, pendingTransition: PendingTransition | null, opts?: import('@trainingai/shared/ai-periodization/program-phase').ProgramMoveOptions): Promise<boolean>
   /** #3766: write on every phased row the scheduled move `decide` works out from the locked rows
    *  (the program's mark, or the switch-over's wait); null writes nothing. */
-  setProgramPendingTransition(userId: string, programId: string, decide: import('@trainingai/shared/ai-periodization/program-phase').DecidePending): Promise<void>
+  setProgramPendingTransition(userId: string, programId: string, decide: import('@trainingai/shared/ai-periodization/program-phase').DecidePending, mode?: { read?: boolean }): Promise<void>
   /** #3766: re-align a program on one phase whose rows have come to disagree, to the target `decide`
    *  works out from the locked rows. */
-  realignProgramPhase(userId: string, programId: string, decide: import('@trainingai/shared/ai-periodization/program-phase').DecideTarget): Promise<void>
+  realignProgramPhase(userId: string, programId: string, decide: import('@trainingai/shared/ai-periodization/program-phase').DecideTarget, mode?: { read?: boolean }): Promise<void>
   /** #3766: completed sessions of the program since `since`, the input to training weeks. */
   listProgramCompletions(userId: string, programId: string, since: Date): Promise<import('@trainingai/shared/ai-periodization/program-phase').ProgramCompletion[]>
   /** #3766: every raw model phase answer of these session types since `since`, with when it was given. */

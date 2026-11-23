@@ -14,6 +14,13 @@ import type { Db } from './domains/types'
 export const lockWait = { ms: 4000 }
 
 /**
+ * #4098: how long a READ that repairs something (the program-phase sync, the session read's baseline
+ * self-heal) may wait for a lock. A repair is retried by the next read, so a read never waits the 4 s
+ * a write does: it try-locks the lift lock (no wait) and gives its row waits this much, then skips.
+ */
+export const readLockWait = { ms: 300 }
+
+/**
  * Run `take` (the statements that wait for a lock) with `lock_timeout` set for this transaction only,
  * then put the previous value back. `set_config(..., true)` is `SET LOCAL`: it ends with the
  * transaction, or with the savepoint when this runs nested in a caller's transaction and rolls back, so
@@ -49,6 +56,12 @@ export async function lockLiftWrites(db: Db, userId: string): Promise<void> {
   await withBoundedLockWait(db, async () => {
     await db.execute(sql`SELECT pg_advisory_xact_lock(hashtext('lift_writes:user'), hashtext(${userId}))`)
   })
+}
+
+/** #4098: take the lift-write lock only if it is free right now, never waiting. Inside a transaction. */
+export async function tryLiftWrites(db: Db, userId: string): Promise<boolean> {
+  const res = await db.execute(sql`SELECT pg_try_advisory_xact_lock(hashtext('lift_writes:user'), hashtext(${userId})) AS ok`)
+  return res.rows[0]?.ok === true
 }
 
 /**
