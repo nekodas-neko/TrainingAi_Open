@@ -34,7 +34,8 @@ import { holdsOneDayDeload } from '@trainingai/shared/ai-periodization/one-day-d
 import { computePerExerciseDeload } from '@trainingai/shared/ai-periodization/per-exercise-deload'
 import { buildTransitionRationale } from '@trainingai/shared/ai-periodization/transition-rationale'
 import { syncProgramPhase, applyProgramPhaseCap, programMoveTarget, collectVotes, programDeloadFinished, guardMoveTarget, NEXT_PROGRAM_PHASE } from '@trainingai/shared/ai-periodization/program-phase'
-import { aiPlanStatus, isAiPlanProgram, SESSION_UNDER_WAY_WINDOW_MS } from '@trainingai/shared/ai-periodization/plan-status'
+import { aiPlanStatus, isAiPlanProgram } from '@trainingai/shared/ai-periodization/plan-status'
+import { isSessionUnderWay } from '@trainingai/shared/ai-periodization/session-under-way'
 import { DELOAD_LOWER_PCT, DELOAD_REPS, DELOAD_SETS, DELOAD_REST } from '@trainingai/shared/ai-periodization/deload-constants'
 import { generateObject } from 'ai'
 import { loggedGenerateObject } from '@/lib/ai/instrument'
@@ -1237,10 +1238,9 @@ function joinNotes(...notes: Array<string | undefined>): string | undefined {
  * lifter made) is planned as before. A failed read is taken as under way when a plan is in the slot,
  * so a database hiccup never re-plans a session that is being trained.
  *
- * #3900 review (C): under way is any unfinished session of this type with a set logged that started in
- * the last `SESSION_UNDER_WAY_WINDOW_MS`, whatever its local date. It read today's sessions, so a
- * workout started at 23:50 and logged at 00:05 was re-planned after midnight, and the program could
- * move under it at the cap.
+ * #3900 review (C, second review 1): under way is `isSessionUnderWay` (session-under-way.ts), the one
+ * definition the serve paths use too: an unfinished session of this type whose last logged set is
+ * within `SESSION_UNDER_WAY_LAST_SET_WINDOW_MS`, whatever its local date or start time.
  */
 async function sessionUnderWay(
   repo: WorkoutRepository,
@@ -1251,16 +1251,7 @@ async function sessionUnderWay(
   const status = state.prescriptionStatus
   const held = state.prescription
   if (held == null || status === 'none' || status === 'consumed') return null
-  if (typeof repo.listUnfinishedLoggedSessions !== 'function') return null
-  let underWay: boolean
-  try {
-    const ids = await repo.listUnfinishedLoggedSessions(userId, new Date(Date.now() - SESSION_UNDER_WAY_WINDOW_MS))
-    underWay = (ids ?? []).includes(programSessionId)
-  } catch (err) {
-    console.error('[prescribe] reading the sessions under way failed; keeping the stored plan:', err)
-    underWay = true
-  }
-  if (!underWay) return null
+  if (!(await isSessionUnderWay(repo, userId, programSessionId))) return null
   if (status === 'pending' || status === 'auto_applied' || status === 'accepted') {
     return { ok: true, prescription: held, prescriptionStatus: status, estimatedSessionDurationMin: held.estimatedSessionDurationMin }
   }

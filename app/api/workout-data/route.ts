@@ -30,6 +30,8 @@ import { estimateProgramSessionMin } from "@trainingai/shared/workout/program-se
 import { generatePrescriptionForSession } from "@trainingai/shared/ai-periodization/generate-prescription";
 import { fitStoredPlanToCheckinBudget } from "@trainingai/shared/ai-periodization/checkin-plan-budget";
 import { adoptPendingAiPlan } from "@trainingai/shared/ai-periodization/pending-plan-adoption";
+import { isSessionUnderWay, sessionUnderWayCheck } from "@trainingai/shared/ai-periodization/session-under-way";
+import { slotHoldsPlan } from "@trainingai/shared/ai-periodization/plan-status";
 import { regeneratePrescriptionInBackground as regeneratePrescriptionSingleFlight } from "@trainingai/shared/ai-periodization/regenerate-in-background";
 import { loadLiftPreferences } from "@trainingai/shared/ai-periodization/lift-preference-read";
 import { readSessionFromStoredState } from "@trainingai/shared/workout/read-session";
@@ -208,6 +210,9 @@ async function handleWorkoutData(req: NextRequest) {
           [...periodizationBySession.values()].find(s => s?.phase === 'deload'), tz).catch(() => null)
       : null
 
+    // #3900 second review (1): a type with a workout under way keeps the plan it started with.
+    const underWayFor = isAiDynamic ? await sessionUnderWayCheck(repo, userId) : () => false
+
     const perSession: Record<string, {
       exercises: WorkoutExercise[]
       program: typeof program
@@ -230,6 +235,7 @@ async function handleWorkoutData(req: NextRequest) {
         thisSessionCount: sessionCounts.get(programSession.id) ?? 0,
         periodization: aiPeriodizationState,
         programDeload,
+        underWay: underWayFor(programSession.id),
         loggedTodayInThisSession: new Set(
           todayExercises
             .filter(e => e.sessionId === programSession.id)
@@ -287,7 +293,8 @@ async function handleWorkoutData(req: NextRequest) {
           .then(state => state && fitStoredPlanToCheckinBudget(userId, programSession.id, repo, tz, state))
           // #3900 review (H): a plan left `pending` from before the AI plan applied every plan by itself.
           .then(state => state && adoptPendingAiPlan(userId, programSession.id, repo, tz, program, state, {
-            onRegenerate: () => regeneratePrescriptionInBackground(userId, programSession.id, repo, tz),
+            // #3900 second review (2): a poll only reads; it never fires generation (`isPoll`).
+            onRegenerate: isPoll ? undefined : () => regeneratePrescriptionInBackground(userId, programSession.id, repo, tz),
           }))
       : Promise.resolve(null),
     repo.listPersonalRecords(userId),
@@ -416,11 +423,18 @@ async function handleWorkoutData(req: NextRequest) {
   const programDeload = isAiDynamic
     ? await readProgramDeloadCheck(repo, userId, program.id, aiPeriodizationState, tz).catch(() => null)
     : null
-  const aiPrescriptionPending = isAiPrescriptionPending(aiPeriodizationState, { isAiDynamic, isBaselinePhase, programDeload })
+  // #3900 second review (1): while a workout of this type is under way (`isSessionUnderWay`, the one
+  // definition generation uses), the plan it started with keeps driving the bar. It is not pending
+  // after its expiry or deload count passes, it does not fall back to the base numbers, and nothing
+  // regenerates it or re-evaluates it against signals that came in mid-session.
+  const underWay = isAiDynamic && aiPeriodizationState != null && slotHoldsPlan(aiPeriodizationState)
+    ? await isSessionUnderWay(repo, userId, programSession.id)
+    : false
+  const aiPrescriptionPending = isAiPrescriptionPending(aiPeriodizationState, { isAiDynamic, isBaselinePhase, programDeload, underWay })
   const aiDrivesLoad = aiPrescription != null && aiPeriodizationState != null && !aiPrescriptionPending
     && prescriptionDrivesLoad(aiPrescription.phaseAction, aiPeriodizationState.prescriptionStatus)
 
-  if (aiDrivesLoad && aiPrescription && aiPeriodizationState) {
+  if (aiDrivesLoad && aiPrescription && aiPeriodizationState && !underWay) {
     // Consumption-day re-evaluation (AI-2/AI-3) — re-derive per-exercise soreness/injury
     // deloads against TODAY's signals without re-running the LLM.
     //

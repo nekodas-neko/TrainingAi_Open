@@ -13,6 +13,7 @@
 // under way is never re-planned: generation returns its stored plan first (`sessionUnderWay`).
 import { nextMidnightInTz } from '@trainingai/shared/date-utils'
 import { isOneDayDeload } from '@trainingai/shared/ai-periodization/one-day-deload'
+import { isSessionUnderWay } from '@trainingai/shared/ai-periodization/session-under-way'
 import { AI_PRESCRIBED_DELOAD_APPLIES } from '@trainingai/shared/ai-periodization/plan-status'
 import type { SessionPeriodization } from '@trainingai/shared/types/ai-periodization'
 import type { WorkoutRepository } from '@/lib/data/repository'
@@ -53,12 +54,34 @@ export function pendingPlanAdoption(
   }
 }
 
+// #3900 second review (2): a pending move is planned again at most once per plan per local day. The
+// in-flight marker (`regenerate-in-background.ts`) only stops two runs at once, so a model that kept
+// failing was tried again on every read that did not poll. The memory is the process's, keyed by the
+// plan (`prescription_generated_at`) and the local day: a server restart forgets it, so the true worst
+// case is one attempt per pending move per process lifetime per day, and then the 20-an-hour rate limit
+// on the regeneration. A row in the database would survive a restart but would need a migration.
+const regenerationTried = new Map<string, number>()
+
+function regenerationAlreadyTried(userId: string, programSessionId: string, planAt: Date, tz: string, now: Date): boolean {
+  const dayEnds = nextMidnightInTz(tz, now).getTime()
+  for (const [key, ends] of regenerationTried) if (ends <= now.getTime()) regenerationTried.delete(key)
+  const key = `${userId}:${programSessionId}:${planAt.getTime()}:${dayEnds}`
+  if (regenerationTried.has(key)) return true
+  regenerationTried.set(key, dayEnds)
+  return false
+}
+
+/** Test seam: forget which moves were planned again. */
+export function resetRegenerationAttempts(): void {
+  regenerationTried.clear()
+}
+
 /**
  * The stored state as the AI plan serves it (`pendingPlanAdoption`). Only for an `ai_dynamic` program;
  * every other kind, and every state that is not a pending plan, is returned as it came with no query.
  * The write is a compare-and-set on the same pending plan; a failed or lost write serves the state as
- * stored (the next read tries again). `onRegenerate` is called for a move to plan again; a read that
- * passes none leaves it to the workout screen's read, which does.
+ * stored (the next read tries again). `onRegenerate` is called for a move to plan again, once per plan per local day; a read that
+ * passes none (a poll, or a reader that is not the workout screen) leaves it to the workout screen's read.
  */
 export async function adoptPendingAiPlan<T extends SessionPeriodization>(
   userId: string,
@@ -73,8 +96,13 @@ export async function adoptPendingAiPlan<T extends SessionPeriodization>(
   const now = opts.now ?? new Date()
   const adoption = pendingPlanAdoption(state, tz, now)
   if (adoption == null) return state
+  // A workout of this type is under way: its plan is left exactly as it is (nothing promoted, ended or
+  // planned again). Read only for a pending plan the rule would change.
+  if (await isSessionUnderWay(repo, userId, programSessionId, now)) return state
   if (adoption.kind === 'regenerate') {
-    opts.onRegenerate?.()
+    if (opts.onRegenerate && !regenerationAlreadyTried(userId, programSessionId, state.prescriptionGeneratedAt!, tz, now)) {
+      opts.onRegenerate()
+    }
     return state
   }
   if (typeof repo.adoptPendingPrescription !== 'function') return state

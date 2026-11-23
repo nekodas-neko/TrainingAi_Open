@@ -5,7 +5,8 @@ import * as s from '../schema'
 import { shiftDateStr, dateStrMidnightInTz } from '@trainingai/shared/date-utils'
 import { normalizeMuscle } from '@trainingai/shared/muscles'
 import { holdsOneDayDeload } from '@trainingai/shared/ai-periodization/one-day-deload'
-import { SESSION_UNDER_WAY_WINDOW_MS, slotHoldsPlan } from '@trainingai/shared/ai-periodization/plan-status'
+import { slotHoldsPlan } from '@trainingai/shared/ai-periodization/plan-status'
+import { sessionUnderWayCutoff } from '@trainingai/shared/ai-periodization/session-under-way'
 import { oneRmImplausible, MAX_PLAUSIBLE_ONE_RM_KG } from '@trainingai/shared/validation/plausibility'
 import {
   joiningPhaseFor, programMoveMark,
@@ -117,20 +118,29 @@ async function lockProgramRows(tx: Tx, userId: string, programId: string): Promi
 }
 
 /**
- * #3900 review (C): the session types with a workout under way: started since `since`, not finished,
- * not deleted, with at least one logged set. Not filtered on the local date, so a workout that crosses
- * midnight is still under way after it.
+ * #3900 second review (1): the session types with a workout under way: not finished, not deleted, and
+ * with a logged set whose time is at or after `lastSetSince` (`sessionUnderWayCutoff`). The time of a
+ * workout's last set is the latest of its exercise logs' `logged_at` and its sets' `set_end_ms`, which
+ * are the phone's clock; `updated_at` is not used, because a late sync stamps it with the push's time.
+ * The start of the workout and the local date do not decide it: a workout across midnight is under
+ * way, and one abandoned half-done is not once its last set is old.
  */
-export async function listUnfinishedLoggedSessions(db: Db | Tx, userId: string, since: Date): Promise<string[]> {
+export async function listUnfinishedLoggedSessions(db: Db | Tx, userId: string, lastSetSince: Date): Promise<string[]> {
   const rows = await db.execute(sql`
-    SELECT DISTINCT ws.session_id AS program_session_id
-    FROM workout_sessions ws
-    WHERE ws.user_id = ${userId}
-      AND ws.session_id IS NOT NULL
-      AND ws.deleted_at IS NULL
-      AND ws.completed_at IS NULL
-      AND ws.started_at >= ${since.toISOString()}::timestamptz
-      AND EXISTS (SELECT 1 FROM exercise_logs el WHERE el.workout_session_id = ws.id AND el.deleted_at IS NULL)
+    SELECT DISTINCT last_sets.program_session_id
+    FROM (
+      SELECT ws.session_id AS program_session_id,
+             GREATEST(max(el.logged_at), to_timestamp(max(sl.set_end_ms) / 1000.0)) AS last_set_at
+      FROM workout_sessions ws
+      JOIN exercise_logs el ON el.workout_session_id = ws.id AND el.deleted_at IS NULL
+      LEFT JOIN set_logs sl ON sl.exercise_log_id = el.id AND sl.deleted_at IS NULL
+      WHERE ws.user_id = ${userId}
+        AND ws.session_id IS NOT NULL
+        AND ws.deleted_at IS NULL
+        AND ws.completed_at IS NULL
+      GROUP BY ws.id, ws.session_id
+    ) last_sets
+    WHERE last_sets.last_set_at >= ${lastSetSince.toISOString()}::timestamptz
   `)
   return (rows.rows as Array<{ program_session_id: string }>).map(r => r.program_session_id)
 }
@@ -148,7 +158,7 @@ async function underWaySlots(tx: Tx, userId: string, programId: string, rows: Se
   if (program?.phaseMode !== 'ai_dynamic') return new Set()
   const withPlan = rows.filter(slotHoldsPlan)
   if (withPlan.length === 0) return new Set()
-  const underWay = new Set(await listUnfinishedLoggedSessions(tx, userId, new Date(Date.now() - SESSION_UNDER_WAY_WINDOW_MS)))
+  const underWay = new Set(await listUnfinishedLoggedSessions(tx, userId, sessionUnderWayCutoff()))
   return new Set(withPlan.filter(r => underWay.has(r.programSessionId)).map(r => r.id))
 }
 

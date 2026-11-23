@@ -8715,7 +8715,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async clearProgramPrescriptions(userId: string, programId: string) { return period.clearProgramPrescriptions(this.db, userId, programId) }
   async updatePrescriptionStatus(userId: string, programSessionId: string, status: PrescriptionStatus) { return period.updatePrescriptionStatus(this.db, userId, programSessionId, status) }
   async voidSessionPrescription(userId: string, programSessionId: string) { return period.voidSessionPrescription(this.db, userId, programSessionId) }
-  async listUnfinishedLoggedSessions(userId: string, since: Date) { return period.listUnfinishedLoggedSessions(this.db, userId, since) }
+  async listUnfinishedLoggedSessions(userId: string, lastSetSince: Date) { return period.listUnfinishedLoggedSessions(this.db, userId, lastSetSince) }
   async adoptPendingPrescription(userId: string, programSessionId: string, generatedAt: Date, status: PrescriptionStatus, expiresAt: Date) { return period.adoptPendingPrescription(this.db, userId, programSessionId, generatedAt, status, expiresAt) }
   async updatePrescriptionExercisesCache(userId: string, programSessionId: string, prescription: AiPrescription) { return period.updatePrescriptionExercisesCache(this.db, userId, programSessionId, prescription) }
   async replacePrescriptionIfUnchanged(userId: string, programSessionId: string, before: AiPrescription, after: AiPrescription) { return period.replacePrescriptionIfUnchanged(this.db, userId, programSessionId, before, after) }

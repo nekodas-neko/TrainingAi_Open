@@ -1478,7 +1478,7 @@ export interface WorkoutRepository {
   updatePrescriptionStatus(userId: string, programSessionId: string, status: PrescriptionStatus): Promise<void>
   /** #3900 review (C): the session types with a workout under way (started since `since`, not finished,
    *  a set logged), whatever its local date. Optional: without it generation treats none as under way. */
-  listUnfinishedLoggedSessions?(userId: string, since: Date): Promise<string[]>
+  listUnfinishedLoggedSessions?(userId: string, lastSetSince: Date): Promise<string[]>
   /** #3900 review (H): bring a plan stored `pending` before #3900 under the AI plan's rule, only while it
    *  is still that plan (`pending`, generated at `generatedAt`). True when it wrote. */
   adoptPendingPrescription?(userId: string, programSessionId: string, generatedAt: Date, status: PrescriptionStatus, expiresAt: Date): Promise<boolean>

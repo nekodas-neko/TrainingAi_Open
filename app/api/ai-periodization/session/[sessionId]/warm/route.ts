@@ -10,6 +10,8 @@ import {
   type GeneratePrescriptionResult,
 } from '@trainingai/shared/ai-periodization/generate-prescription'
 import { regeneratePrescriptionInBackground as regeneratePrescriptionSingleFlight } from '@trainingai/shared/ai-periodization/regenerate-in-background'
+import { isSessionUnderWay } from '@trainingai/shared/ai-periodization/session-under-way'
+import { slotHoldsPlan } from '@trainingai/shared/ai-periodization/plan-status'
 import { isAiPrescriptionPending } from '@trainingai/shared/ai-periodization/prescription-pending'
 import { prescriptionAgedOut } from '@trainingai/shared/ai-periodization/reevaluate'
 import { readProgramDeloadCheck } from '@trainingai/shared/ai-periodization/program-phase'
@@ -70,8 +72,12 @@ export async function POST(
   const programDeload = isAiDynamic
     ? await readProgramDeloadCheck(repo, userId, program.id, state, tz).catch(() => null)
     : null
-  const needed = isAiDynamic && !isBaselinePhase && state != null && (
-    isAiPrescriptionPending(state, { isAiDynamic, isBaselinePhase, programDeload }) || prescriptionAgedOut(state)
+  // #3900 second review (1): a workout under way keeps the plan it started with; nothing warms over it.
+  const underWay = isAiDynamic && state != null && slotHoldsPlan(state)
+    ? await isSessionUnderWay(repo, userId, programSessionId)
+    : false
+  const needed = isAiDynamic && !isBaselinePhase && state != null && !underWay && (
+    isAiPrescriptionPending(state, { isAiDynamic, isBaselinePhase, programDeload, underWay }) || prescriptionAgedOut(state)
   )
   if (!needed) return NextResponse.json({ status: 'not_needed' })
 

@@ -23,7 +23,9 @@ import { shouldTriggerEmergencyDeload } from '../emergency-deload'
 import { reevaluatePrescriptionForToday } from '../reevaluate'
 import { prescriptionDrivesLoad } from '../apply-prescription'
 import { rowUnderFull } from '../prescription-figures'
-import { pendingPlanAdoption, adoptPendingAiPlan } from '../pending-plan-adoption'
+import { pendingPlanAdoption, adoptPendingAiPlan, resetRegenerationAttempts } from '../pending-plan-adoption'
+import { isSessionUnderWay, SESSION_UNDER_WAY_LAST_SET_WINDOW_MS } from '../session-under-way'
+import { isAiPrescriptionPending } from '../prescription-pending'
 
 const mocks = vi.hoisted(() => ({
   signals: null as unknown, answer: null as unknown, fail: false, calls: 0, prompts: [] as string[],
@@ -102,7 +104,7 @@ let users = 0
  */
 function program(opts: {
   kind?: Kind; tz?: string; now: Date; phase?: PeriodizationPhase; weeksDone: number
-  voters?: boolean; waiting?: boolean; underWay?: boolean | 'throws' | { startedAt: Date }; checkinBudgetMin?: number | null
+  voters?: boolean; waiting?: boolean; underWay?: boolean | 'throws' | { lastSetAt: Date }; checkinBudgetMin?: number | null
   stored?: { prescription: AiPrescription; status: PrescriptionStatus; expiresAt?: Date }
 }) {
   const tz = opts.tz ?? BRISBANE
@@ -159,20 +161,12 @@ function program(opts: {
     realignProgramPhase: async () => undefined,
     voidSessionPrescription: async () => undefined,
     recordPrescriptionShadow: async () => undefined,
-    // main's read (before review C): today's sessions only, by local date, as the adapter filters them.
-    getDaySessionSummaries: async (_u: string, date: string, tz: string) => {
+    // The adapter's query: unfinished sessions whose last logged set is at or after `lastSetSince`, any local date.
+    listUnfinishedLoggedSessions: async (_u: string, lastSetSince: Date) => {
       if (opts.underWay === 'throws') throw new Error('read failed')
       if (!opts.underWay) return []
-      const startedAt = opts.underWay === true ? new Date(opts.now.getTime() - 1_800_000) : opts.underWay.startedAt
-      const local = new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(startedAt).replace(/-/g, '/')
-      return local === date ? [{ sessionId: 'push', sessionName: 'Push', startedAt }] : []
-    },
-    // The adapter's query: unfinished sessions with a set logged, started since `since`, any local date.
-    listUnfinishedLoggedSessions: async (_u: string, since: Date) => {
-      if (opts.underWay === 'throws') throw new Error('read failed')
-      if (!opts.underWay) return []
-      const startedAt = opts.underWay === true ? new Date(opts.now.getTime() - 1_800_000) : opts.underWay.startedAt
-      return startedAt >= since ? ['push'] : []
+      const lastSetAt = opts.underWay === true ? new Date(opts.now.getTime() - 600_000) : opts.underWay.lastSetAt
+      return lastSetAt >= lastSetSince ? ['push'] : []
     },
     // The adapter's compare-and-set: the move lands only on rows still on the expected phase and start.
     advanceProgramPhase: async (_u: string, id: string, newPhase: PeriodizationPhase, expected?: { phase: string; phaseStartedAt: Date }) => {
@@ -199,7 +193,7 @@ function program(opts: {
   const repo = new Proxy({}, { get: (_t, prop: string) => known[prop] ?? (async () => undefined) }) as WorkoutRepository
   const user = `u-3900-${++users}`
   return {
-    db, log, start, tz,
+    db, log, start, tz, repo, user,
     // A completion-path call (`excludeSessionId`) skips the read-through cooldown, as a re-plan would.
     run: (exclude?: string) => generatePrescriptionForSession(user, 'push', repo, tz, exclude),
   }
@@ -208,6 +202,7 @@ function program(opts: {
 const NOW = new Date('2026-11-25T12:00:00+10:00') // Wednesday, Brisbane
 
 beforeEach(() => {
+  resetRegenerationAttempts()
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(NOW)
   mocks.calls = 0
@@ -755,11 +750,11 @@ describe('review C: a workout that crosses local midnight is still under way', (
   const held = { phase: 'accumulation', phaseAction: 'stay', reasoning: 'Held.', confidence: 0.9, deload: false,
     estimatedSessionDurationMin: 50, weeklyVolumeContribution: {},
     exercises: [{ sessionExerciseId: 'p', name: 'Lift p', sets: 3, reps: 5, pct: 70, restSec: 180 }] } as AiPrescription
-  const startedAt = new Date('2026-11-24T23:50:00-06:00')
+  const lastSetAt = new Date('2026-11-24T23:55:00-06:00') // started 23:50
   for (const [side, now] of [['before', new Date('2026-11-24T23:58:00-06:00')], ['after', new Date('2026-11-25T00:05:00-06:00')]] as const) {
     it(`${side} midnight, at the window cap: the stored plan, no model call, no move`, async () => {
       vi.setSystemTime(now)
-      const h = program({ kind: 'ai_dynamic', tz: TZ, now, weeksDone: CAP.accumulation, underWay: { startedAt }, stored: { prescription: held, status: 'auto_applied' } })
+      const h = program({ kind: 'ai_dynamic', tz: TZ, now, weeksDone: CAP.accumulation, underWay: { lastSetAt }, stored: { prescription: held, status: 'auto_applied' } })
       const r = ok(await h.run())
       expect(r.prescription).toEqual(held)
       expect(mocks.calls).toBe(0)
@@ -767,10 +762,10 @@ describe('review C: a workout that crosses local midnight is still under way', (
       expect(h.log.stores).toEqual([])
     })
   }
-  it('a session left open for longer than the window is not under way: the slot is planned', async () => {
-    const now = new Date('2026-11-26T12:00:00-06:00') // 36 h 10 min after the start
+  it('a session whose last set is older than the window is not under way: the slot is planned', async () => {
+    const now = new Date(lastSetAt.getTime() + SESSION_UNDER_WAY_LAST_SET_WINDOW_MS + 600_000) // 5 h 10 min after the last set
     vi.setSystemTime(now)
-    const h = program({ kind: 'ai_dynamic', tz: TZ, now, weeksDone: 2, underWay: { startedAt }, stored: { prescription: held, status: 'auto_applied', expiresAt: new Date(now.getTime() - 1) } })
+    const h = program({ kind: 'ai_dynamic', tz: TZ, now, weeksDone: 2, underWay: { lastSetAt }, stored: { prescription: held, status: 'auto_applied', expiresAt: new Date(now.getTime() - 1) } })
     ok(await h.run())
     expect(h.log.stores).toHaveLength(1)
   })
@@ -883,5 +878,139 @@ describe('review H: a plan left pending from before #3900 is brought under the n
     const repo = { adoptPendingPrescription: async () => false } as unknown as WorkoutRepository
     const st = state(plan({})) as never
     expect(await adoptPendingAiPlan('u', 'push', repo, BRISBANE, { phaseMode: 'ai_dynamic' }, st, { now: NOW })).toBe(st)
+  })
+})
+
+describe('second review (1): one definition of "under way", read from the last set, on every path', () => {
+  const HOUR = 3_600_000
+  const deloadPlan = { phase: 'deload', phaseAction: 'deload_recommended', reasoning: 'Emergency deload: x.', confidence: 1, deload: true,
+    estimatedSessionDurationMin: 30, weeklyVolumeContribution: {},
+    exercises: [{ sessionExerciseId: 'p', name: 'Lift p', sets: 2, reps: 6, pct: 50, restSec: 120, deloaded: true }] } as AiPrescription
+  const planned = (stored: { expiresAt: Date }) => ({ prescription: deloadPlan, status: 'auto_applied' as const, expiresAt: stored.expiresAt })
+  /** What `/api/workout-data` asks of the stored slot, with the same function generation asks. */
+  const pendingOnServe = async (h: ReturnType<typeof program>, now: Date) => {
+    const state = h.db.get('push')!
+    const underWay = await isSessionUnderWay(h.repo, h.user, 'push', now)
+    return { underWay, pending: isAiPrescriptionPending(state, { isAiDynamic: true, isBaselinePhase: false, underWay }, now) }
+  }
+
+  it('R1: started 40 minutes ago, the applied one-day deload expired 5 minutes ago: same plan, 0 model calls, not pending on the serve path', async () => {
+    const lastSetAt = new Date(NOW.getTime() - 10 * 60_000)
+    const h = program({ kind: 'ai_dynamic', now: NOW, weeksDone: 2, underWay: { lastSetAt }, stored: planned({ expiresAt: new Date(NOW.getTime() - 5 * 60_000) }) })
+    expect(await pendingOnServe(h, NOW)).toEqual({ underWay: true, pending: false })
+    const r = ok(await h.run())
+    expect(r.prescription).toEqual(deloadPlan)
+    expect(r.prescriptionStatus).toBe('auto_applied')
+    expect(mocks.calls).toBe(0)
+    expect(h.log.stores).toEqual([])
+    // The same slot with nothing under way is aged out on both paths (the control).
+    const idle = program({ kind: 'ai_dynamic', now: NOW, weeksDone: 2, stored: planned({ expiresAt: new Date(NOW.getTime() - 5 * 60_000) }) })
+    expect(await pendingOnServe(idle, NOW)).toEqual({ underWay: false, pending: true })
+  })
+
+  it('R2: one set logged 19 hours ago and never finished, yesterday\'s deload expired 8 hours ago: both paths say aged out, and it is re-planned', async () => {
+    const lastSetAt = new Date(NOW.getTime() - 19 * HOUR)
+    const h = program({ kind: 'ai_dynamic', now: NOW, weeksDone: 2, underWay: { lastSetAt }, stored: planned({ expiresAt: new Date(NOW.getTime() - 8 * HOUR) }) })
+    expect(await pendingOnServe(h, NOW)).toEqual({ underWay: false, pending: true })
+    mocks.answer = answer('accumulation', 'stay')
+    const r = ok(await h.run())
+    expect(r.prescription.phaseAction).toBe('stay')
+    expect(mocks.calls).toBe(1)
+    expect(h.log.stores).toHaveLength(1)
+  })
+
+  for (const [tz, label] of [['Asia/Tokyo', 'east of UTC'], ['America/Los_Angeles', 'west of UTC']] as const) {
+    it(`a 3-hour workout across local midnight, ${label} (${tz}): the plan it started with, on both paths`, async () => {
+      const start = new Date(dateStrMidnightInTz('2026-11-25', tz).getTime() - HOUR) // 23:00 local
+      const lastSetAt = new Date(start.getTime() + 2.8 * HOUR) // 01:48 local, the next day
+      const now = new Date(start.getTime() + 3 * HOUR)
+      vi.setSystemTime(now)
+      const midnight = dateStrMidnightInTz('2026-11-25', tz)
+      const h = program({ kind: 'ai_dynamic', tz, now, weeksDone: 2, underWay: { lastSetAt }, stored: planned({ expiresAt: midnight }) })
+      expect(await pendingOnServe(h, now)).toEqual({ underWay: true, pending: false })
+      const r = ok(await h.run())
+      expect(r.prescription).toEqual(deloadPlan)
+      expect(mocks.calls).toBe(0)
+      expect(h.log.stores).toEqual([])
+    })
+  }
+
+  it('a session abandoned yesterday evening and the same type trained this morning is re-planned: one model call', async () => {
+    const lastSetAt = new Date(NOW.getTime() - 14 * HOUR) // 22:00 yesterday
+    const h = program({ kind: 'ai_dynamic', now: NOW, weeksDone: 2, underWay: { lastSetAt }, stored: planned({ expiresAt: new Date(NOW.getTime() - 12 * HOUR) }) })
+    mocks.answer = answer('accumulation', 'stay')
+    ok(await h.run())
+    expect(mocks.calls).toBe(1)
+    expect(h.log.stores).toHaveLength(1)
+  })
+
+  it('an illness check-in after an abandoned half-workout re-plans that type; the same check-in mid-workout does not', async () => {
+    const sick = signals({ selfReportedSick: true, hoursSinceLastSession: 20 })
+    mocks.signals = sick
+    const accumulationStay = { ...deloadPlan, phase: 'accumulation', phaseAction: 'stay', deload: false, reasoning: 'Held.' } as AiPrescription
+    const stored = { prescription: accumulationStay, status: 'auto_applied' as const, expiresAt: new Date(NOW.getTime() + 3 * DAY) }
+    const abandoned = program({ kind: 'ai_dynamic', now: NOW, weeksDone: 2, underWay: { lastSetAt: new Date(NOW.getTime() - 19 * HOUR) }, stored })
+    const r = ok(await abandoned.run())
+    expect(r.prescription.phaseAction).toBe('deload_recommended')
+    expect(abandoned.log.stores).toHaveLength(1)
+    const midWorkout = program({ kind: 'ai_dynamic', now: NOW, weeksDone: 2, underWay: { lastSetAt: new Date(NOW.getTime() - 10 * 60_000) }, stored })
+    expect(ok(await midWorkout.run()).prescription).toEqual(accumulationStay)
+    expect(midWorkout.log.stores).toEqual([])
+  })
+
+  it('the window is the last set\'s age: 4 h 59 min is under way, 5 h 01 min is not', async () => {
+    for (const [age, expected] of [[SESSION_UNDER_WAY_LAST_SET_WINDOW_MS - 60_000, true], [SESSION_UNDER_WAY_LAST_SET_WINDOW_MS + 60_000, false]] as const) {
+      const repo = { listUnfinishedLoggedSessions: async (_u: string, since: Date) => (new Date(NOW.getTime() - age) >= since ? ['push'] : []) } as unknown as WorkoutRepository
+      expect(await isSessionUnderWay(repo, 'u', 'push', NOW)).toBe(expected)
+    }
+  })
+
+  it('a pending plan of a session under way is left exactly as it is: nothing promoted, ended or planned again', async () => {
+    const writes: unknown[] = []
+    const regenerations: number[] = []
+    const repo = {
+      listUnfinishedLoggedSessions: async () => ['push'],
+      adoptPendingPrescription: async (...a: unknown[]) => { writes.push(a); return true },
+    } as unknown as WorkoutRepository
+    const generatedAt = new Date(NOW.getTime() - 2 * HOUR)
+    const pending = (p: AiPrescription) => ({ prescription: p, prescriptionStatus: 'pending', prescriptionExpiresAt: new Date(NOW.getTime() + DAY), prescriptionGeneratedAt: generatedAt }) as never
+    for (const p of [deloadPlan, { ...deloadPlan, phase: 'intensification', phaseAction: 'transition_recommended', deload: false } as AiPrescription, { ...deloadPlan, phaseAction: 'stay', deload: false } as AiPrescription]) {
+      const st = pending(p)
+      expect(await adoptPendingAiPlan('u', 'push', repo, BRISBANE, { phaseMode: 'ai_dynamic' }, st, { now: NOW, onRegenerate: () => regenerations.push(1) })).toBe(st)
+    }
+    expect(writes).toEqual([])
+    expect(regenerations).toEqual([])
+  })
+})
+
+describe('second review (2): a poll never fires generation, and a move is planned again once per plan per day', () => {
+  const move = (generatedAt: Date) => ({
+    prescription: { phase: 'intensification', phaseAction: 'transition_recommended', reasoning: 'x', confidence: 0.9, deload: false, estimatedSessionDurationMin: 50,
+      weeklyVolumeContribution: {}, exercises: [{ sessionExerciseId: 'p', name: 'Lift p', sets: 3, reps: 5, pct: 72, restSec: 180 }] },
+    prescriptionStatus: 'pending', prescriptionExpiresAt: new Date(generatedAt.getTime() + DAY * 3), prescriptionGeneratedAt: generatedAt,
+  }) as never
+  const repo = {} as unknown as WorkoutRepository
+
+  it('R7: six polls (no onRegenerate) make no model attempt; the plan stays pending', async () => {
+    const st = move(new Date(NOW.getTime() - 3_600_000))
+    let attempts = 0
+    // The workout-data route passes no `onRegenerate` on `poll=1`.
+    for (let i = 0; i < 6; i++) expect(await adoptPendingAiPlan('u', 'push', repo, BRISBANE, { phaseMode: 'ai_dynamic' }, st, { now: NOW })).toBe(st)
+    expect(attempts).toBe(0)
+    // Six reads that are not polls, with the model failing every time, make one attempt.
+    for (let i = 0; i < 6; i++) await adoptPendingAiPlan('u', 'push', repo, BRISBANE, { phaseMode: 'ai_dynamic' }, st, { now: NOW, onRegenerate: () => { attempts++ } })
+    expect(attempts).toBe(1)
+  })
+
+  it('a new plan, or the next local day, is tried again', async () => {
+    let attempts = 0
+    const go = (st: never, now: Date) => adoptPendingAiPlan('u', 'push', repo, BRISBANE, { phaseMode: 'ai_dynamic' }, st, { now, onRegenerate: () => { attempts++ } })
+    await go(move(new Date(NOW.getTime() - 3_600_000)), NOW)
+    await go(move(new Date(NOW.getTime() - 3_600_000)), NOW)
+    expect(attempts).toBe(1)
+    await go(move(new Date(NOW.getTime() - 1_800_000)), NOW)
+    expect(attempts).toBe(2)
+    await go(move(new Date(NOW.getTime() - 3_600_000)), new Date(NOW.getTime() + DAY))
+    expect(attempts).toBe(3)
   })
 })
