@@ -1,6 +1,6 @@
 import type { AiPrescription, AiPrescriptionExercise } from '@trainingai/shared/types/ai-periodization'
 import { computePerExerciseDeload, RECENTLY_TRAINED_NOTE_PREFIX, type PerExerciseDeloadInput } from './per-exercise-deload'
-import { shouldTriggerEmergencyDeload, type EmergencySignals, type EmergencyState } from './emergency-deload'
+import { shouldTriggerEmergencyDeload, emergencyDeloadTrigger, type EmergencySignals, type EmergencyState } from './emergency-deload'
 import type { IllnessFlag } from '@trainingai/shared/health/illness-radar'
 import { recostPrescription, rowNumbersMoved, type FigureSignals } from './prescription-figures'
 import { prescriptionAgedOut } from './prescription-expiry'
@@ -190,13 +190,16 @@ export function reevaluatePrescriptionForToday(
   // Under way, the re-plan a signal calls for cannot land, so every row is lightened (the per-exercise
   // deload, applied to the whole session) with the reason the re-plan would have given.
   if (underWay && (emergency || perEx.outcome === 'whole_session')) {
+    // The reason shown is the one that fired: the emergency trigger's own note (illness, or several
+    // sore muscles after a recent session), never "unwell" for a session lightened for soreness.
+    const emergencyNote = emergency ? emergencyDeloadTrigger(emergencySignals)?.note : undefined
+    const soreNote = perEx.outcome === 'whole_session' && perEx.matchedMuscles.length > 0
+      ? `Deload — ${perEx.matchedMuscles.map(m => m.toLowerCase()).join(' & ')} still sore`
+      : undefined
+    const wholeNote = soreNote ?? emergencyNote ?? 'Deload — several muscles are sore'
     for (const ex of signals.exercises) {
       nowDeloadedIds.add(ex.sessionExerciseId)
-      if (!notes[ex.sessionExerciseId]) {
-        notes[ex.sessionExerciseId] = perEx.outcome === 'whole_session' && perEx.matchedMuscles.length > 0
-          ? `Deload — ${perEx.matchedMuscles.map(m => m.toLowerCase()).join(' & ')} still sore`
-          : 'Deload — you reported feeling unwell'
-      }
+      if (!notes[ex.sessionExerciseId]) notes[ex.sessionExerciseId] = wholeNote
     }
   }
   if (illnessDeload) {

@@ -1051,6 +1051,20 @@ describe('third review (1) and (3): the held plan and the re-evaluation, without
     const r = reevaluatePrescriptionForToday(plan, signalsOf({ selfReportedSick: true }), state({ underWay: true, prescriptionExpiresAt: new Date(NOW.getTime() + DAY) }), NOW)
     expect(r.needsRegenerate).toBe(false)
     expect(r.prescription.exercises.every(e => e.deloaded === true && e.pct < 60)).toBe(true)
+    expect(r.prescription.exercises.every(e => e.deloadNote === 'Deload — you reported feeling unwell')).toBe(true)
+  })
+
+  it('under way, the reason shown is the one that fired: soreness after a recent session never reads as unwell', () => {
+    // Three sore muscles within 36 hours of the last session is the emergency soreness trigger; none
+    // of them is a muscle this session trains, so the per-exercise path has nothing to name.
+    const sore = signalsOf({ soreMusclesInSession: ['calves', 'forearms', 'neck'], hoursSinceLastSession: 20 })
+    const r = reevaluatePrescriptionForToday(plan, sore, state({ underWay: true, prescriptionExpiresAt: new Date(NOW.getTime() + DAY) }), NOW)
+    expect(r.needsRegenerate).toBe(false)
+    expect(r.prescription.exercises.every(e => e.deloaded === true)).toBe(true)
+    for (const e of r.prescription.exercises) {
+      expect(e.deloadNote).not.toMatch(/unwell/)
+      expect(e.deloadNote).toMatch(/sore/)
+    }
   })
 
   it('under way, soreness on most of the session lightens every row (the whole-session outcome)', () => {
