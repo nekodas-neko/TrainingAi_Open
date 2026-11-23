@@ -58,6 +58,20 @@ describe('model call schemas are under the Gemini schema check (#4060)', () => {
     ]))
   })
 
+  // The scan above reads `generateObject(` / `streamObject(` by name. These are the ways to hand a
+  // model a schema that it would not see, so they are refused outright until the scan learns them.
+  it('no model call takes its schema by a route the scan cannot read', () => {
+    const unseen = sources.flatMap(({ file, text }) => {
+      const src = stripComments(text)
+      return [
+        /\b(?:generateObject|streamObject)\s+as\s+\w+/,
+        /\bOutput\s*\.\s*object\s*\(/,
+        /\bexperimental_output\b/,
+      ].filter(re => re.test(src)).map(re => `${file}: ${re.source}`)
+    })
+    expect(unseen).toEqual([])
+  })
+
   it('every call names its schema as an identifier, never an inline z.object(...)', () => {
     expect(sites.filter(s => !/^[A-Za-z_]\w*$/.test(s.schema)).map(s => `${s.file}: schema: ${s.schema}`)).toEqual([])
   })
