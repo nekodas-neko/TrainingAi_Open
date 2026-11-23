@@ -103,6 +103,28 @@ service, then paste both to the Orchestrator.
 Retry just that half: **Actions** → **Android** → **Run workflow** → `main`, **release_tag** =
 `v<version>`. It rebuilds from the tag and attaches `app-v<version>.apk`.
 
+**If *Tag and publish notes* fails before the tag was created:** production is already serving the
+release, but there is no tag and no release page. GitHub refuses to let the workflow create a tag at
+a commit whose `.github/workflows` files differ from `main`'s (the log says "without `workflows`
+permission"; this happened on 1.531.0). A normal release now stops in *Verify* before it deploys
+anything for that reason, so you meet this only after a **hotfix**, which warns instead. You make the
+tag yourself, one command from a machine with `gh`:
+`gh release create v<version> --target <sha> --title v<version> --generate-notes --notes-start-tag <previous tag>`
+(`<sha>` is the commit the run deployed, shown in the run's *Verify* step; `<previous tag>` is the
+`v*` tag before it). Or by hand: **Code** → **Releases** → **Draft a new release** → type
+`v<version>` as the tag → **Target** → **Recent Commits** → pick the released commit → **Previous
+tag** → **Generate release notes** → **Publish release**. **Check the target is the released commit,
+not `main`**: the tag is permanent. Then go back to the release run and **Re-run failed jobs**: the
+tag and the notes now exist, so those steps skip themselves and *Attach the APK* runs. Or, instead of
+re-running, start **Actions** → **Android** → **Run workflow** → `main`, **release_tag** = `v<version>`.
+(Don't use **Re-run all jobs**: it runs *Verify* again, which refuses a version whose tag exists.)
+**Re-run failed jobs** uses the workflow file of the ORIGINAL run, so a run that started before this
+fix (the 1.531.0 run) cannot be finished that way; for it, make the release by hand and start the
+Android workflow with `release_tag`. A *draft* release is not seen by the "release exists" check, so
+publish it rather than leaving it as a draft. *Verify* compares the workflow files once, so merge
+nothing that changes `.github/workflows/` while a release run is in progress; if one slips in, the tag
+job tries the push anyway and, if GitHub refuses it, says so and why, and the recovery is the one above.
+
 **If *Tag and publish notes* fails after the tag was created:** production is already serving the
 release and the tag is permanent, so only the release page is missing. **Code** → **Releases** →
 **Draft a new release** → **Choose a tag** → pick the existing `v<version>` → title `v<version>` →

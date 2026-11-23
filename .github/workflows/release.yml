@@ -128,6 +128,18 @@ jobs:
             exit 1
           fi
 
+          # #4051. GitHub refuses to let this workflow's token create a tag at a commit whose
+          # `.github/workflows` files differ from main's ("without `workflows` permission"). That
+          # refusal only arrives at the tag step, after the deploy, which left release 1.531.0 live
+          # with no tag. So ask now, while stopping is still free. A release of main's head, or of a
+          # commit with no workflow change since, passes. A hotfix branch can differ from main by
+          # design and a hotfix ships when production is broken, so there it is a loud warning and
+          # the owner makes the tag. The comparison and the messages are in the script.
+          # This is a SNAPSHOT of main taken now. A workflow change that merges to main after this
+          # step and before the tag job is caught again by the tag job, but only after the deploy,
+          # so merge nothing under `.github/workflows/` while a release run is in progress.
+          node scripts/release-guards.js drift "$SHA" "$MODE"
+
           echo "mode=$MODE" >> "$GITHUB_OUTPUT"
           echo "sha=$SHA" >> "$GITHUB_OUTPUT"
           echo "$MODE of v$VERSION from $SHA"
@@ -236,10 +248,19 @@ jobs:
         # Created only now, once production is confirmed serving this commit. The ruleset blocks
         # updates and deletions, so this is permanent — which is the point: redeploying a tag is
         # the rollback, and it must always mean the same commit.
-        run: |
-          set -euo pipefail
-          git tag "v$VERSION" "$SHA"
-          git push origin "v$VERSION"
+        #
+        # Safe to re-run (#4051). If the tag is already on the remote at exactly this commit (the
+        # owner made it by hand after the push was refused) the step skips it and the job goes on
+        # to the notes. At any other commit it fails and nothing is moved. `verify` still refuses
+        # an existing tag on a FRESH run, and on "Re-run all jobs", which re-runs `verify`. A
+        # "Re-run failed jobs" does not re-run `verify`, so only that path reaches an existing tag.
+        # A tag already at this commit is answered first. Otherwise the push is always attempted:
+        # production is already live, so not trying protects nothing, and in hotfix mode the
+        # workflow files differ from main's by design. If the files differ, a warning is printed
+        # first. If the push fails, the script fetches main again: with differing files it says
+        # production is live, the tag was not created and how to make it; without, it reports git's
+        # own error. Git's message is quoted either way.
+        run: node scripts/release-guards.js tag "$VERSION" "$SHA"
 
       - name: Publish the release notes
         env:
@@ -254,8 +275,19 @@ jobs:
         # over 125,000 characters. That left a tag with no release, because the tag is pushed
         # first and cannot be withdrawn. With no previous v* tag there is nothing to diff against,
         # so the first release gets a fixed note instead.
+        #
+        # Safe to re-run (#4051): a release that already exists is left alone, so finishing a
+        # release by hand and then re-running the failed jobs goes straight on to the APK. Only gh's
+        # own "release not found" counts as absent; any other failure stops the step.
         run: |
           set -euo pipefail
+          rc=0
+          node scripts/release-guards.js release-exists "v$VERSION" || rc=$?
+          if [ "$rc" -eq 0 ]; then
+            exit 0
+          elif [ "$rc" -ne 1 ]; then
+            exit "$rc"
+          fi
           git fetch --quiet --tags origin
           PREV="$(git tag -l 'v*' --sort=-v:refname | grep -vx "v$VERSION" | head -1 || true)"
           if [ -n "$PREV" ]; then
