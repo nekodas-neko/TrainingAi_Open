@@ -121,10 +121,14 @@ export const coachPaths = [
   '/api/calendar',
   '/api/goal-recommendations',
 ];
+export const COACH_BUSY_TEXT =
+  'Coach is busy saving another change. Nothing was changed. Tap Apply again in a moment.';
 export function coachError(error: unknown, action = 'get a reply') {
   if ((error as { code?: string })?.code === 'pending_local_changes')
     return 'Finish uploading your saved changes before applying this suggestion.';
   const status = (error as { status?: number })?.status;
+  // Busy: another save held the lock, nothing changed and the suggestion is still good (#4084).
+  if (status === 409 && (error as { busy?: boolean }).busy === true) return COACH_BUSY_TEXT;
   if (status === 409) return 'This suggestion is out of date. Ask Coach for a fresh one.';
   if (status === 401 || status === 403)
     return 'Check your sign-in and account access to use Coach.';

@@ -24,6 +24,12 @@ export class ApiError extends Error {
    * notice, and never put into `message`, which is what gets reported.
    */
   serverMessage?: string;
+  /**
+   * A 409 whose body says `busy: true` (#4084): the server gave up waiting for a lock another save
+   * held and changed nothing, so the request is still good and can be sent again. An older server
+   * sends no flag, which reads as false.
+   */
+  busy = false;
   constructor(status: number, code?: string, notice?: string, path?: string, validation = false, serverMessage?: string) {
     super(`TrainingAi request failed (${status}).`);
     this.status = status;
@@ -98,16 +104,18 @@ export function isNothingToAnswer(error: unknown): boolean {
  */
 function failedRequest(path: string, status: number, body: unknown, code?: string) {
   const error = (body as { error?: unknown } | null)?.error;
-  return aiPausedMessage(status, body) === null
-    ? new ApiError(
-        status,
-        code,
-        undefined,
-        path,
-        typeof error === 'string' && error.length > 0,
-        typeof error === 'string' && error.length > 0 && error.length <= 200 ? error : undefined,
-      )
-    : new ApiError(status, AI_PAUSED_CODE, AI_PAUSED_MESSAGE, path);
+  if (aiPausedMessage(status, body) !== null)
+    return new ApiError(status, AI_PAUSED_CODE, AI_PAUSED_MESSAGE, path);
+  const failure = new ApiError(
+    status,
+    code,
+    undefined,
+    path,
+    typeof error === 'string' && error.length > 0,
+    typeof error === 'string' && error.length > 0 && error.length <= 200 ? error : undefined,
+  );
+  failure.busy = status === 409 && (body as { busy?: unknown } | null)?.busy === true;
+  return failure;
 }
 /** The paused sentence for an AI failure, else the caller's own line. Never any other server text. */
 export function aiFailureText(error: unknown, fallback: string): string {
