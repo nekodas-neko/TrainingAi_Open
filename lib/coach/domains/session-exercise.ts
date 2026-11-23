@@ -9,6 +9,7 @@ import { normalizeMuscle } from '@trainingai/shared/muscles'
 import { FIELD_LABEL, type PatchChange } from '../patch'
 import type { Consequence, DomainHandler, Db, PreviewResult } from './types'
 import { driftAgainst } from './types'
+import { withBoundedLockWait } from '../lock-wait'
 
 export interface TargetRow {
   id: string
@@ -163,12 +164,30 @@ async function createMissingExercise(
     ? (equipmentChange.to as string).split(',').map(e => e.trim()).filter(Boolean)
     : []
 
-  const [created] = await db
-    .insert(s.exerciseLibrary)
-    .values({ name, muscles, equipment, createdBy: userId })
-    .returning({ id: s.exerciseLibrary.id })
+  // #4076: the caller read the library, found no `name`, and inserts here. A second apply landing in
+  // between (an admin's double tap) used to fail this insert on the unique name as a raw 500. The
+  // loser now takes the row the first one made, which is what a swap to that name should land on.
+  // The insert waits on the other apply's uncommitted row, so it runs in its own small transaction with
+  // the lock wait bounded (lib/coach/lock-wait.ts). It commits on its own, as the bare insert did.
+  return db.transaction(async tx => {
+    const t = tx as unknown as Db
+    return withBoundedLockWait(t, async () => {
+      const [created] = await t
+        .insert(s.exerciseLibrary)
+        .values({ name, muscles, equipment, createdBy: userId })
+        .onConflictDoNothing({ target: s.exerciseLibrary.name })
+        .returning({ id: s.exerciseLibrary.id })
+      if (created) return { id: created.id, muscles }
 
-  return { id: created.id, muscles }
+      const [won] = await t
+        .select({ id: s.exerciseLibrary.id, muscles: s.exerciseLibrary.muscles, mergedInto: s.exerciseLibrary.mergedInto })
+        .from(s.exerciseLibrary)
+        .where(eq(s.exerciseLibrary.name, name))
+        .limit(1)
+      if (!won || won.mergedInto) return { error: `"${name}" has been merged into another exercise` }
+      return { id: won.id, muscles: (won.muscles as { muscle: string }[] | null) ?? [] }
+    })
+  })
 }
 
 export const sessionExerciseHandler: DomainHandler = {

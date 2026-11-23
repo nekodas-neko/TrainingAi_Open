@@ -35,6 +35,8 @@ export type ApplyOutcome =
   | { ok: false; reason: 'not_found' }
   | { ok: false; reason: 'stale'; drift: Drift[] }
   | { ok: false; reason: 'invalid'; detail: string }
+  /** Gave up waiting for a lock another writer held (#4080). Nothing was written; the same request can be sent again. */
+  | { ok: false; reason: 'busy' }
 
 /**
  * One of these per writable domain.
