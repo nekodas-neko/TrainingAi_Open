@@ -50,7 +50,8 @@ import { resolveModelIngredients } from '@/lib/nutrition/ingredient-densities'
 
 const MAX_TOP_UP_INGREDIENTS = 3
 
-const TopUpSchema = z.object({
+/** Exported for the Gemini schema check (#4056). */
+export const TopUpSchema = z.object({
   ingredients: z.array(ModelIngredientSchema).max(MAX_TOP_UP_INGREDIENTS),
 })
 
