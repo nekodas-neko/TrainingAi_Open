@@ -429,6 +429,10 @@ const aiExercise = z
     restSec: finite,
     deloaded: z.boolean().optional(),
     rationale: text.optional(),
+    // Why this lift's load was cut or pushed, or that an effort answer changed nothing. A bad value
+    // is no note, never a refusal of the whole plan.
+    autoregNote: text.optional().catch(undefined),
+    deloadNote: text.optional().catch(undefined),
     preDeload: z.object({ pct: finite, reps: finite, sets: finite }).optional(),
   })
   .passthrough();

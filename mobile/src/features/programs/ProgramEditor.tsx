@@ -21,6 +21,7 @@ import { useWorkoutAction } from '../workouts/data/useWorkoutAction';
 import { useWorkoutContext } from '../workouts/WorkoutProvider';
 import { ProgramDraftSchema, programDraft, programPayload } from './editor-model';
 import { ProgramSessionList } from './ProgramSessionList';
+import { ProgramPhaseRow } from './ProgramPhaseRow';
 
 export function ProgramEditor({
   program,
@@ -195,6 +196,9 @@ export function ProgramEditor({
                   draft.setValue({ ...value, autoApplyPrescriptions })
                 }
               />
+              {program?.isActive && program.phaseMode === 'ai_dynamic' && (
+                <ProgramPhaseRow program={program} />
+              )}
             </Card>
           ) : (
             <>
