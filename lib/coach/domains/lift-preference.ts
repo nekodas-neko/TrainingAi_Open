@@ -840,7 +840,9 @@ export function liftPreferenceHandler(
       // #4082: the same first lock as apply. Undo used to take the preference row and then the plan rows
       // with no advisory lock, which a check-in applying a sibling lift could meet in a cycle.
       await lockLiftWrites(db, userId)
-      const row = await rowById(db, userId, targetId, true)
+      // Bounded like apply's own row lock: a preference row held past the wait is `busy`, not a wait that
+      // runs into the pool's 15 s statement timeout (#4082 review).
+      const row = await withBoundedLockWait(db, () => rowById(db, userId, targetId, true))
       if (!row) return { ok: false, reason: 'not_found' }
       if (!same(columnsOf(row), state.after)) {
         // The change's one-shot was used up (a log consumed it) or expired, and nothing else moved: that

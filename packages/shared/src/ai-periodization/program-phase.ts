@@ -1,3 +1,4 @@
+import { isBusyError } from '@trainingai/shared/errors'
 import { toAestDay, weekStartForDay, shiftDateStr, dateStrMidnightInTz } from '@trainingai/shared/date-utils'
 import { DELOAD_FLOOR, type ProgramDeloadCheck } from '@trainingai/shared/ai-periodization/phase-guards'
 import { servePrescriptionState, type ServedPrescriptionState } from '@trainingai/shared/ai-periodization/prescription-expiry'
@@ -525,19 +526,25 @@ export async function syncProgramPhase(
   let rows = await repo.listSessionPeriodizationForProgram(userId, programId)
   let completions = await completionsFor(repo, userId, programId, rows, tz)
   const plan = planSwitchOver(rows, completions, tz, now)
+  // #4082 review: these program writes queue behind a person's check-in or Coach apply for a bounded time
+  // (`BusyError` past it, nothing written). A read must not fail for that: the sync is a repair that every
+  // read retries, so a busy write is skipped and the view below is built from the rows as they are.
+  const whenFree = async (write: () => Promise<unknown>) => {
+    try { await write() } catch (err) { if (!isBusyError(err)) throw err }
+  }
   // Every write below re-decides from the rows it locks (`DecidePending`, `DecideTarget`, the
   // switch's `expect`); this read only says which write to try.
   if (plan.kind === 'aligned' && plan.mark) {
-    await repo.setProgramPendingTransition(userId, programId, firstReadMark)
+    await whenFree(() => repo.setProgramPendingTransition(userId, programId, firstReadMark))
     rows = await repo.listSessionPeriodizationForProgram(userId, programId)
   }
   if (plan.kind === 'waiting') {
-    if (plan.stamp) await repo.setProgramPendingTransition(userId, programId, waitingStampFor(completions, tz, now))
+    if (plan.stamp) await whenFree(() => repo.setProgramPendingTransition(userId, programId, waitingStampFor(completions, tz, now)))
     for (const r of phasedRows(rows).filter(staleTypeMoveOffer)) await repo.voidSessionPrescription(userId, r.programSessionId)
   }
   if (plan.kind === 'realign' || plan.kind === 'switch') {
-    if (plan.kind === 'realign') await repo.realignProgramPhase(userId, programId, realignTargetFor(completions, tz, now))
-    else await repo.setProgramPhase(userId, programId, 'accumulation', plan.startsAt, switchOverPendingTransition(), { expect: 'switch-over' })
+    if (plan.kind === 'realign') await whenFree(() => repo.realignProgramPhase(userId, programId, realignTargetFor(completions, tz, now)))
+    else await whenFree(() => repo.setProgramPhase(userId, programId, 'accumulation', plan.startsAt, switchOverPendingTransition(), { expect: 'switch-over' }))
     await repo.reconcileSessionsInPhase(userId, programId)
     rows = await repo.listSessionPeriodizationForProgram(userId, programId)
     completions = await completionsFor(repo, userId, programId, rows, tz)

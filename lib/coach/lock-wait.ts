@@ -68,3 +68,14 @@ export async function withDomainLock<T>(db: Db, userId: string, domain: string, 
     return run(t)
   })
 }
+
+/**
+ * #4082 review: the same lock, taken only if it is free right now. For best-effort writers (the
+ * sessions-in-phase repair, a read's expired-one-shot clear) that would rather skip than queue: a writer
+ * that never waits cannot be one side of a cycle, and what it skipped is repaired by the next read.
+ * Transaction-scoped like `lockLiftWrites`.
+ */
+export async function tryLockLiftWrites(db: Db, userId: string): Promise<boolean> {
+  const r = await db.execute(sql`SELECT pg_try_advisory_xact_lock(hashtext('lift_writes:user'), hashtext(${userId})) AS got`)
+  return r.rows[0]?.got === true
+}

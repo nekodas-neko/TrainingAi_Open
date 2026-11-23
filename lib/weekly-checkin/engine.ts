@@ -374,6 +374,11 @@ async function tryUndo(db: Db, userId: string, changeId: string): Promise<{ ok: 
   if (await trainedSince(db, userId, changeId)) return { ok: false, detail: "You've trained since this change, so it stays." }
   const res = await undoCoachChange(db, userId, changeId)
   if (res.ok) return { ok: true }
+  // #4082 review: a lock timeout or deadlock in the undo is not an answer about the change. Turning it
+  // into "no longer the one in effect" let the save carry on and commit the new answer with the old
+  // change still in effect, half applied. The whole save fails instead, and every write of it rolls back.
+  // Already reported by `undoCoachChange`.
+  if (res.reason === 'busy') throw CHECKIN_BUSY()
   return { ok: false, detail: res.reason === 'invalid' ? res.detail : 'This change is no longer the one in effect.' }
 }
 

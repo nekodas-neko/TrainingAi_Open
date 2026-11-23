@@ -1,5 +1,8 @@
 import { eq, and, inArray, asc, desc, sql, isNull, gte, lte } from 'drizzle-orm'
-import { NotFoundError } from '@trainingai/shared/errors'
+import { NotFoundError, BusyError } from '@trainingai/shared/errors'
+import { lockLiftWrites, tryLockLiftWrites } from '../../../coach/lock-wait'
+import { isLockWaitTimeout } from '@/lib/api/route-errors'
+import { reportServerError } from '@/lib/observability'
 import type { getDb } from '../client'
 import * as s from '../schema'
 import { shiftDateStr, dateStrMidnightInTz } from '@trainingai/shared/date-utils'
@@ -93,6 +96,36 @@ export async function ensureSessionPeriodization(db: Db, userId: string, program
   if (row) return mapPeriodization(row)
   const existing = await getSessionPeriodization(db, userId, programSessionId)
   return existing!
+}
+
+/**
+ * #4082 review: one transaction for a writer that updates SEVERAL of a program's stored-plan rows, holding
+ * the person's lift-write lock (`lockLiftWrites`, the one a Coach apply and a weekly check-in take first).
+ *
+ * Before it, these writers locked the program's rows in id order and took no lift lock, while a check-in
+ * save updates one plan row per lift in lift order: the check-in held lift A's row and wanted B's, the
+ * mover held B's and wanted A's, and Postgres ended it with 40P01 (unmapped, a 500). Taking the lock
+ * first puts the mover in the same queue: it waits holding nothing, so no cycle can form with a writer
+ * that takes the lock, and the single-statement, single-row writers (the restate, the generator's store,
+ * `exitDeload`, the workout-log counters) hold one row at a time and release it with their statement.
+ *
+ * The lock is held only for this transaction, which makes no model or network call: every caller does
+ * its model call before or after. A wait past `lockWait`, a statement timeout or a deadlock rolls the
+ * whole transaction back, so nothing was written: reported once, answered as `BusyError` (409).
+ */
+async function withProgramWriteLock<T>(db: Db, userId: string, run: (tx: Tx) => Promise<T>): Promise<T> {
+  try {
+    return await db.transaction(async tx => {
+      await lockLiftWrites(tx as never, userId)
+      return run(tx)
+    })
+  } catch (err) {
+    if (isLockWaitTimeout(err)) {
+      reportServerError(err, { userId, url: 'periodization/program-write' })
+      throw new BusyError()
+    }
+    throw err
+  }
 }
 
 /**
@@ -299,7 +332,7 @@ export async function setProgramPhase(
   opts: ProgramMoveOptions = {},
 ): Promise<boolean> {
   const mark = programMoveMark(phase, pendingTransition)
-  return db.transaction(async tx => {
+  return withProgramWriteLock(db, userId, async tx => {
     const rows = await lockProgramRows(tx, userId, programId)
     const phased = rows.filter(r => r.baselineComplete && r.phase !== 'baseline')
     if (phased.length === 0) return false
@@ -351,7 +384,7 @@ async function voidPlans(tx: Tx, userId: string, rowIds: string[], now: Date): P
  * the others keep their plans and just get the mark.
  */
 export async function realignProgramPhase(db: Db, userId: string, programId: string, decide: DecideTarget): Promise<void> {
-  await db.transaction(async tx => {
+  await withProgramWriteLock(db, userId, async tx => {
     const locked = await lockProgramRows(tx, userId, programId)
     const target = decide(locked)
     if (target == null) return
@@ -378,7 +411,7 @@ export async function realignProgramPhase(db: Db, userId: string, programId: str
  *  works it out from the LOCKED rows, so a switch-over landing after the caller's read is not
  *  overwritten by a waiting stamp; null writes nothing. */
 export async function setProgramPendingTransition(db: Db, userId: string, programId: string, decide: DecidePending): Promise<void> {
-  await db.transaction(async tx => {
+  await withProgramWriteLock(db, userId, async tx => {
     const locked = await lockProgramRows(tx, userId, programId)
     const phased = locked.filter(r => r.baselineComplete && r.phase !== 'baseline')
     if (phased.length === 0) return
@@ -582,19 +615,23 @@ export async function clearProgramPrescriptions(db: Db, userId: string, programI
     .where(and(eq(s.programSessions.programId, programId), isNull(s.programSessions.deletedAt)))
   const sessionIds = sessionRows.map(r => r.id)
   if (sessionIds.length === 0) return
-  await db
-    .update(s.sessionPeriodization)
-    .set({
-      prescription: null,
-      prescriptionStatus: 'consumed',
-      prescriptionGeneratedAt: null,
-      prescriptionExpiresAt: null,
-      updatedAt: new Date(),
-    })
-    .where(and(
-      eq(s.sessionPeriodization.userId, userId),
-      inArray(s.sessionPeriodization.programSessionId, sessionIds),
-    ))
+  // A multi-row update with no stated row order: under the program-write lock, so it cannot cycle with a
+  // check-in or a phase move.
+  await withProgramWriteLock(db, userId, async tx => {
+    await tx
+      .update(s.sessionPeriodization)
+      .set({
+        prescription: null,
+        prescriptionStatus: 'consumed',
+        prescriptionGeneratedAt: null,
+        prescriptionExpiresAt: null,
+        updatedAt: new Date(),
+      })
+      .where(and(
+        eq(s.sessionPeriodization.userId, userId),
+        inArray(s.sessionPeriodization.programSessionId, sessionIds),
+      ))
+  })
 }
 
 /** One session's stored plan voided to 'consumed' + no plan, which the open-time trigger regenerates
@@ -700,7 +737,12 @@ export const DECREMENT_SESSIONS_IN_PHASE_SQL =
 // a session started before the phase moved and finished after it ran in the new phase and was not
 // counted, so a deload block ran three sessions instead of two.
 export async function reconcileSessionsInPhase(db: Db, userId: string, programId: string): Promise<void> {
-  await db.execute(sql`
+  // #4082 review: a multi-row update, so it takes the lift-write lock too, but only if it is free right
+  // now: it runs on most reads and is self-healing, so it skips rather than queue behind a check-in (and
+  // a writer that never waits cannot be one side of a cycle). The next read repairs what it skipped.
+  await db.transaction(async tx => {
+    if (!(await tryLockLiftWrites(tx as never, userId))) return
+    await tx.execute(sql`
     UPDATE session_periodization sp
     SET sessions_in_phase = sub.cnt, updated_at = NOW()
     FROM (
@@ -720,6 +762,7 @@ export async function reconcileSessionsInPhase(db: Db, userId: string, programId
     ) sub
     WHERE sp.id = sub.id AND sp.sessions_in_phase <> sub.cnt
   `)
+  })
 }
 
 export async function setLastSessionRanPrescription(db: Db, userId: string, programSessionId: string, ranPrescription: boolean): Promise<void> {

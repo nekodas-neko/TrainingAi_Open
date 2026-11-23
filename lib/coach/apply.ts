@@ -12,6 +12,7 @@ import { liftPreferenceHandler, StaleLiftPreference, type LiftPreferenceSource }
 import { DEFAULT_TZ, todayInTz } from '@trainingai/shared/date-utils'
 import { isLockWaitTimeout, isBoundedLockTimeout } from '@/lib/api/route-errors'
 import { reportServerError } from '@/lib/observability'
+import { withDomainLock } from './lock-wait'
 
 export type { ApplyOutcome } from './domains/types'
 
@@ -187,17 +188,24 @@ export async function undoCoachChange(db: Db, userId: string, changeId: string):
   const accepted = (record.patch as CoachPatch | null)?.changes ?? []
   const acceptedIds = new Set(record.acceptedIds ?? [])
   const applied = acceptedIds.size > 0 ? accepted.filter(c => acceptedIds.has(c.id)) : accepted
-  if (applied.length > 0) {
-    const current = await handler.currentState(db, userId, record.targetId)
-    // A null map means there is nothing to compare — the target is gone, or was never a row. Undo
-    // still runs: a removal's undo re-inserts exactly the row that is missing.
-    if (current) {
-      // Only fields the handler actually reports as state. The rest — `removed`, the
-      // create-on-swap fields — describe an action rather than a value that can have moved.
-      const stateful = applied.filter(c => c.field in current)
-      const drift = driftAgainst(stateful, current, undefined, 'to')
-      if (drift.length > 0) return { ok: false, reason: 'stale', drift }
+  const checkDrift = async (q: Db): Promise<ApplyOutcome | null> => {
+    if (applied.length > 0) {
+      const current = await handler.currentState(q, userId, record.targetId)
+      // A null map means there is nothing to compare — the target is gone, or was never a row. Undo
+      // still runs: a removal's undo re-inserts exactly the row that is missing.
+      if (current) {
+        // Only fields the handler actually reports as state. The rest — `removed`, the
+        // create-on-swap fields — describe an action rather than a value that can have moved.
+        const stateful = applied.filter(c => c.field in current)
+        const drift = driftAgainst(stateful, current, undefined, 'to')
+        if (drift.length > 0) return { ok: false, reason: 'stale', drift }
+      }
     }
+    return null
+  }
+  if (handler.transactional) {
+    const drifted = await checkDrift(db)
+    if (drifted) return drifted
   }
 
   if (handler.transactional) {
@@ -226,16 +234,44 @@ export async function undoCoachChange(db: Db, userId: string, changeId: string):
     }
   }
 
-  const restored = await handler.undo(
-    db,
-    userId,
-    record.targetId,
-    (record.beforeState ?? {}) as Record<string, unknown>,
-  )
-  if (!restored.ok) return restored
+  // #4082 review: the other domains apply under a per-user, per-domain lock (`withDomainLock`) and undo
+  // took none, so a double-tapped undo restored twice and an undo racing a new apply read a state the
+  // apply was about to change. Undo now takes the SAME lock its apply takes, re-reads the record and checks
+  // the target under it: the second undo waits, finds the change already undone and is refused cleanly.
+  // One transaction around the restore and the mark, so a failure anywhere leaves both unwritten; the wait
+  // is bounded and is answered as `busy`, reported once.
+  try {
+    return await withDomainLock<ApplyOutcome>(db, userId, undoLockKey(record.domain as CoachPatchDomain, record.targetId), async t => {
+      const [fresh] = await t.select({ undoneAt: s.coachChanges.undoneAt }).from(s.coachChanges)
+        .where(and(eq(s.coachChanges.id, changeId), eq(s.coachChanges.userId, userId))).limit(1)
+      if (!fresh) return { ok: false, reason: 'not_found' }
+      if (fresh.undoneAt) return { ok: false, reason: 'invalid', detail: 'Already undone' }
+      const drifted = await checkDrift(t)
+      if (drifted) return drifted
+      const restored = await handler.undo(t, userId, record.targetId, (record.beforeState ?? {}) as Record<string, unknown>)
+      if (!restored.ok) return restored
+      const marked = await t.update(s.coachChanges).set({ undoneAt: new Date() })
+        .where(and(eq(s.coachChanges.id, changeId), eq(s.coachChanges.userId, userId), isNull(s.coachChanges.undoneAt)))
+        .returning({ id: s.coachChanges.id })
+      // Cannot happen under the lock; if it ever does, the restore rolls back with it.
+      if (marked.length !== 1) throw new Refused({ ok: false, reason: 'invalid', detail: 'Already undone' })
+      return { ok: true, changeId, summary: `Undid: ${record.summary}` }
+    })
+  } catch (err) {
+    if (err instanceof Refused) return err.outcome
+    if (isLockWaitTimeout(err)) {
+      reportServerError(err, { userId, url: '/api/coach/apply/undo' })
+      return { ok: false, reason: 'busy' }
+    }
+    throw err
+  }
+}
 
-  await db.update(s.coachChanges).set({ undoneAt: new Date() })
-    .where(and(eq(s.coachChanges.id, changeId), eq(s.coachChanges.userId, userId)))
-
-  return { ok: true, changeId, summary: `Undid: ${record.summary}` }
+/** The lock key a domain's APPLY takes (`withDomainLock` in `domains/`), so its undo can take the same. */
+function undoLockKey(domain: CoachPatchDomain, targetId: string | null): string {
+  switch (domain) {
+    case 'session_exercise': return `session_exercise:${targetId}`
+    case 'injury': return `injury_resolve:${targetId}`
+    default: return domain // nutrition_targets, user_goals, program_phase, early_deload
+  }
 }

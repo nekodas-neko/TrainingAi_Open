@@ -1,3 +1,4 @@
+import { isBusyError } from '@trainingai/shared/errors'
 import { nextMidnightInTz, startOfWeekInTz, todayInTz } from '@trainingai/shared/date-utils'
 import { prescriptionExpiresAt } from '@trainingai/shared/ai-periodization/prescription-expiry'
 
@@ -360,7 +361,14 @@ export async function generatePrescriptionForSession(
     // An explicit preset choice is a user action asking for a different plan — it must
     // never be answered from the read-through cooldown.
     { skipCooldown: Boolean(excludeSessionId) || durationPreset != null, cacheable: r => r.ok },
-    () => runPrescriptionGeneration(userId, programSessionId, repo, tz, activeProgram, structure, excludeSessionId, durationPreset, checkinBudgetMin),
+    // #4082 review: a program move that gave up waiting for a person's other write (a check-in, a Coach
+    // apply) wrote nothing: answered as "busy, try again", never cached (`cacheable` is ok only) and never
+    // a 500. The move's lock is taken inside the repository call, after the model call has returned.
+    () => runPrescriptionGeneration(userId, programSessionId, repo, tz, activeProgram, structure, excludeSessionId, durationPreset, checkinBudgetMin)
+      .catch((err): GeneratePrescriptionResult => {
+        if (isBusyError(err)) return { ok: false, error: err.message, status: 409 }
+        throw err
+      }),
   )
 }
 
