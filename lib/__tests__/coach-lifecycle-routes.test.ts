@@ -313,6 +313,17 @@ describe('/api/coach/apply/[id]/undo', () => {
     expect(undoCoachChange).toHaveBeenCalledWith(expect.anything(), sessionUser!.id, CHANGE)
   })
 
+  // #4082: the lift-write lock was held past the wait, or a deadlock was broken against this undo. It is its own
+  // answer, not "can no longer be undone" (400) and not "a later change is in effect": nothing moved, try again.
+  it('answers 409 busy, not 400, when the undo gave up waiting for a lock', async () => {
+    undoRows({ appliedAt: APPLIED_AT, undoneAt: null }, undefined)
+    undoCoachChange.mockResolvedValue({ ok: false, reason: 'busy' })
+    const res = await undo(CHANGE)
+
+    expect(res.status).toBe(409)
+    expect(await res.json()).toEqual({ error: expect.stringContaining('try again'), busy: true })
+  })
+
   // Q-468: a later change written over this one. Same 409 as apply, and the message says what to
   // do about it rather than only that it failed.
   it('answers 409 when a later change is the one in effect', async () => {
