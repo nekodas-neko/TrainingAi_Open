@@ -90,6 +90,8 @@ test('the session list and the exercise preview read a lift’s load by the unit
     lastReps: [10],
     lastWeights: [Number(dumbbell)],
     lastDate: '2026-11-16',
+    setCount: 1,
+    sets: [],
   };
   state.units = { [exercise.id]: 'lb' };
   const list = words(createElement(SessionExerciseList, { exercises: [exercise], onSelect: () => {} }));

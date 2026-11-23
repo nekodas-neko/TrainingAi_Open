@@ -47,4 +47,4 @@ export const useWorkoutContext = () => ({ timezone: 'Australia/Brisbane' });
 export const useWorkoutResource = (spec: { path: string }) => ({ data: state.resources[spec.path] ?? null });
 export const useWeightUnits = () => state.units;
 export const ResourceCard = ({ children }: Props) =>
-  (children as (data: unknown) => ReactNode)(state.next);
+  (children as unknown as (data: unknown) => ReactNode)(state.next);
