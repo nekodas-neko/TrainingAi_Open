@@ -1,4 +1,4 @@
-import { displayOneRm, displayOneRmSeries, isEstimatedOneRm, oneRmLabel } from '@trainingai/shared/1rm';
+import { displayOneRmSeries, oneRmLabel, oneRmText } from '@trainingai/shared/1rm';
 import { AppText, Card, LineChart, Stack } from '../../../shared/ui';
 import { useWorkoutResource } from '../data/WorkoutDataProvider';
 import { exerciseHistorySpec } from '../data/models';
@@ -44,9 +44,9 @@ export function ExerciseHistory({ name }: { name: string }) {
                     {entry.date}
                   </AppText>
                 </Stack>
-                {isEstimatedOneRm(entry.estimated1rm) && (
+                {oneRmText(entry.estimated1rm, type) !== null && (
                   <AppText variant="caption" tone="brand">
-                    {oneRmLabel(type)} · {displayOneRm(entry.estimated1rm, type).text}
+                    {oneRmLabel(type)} · {oneRmText(entry.estimated1rm, type)}
                   </AppText>
                 )}
                 <Stack gap="xs">

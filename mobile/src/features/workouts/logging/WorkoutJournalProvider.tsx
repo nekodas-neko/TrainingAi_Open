@@ -109,6 +109,14 @@ export function WorkoutJournalStateProvider({
   return <Context.Provider value={{ ...state, controller }}>{children}</Context.Provider>;
 }
 
+/**
+ * The unit each lift is logged in, by session-exercise id: what its set card's toggle last chose
+ * (#4072). Empty outside the provider, so a list that only reads labels never needs one.
+ */
+export function useWeightUnits() {
+  return useContext(Context)?.data.preferences.units ?? {};
+}
+
 export function useWorkoutJournal() {
   const value = useContext(Context);
   if (!value) {

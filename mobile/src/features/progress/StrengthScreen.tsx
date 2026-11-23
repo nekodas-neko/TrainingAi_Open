@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { View } from 'react-native';
-import { displayOneRm, displayOneRmSeries, oneRmLabel } from '@trainingai/shared/1rm';
+import { displayOneRmSeries, oneRmLabel, oneRmText } from '@trainingai/shared/1rm';
 import { toAestDay } from '@trainingai/shared/date-utils';
 import { isRmPlateau, projectRm } from '@trainingai/shared/health/strength-projection';
 import {
@@ -47,6 +47,8 @@ export function StrengthScreen({ section }: { section: 'trend' | 'records' }) {
           exercise.history.map((point) => ({ ...point, date: point.date.replace(/\//g, '-') })),
         )
       : null;
+  const projectedText =
+    exercise && projection ? oneRmText(projection.projectedRm, exercise.exerciseType) : null;
   return (
     <>
       {section !== 'records' && (
@@ -87,7 +89,7 @@ export function StrengthScreen({ section }: { section: 'trend' | 'records' }) {
                   </AppText>
                   <Stack direction="row" align="center" justify="center">
                     <AppText variant="trendValue" tone="brand" style={{ fontVariant: ['tabular-nums'] }}>
-                      {displayOneRm(exercise.currentRm, exercise.exerciseType).text}
+                      {oneRmText(exercise.currentRm, exercise.exerciseType) ?? '—'}
                     </AppText>
                     {exercise.gainPct !== null && (
                       <AppText
@@ -102,9 +104,9 @@ export function StrengthScreen({ section }: { section: 'trend' | 'records' }) {
                       </AppText>
                     )}
                   </Stack>
-                  {projection && (
+                  {projectedText && (
                     <AppText variant="micro" tone="muted">
-                      → ~{displayOneRm(projection.projectedRm, exercise.exerciseType).text} in
+                      → ~{projectedText} in
                       30d
                     </AppText>
                   )}
@@ -147,14 +149,14 @@ export function StrengthScreen({ section }: { section: 'trend' | 'records' }) {
                 <AppText variant="micro" tone="muted">
                   90d low:{' '}
                   {exercise.history.length
-                    ? displayOneRm(
+                    ? (oneRmText(
                         Math.min(...exercise.history.map((point) => point.rm)),
                         exercise.exerciseType,
-                      ).text
+                      ) ?? '—')
                     : '—'}
                 </AppText>
                 <AppText variant="micro" tone="muted">
-                  Peak: {displayOneRm(exercise.peakRm, exercise.exerciseType).text}
+                  Peak: {oneRmText(exercise.peakRm, exercise.exerciseType) ?? '—'}
                 </AppText>
               </Stack>
               {exercises.length > 1 && (
@@ -212,7 +214,7 @@ export function StrengthScreen({ section }: { section: 'trend' | 'records' }) {
                 title={record.exerciseName}
                 subtitle={
                   (type
-                    ? displayOneRm(record.estimated1rm, type).text
+                    ? (oneRmText(record.estimated1rm, type) ?? '—')
                     : 'Load type unavailable') +
                   ' · ' +
                   date

@@ -2,8 +2,11 @@ import { AppText, Badge, Stack } from '../../../shared/ui';
 import { nextPrescriptionSpec } from '../data/models';
 import { ResourceCard } from './ResourceCard';
 import { LiftCoachMenu } from '../../coach/components/LiftCoachMenu';
+import { loadLabel, weightUnitOf } from '../logging/preferences';
+import { useWeightUnits } from '../logging/WorkoutJournalProvider';
 
 export function NextPrescription() {
+  const units = useWeightUnits();
   return (
     <ResourceCard title="Next workout" spec={nextPrescriptionSpec}>
       {(data) =>
@@ -43,7 +46,7 @@ export function NextPrescription() {
                         set.weightKg === null ||
                         (exercise.exerciseType === 'bodyweight' && set.weightKg === 0)
                           ? `${set.reps} reps`
-                          : `${set.weightKg} kg × ${set.reps}`
+                          : `${loadLabel(set.weightKg, weightUnitOf(units, exercise.sessionExerciseId))} × ${set.reps}`
                       }
                     />
                   ))}

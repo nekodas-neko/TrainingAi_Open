@@ -32,7 +32,7 @@ export function workoutCalendarEvent(workout: WorkoutRecord): CalendarEvent {
           (exercise) =>
             `${exercise.name}: ${exercise.sets
               .filter((set) => set.completedAt !== null)
-              .map((set) => `${loadLabel(set.weight)} × ${set.reps}`)
+              .map((set) => `${loadLabel(set.weight, exercise.weightUnit)} × ${set.reps}`)
               .join(', ')}`,
         ),
     ].join('\n'),

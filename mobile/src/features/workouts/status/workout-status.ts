@@ -24,7 +24,7 @@ export function knownLoad(exercise: WorkoutExercise, set: WorkoutSet | undefined
   const weight = exercise.exerciseType === 'bodyweight' ? null : (numberIn(set.weight) ?? set.plannedWeight);
   const typed = numberIn(set.reps);
   const reps = typed !== null && Number.isInteger(typed) ? typed : (set.planned?.reps ?? null);
-  const weightText = weight === null ? null : loadLabel(weight);
+  const weightText = weight === null ? null : loadLabel(weight, exercise.weightUnit);
   if (weightText && reps !== null) return `${weightText} × ${reps}`;
   return weightText ?? (reps !== null ? `${reps} reps` : null);
 }
