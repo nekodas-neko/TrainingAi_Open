@@ -1044,7 +1044,7 @@ test('unit changes preserve canonical kilograms and previous reuse changes only 
     assert.equal(displayLoad(storedLoad(pounds, 'lb'), 'lb'), pounds);
   }
   assert.equal(displayLoad('-9', 'lb'), '-19.84');
-  assert.equal(loadLabel('7.5'), '7.5 kg', 'every read-only surface shows kg, whatever the exercise unit');
+  assert.equal(loadLabel('7.5'), '7.5 kg', 'a label with no unit reads in kg; a pound lift passes \'lb\' (#4072)');
   assert.equal(loadLabel(''), '');
   await f.controller.startSet(id, exerciseId, first.id);
   f.clock(20_000);

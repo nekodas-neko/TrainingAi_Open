@@ -47,6 +47,7 @@ const anyValue: Record<string | symbol, unknown> = new Proxy(
   {},
   { get: (_t, key) => (key === Symbol.toPrimitive ? () => 8 : anyValue) },
 );
+export const useWeightUnits = () => ({});
 export const useTheme = () => ({ theme: anyValue });
 export const useCoachLaunch = () => (request?: unknown) => {
   launches.push(request ?? {});
