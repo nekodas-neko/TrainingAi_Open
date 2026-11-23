@@ -7,10 +7,13 @@ import { CoachPatchSchema, hasUniqueChangeIds } from '@/lib/coach/patch'
 import { applyCoachPatch } from '@/lib/coach/apply'
 import { DEFAULT_TZ, todayInTz } from '@trainingai/shared/date-utils'
 import { errorLog } from '@trainingai/shared/logger'
+import { reportServerError } from '@/lib/observability'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 
 // A patch of at most 8 changes plus up to 8 accepted ids. 256 KB is far past any real patch.
 const MAX_BODY_BYTES = 256 * 1024
+
+const COACH_BUSY_MESSAGE = 'Another change to this is still saving. Nothing was changed; try again in a moment.'
 
 const BodySchema = z.object({
   patch: CoachPatchSchema,
@@ -69,6 +72,11 @@ export async function POST(req: Request) {
         // "out of date — ask again" rather than a generic failure.
         return NextResponse.json({ error: 'This suggestion is out of date', drift: result.drift }, { status: 409 })
       }
+      if (result.reason === 'busy') {
+        // 409 with its own sentence, not the `stale` one: nothing is out of date, another save held the
+        // lift for longer than the wait and nothing was written. The same request can be sent again.
+        return NextResponse.json({ error: COACH_BUSY_MESSAGE, busy: true }, { status: 409 })
+      }
       return NextResponse.json({ error: result.detail }, { status: 400 })
     }
 
@@ -77,6 +85,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ changeId: result.changeId, summary: result.summary })
   } catch (error) {
     errorLog(error, 'API /coach/apply')
+    // A timeout after a non-transactional write lands here with the outcome unknown; it must be seen.
+    reportServerError(error, { userId, url: '/api/coach/apply' })
     return NextResponse.json({ error: 'Apply failed' }, { status: 500 })
   }
 }

@@ -229,6 +229,10 @@ describe.skipIf(!canRun)('repository ownership scoping — sweep survivors (#242
     } finally {
       c.release()
     }
+    // The fixture also inserts one exercise_library row for B; deleting B anonymises it (created_by
+    // SET NULL) and keeps it, so it is removed by id here (#4055).
+    const seededLibraryId = b?.rows.get('exercise_library')?.id
+    if (seededLibraryId) await pool.query(`DELETE FROM exercise_library WHERE id = $1`, [seededLibraryId]).catch(() => {})
     for (const row of createdCatalogue.reverse()) {
       const { __table, ...key } = row as { __table: string } & Record<string, unknown>
       const cols = Object.keys(key)

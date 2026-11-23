@@ -857,6 +857,8 @@ async function runPrescriptionGeneration(
         repCompletionRate: e.repCompletionRate,
         // #4061: the delta came from the lifter's tap, so a cut's note says "felt harder", not "RPE".
         ...(e.effortAnswer !== undefined && { effortFromAnswer: true as const }),
+        // #4079: Harder or Easier only; a tapped As expected is no signal and earns no note.
+        ...((e.effortAnswer === 1 || e.effortAnswer === -1) && { effortAnswer: e.effortAnswer }),
         ...(preferenceFor(e.sessionExerciseId)?.preference.repRange && {
           repBand: {
             repMin: preferenceFor(e.sessionExerciseId)!.preference.repRange!.min,

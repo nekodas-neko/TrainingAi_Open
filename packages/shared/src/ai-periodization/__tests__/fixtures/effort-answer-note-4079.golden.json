@@ -1,0 +1,3762 @@
+{
+ "strength/accumulation/90min/model/none/tapped-harder": {
+  "hash": "2d52839fc69da1651435928d132341e2d0fa673677108e328fb3fd5c4619a7f8",
+  "notes": {}
+ },
+ "strength/accumulation/90min/model/none/tapped-easier": {
+  "hash": "2d52839fc69da1651435928d132341e2d0fa673677108e328fb3fd5c4619a7f8",
+  "notes": {}
+ },
+ "strength/accumulation/90min/model/none/tapped-as-expected": {
+  "hash": "2d52839fc69da1651435928d132341e2d0fa673677108e328fb3fd5c4619a7f8",
+  "notes": {}
+ },
+ "strength/accumulation/90min/model/expected/tapped-harder": {
+  "hash": "9cecc45133e607c65d6e316ff0bcfa4465b34e3cb7ba32b95fc44b2ed780c9ff",
+  "notes": {}
+ },
+ "strength/accumulation/90min/model/expected/tapped-easier": {
+  "hash": "4b4152ad338420fb1fcaa6a01a4488853d11e01b43a15ae55745593cbee3e92e",
+  "notes": {
+   "se-p": "+1 target rep — that felt easy, earning the next jump",
+   "se-a": "+1 set — you're at the top of the rep range and it still felt easy"
+  }
+ },
+ "strength/accumulation/90min/model/expected/tapped-as-expected": {
+  "hash": "d41b5115faca3dc0da63fb58905925b68db5091f1c64698ce0c8589ef93808ef",
+  "notes": {}
+ },
+ "strength/accumulation/90min/model/expected-missed/tapped-harder": {
+  "hash": "44dd9795f4f63b466b8ce0bfcb865a0ecab769b3b9cfeb5683538e72d7c315aa",
+  "notes": {
+   "se-p": "−8% load — it felt harder than expected and you fell short of the prescribed reps",
+   "se-s": "−6.5% load — it felt harder than expected and you fell short of the prescribed reps",
+   "se-a": "−6% load — it felt harder than expected and you fell short of the prescribed reps"
+  }
+ },
+ "strength/accumulation/90min/model/expected-missed/tapped-easier": {
+  "hash": "c32094bdc378383fe78c9c4b8295ac1d61d45218097d1e364c99e24f99ee91d6",
+  "notes": {}
+ },
+ "strength/accumulation/90min/model/expected-missed/tapped-as-expected": {
+  "hash": "f82b40b47f7ae216b9dac216f7bd852c4f472644a82029aed92eda228302f538",
+  "notes": {}
+ },
+ "strength/accumulation/90min/model/expected-down/tapped-harder": {
+  "hash": "a8cb0db0513ca77f1e2b9fea3a5b4d388758185d0cc0e1a0593f4b25d3ba8a3d",
+  "notes": {
+   "se-p": "−5% load — it felt harder than expected while your 1RM slipped",
+   "se-s": "−5% load — it felt harder than expected while your 1RM slipped",
+   "se-a": "−5% load — it felt harder than expected while your 1RM slipped"
+  }
+ },
+ "strength/accumulation/90min/model/expected-down/tapped-easier": {
+  "hash": "91ee287855efec391ec4fe52f7c1b8928014c680f6d1800bcd2cbf3932b74f1e",
+  "notes": {}
+ },
+ "strength/accumulation/90min/model/expected-down/tapped-as-expected": {
+  "hash": "532afe06116a330ff195403e64c0595ef3ad0d19762b59399113bb920bb81413",
+  "notes": {}
+ },
+ "strength/accumulation/90min/model/rated-high-missed/tapped-harder": {
+  "hash": "18b40f8b7682be7739c4b1ed0f70eed43be887db8c553596a410ed2a6c90b225",
+  "notes": {
+   "se-p": "−8% load — it felt harder than expected and you fell short of the prescribed reps",
+   "se-s": "−6.5% load — it felt harder than expected and you fell short of the prescribed reps",
+   "se-a": "−6% load — it felt harder than expected and you fell short of the prescribed reps"
+  }
+ },
+ "strength/accumulation/90min/model/rated-high-missed/tapped-easier": {
+  "hash": "53ba4a8b76499c15a624bafef556a4c2b9fbce8449da38a1a462e51e8ba7c92c",
+  "notes": {}
+ },
+ "strength/accumulation/90min/model/rated-high-missed/tapped-as-expected": {
+  "hash": "c269fd552569f7d52a254e9028bdacef589f22451e98347c65c036fc118e05c9",
+  "notes": {}
+ },
+ "strength/accumulation/90min/model/rated-low-met/tapped-harder": {
+  "hash": "b4e93bedcc0742d804b75d72f435a43d257c269a8b85c974f20733c07b8ecf3f",
+  "notes": {}
+ },
+ "strength/accumulation/90min/model/rated-low-met/tapped-easier": {
+  "hash": "319e707d3168a349fcbdf705a12f178424e4ecd105b9be85726166b22572925a",
+  "notes": {
+   "se-p": "+1 target rep — that felt easy, earning the next jump",
+   "se-a": "+1 set — you're at the top of the rep range and it still felt easy"
+  }
+ },
+ "strength/accumulation/90min/model/rated-low-met/tapped-as-expected": {
+  "hash": "57fd37b76ad4f82a8394df5caffde6fe8217a0c4799d51caf2f0b156f33c38ea",
+  "notes": {}
+ },
+ "strength/accumulation/90min/model-fails/none/tapped-harder": {
+  "hash": "a2a3c6cf5e4673a0dafabf0b289176df265048e6ebd4ed23db0b0c850f83754c",
+  "notes": {}
+ },
+ "strength/accumulation/90min/model-fails/none/tapped-easier": {
+  "hash": "a2a3c6cf5e4673a0dafabf0b289176df265048e6ebd4ed23db0b0c850f83754c",
+  "notes": {}
+ },
+ "strength/accumulation/90min/model-fails/none/tapped-as-expected": {
+  "hash": "a2a3c6cf5e4673a0dafabf0b289176df265048e6ebd4ed23db0b0c850f83754c",
+  "notes": {}
+ },
+ "strength/accumulation/90min/model-fails/expected/tapped-harder": {
+  "hash": "0dd046d8ee6acca62bc0b931935add0ea59fcc333be5d1bed318af46dfc9972c",
+  "notes": {}
+ },
+ "strength/accumulation/90min/model-fails/expected/tapped-easier": {
+  "hash": "087c0e3ddbca687466410a08583fcfd6ddaea1f491a10a4e24a018e28534f95c",
+  "notes": {}
+ },
+ "strength/accumulation/90min/model-fails/expected/tapped-as-expected": {
+  "hash": "bd0309b29c1f805402c4a036686f920fdbba8c4d929b7f8dfcbc78eaa767b107",
+  "notes": {}
+ },
+ "strength/accumulation/90min/model-fails/expected-missed/tapped-harder": {
+  "hash": "c62c81b99d89162c37cf05064340c89907fb1d54b988e20983e5e7fc4d8f1b91",
+  "notes": {}
+ },
+ "strength/accumulation/90min/model-fails/expected-missed/tapped-easier": {
+  "hash": "1bc8179b974c0afb87be0b24ec85c044309145865cac41d68d8ee064bbac8172",
+  "notes": {}
+ },
+ "strength/accumulation/90min/model-fails/expected-missed/tapped-as-expected": {
+  "hash": "391ee4fe6446b901b2acfbaad468c6eb1d33514a034716716252d5ac84294eb7",
+  "notes": {}
+ },
+ "strength/accumulation/90min/model-fails/expected-down/tapped-harder": {
+  "hash": "9c66a982481d97a4c758f95be62a0942ea5df0a9a74926e7d0e7288ca76a225d",
+  "notes": {}
+ },
+ "strength/accumulation/90min/model-fails/expected-down/tapped-easier": {
+  "hash": "24b6a10fe1f5c14580ef665e801d81e136dadf452161ca5d24ac24c6fb567e51",
+  "notes": {}
+ },
+ "strength/accumulation/90min/model-fails/expected-down/tapped-as-expected": {
+  "hash": "f60a6a3e34129d0b14f8a5264acce78fb38630306ed3e093f01c78ef3392f036",
+  "notes": {}
+ },
+ "strength/accumulation/90min/model-fails/rated-high-missed/tapped-harder": {
+  "hash": "2fd21501ceff02da89fde430bd8d0f17f3e0899baffef36fb87ff4959b75c97b",
+  "notes": {}
+ },
+ "strength/accumulation/90min/model-fails/rated-high-missed/tapped-easier": {
+  "hash": "05b99008f601d67d4bec0163a9a77922da59bfc23913128cdf8fbcbb48adf931",
+  "notes": {}
+ },
+ "strength/accumulation/90min/model-fails/rated-high-missed/tapped-as-expected": {
+  "hash": "cc06a03e865deee9bd209ea3f52e8405973391216bbe9ffe54db2c044dfb7b35",
+  "notes": {}
+ },
+ "strength/accumulation/90min/model-fails/rated-low-met/tapped-harder": {
+  "hash": "7c00975d90628b355e96d33ecbf4f59fc02fd8fa7e7442c297c01ca4559d87f2",
+  "notes": {}
+ },
+ "strength/accumulation/90min/model-fails/rated-low-met/tapped-easier": {
+  "hash": "b258aa8e83aaafaeaa6031b48881ff94c0bf6c636cf632de8a1d1b8ad3dc6cf7",
+  "notes": {}
+ },
+ "strength/accumulation/90min/model-fails/rated-low-met/tapped-as-expected": {
+  "hash": "7e941bf1a0bfa5019d80079d5b48b89c7b77ac197fa031e43f13d0234618b347",
+  "notes": {}
+ },
+ "strength/accumulation/40min/model/none/tapped-harder": {
+  "hash": "0666d2c386b7eae4fe4401f5516130d00fba587dd35a81a1e39531eedfe3f611",
+  "notes": {}
+ },
+ "strength/accumulation/40min/model/none/tapped-easier": {
+  "hash": "0666d2c386b7eae4fe4401f5516130d00fba587dd35a81a1e39531eedfe3f611",
+  "notes": {}
+ },
+ "strength/accumulation/40min/model/none/tapped-as-expected": {
+  "hash": "0666d2c386b7eae4fe4401f5516130d00fba587dd35a81a1e39531eedfe3f611",
+  "notes": {}
+ },
+ "strength/accumulation/40min/model/expected/tapped-harder": {
+  "hash": "897c49cd2f21bc67ea5a32df4bc08dcf69196ee3da183a25e367863d7fce0e8d",
+  "notes": {}
+ },
+ "strength/accumulation/40min/model/expected/tapped-easier": {
+  "hash": "07184a0a960acdebbf57418da991dbaf2d47a562b687ee62b2cae606ea2fb95b",
+  "notes": {
+   "se-p": "+1 target rep — that felt easy, earning the next jump",
+   "se-a": "+1 set — you're at the top of the rep range and it still felt easy"
+  }
+ },
+ "strength/accumulation/40min/model/expected/tapped-as-expected": {
+  "hash": "bcd894c4b4ba767b33d810b2aafa1b4e6fa1b76abad8f2eda9db722a7162d6b7",
+  "notes": {}
+ },
+ "strength/accumulation/40min/model/expected-missed/tapped-harder": {
+  "hash": "280dcbdc30508a0d2993c1baffbfc625ed5ea2f409e8c34677769af2231363ed",
+  "notes": {
+   "se-p": "−8% load — it felt harder than expected and you fell short of the prescribed reps",
+   "se-s": "−6.5% load — it felt harder than expected and you fell short of the prescribed reps",
+   "se-a": "−6% load — it felt harder than expected and you fell short of the prescribed reps"
+  }
+ },
+ "strength/accumulation/40min/model/expected-missed/tapped-easier": {
+  "hash": "a3f2a2382b75aaf7bdec003b0ad9c5bdae2ff95a0f9c20099917781fed40b0a4",
+  "notes": {}
+ },
+ "strength/accumulation/40min/model/expected-missed/tapped-as-expected": {
+  "hash": "f2c533238a4f52149b8bb7c96a7e65984a3f2caf76044943b857960f6c0d9198",
+  "notes": {}
+ },
+ "strength/accumulation/40min/model/expected-down/tapped-harder": {
+  "hash": "1898c90fb8e973c73696ac8c17735a2f823ac0e3bf11118b05fa0802742ce99e",
+  "notes": {
+   "se-p": "−5% load — it felt harder than expected while your 1RM slipped",
+   "se-s": "−5% load — it felt harder than expected while your 1RM slipped",
+   "se-a": "−5% load — it felt harder than expected while your 1RM slipped"
+  }
+ },
+ "strength/accumulation/40min/model/expected-down/tapped-easier": {
+  "hash": "a83efceae2561637c74b9210d16723d4f2cd5ee4e5cccf7597f41e30cf568d36",
+  "notes": {}
+ },
+ "strength/accumulation/40min/model/expected-down/tapped-as-expected": {
+  "hash": "354c021c6352c23446cfa2d89b60a37f7f11e16f65c4024443ed60445f5cabd4",
+  "notes": {}
+ },
+ "strength/accumulation/40min/model/rated-high-missed/tapped-harder": {
+  "hash": "70082833bcf6542c1c7f4c3960902ce31d5d450f5d7f133c221676d87b99d471",
+  "notes": {
+   "se-p": "−8% load — it felt harder than expected and you fell short of the prescribed reps",
+   "se-s": "−6.5% load — it felt harder than expected and you fell short of the prescribed reps",
+   "se-a": "−6% load — it felt harder than expected and you fell short of the prescribed reps"
+  }
+ },
+ "strength/accumulation/40min/model/rated-high-missed/tapped-easier": {
+  "hash": "d26b0ba9870097d502d43cdd8964a49e207d13a2d7c9991062bc175f8a040838",
+  "notes": {}
+ },
+ "strength/accumulation/40min/model/rated-high-missed/tapped-as-expected": {
+  "hash": "5ed267669510db12a3b7fe1a8bcdd2a18a8ae735fc95f521d2f2d82037c9a0e1",
+  "notes": {}
+ },
+ "strength/accumulation/40min/model/rated-low-met/tapped-harder": {
+  "hash": "2fb0327578c370290eec58b85b913f79a4ce2a366b13e83cff517c21b0d5a498",
+  "notes": {}
+ },
+ "strength/accumulation/40min/model/rated-low-met/tapped-easier": {
+  "hash": "e521ae9ed222cb67e4c006297364f48a58b0036660e9cf1712dfaae7e26d1b68",
+  "notes": {
+   "se-p": "+1 target rep — that felt easy, earning the next jump",
+   "se-a": "+1 set — you're at the top of the rep range and it still felt easy"
+  }
+ },
+ "strength/accumulation/40min/model/rated-low-met/tapped-as-expected": {
+  "hash": "92055bd59fcf8d5cf07c0e56f1db4827c7faa62f5b85b84ee93ec991ddd3bc44",
+  "notes": {}
+ },
+ "strength/accumulation/40min/model-fails/none/tapped-harder": {
+  "hash": "9c44e49b2932765827af17f353ccf5e80d3b6d100a027082ebfd0616765bfa7a",
+  "notes": {}
+ },
+ "strength/accumulation/40min/model-fails/none/tapped-easier": {
+  "hash": "9c44e49b2932765827af17f353ccf5e80d3b6d100a027082ebfd0616765bfa7a",
+  "notes": {}
+ },
+ "strength/accumulation/40min/model-fails/none/tapped-as-expected": {
+  "hash": "9c44e49b2932765827af17f353ccf5e80d3b6d100a027082ebfd0616765bfa7a",
+  "notes": {}
+ },
+ "strength/accumulation/40min/model-fails/expected/tapped-harder": {
+  "hash": "9200a3d6eeb2efcc6e1802b90bcb199c2bd0920e4b9c13fdc2972cdd8e35c406",
+  "notes": {}
+ },
+ "strength/accumulation/40min/model-fails/expected/tapped-easier": {
+  "hash": "6e71aaf8b2ab950f9f2be7d766f339756a670f007fa6f3038474a9df5c8f3221",
+  "notes": {}
+ },
+ "strength/accumulation/40min/model-fails/expected/tapped-as-expected": {
+  "hash": "6dfee26da325f1b98e69bc2c69f239aa365f850e5273b9d0b3418a4624fc6db0",
+  "notes": {}
+ },
+ "strength/accumulation/40min/model-fails/expected-missed/tapped-harder": {
+  "hash": "1c6343eba5fba53a6e9912dbc3c6194a66e5161facba93b803fa49ae2e1793ab",
+  "notes": {}
+ },
+ "strength/accumulation/40min/model-fails/expected-missed/tapped-easier": {
+  "hash": "49be81fb360e351c42d0d356cf0784ac4174fa2e1bcfab7e8518040b0f8257b1",
+  "notes": {}
+ },
+ "strength/accumulation/40min/model-fails/expected-missed/tapped-as-expected": {
+  "hash": "27f43810d5f4a0ea1915ffb124dd1b88da1b789a01f338739db43103d60f28d8",
+  "notes": {}
+ },
+ "strength/accumulation/40min/model-fails/expected-down/tapped-harder": {
+  "hash": "c0d3f0d0444d51117acd807386ea97d36cfff66d7dddb2fb8a87115924c0aebc",
+  "notes": {}
+ },
+ "strength/accumulation/40min/model-fails/expected-down/tapped-easier": {
+  "hash": "8fba580b79a02fb5ada1f0573809160ef292651c1cd9129d0a555d178d4f352d",
+  "notes": {}
+ },
+ "strength/accumulation/40min/model-fails/expected-down/tapped-as-expected": {
+  "hash": "7f6cf583bd470c4d33f290ea4846f1829aa7d5909172ede59308f5c44979f075",
+  "notes": {}
+ },
+ "strength/accumulation/40min/model-fails/rated-high-missed/tapped-harder": {
+  "hash": "200f02e832978bb4fd40a9ad0be2772132bd1e6d70e01c60a03362f04eabb27b",
+  "notes": {}
+ },
+ "strength/accumulation/40min/model-fails/rated-high-missed/tapped-easier": {
+  "hash": "41947e75823d819de301cceb088fce0839c0939f5c14ee860e628ee0ddecc238",
+  "notes": {}
+ },
+ "strength/accumulation/40min/model-fails/rated-high-missed/tapped-as-expected": {
+  "hash": "3eb9303d45788f05d397aee5b4cd22ac94c2fe4c321a07b9af9593eb9079b13c",
+  "notes": {}
+ },
+ "strength/accumulation/40min/model-fails/rated-low-met/tapped-harder": {
+  "hash": "c79de9ae360188f637d341d73c41680cdd7db2f12f87631ec28c4f23fb773f01",
+  "notes": {}
+ },
+ "strength/accumulation/40min/model-fails/rated-low-met/tapped-easier": {
+  "hash": "76a43c1bd314c0da4d3abf3f4f81f0528cc04f109c03432dfb59996cd2309ffe",
+  "notes": {}
+ },
+ "strength/accumulation/40min/model-fails/rated-low-met/tapped-as-expected": {
+  "hash": "3fa6e5bd6f0d154ce912183e3cce6a2f215844368b32931ce8accfa2a712d04a",
+  "notes": {}
+ },
+ "strength/intensification/90min/model/none/tapped-harder": {
+  "hash": "a3a74dce0b81b16771d46289037b7c2673cb5d8e3b134ef584fcbc833e717be0",
+  "notes": {}
+ },
+ "strength/intensification/90min/model/none/tapped-easier": {
+  "hash": "a3a74dce0b81b16771d46289037b7c2673cb5d8e3b134ef584fcbc833e717be0",
+  "notes": {}
+ },
+ "strength/intensification/90min/model/none/tapped-as-expected": {
+  "hash": "a3a74dce0b81b16771d46289037b7c2673cb5d8e3b134ef584fcbc833e717be0",
+  "notes": {}
+ },
+ "strength/intensification/90min/model/expected/tapped-harder": {
+  "hash": "c29ea2a3c491e276de443807aa093b10a845eca936c88cd1a05a01e53d9ba312",
+  "notes": {}
+ },
+ "strength/intensification/90min/model/expected/tapped-easier": {
+  "hash": "820468d6e9feadd8c0cc00895ab1ad2a28bb2aa59fa1364a05acdf133f1df7fe",
+  "notes": {
+   "se-p": "+1 target rep — that felt easy, earning the next jump",
+   "se-a": "+1 set — you're at the top of the rep range and it still felt easy"
+  }
+ },
+ "strength/intensification/90min/model/expected/tapped-as-expected": {
+  "hash": "a5b8cca39098e2cc825d4595f520ffe1bb49aea617b3a49fc6d5c2ef054eeee6",
+  "notes": {}
+ },
+ "strength/intensification/90min/model/expected-missed/tapped-harder": {
+  "hash": "8f4377649f2c12aac3725fb8992777d9bff41cabcc369919c98177f35c854e15",
+  "notes": {
+   "se-p": "−8% load — it felt harder than expected and you fell short of the prescribed reps",
+   "se-s": "−6.5% load — it felt harder than expected and you fell short of the prescribed reps",
+   "se-a": "−6% load — it felt harder than expected and you fell short of the prescribed reps"
+  }
+ },
+ "strength/intensification/90min/model/expected-missed/tapped-easier": {
+  "hash": "a2b664366b8e9de280ef3219984b669ba02e695b87620813de3297de20eab60d",
+  "notes": {}
+ },
+ "strength/intensification/90min/model/expected-missed/tapped-as-expected": {
+  "hash": "1bb2889fa6d15a5af014fbac964d04b9c57bb85a3c97d100b03a3827ae39fd4b",
+  "notes": {}
+ },
+ "strength/intensification/90min/model/expected-down/tapped-harder": {
+  "hash": "45ce68e732b21f62b1e7f2c899bc1fc8689f3633fe1b52c7255392eba0c5bcad",
+  "notes": {
+   "se-p": "−5% load — it felt harder than expected while your 1RM slipped",
+   "se-s": "−5% load — it felt harder than expected while your 1RM slipped",
+   "se-a": "−5% load — it felt harder than expected while your 1RM slipped"
+  }
+ },
+ "strength/intensification/90min/model/expected-down/tapped-easier": {
+  "hash": "57586ad398d9d6f8428b031476c31e88a14251b2ea9aee48e32f4cd6284e1bd0",
+  "notes": {}
+ },
+ "strength/intensification/90min/model/expected-down/tapped-as-expected": {
+  "hash": "25898987cc16ecbf7effd512543f812bd4e5c066f9ec89a4ec6077695a9f9a0b",
+  "notes": {}
+ },
+ "strength/intensification/90min/model/rated-high-missed/tapped-harder": {
+  "hash": "58e2a5c6e254c02fc2747ca50306e9e572343e90e52f0988f1924b54d7aeb5ed",
+  "notes": {
+   "se-p": "−8% load — it felt harder than expected and you fell short of the prescribed reps",
+   "se-s": "−6.5% load — it felt harder than expected and you fell short of the prescribed reps",
+   "se-a": "−6% load — it felt harder than expected and you fell short of the prescribed reps"
+  }
+ },
+ "strength/intensification/90min/model/rated-high-missed/tapped-easier": {
+  "hash": "c13bc171d50b6089a7e06377485a85bfbd6df87a058ef7b239820cdbef9bd058",
+  "notes": {}
+ },
+ "strength/intensification/90min/model/rated-high-missed/tapped-as-expected": {
+  "hash": "6887f4dc7d940b2d3a48adcf90dc88596e20ed96529049e452cf10df4a26e084",
+  "notes": {}
+ },
+ "strength/intensification/90min/model/rated-low-met/tapped-harder": {
+  "hash": "c7e29550739d22c9cc65abe195fda5e8211b77156a26b8498e05072fab08c5d5",
+  "notes": {}
+ },
+ "strength/intensification/90min/model/rated-low-met/tapped-easier": {
+  "hash": "f8eae085bc839e3bb66461d3592faf8be46aedb27f604cc53308c23a79d50582",
+  "notes": {
+   "se-p": "+1 target rep — that felt easy, earning the next jump",
+   "se-a": "+1 set — you're at the top of the rep range and it still felt easy"
+  }
+ },
+ "strength/intensification/90min/model/rated-low-met/tapped-as-expected": {
+  "hash": "eb5c2cdabc01c6348397c590d8fb923dafb6f5debe8cbfdb4782ac9581628f25",
+  "notes": {}
+ },
+ "strength/intensification/90min/model-fails/none/tapped-harder": {
+  "hash": "071954ac516f8e6a17057d02d99e501c76637389232935a608c523cb62aa2ed2",
+  "notes": {}
+ },
+ "strength/intensification/90min/model-fails/none/tapped-easier": {
+  "hash": "071954ac516f8e6a17057d02d99e501c76637389232935a608c523cb62aa2ed2",
+  "notes": {}
+ },
+ "strength/intensification/90min/model-fails/none/tapped-as-expected": {
+  "hash": "071954ac516f8e6a17057d02d99e501c76637389232935a608c523cb62aa2ed2",
+  "notes": {}
+ },
+ "strength/intensification/90min/model-fails/expected/tapped-harder": {
+  "hash": "bd9f26eb241bda4aeffde20bc36d5730291843d00a65120f95711f3a8ad0462c",
+  "notes": {}
+ },
+ "strength/intensification/90min/model-fails/expected/tapped-easier": {
+  "hash": "61d4b8fa98220a33f7813d3f7d750a05d2f675bf76f062cce5a56d15d4085f72",
+  "notes": {}
+ },
+ "strength/intensification/90min/model-fails/expected/tapped-as-expected": {
+  "hash": "38e1a7b111e6e0d149158ae448b91054f03c05e36280767649f375b6fc0878a7",
+  "notes": {}
+ },
+ "strength/intensification/90min/model-fails/expected-missed/tapped-harder": {
+  "hash": "9dd83faffb2c5551cd3fd8b056cab79e4fc90fc48a7f4983d5eaa8f949614da2",
+  "notes": {}
+ },
+ "strength/intensification/90min/model-fails/expected-missed/tapped-easier": {
+  "hash": "79f1e320fbc96da4d7681d3b3621239bd909468ae5983666804093a2dbc593b8",
+  "notes": {}
+ },
+ "strength/intensification/90min/model-fails/expected-missed/tapped-as-expected": {
+  "hash": "119709e5f5d64646db61ffc8029f291b96c88dc1db978da1f44fd69feb6628b5",
+  "notes": {}
+ },
+ "strength/intensification/90min/model-fails/expected-down/tapped-harder": {
+  "hash": "49a2f5f4c1d55fecf22922cbe79011ae0dd1f9073a23d74612454a8fe2c8a6de",
+  "notes": {}
+ },
+ "strength/intensification/90min/model-fails/expected-down/tapped-easier": {
+  "hash": "f8c13829010cacfc79caf71a29bc3859daa36214403cc50d6b8d7143c68ab666",
+  "notes": {}
+ },
+ "strength/intensification/90min/model-fails/expected-down/tapped-as-expected": {
+  "hash": "c6f1b8e63c5438bc7c290be7e5ce6c5d7b2fca4cd173b421c86b7dd6ffcc53a9",
+  "notes": {}
+ },
+ "strength/intensification/90min/model-fails/rated-high-missed/tapped-harder": {
+  "hash": "f71dbdf4113f67bf3cb32aa3f46f473ad62da6185206430f5d4ac812f5a68c57",
+  "notes": {}
+ },
+ "strength/intensification/90min/model-fails/rated-high-missed/tapped-easier": {
+  "hash": "4adf27cc4923878cd908dc7b4d800c55a6d33ba33a497d2085721e842c4910ae",
+  "notes": {}
+ },
+ "strength/intensification/90min/model-fails/rated-high-missed/tapped-as-expected": {
+  "hash": "de6d105cda5bc5036f394c06105bb3e9b2c8b1cac92c561e88d880ec80082990",
+  "notes": {}
+ },
+ "strength/intensification/90min/model-fails/rated-low-met/tapped-harder": {
+  "hash": "7b2658de325a5f4707bd7ddcf7e42cb24b9a81802ae71d197f95782815028b4c",
+  "notes": {}
+ },
+ "strength/intensification/90min/model-fails/rated-low-met/tapped-easier": {
+  "hash": "6eeb3aacfe2b5a2c4e49c3bbbcb72765fd874083daf2264bf4ade7539e0ea07a",
+  "notes": {}
+ },
+ "strength/intensification/90min/model-fails/rated-low-met/tapped-as-expected": {
+  "hash": "b3966b152008ffe166363cef82046f055ea8a4e7fb79a619632fa473c066965e",
+  "notes": {}
+ },
+ "strength/intensification/40min/model/none/tapped-harder": {
+  "hash": "efa37c87796a4abf9b024d8673661d90b8ce2744f9859e37d95ed9c63b1f11d7",
+  "notes": {}
+ },
+ "strength/intensification/40min/model/none/tapped-easier": {
+  "hash": "efa37c87796a4abf9b024d8673661d90b8ce2744f9859e37d95ed9c63b1f11d7",
+  "notes": {}
+ },
+ "strength/intensification/40min/model/none/tapped-as-expected": {
+  "hash": "efa37c87796a4abf9b024d8673661d90b8ce2744f9859e37d95ed9c63b1f11d7",
+  "notes": {}
+ },
+ "strength/intensification/40min/model/expected/tapped-harder": {
+  "hash": "7ad5e868c399950f9a7c6e4fa8c87803a63e5c6b851535144bec5b23f762e027",
+  "notes": {}
+ },
+ "strength/intensification/40min/model/expected/tapped-easier": {
+  "hash": "3dd2ed269c3f924abe82afc1de9bcdd081cb10cc3084da3c6ba393576e103269",
+  "notes": {
+   "se-p": "+1 target rep — that felt easy, earning the next jump",
+   "se-a": "+1 set — you're at the top of the rep range and it still felt easy"
+  }
+ },
+ "strength/intensification/40min/model/expected/tapped-as-expected": {
+  "hash": "f71cc1b9052288d55055a569589bebf25adc8e82065f5029e95fa089d4d31498",
+  "notes": {}
+ },
+ "strength/intensification/40min/model/expected-missed/tapped-harder": {
+  "hash": "c0f5574bc9b35bb882f7698b933331cf8e04f3e4de29599349c173a4e7244c8e",
+  "notes": {
+   "se-p": "−8% load — it felt harder than expected and you fell short of the prescribed reps",
+   "se-s": "−6.5% load — it felt harder than expected and you fell short of the prescribed reps",
+   "se-a": "−6% load — it felt harder than expected and you fell short of the prescribed reps"
+  }
+ },
+ "strength/intensification/40min/model/expected-missed/tapped-easier": {
+  "hash": "f236e329449a8b4de48613a673243f7ae27a5a1460fae0b6dc967e5d4558840c",
+  "notes": {}
+ },
+ "strength/intensification/40min/model/expected-missed/tapped-as-expected": {
+  "hash": "63c7fb78fe199e7bdc024c692b259befb79d83afd3ac1b56d37a4ea331bb12eb",
+  "notes": {}
+ },
+ "strength/intensification/40min/model/expected-down/tapped-harder": {
+  "hash": "7be487ec031edf8d470561f1435715f25584914bddc051b4be1e447546b9e3b7",
+  "notes": {
+   "se-p": "−5% load — it felt harder than expected while your 1RM slipped",
+   "se-s": "−5% load — it felt harder than expected while your 1RM slipped",
+   "se-a": "−5% load — it felt harder than expected while your 1RM slipped"
+  }
+ },
+ "strength/intensification/40min/model/expected-down/tapped-easier": {
+  "hash": "1b3c9ca681778da83013cbb97972bb6d7ab913e960cfde4e4e4ff64ca24fc114",
+  "notes": {}
+ },
+ "strength/intensification/40min/model/expected-down/tapped-as-expected": {
+  "hash": "83ffb49773dd0b4eef2200c54205e3251853238968d6aecba1e130626641d18d",
+  "notes": {}
+ },
+ "strength/intensification/40min/model/rated-high-missed/tapped-harder": {
+  "hash": "defbd8d3e783513d926dc20a6002ad97189492b9e5ac0ae8e502124285223e64",
+  "notes": {
+   "se-p": "−8% load — it felt harder than expected and you fell short of the prescribed reps",
+   "se-s": "−6.5% load — it felt harder than expected and you fell short of the prescribed reps",
+   "se-a": "−6% load — it felt harder than expected and you fell short of the prescribed reps"
+  }
+ },
+ "strength/intensification/40min/model/rated-high-missed/tapped-easier": {
+  "hash": "7e85ea8a2e765c12bce280925938f301a59c9d53262643529cbc3b5c38845db5",
+  "notes": {}
+ },
+ "strength/intensification/40min/model/rated-high-missed/tapped-as-expected": {
+  "hash": "60b3a90feb5e9b37cb038f5a4e342b8500a25fc18f6d79a085a1e0623ea07aff",
+  "notes": {}
+ },
+ "strength/intensification/40min/model/rated-low-met/tapped-harder": {
+  "hash": "0236285d32e431d321c619ea6a93648c8de5e422ff3a855968065d66302c0f8a",
+  "notes": {}
+ },
+ "strength/intensification/40min/model/rated-low-met/tapped-easier": {
+  "hash": "3756003eb745118605230e2ccab25cc2d7530398a3276460344e7f0afcae100c",
+  "notes": {
+   "se-p": "+1 target rep — that felt easy, earning the next jump",
+   "se-a": "+1 set — you're at the top of the rep range and it still felt easy"
+  }
+ },
+ "strength/intensification/40min/model/rated-low-met/tapped-as-expected": {
+  "hash": "6e9c12be67f557464f469b12d8a0ac03243357712474f813e4a547ffaf5c8f86",
+  "notes": {}
+ },
+ "strength/intensification/40min/model-fails/none/tapped-harder": {
+  "hash": "8d2201076889431770ea47e9894833e62e23b218d9e7ab6b5dc1d907a075e11c",
+  "notes": {}
+ },
+ "strength/intensification/40min/model-fails/none/tapped-easier": {
+  "hash": "8d2201076889431770ea47e9894833e62e23b218d9e7ab6b5dc1d907a075e11c",
+  "notes": {}
+ },
+ "strength/intensification/40min/model-fails/none/tapped-as-expected": {
+  "hash": "8d2201076889431770ea47e9894833e62e23b218d9e7ab6b5dc1d907a075e11c",
+  "notes": {}
+ },
+ "strength/intensification/40min/model-fails/expected/tapped-harder": {
+  "hash": "8f84bd150abeda737cfb35e7506e8a44a284535ac151b6d823d5a0e158fedbe8",
+  "notes": {}
+ },
+ "strength/intensification/40min/model-fails/expected/tapped-easier": {
+  "hash": "69f78de4e9d88daae6685b21b64f33caa33cc90705821048161751f3fbafe43d",
+  "notes": {}
+ },
+ "strength/intensification/40min/model-fails/expected/tapped-as-expected": {
+  "hash": "700a17dccf291239d5ab9bc5c63217fb5abf54d8a0ccc605c8829065b6aa38a7",
+  "notes": {}
+ },
+ "strength/intensification/40min/model-fails/expected-missed/tapped-harder": {
+  "hash": "d19002f31ab6832578207f3b640d18f2cbb0e886682e2a7b7234ff3b5200f42c",
+  "notes": {}
+ },
+ "strength/intensification/40min/model-fails/expected-missed/tapped-easier": {
+  "hash": "0479fb649049ce20200f8ce99eded769438a28c9ad4e878dcf4ab51628731fdc",
+  "notes": {}
+ },
+ "strength/intensification/40min/model-fails/expected-missed/tapped-as-expected": {
+  "hash": "06d02b36fb445d711a1ee295719d9d253bf2cba80febc3d7034ac0d192580175",
+  "notes": {}
+ },
+ "strength/intensification/40min/model-fails/expected-down/tapped-harder": {
+  "hash": "3f5c352984c31fd1820a7b43d8df256477ef99ad0be206997b56cd2fcea1510b",
+  "notes": {}
+ },
+ "strength/intensification/40min/model-fails/expected-down/tapped-easier": {
+  "hash": "f0b95749b1fea68cc1d3c1d629c6f1970ea501e37e0515dfc5449d11daa2d767",
+  "notes": {}
+ },
+ "strength/intensification/40min/model-fails/expected-down/tapped-as-expected": {
+  "hash": "ffecb24b874e892763f69b473db1673753ea1dcc5dd410ff67844a01cfe1557c",
+  "notes": {}
+ },
+ "strength/intensification/40min/model-fails/rated-high-missed/tapped-harder": {
+  "hash": "ff6e6a80e0a241b5004b7548666abb21428ba04f77438e9b1494e7098ab837ec",
+  "notes": {}
+ },
+ "strength/intensification/40min/model-fails/rated-high-missed/tapped-easier": {
+  "hash": "519427c4d88ea1c4ab9d93f32218f2f2296a6172b0f3aa5f5eae57bb625f5d70",
+  "notes": {}
+ },
+ "strength/intensification/40min/model-fails/rated-high-missed/tapped-as-expected": {
+  "hash": "4c568dc48412b23aaf7295a7fb4f3cb2d7314ee0aef8c8f93c48d9b746231ff4",
+  "notes": {}
+ },
+ "strength/intensification/40min/model-fails/rated-low-met/tapped-harder": {
+  "hash": "36d050e978b4e81b0e25ad967384d649cf9a3553bf3157d0d957edaa6f9fc122",
+  "notes": {}
+ },
+ "strength/intensification/40min/model-fails/rated-low-met/tapped-easier": {
+  "hash": "33e2986b8bc2fc04a08c4122016bc1ec4617dde0fd864775e87bddf0b9f7d2f0",
+  "notes": {}
+ },
+ "strength/intensification/40min/model-fails/rated-low-met/tapped-as-expected": {
+  "hash": "413a0ef2f4ca866246840d36323b520d5053389caed9f7582a026c07f5e654b1",
+  "notes": {}
+ },
+ "strength/realisation/90min/model/none/tapped-harder": {
+  "hash": "7a9035d4e521304fe75d25bbbecb15baeeb3c16358634fe76dc3038530db52e9",
+  "notes": {}
+ },
+ "strength/realisation/90min/model/none/tapped-easier": {
+  "hash": "7a9035d4e521304fe75d25bbbecb15baeeb3c16358634fe76dc3038530db52e9",
+  "notes": {}
+ },
+ "strength/realisation/90min/model/none/tapped-as-expected": {
+  "hash": "7a9035d4e521304fe75d25bbbecb15baeeb3c16358634fe76dc3038530db52e9",
+  "notes": {}
+ },
+ "strength/realisation/90min/model/expected/tapped-harder": {
+  "hash": "572f0ae67af92cb186bb8b13f8a76f7cdfd7d61889ae08ef47d5187b4e633e66",
+  "notes": {}
+ },
+ "strength/realisation/90min/model/expected/tapped-easier": {
+  "hash": "ae41d26214978399939e37b927b25bc3f10470ac95946960ae5b139994bb5ac2",
+  "notes": {}
+ },
+ "strength/realisation/90min/model/expected/tapped-as-expected": {
+  "hash": "6e8278a35be14b0606b42e9bc22d5c9c6d3859e581f062d5e599926d57f55817",
+  "notes": {}
+ },
+ "strength/realisation/90min/model/expected-missed/tapped-harder": {
+  "hash": "7a996aca12792849a09f39ce6270b40ab4f55f45acaa518eb807cdfcd4bfb5f8",
+  "notes": {
+   "se-p": "−8% load — it felt harder than expected and you fell short of the prescribed reps",
+   "se-s": "−6.5% load — it felt harder than expected and you fell short of the prescribed reps",
+   "se-a": "−6% load — it felt harder than expected and you fell short of the prescribed reps"
+  }
+ },
+ "strength/realisation/90min/model/expected-missed/tapped-easier": {
+  "hash": "391cf4aabb56c361b66f358453e8c50b454a3365bf477b9644105d4499264309",
+  "notes": {}
+ },
+ "strength/realisation/90min/model/expected-missed/tapped-as-expected": {
+  "hash": "3ae2c3ae06cf55f6dc1db3b606a76c6461954666e21e72b0da11de8b0e7832f0",
+  "notes": {}
+ },
+ "strength/realisation/90min/model/expected-down/tapped-harder": {
+  "hash": "6c8323c2cdff76c9e94e36af35a71811b919100eaaa9ef43ff57b056097f5285",
+  "notes": {
+   "se-p": "−5% load — it felt harder than expected while your 1RM slipped",
+   "se-s": "−5% load — it felt harder than expected while your 1RM slipped",
+   "se-a": "−5% load — it felt harder than expected while your 1RM slipped"
+  }
+ },
+ "strength/realisation/90min/model/expected-down/tapped-easier": {
+  "hash": "a57572f8ba0f511bbbade53746a20c9707e34bbb9c941434a2f4e7110d6e9488",
+  "notes": {}
+ },
+ "strength/realisation/90min/model/expected-down/tapped-as-expected": {
+  "hash": "774562b6b137d03be74ad39ea9d9501fb8fe710fe3f7824821bbdc8a4fbaf08a",
+  "notes": {}
+ },
+ "strength/realisation/90min/model/rated-high-missed/tapped-harder": {
+  "hash": "d5baac76b544d9f9632506201b5e8f4f7a43c6d8ce6fd32357f4b0e0d6c5df37",
+  "notes": {
+   "se-p": "−8% load — it felt harder than expected and you fell short of the prescribed reps",
+   "se-s": "−6.5% load — it felt harder than expected and you fell short of the prescribed reps",
+   "se-a": "−6% load — it felt harder than expected and you fell short of the prescribed reps"
+  }
+ },
+ "strength/realisation/90min/model/rated-high-missed/tapped-easier": {
+  "hash": "fab1b35b37d6b4aa647510bfdb5b58eb2834d7211396de8dba54382d72377232",
+  "notes": {}
+ },
+ "strength/realisation/90min/model/rated-high-missed/tapped-as-expected": {
+  "hash": "09b9ac85fb935c4d6317e99cb4e242893d65d6eed337af7a9481dffb1f597f55",
+  "notes": {}
+ },
+ "strength/realisation/90min/model/rated-low-met/tapped-harder": {
+  "hash": "6fc6030931d7e90f0c23662243065e58e5e7a329403f9599340a4d8d79cf05da",
+  "notes": {}
+ },
+ "strength/realisation/90min/model/rated-low-met/tapped-easier": {
+  "hash": "32725dd733737c7e26111290ac07ad52b6ae0612ec1017946cfd4907cb519342",
+  "notes": {}
+ },
+ "strength/realisation/90min/model/rated-low-met/tapped-as-expected": {
+  "hash": "fb9ebcc6a62230206d370e07fb1952772553a5207eca652096b51f7719b101e3",
+  "notes": {}
+ },
+ "strength/realisation/90min/model-fails/none/tapped-harder": {
+  "hash": "a7abe21be5092313f571a5d27d95e5e5db063d6c69dd85dc52a91ac286870fb4",
+  "notes": {}
+ },
+ "strength/realisation/90min/model-fails/none/tapped-easier": {
+  "hash": "a7abe21be5092313f571a5d27d95e5e5db063d6c69dd85dc52a91ac286870fb4",
+  "notes": {}
+ },
+ "strength/realisation/90min/model-fails/none/tapped-as-expected": {
+  "hash": "a7abe21be5092313f571a5d27d95e5e5db063d6c69dd85dc52a91ac286870fb4",
+  "notes": {}
+ },
+ "strength/realisation/90min/model-fails/expected/tapped-harder": {
+  "hash": "94729b8201c69adbf45302952563cd4eaf806879d08b6add6f7c260d31727f8c",
+  "notes": {}
+ },
+ "strength/realisation/90min/model-fails/expected/tapped-easier": {
+  "hash": "b38bbe91b81b7313df0c941a1ad50c8dedc7048ab99bcd71c534c0451fac481a",
+  "notes": {}
+ },
+ "strength/realisation/90min/model-fails/expected/tapped-as-expected": {
+  "hash": "febeca3e2021f2ca67467fa477e132739ac7aa2df89ad030ca57c12f77d439b8",
+  "notes": {}
+ },
+ "strength/realisation/90min/model-fails/expected-missed/tapped-harder": {
+  "hash": "acc214c713cfc1ba8afd59de1436d86b929552a7448ce2b44caa961eda3681c5",
+  "notes": {}
+ },
+ "strength/realisation/90min/model-fails/expected-missed/tapped-easier": {
+  "hash": "3b48035443860d4c04a710fe17186542157d91eaa95eac6696217075c0a31c1f",
+  "notes": {}
+ },
+ "strength/realisation/90min/model-fails/expected-missed/tapped-as-expected": {
+  "hash": "5b3a66f3ee770021d454849b8a37c9ed4abb4d9b7261457959cfcb6902604b07",
+  "notes": {}
+ },
+ "strength/realisation/90min/model-fails/expected-down/tapped-harder": {
+  "hash": "6f2a36494b825b8d032acf34c600941acc05e488c1102c01c227ea4b93afd937",
+  "notes": {}
+ },
+ "strength/realisation/90min/model-fails/expected-down/tapped-easier": {
+  "hash": "e34ea4d118fdf92d6c26748adbcd3bb890e4e504c49786d694e5b1cdaa09640f",
+  "notes": {}
+ },
+ "strength/realisation/90min/model-fails/expected-down/tapped-as-expected": {
+  "hash": "fe7fb4c471855ca6865bff8324e810ae6cdd223d24fc932e6269b64a3f4c7d69",
+  "notes": {}
+ },
+ "strength/realisation/90min/model-fails/rated-high-missed/tapped-harder": {
+  "hash": "8c5e7d2afb26f58f6dcbc67e293f7eac3477bee1d1f1d9cec384b968dfa28094",
+  "notes": {}
+ },
+ "strength/realisation/90min/model-fails/rated-high-missed/tapped-easier": {
+  "hash": "1e5b8b515121621e682db385549daa46c53c7a329cd77f50f1c8bd2ce76386e5",
+  "notes": {}
+ },
+ "strength/realisation/90min/model-fails/rated-high-missed/tapped-as-expected": {
+  "hash": "56d4c4508287d96830f98bebda220aafdae8d6d2ad349ee33ecfc8ed98f8823c",
+  "notes": {}
+ },
+ "strength/realisation/90min/model-fails/rated-low-met/tapped-harder": {
+  "hash": "3ee71fcfe206056497989dba77b273182c6783262aa6b82d863011e857a508dd",
+  "notes": {}
+ },
+ "strength/realisation/90min/model-fails/rated-low-met/tapped-easier": {
+  "hash": "d636e1a5cb2d1c770286940a9dffd188fc51441dc6ba1d91dd080d163ea9c7b7",
+  "notes": {}
+ },
+ "strength/realisation/90min/model-fails/rated-low-met/tapped-as-expected": {
+  "hash": "4708851f2461ceb5da8b48a34e996e75211bef6e30504d928ef5be53039bad23",
+  "notes": {}
+ },
+ "strength/realisation/40min/model/none/tapped-harder": {
+  "hash": "7857df62dea4a3d26535b9b9d30b720f35994f28da07231222bc8c294140c26f",
+  "notes": {}
+ },
+ "strength/realisation/40min/model/none/tapped-easier": {
+  "hash": "7857df62dea4a3d26535b9b9d30b720f35994f28da07231222bc8c294140c26f",
+  "notes": {}
+ },
+ "strength/realisation/40min/model/none/tapped-as-expected": {
+  "hash": "7857df62dea4a3d26535b9b9d30b720f35994f28da07231222bc8c294140c26f",
+  "notes": {}
+ },
+ "strength/realisation/40min/model/expected/tapped-harder": {
+  "hash": "5312ee50899005da2b4e045a91b4c6dd98a09f62e4600e16ba95200bbb50546f",
+  "notes": {}
+ },
+ "strength/realisation/40min/model/expected/tapped-easier": {
+  "hash": "378d3f24a832af0bf3846cbf6ab48548e91035436120f1fbcb8bb5288d5e9b52",
+  "notes": {}
+ },
+ "strength/realisation/40min/model/expected/tapped-as-expected": {
+  "hash": "9288ee8c377f8eb5ae342ccbdc64a11ec9066020b0f1ff91edd926af4d1ad97e",
+  "notes": {}
+ },
+ "strength/realisation/40min/model/expected-missed/tapped-harder": {
+  "hash": "f1c6745b6bf084f8effae938f565e9d81efea6b4ef78344f711f2c163799571f",
+  "notes": {
+   "se-p": "−8% load — it felt harder than expected and you fell short of the prescribed reps",
+   "se-s": "−6.5% load — it felt harder than expected and you fell short of the prescribed reps",
+   "se-a": "−6% load — it felt harder than expected and you fell short of the prescribed reps"
+  }
+ },
+ "strength/realisation/40min/model/expected-missed/tapped-easier": {
+  "hash": "7d107ccbb8903826aeb9e90c3a9b135f4a2f5cae1b70b0e4668da98c10b11b08",
+  "notes": {}
+ },
+ "strength/realisation/40min/model/expected-missed/tapped-as-expected": {
+  "hash": "6b4b23f78c96dbcf3ca93cd3e0417af408c5eddc5a5e946f3b2b7edc43ba3a43",
+  "notes": {}
+ },
+ "strength/realisation/40min/model/expected-down/tapped-harder": {
+  "hash": "bae1f592c8e6e7751e19f2d089c44f75ff1a12dac7e4cf51954787d6c3066ddd",
+  "notes": {
+   "se-p": "−5% load — it felt harder than expected while your 1RM slipped",
+   "se-s": "−5% load — it felt harder than expected while your 1RM slipped",
+   "se-a": "−5% load — it felt harder than expected while your 1RM slipped"
+  }
+ },
+ "strength/realisation/40min/model/expected-down/tapped-easier": {
+  "hash": "de9deec934df33991d16aac357f89f82e11d342282cbd68824e05c4aed076a0b",
+  "notes": {}
+ },
+ "strength/realisation/40min/model/expected-down/tapped-as-expected": {
+  "hash": "97253db26f92636ba128ca3f4cd2a75ecde2e47c97a4a7310c81846ae5c34c2c",
+  "notes": {}
+ },
+ "strength/realisation/40min/model/rated-high-missed/tapped-harder": {
+  "hash": "051c9acc47ebde7114057ab74c1b09694058535464ab9ad65ec3e2774db86a91",
+  "notes": {
+   "se-p": "−8% load — it felt harder than expected and you fell short of the prescribed reps",
+   "se-s": "−6.5% load — it felt harder than expected and you fell short of the prescribed reps",
+   "se-a": "−6% load — it felt harder than expected and you fell short of the prescribed reps"
+  }
+ },
+ "strength/realisation/40min/model/rated-high-missed/tapped-easier": {
+  "hash": "2b5973a1bb935d349cfa8729ec4124a734b24db1de0afd7249b3b7b464fbbdcf",
+  "notes": {}
+ },
+ "strength/realisation/40min/model/rated-high-missed/tapped-as-expected": {
+  "hash": "344d3cfe5d66c34fa6892d4eebf13b5d4f16c62d6a8a7444921af84ddf88772d",
+  "notes": {}
+ },
+ "strength/realisation/40min/model/rated-low-met/tapped-harder": {
+  "hash": "d4dd777196be90fa1f72d39737551dc907a9d9091778a62b3fcf896591340a87",
+  "notes": {}
+ },
+ "strength/realisation/40min/model/rated-low-met/tapped-easier": {
+  "hash": "957cc0688455412aae3ec3d4c02d0456c9922db9d4426db245b7f8cc484fdaf5",
+  "notes": {}
+ },
+ "strength/realisation/40min/model/rated-low-met/tapped-as-expected": {
+  "hash": "965c14a50becbff292c6a49c3fe3bb780c191a39abd124772eea8fe132ced04f",
+  "notes": {}
+ },
+ "strength/realisation/40min/model-fails/none/tapped-harder": {
+  "hash": "2da781479842f2c8195d30502a592acde38d15367ed4faee6d80fbed0230e333",
+  "notes": {}
+ },
+ "strength/realisation/40min/model-fails/none/tapped-easier": {
+  "hash": "2da781479842f2c8195d30502a592acde38d15367ed4faee6d80fbed0230e333",
+  "notes": {}
+ },
+ "strength/realisation/40min/model-fails/none/tapped-as-expected": {
+  "hash": "2da781479842f2c8195d30502a592acde38d15367ed4faee6d80fbed0230e333",
+  "notes": {}
+ },
+ "strength/realisation/40min/model-fails/expected/tapped-harder": {
+  "hash": "d59f74d01a41bd23b2c6ef92ccaaf0ff800d09117296c33d5980ce29ad3925c2",
+  "notes": {}
+ },
+ "strength/realisation/40min/model-fails/expected/tapped-easier": {
+  "hash": "2c790f05d07e0cfb8d852dda00c1fdb171d7d1d46c618f322e0893099baf52f5",
+  "notes": {}
+ },
+ "strength/realisation/40min/model-fails/expected/tapped-as-expected": {
+  "hash": "a296a40904480fcfeb915fcbed421b18fa916b88ef8101064cbaef85cff2f2cb",
+  "notes": {}
+ },
+ "strength/realisation/40min/model-fails/expected-missed/tapped-harder": {
+  "hash": "da98676d0553d4196978b61b3811c15350beba083fde7306103cb5700b83ee34",
+  "notes": {}
+ },
+ "strength/realisation/40min/model-fails/expected-missed/tapped-easier": {
+  "hash": "bbf9230eec6cf21c62f0f8ea4be85a322c94b1da0f4dde37d274e84abf6d34db",
+  "notes": {}
+ },
+ "strength/realisation/40min/model-fails/expected-missed/tapped-as-expected": {
+  "hash": "cb7fd0c32717b0deef7c21089be143754225a8dc0d0216c1bf1905f22d4eeed7",
+  "notes": {}
+ },
+ "strength/realisation/40min/model-fails/expected-down/tapped-harder": {
+  "hash": "9307b1b7d66703ba9b1dcabc4b681d6661203b010e9da8a7fbbcdabefcf20a17",
+  "notes": {}
+ },
+ "strength/realisation/40min/model-fails/expected-down/tapped-easier": {
+  "hash": "dd182e84a4855ebc382c9f63234add406da5c83294ed24e73c8ccb365fccbb77",
+  "notes": {}
+ },
+ "strength/realisation/40min/model-fails/expected-down/tapped-as-expected": {
+  "hash": "6e8ba44fee43592cb87988e8244a0091f2d2013ee6ab32aed1cdd44e91bec0b9",
+  "notes": {}
+ },
+ "strength/realisation/40min/model-fails/rated-high-missed/tapped-harder": {
+  "hash": "df6d135f4937ca5cd581b75e9f02602d1083dcff34a1d1a364f2da40066ea762",
+  "notes": {}
+ },
+ "strength/realisation/40min/model-fails/rated-high-missed/tapped-easier": {
+  "hash": "33fcbb14e371ec8b0e00b1d9abb1ab3a01e7f3f78473ba148ea0bb5a420e4320",
+  "notes": {}
+ },
+ "strength/realisation/40min/model-fails/rated-high-missed/tapped-as-expected": {
+  "hash": "7b7dac1cea40f6e44b89a5a8625a91df0c2f554a7855a230cfd80990de35db48",
+  "notes": {}
+ },
+ "strength/realisation/40min/model-fails/rated-low-met/tapped-harder": {
+  "hash": "2c42f20b9bc641b206586701489f840ee682b943b71740314441c4ffa926b78d",
+  "notes": {}
+ },
+ "strength/realisation/40min/model-fails/rated-low-met/tapped-easier": {
+  "hash": "4605d08ba26245117955060d30ac361ae7d976d7c73b28efd0cc152c8c008def",
+  "notes": {}
+ },
+ "strength/realisation/40min/model-fails/rated-low-met/tapped-as-expected": {
+  "hash": "ab2aaead423c61a63049f998075046c80a10a67e3b003575df1c4ec26d4ed660",
+  "notes": {}
+ },
+ "strength/deload/90min/model/none/tapped-harder": {
+  "hash": "de973cd8550ae8c7ace12e0436df97319bf3e599571f343bdcbdbe8ad3fb5c81",
+  "notes": {}
+ },
+ "strength/deload/90min/model/none/tapped-easier": {
+  "hash": "de973cd8550ae8c7ace12e0436df97319bf3e599571f343bdcbdbe8ad3fb5c81",
+  "notes": {}
+ },
+ "strength/deload/90min/model/none/tapped-as-expected": {
+  "hash": "de973cd8550ae8c7ace12e0436df97319bf3e599571f343bdcbdbe8ad3fb5c81",
+  "notes": {}
+ },
+ "strength/deload/90min/model/expected/tapped-harder": {
+  "hash": "cf0acda3c188139baaa2b4b8037a9553469d18a1ed67feca336c895278553ee1",
+  "notes": {}
+ },
+ "strength/deload/90min/model/expected/tapped-easier": {
+  "hash": "adf3dac76b240a4b23e511cd9c72241bcd81d82a3dbdf231cd002c6b4ec03e1b",
+  "notes": {}
+ },
+ "strength/deload/90min/model/expected/tapped-as-expected": {
+  "hash": "03efeeab7b9ec0cf201b293afd1b20f6c1a39771413b30a0d5804bf9f3a1df53",
+  "notes": {}
+ },
+ "strength/deload/90min/model/expected-missed/tapped-harder": {
+  "hash": "4a82a96d92e9aa02c40b1c85bee1f2405c3eb55e855ec5ef86760ec4f6af9a51",
+  "notes": {}
+ },
+ "strength/deload/90min/model/expected-missed/tapped-easier": {
+  "hash": "ae697d7b6efddaca84dc9b8d9b939ce1b67fdab07f6f9a7119298d724274b978",
+  "notes": {}
+ },
+ "strength/deload/90min/model/expected-missed/tapped-as-expected": {
+  "hash": "4d3e8fc33edf67a6b343c897ace9bcb8c62f8a47f891231cb5816e8d73af5b12",
+  "notes": {}
+ },
+ "strength/deload/90min/model/expected-down/tapped-harder": {
+  "hash": "6fe7cc1d8ac8d76722f3bc04af866d3fc92f354203e4b01738ed931616161d00",
+  "notes": {}
+ },
+ "strength/deload/90min/model/expected-down/tapped-easier": {
+  "hash": "d236bbbc0105b01b0258b0ccfd26fd895aabe351ed2388b8db6d66aa600c7b5a",
+  "notes": {}
+ },
+ "strength/deload/90min/model/expected-down/tapped-as-expected": {
+  "hash": "64445e9021b4236762fc2720afeade80d46a1860363fbcd32763b115b5dc0dbd",
+  "notes": {}
+ },
+ "strength/deload/90min/model/rated-high-missed/tapped-harder": {
+  "hash": "53af8b8b9229cf631cb3222856befa0599da038fc405be6e34954360a1f20abe",
+  "notes": {}
+ },
+ "strength/deload/90min/model/rated-high-missed/tapped-easier": {
+  "hash": "d958f0a6c289c2545bed7d2a6474c36e9a3f2d6891f476eb710304a086079a0a",
+  "notes": {}
+ },
+ "strength/deload/90min/model/rated-high-missed/tapped-as-expected": {
+  "hash": "96a55c6f72ab5164d45eaa28108ef63a9329b75d416e606bce4a408026bc395d",
+  "notes": {}
+ },
+ "strength/deload/90min/model/rated-low-met/tapped-harder": {
+  "hash": "f55bec7da47879da81ac2881ebb3eef64028893920848ed18cad32bdc1694e84",
+  "notes": {}
+ },
+ "strength/deload/90min/model/rated-low-met/tapped-easier": {
+  "hash": "210102420aa117fa4d5a989b5c184e143c6ab082d8658e860e80f90df2e4d771",
+  "notes": {}
+ },
+ "strength/deload/90min/model/rated-low-met/tapped-as-expected": {
+  "hash": "9c110a724198cd7dd081f972c3e9636a15f2410bf8d9b0393b693a651cf585ec",
+  "notes": {}
+ },
+ "strength/deload/90min/model-fails/none/tapped-harder": {
+  "hash": "f6b876573e244b389fbc2386842cf4a8b9c16a7734be1573b002d61d3dd4b8b4",
+  "notes": {}
+ },
+ "strength/deload/90min/model-fails/none/tapped-easier": {
+  "hash": "f6b876573e244b389fbc2386842cf4a8b9c16a7734be1573b002d61d3dd4b8b4",
+  "notes": {}
+ },
+ "strength/deload/90min/model-fails/none/tapped-as-expected": {
+  "hash": "f6b876573e244b389fbc2386842cf4a8b9c16a7734be1573b002d61d3dd4b8b4",
+  "notes": {}
+ },
+ "strength/deload/90min/model-fails/expected/tapped-harder": {
+  "hash": "6f391c2a413e4322586207f1584279de7afb96ca222dfa24f4be6bb5b34f8b56",
+  "notes": {}
+ },
+ "strength/deload/90min/model-fails/expected/tapped-easier": {
+  "hash": "feb2cec41888fc47297527affcceacdfa6cf0c1c47828037e2640d691faf4413",
+  "notes": {}
+ },
+ "strength/deload/90min/model-fails/expected/tapped-as-expected": {
+  "hash": "78ecb63c0e3edb844abf6b93f9cb16feba1d63fd01564598d4db6fa9f91cc7c5",
+  "notes": {}
+ },
+ "strength/deload/90min/model-fails/expected-missed/tapped-harder": {
+  "hash": "8d8f02bce79034754d01e962d0ae1b5aa26fd1e25d936c8b1f580a10ccd2e333",
+  "notes": {}
+ },
+ "strength/deload/90min/model-fails/expected-missed/tapped-easier": {
+  "hash": "ce0a307c3f1f6430f9a577bcf131c8d9a4698155400a56d88d0774aadb966171",
+  "notes": {}
+ },
+ "strength/deload/90min/model-fails/expected-missed/tapped-as-expected": {
+  "hash": "16e1db90f75795a075fdd657f48911ef8690abbb600f442ac3f277eb58bf3917",
+  "notes": {}
+ },
+ "strength/deload/90min/model-fails/expected-down/tapped-harder": {
+  "hash": "c7ba481b0cfbd1caa38c310c23e08ae662cbd0fa5ddada88c6f0798c508b0a41",
+  "notes": {}
+ },
+ "strength/deload/90min/model-fails/expected-down/tapped-easier": {
+  "hash": "beaeeaafe938744a9014883f3dcc18a7b24187700baff8a1339f35be0dfc9976",
+  "notes": {}
+ },
+ "strength/deload/90min/model-fails/expected-down/tapped-as-expected": {
+  "hash": "e8d1e760d3d2a64e5ad13bf5ab429a9df500193f172c0d10da813fa754161d96",
+  "notes": {}
+ },
+ "strength/deload/90min/model-fails/rated-high-missed/tapped-harder": {
+  "hash": "bd874df864d912e44cdcd8f9292e6d284a23f4e139189f7e7c67e519eb2e3f82",
+  "notes": {}
+ },
+ "strength/deload/90min/model-fails/rated-high-missed/tapped-easier": {
+  "hash": "9160f1cb84a48873bfcd5cd0f1f905794ea4ef04a6ea578652b3bcd98da6b71e",
+  "notes": {}
+ },
+ "strength/deload/90min/model-fails/rated-high-missed/tapped-as-expected": {
+  "hash": "c3ed3d82e68f27f17723f2af53110cb135449815ef992a9ad49a629c92c9bff5",
+  "notes": {}
+ },
+ "strength/deload/90min/model-fails/rated-low-met/tapped-harder": {
+  "hash": "6b3b9a73ac416ce3f97c4bc24baeabf7d429f983efdcb25b17cbbd0338a4d244",
+  "notes": {}
+ },
+ "strength/deload/90min/model-fails/rated-low-met/tapped-easier": {
+  "hash": "d7021ea3b87895efb61fcc4f072f81a67dc3a26d6dfa3ad205ee2d5055f49e6d",
+  "notes": {}
+ },
+ "strength/deload/90min/model-fails/rated-low-met/tapped-as-expected": {
+  "hash": "4f63107e92787a31cb1e15d7dd98e028c40a453dbcd89a53f6976e22b1e21cfa",
+  "notes": {}
+ },
+ "strength/deload/40min/model/none/tapped-harder": {
+  "hash": "142c4bd967b4b8c4c49bacc3460478e61457dce4ee56cfb0f36e18f8e3eac3e2",
+  "notes": {}
+ },
+ "strength/deload/40min/model/none/tapped-easier": {
+  "hash": "142c4bd967b4b8c4c49bacc3460478e61457dce4ee56cfb0f36e18f8e3eac3e2",
+  "notes": {}
+ },
+ "strength/deload/40min/model/none/tapped-as-expected": {
+  "hash": "142c4bd967b4b8c4c49bacc3460478e61457dce4ee56cfb0f36e18f8e3eac3e2",
+  "notes": {}
+ },
+ "strength/deload/40min/model/expected/tapped-harder": {
+  "hash": "e0aa719574a28ad097d21c14e427ea06264f54d5ac8eb862cea2eb7694522128",
+  "notes": {}
+ },
+ "strength/deload/40min/model/expected/tapped-easier": {
+  "hash": "2611c6b27429ff3eae6a22da7a4b773a30fa1ded7e5aba08e6e87ed126493fe6",
+  "notes": {}
+ },
+ "strength/deload/40min/model/expected/tapped-as-expected": {
+  "hash": "1b6c0fb0b7e7b78ffc435705f82aba6e88a568308123aaf36f522b96add06c2c",
+  "notes": {}
+ },
+ "strength/deload/40min/model/expected-missed/tapped-harder": {
+  "hash": "866a188d13cdaad3f15f7c0932d48c3122e9faa34dbe4d3df1ce30ed1cd9393b",
+  "notes": {}
+ },
+ "strength/deload/40min/model/expected-missed/tapped-easier": {
+  "hash": "87faf2754b3187936ea7de915d6e057b84419ad77fa2964bb4c2511299f91cf4",
+  "notes": {}
+ },
+ "strength/deload/40min/model/expected-missed/tapped-as-expected": {
+  "hash": "9a040aae4a22c2b8a9fed06bec8616f2df60ec7b22252bf1275263f2f952bade",
+  "notes": {}
+ },
+ "strength/deload/40min/model/expected-down/tapped-harder": {
+  "hash": "8bdfe373f043552cd392b93253997df73af4cdfdd470033e6e5b4615552be08c",
+  "notes": {}
+ },
+ "strength/deload/40min/model/expected-down/tapped-easier": {
+  "hash": "1b62bc791c4b736786fa830c6463bce53c2ba67dee22911568619b34214a7210",
+  "notes": {}
+ },
+ "strength/deload/40min/model/expected-down/tapped-as-expected": {
+  "hash": "a56e9e2dd2ed18fed5a4215e330c5bde2416d02b221df2dedad2368dcdf5fec4",
+  "notes": {}
+ },
+ "strength/deload/40min/model/rated-high-missed/tapped-harder": {
+  "hash": "c4cadb1b73e030e1c6987cf02e1db53292cbcbb724ae246ee8522ee80fe2b354",
+  "notes": {}
+ },
+ "strength/deload/40min/model/rated-high-missed/tapped-easier": {
+  "hash": "071e3bca1eeb365fd4a6351aae22ee3561bda96ea7f11bcfcdec02cecd424c5e",
+  "notes": {}
+ },
+ "strength/deload/40min/model/rated-high-missed/tapped-as-expected": {
+  "hash": "345a46f129b8153c7422f0788db6908047afdb3c5f04a74c8994094c5809a5b0",
+  "notes": {}
+ },
+ "strength/deload/40min/model/rated-low-met/tapped-harder": {
+  "hash": "c8d7834d632c4478cae4709aa72d1e83ec0cadf5d61e9bc7603fdeaddc398188",
+  "notes": {}
+ },
+ "strength/deload/40min/model/rated-low-met/tapped-easier": {
+  "hash": "372330fdbf273bcf39c5c6e2966f2e1135484872ffb75cd537736682e70f6e24",
+  "notes": {}
+ },
+ "strength/deload/40min/model/rated-low-met/tapped-as-expected": {
+  "hash": "c99b149357dbbebc016b1afa5c93fa3892c72df2eb753eb9b8ae50ee73c2a54a",
+  "notes": {}
+ },
+ "strength/deload/40min/model-fails/none/tapped-harder": {
+  "hash": "768eee2bead554e75822fe20de1089428507636655e5783c1f200d6fccd88358",
+  "notes": {}
+ },
+ "strength/deload/40min/model-fails/none/tapped-easier": {
+  "hash": "768eee2bead554e75822fe20de1089428507636655e5783c1f200d6fccd88358",
+  "notes": {}
+ },
+ "strength/deload/40min/model-fails/none/tapped-as-expected": {
+  "hash": "768eee2bead554e75822fe20de1089428507636655e5783c1f200d6fccd88358",
+  "notes": {}
+ },
+ "strength/deload/40min/model-fails/expected/tapped-harder": {
+  "hash": "2440a1e88ab8b9fd13a180fc6fb4e6ab2ec89f6e4615fce5a6822115576e0717",
+  "notes": {}
+ },
+ "strength/deload/40min/model-fails/expected/tapped-easier": {
+  "hash": "be9557949db98e01df35ec7a1631e95a71b68978b79e4a6804c716936307338f",
+  "notes": {}
+ },
+ "strength/deload/40min/model-fails/expected/tapped-as-expected": {
+  "hash": "e5ad84efe06b0ae26174dca8246110b352a6859ded5b9ae5a960f43d8488502c",
+  "notes": {}
+ },
+ "strength/deload/40min/model-fails/expected-missed/tapped-harder": {
+  "hash": "f10ef635e6dbb5aca726db00afa85f6e6b2fa6c688c4f14dc47692d682cd4628",
+  "notes": {}
+ },
+ "strength/deload/40min/model-fails/expected-missed/tapped-easier": {
+  "hash": "57a9a2e3de0450fb07c2eda215d33f35df1fe126ce2ce48cc0f65691e661d960",
+  "notes": {}
+ },
+ "strength/deload/40min/model-fails/expected-missed/tapped-as-expected": {
+  "hash": "ac52e8bee2b6adb6b925217ecd87b0348486004fefd20632611aade2f31bbeef",
+  "notes": {}
+ },
+ "strength/deload/40min/model-fails/expected-down/tapped-harder": {
+  "hash": "d4930246fd0b992144d03e81f4d8fa5b7e9d21b583d8e9d18a547c9a3e9b0d79",
+  "notes": {}
+ },
+ "strength/deload/40min/model-fails/expected-down/tapped-easier": {
+  "hash": "709e0a8e855142cc7b49cd88f1e089bb9949c629700fe599791c12afac5f30f0",
+  "notes": {}
+ },
+ "strength/deload/40min/model-fails/expected-down/tapped-as-expected": {
+  "hash": "a9a1c49692f7d249e7d26aa5a51a802175e540ce58d7b8d88ece0b34a84a23d2",
+  "notes": {}
+ },
+ "strength/deload/40min/model-fails/rated-high-missed/tapped-harder": {
+  "hash": "6c0a4e4f50402badd78f7d926361250909644d78c0cd52f5b3b7024f53637765",
+  "notes": {}
+ },
+ "strength/deload/40min/model-fails/rated-high-missed/tapped-easier": {
+  "hash": "56e2f4a677bdb77d4595dd344fdb375fbf88e5a00e38d9fcd84191e1d5918a35",
+  "notes": {}
+ },
+ "strength/deload/40min/model-fails/rated-high-missed/tapped-as-expected": {
+  "hash": "8c71922f5a61acff99a2e67364ac9e27638738a72b50c1fa82c66ca2b4ae15b8",
+  "notes": {}
+ },
+ "strength/deload/40min/model-fails/rated-low-met/tapped-harder": {
+  "hash": "7f7d295100cf0134967c0602270cd551ebcf5dfa8e8d9143e4eaf6874673b98f",
+  "notes": {}
+ },
+ "strength/deload/40min/model-fails/rated-low-met/tapped-easier": {
+  "hash": "dcffa44a694530f0ea2a4ca5412262741d6fe8cc43e7cd3a9df3fa541a3f5434",
+  "notes": {}
+ },
+ "strength/deload/40min/model-fails/rated-low-met/tapped-as-expected": {
+  "hash": "e7a8e1d942fbf433bdb74accc094c97af307bba8c70e1c3388d9dfcdaf8631a0",
+  "notes": {}
+ },
+ "hypertrophy/accumulation/90min/model/none/tapped-harder": {
+  "hash": "2d4a375c1057765182d11e4475aa87858b917ca9495a8d7b015721a9b226e19d",
+  "notes": {}
+ },
+ "hypertrophy/accumulation/90min/model/none/tapped-easier": {
+  "hash": "2d4a375c1057765182d11e4475aa87858b917ca9495a8d7b015721a9b226e19d",
+  "notes": {}
+ },
+ "hypertrophy/accumulation/90min/model/none/tapped-as-expected": {
+  "hash": "2d4a375c1057765182d11e4475aa87858b917ca9495a8d7b015721a9b226e19d",
+  "notes": {}
+ },
+ "hypertrophy/accumulation/90min/model/expected/tapped-harder": {
+  "hash": "f21189219d241fccab175d6d7e3160c62bd8085a135534c892f8b95cc0770824",
+  "notes": {}
+ },
+ "hypertrophy/accumulation/90min/model/expected/tapped-easier": {
+  "hash": "b1bc428702f1f84a56c4116a1d05fd76b7fd41bc36ced4bba49dd156395aca09",
+  "notes": {
+   "se-p": "+1 target rep — that felt easy, earning the next jump",
+   "se-s": "+1 target rep — that felt easy, earning the next jump",
+   "se-a": "+1 target rep — that felt easy, earning the next jump"
+  }
+ },
+ "hypertrophy/accumulation/90min/model/expected/tapped-as-expected": {
+  "hash": "0d90a209aa471a2628c77e6b47ea2971a4f3982fdfdd82ed5507c0f94bbecf2b",
+  "notes": {}
+ },
+ "hypertrophy/accumulation/90min/model/expected-missed/tapped-harder": {
+  "hash": "4b1b62473cf50a3f1ca13afcacbaae3bee272c9e9d45850339864511ed067f33",
+  "notes": {
+   "se-p": "−8% load — it felt harder than expected and you fell short of the prescribed reps",
+   "se-s": "−6.5% load — it felt harder than expected and you fell short of the prescribed reps",
+   "se-a": "−6% load — it felt harder than expected and you fell short of the prescribed reps"
+  }
+ },
+ "hypertrophy/accumulation/90min/model/expected-missed/tapped-easier": {
+  "hash": "4b8d35c352a201d87118a1a688d3593a955de783fa0b7af6d35d072e1820b160",
+  "notes": {}
+ },
+ "hypertrophy/accumulation/90min/model/expected-missed/tapped-as-expected": {
+  "hash": "0ebf62daa47325d9eb58b1f41093f58d7322ac381310740a1f1c3edb432b1e69",
+  "notes": {}
+ },
+ "hypertrophy/accumulation/90min/model/expected-down/tapped-harder": {
+  "hash": "eaef42ae45f0fead5c121c94d9de6ce8271b74b788afbc6c8914a466990b70e8",
+  "notes": {
+   "se-p": "−5% load — it felt harder than expected while your 1RM slipped",
+   "se-s": "−5% load — it felt harder than expected while your 1RM slipped",
+   "se-a": "−5% load — it felt harder than expected while your 1RM slipped"
+  }
+ },
+ "hypertrophy/accumulation/90min/model/expected-down/tapped-easier": {
+  "hash": "2eda87784806193bf3be677cc3fee346366c6c8870ecdea300318f3a843384f0",
+  "notes": {}
+ },
+ "hypertrophy/accumulation/90min/model/expected-down/tapped-as-expected": {
+  "hash": "ed6f95a20c449f164658dd7d112415eab29107fa275d48efb12f633040cbcb1e",
+  "notes": {}
+ },
+ "hypertrophy/accumulation/90min/model/rated-high-missed/tapped-harder": {
+  "hash": "43c0e14bb4f77f459737aad11af5e5ac6b98597195b78fab8b0537bd70c24e97",
+  "notes": {
+   "se-p": "−8% load — it felt harder than expected and you fell short of the prescribed reps",
+   "se-s": "−6.5% load — it felt harder than expected and you fell short of the prescribed reps",
+   "se-a": "−6% load — it felt harder than expected and you fell short of the prescribed reps"
+  }
+ },
+ "hypertrophy/accumulation/90min/model/rated-high-missed/tapped-easier": {
+  "hash": "dfb42fca5a58cbf5ee7cf0b1b18b29d71c5dfb618f0a4cc849e261cd729f4c38",
+  "notes": {}
+ },
+ "hypertrophy/accumulation/90min/model/rated-high-missed/tapped-as-expected": {
+  "hash": "8f3cf9b7c22b8309868945df622858821d682ff7a5278dddcc1dc473cd531970",
+  "notes": {}
+ },
+ "hypertrophy/accumulation/90min/model/rated-low-met/tapped-harder": {
+  "hash": "67294266997f65929ef15e276853fd63fff831d3ff4858c8c4c091ad57978df1",
+  "notes": {}
+ },
+ "hypertrophy/accumulation/90min/model/rated-low-met/tapped-easier": {
+  "hash": "8f94f76272c77f4fff4bf2b66e789e08fa1c14f24d76e1f8d190751c022b6cf6",
+  "notes": {
+   "se-p": "+1 target rep — that felt easy, earning the next jump",
+   "se-s": "+1 target rep — that felt easy, earning the next jump",
+   "se-a": "+1 target rep — that felt easy, earning the next jump"
+  }
+ },
+ "hypertrophy/accumulation/90min/model/rated-low-met/tapped-as-expected": {
+  "hash": "5d3537be7114dfd7be63d9b0e95000f169a420cf43eeddbd0c7713fba7b9a08f",
+  "notes": {}
+ },
+ "hypertrophy/accumulation/90min/model-fails/none/tapped-harder": {
+  "hash": "3e0185fe6d8b8f0f123f6b81c52c64b5df55e1ecd55cc1e703264c29a0d0b9de",
+  "notes": {}
+ },
+ "hypertrophy/accumulation/90min/model-fails/none/tapped-easier": {
+  "hash": "3e0185fe6d8b8f0f123f6b81c52c64b5df55e1ecd55cc1e703264c29a0d0b9de",
+  "notes": {}
+ },
+ "hypertrophy/accumulation/90min/model-fails/none/tapped-as-expected": {
+  "hash": "3e0185fe6d8b8f0f123f6b81c52c64b5df55e1ecd55cc1e703264c29a0d0b9de",
+  "notes": {}
+ },
+ "hypertrophy/accumulation/90min/model-fails/expected/tapped-harder": {
+  "hash": "1cc810e6e87b2ea280c8ba273865d6ae079ed20419a01c8bbabd8470bc1e96d2",
+  "notes": {}
+ },
+ "hypertrophy/accumulation/90min/model-fails/expected/tapped-easier": {
+  "hash": "da46cff2e5bef7685cb6b95d6639579ac5032c443bed35305895b942fdaaea81",
+  "notes": {}
+ },
+ "hypertrophy/accumulation/90min/model-fails/expected/tapped-as-expected": {
+  "hash": "3e11e50ed5dd74de1a10455fc0c7ddab60f78cdff482e3ac66c663dfa0535bec",
+  "notes": {}
+ },
+ "hypertrophy/accumulation/90min/model-fails/expected-missed/tapped-harder": {
+  "hash": "14b7f8f6b5bfb1ce5d6e53debd3751e079e2f3634fc4d4cd124567485e0c4e4f",
+  "notes": {}
+ },
+ "hypertrophy/accumulation/90min/model-fails/expected-missed/tapped-easier": {
+  "hash": "888058d4dd0315e2d0c2ca2f236a67e9a487cc24e6de70f66a7207a83facc56d",
+  "notes": {}
+ },
+ "hypertrophy/accumulation/90min/model-fails/expected-missed/tapped-as-expected": {
+  "hash": "feda8b4415308b1536bbe8576046784bb6acfd8e8483f4d3aa79f14a702f93c9",
+  "notes": {}
+ },
+ "hypertrophy/accumulation/90min/model-fails/expected-down/tapped-harder": {
+  "hash": "226b61b6067ea249b7173045be98acf3a5cde7dc088792ecf182463632ae7312",
+  "notes": {}
+ },
+ "hypertrophy/accumulation/90min/model-fails/expected-down/tapped-easier": {
+  "hash": "76081e683d1ccd996961c21d3ba3be318e287bad86b08bea9675963ff449ddb1",
+  "notes": {}
+ },
+ "hypertrophy/accumulation/90min/model-fails/expected-down/tapped-as-expected": {
+  "hash": "a1f1d288b7456b83ffb1a28d194ffe9baa865daf605154a08c1f153360e09ad1",
+  "notes": {}
+ },
+ "hypertrophy/accumulation/90min/model-fails/rated-high-missed/tapped-harder": {
+  "hash": "9d856933c21a33c9ba42d19f63c4f32f554fb8187636e3c7377fe80a283650bb",
+  "notes": {}
+ },
+ "hypertrophy/accumulation/90min/model-fails/rated-high-missed/tapped-easier": {
+  "hash": "f9b73d843502821bc653869632886dafa7d5c42bae153e4555f2c9d819d365bc",
+  "notes": {}
+ },
+ "hypertrophy/accumulation/90min/model-fails/rated-high-missed/tapped-as-expected": {
+  "hash": "3a9579b8020a1f82137037545d4d53d20f80a3bf45991e2cecc7130ca7c9ad43",
+  "notes": {}
+ },
+ "hypertrophy/accumulation/90min/model-fails/rated-low-met/tapped-harder": {
+  "hash": "611c25800d67e630363a64713cc105b39ba5cf2dafa00ac2ce9993fdce6ad5ba",
+  "notes": {}
+ },
+ "hypertrophy/accumulation/90min/model-fails/rated-low-met/tapped-easier": {
+  "hash": "2f5f02329fa4eb5f778e5edd938bd87e75b08727e546f25525808f81dd498516",
+  "notes": {}
+ },
+ "hypertrophy/accumulation/90min/model-fails/rated-low-met/tapped-as-expected": {
+  "hash": "b93da102c7a31a1bae8205772f2c4c02b567c50349fb91ac589c4881bdf93bdd",
+  "notes": {}
+ },
+ "hypertrophy/accumulation/40min/model/none/tapped-harder": {
+  "hash": "20ef2f6b4ec6b27c7423a453bbbbf9d113233a99cab7f2ad0e2b9e7936bd93af",
+  "notes": {}
+ },
+ "hypertrophy/accumulation/40min/model/none/tapped-easier": {
+  "hash": "20ef2f6b4ec6b27c7423a453bbbbf9d113233a99cab7f2ad0e2b9e7936bd93af",
+  "notes": {}
+ },
+ "hypertrophy/accumulation/40min/model/none/tapped-as-expected": {
+  "hash": "20ef2f6b4ec6b27c7423a453bbbbf9d113233a99cab7f2ad0e2b9e7936bd93af",
+  "notes": {}
+ },
+ "hypertrophy/accumulation/40min/model/expected/tapped-harder": {
+  "hash": "be49f7ced85a9283ed7ed26bb4fb212540ae2d521201b3ea938f6b0e8c4eb8ab",
+  "notes": {}
+ },
+ "hypertrophy/accumulation/40min/model/expected/tapped-easier": {
+  "hash": "2fb9be436666684a0ae5d87770d9909aa2f7c15250aa20f2130b5aed6f4c2161",
+  "notes": {
+   "se-p": "+1 target rep — that felt easy, earning the next jump",
+   "se-s": "+1 target rep — that felt easy, earning the next jump",
+   "se-a": "+1 target rep — that felt easy, earning the next jump"
+  }
+ },
+ "hypertrophy/accumulation/40min/model/expected/tapped-as-expected": {
+  "hash": "69ee05aec72f03cce10ca47e6991c65b8b67ede308a8a325f7cd5be60afa50ff",
+  "notes": {}
+ },
+ "hypertrophy/accumulation/40min/model/expected-missed/tapped-harder": {
+  "hash": "ff67160eb1364ccedd528480316e42a146c9a9698b7b6a389283ad7761da19e6",
+  "notes": {
+   "se-p": "−8% load — it felt harder than expected and you fell short of the prescribed reps",
+   "se-s": "−6.5% load — it felt harder than expected and you fell short of the prescribed reps",
+   "se-a": "−6% load — it felt harder than expected and you fell short of the prescribed reps"
+  }
+ },
+ "hypertrophy/accumulation/40min/model/expected-missed/tapped-easier": {
+  "hash": "0839a26ce666e9f4e147da2af3ed3fcd359105072cd3d1ef5016cd7e032e32eb",
+  "notes": {}
+ },
+ "hypertrophy/accumulation/40min/model/expected-missed/tapped-as-expected": {
+  "hash": "096d679db2aa4852fb7e70b2cd1629e5de8798764933191297c96c8f538c954c",
+  "notes": {}
+ },
+ "hypertrophy/accumulation/40min/model/expected-down/tapped-harder": {
+  "hash": "8bd21a3749c42a27ae07691f489b9ac0c2c2496fc7a88e9730bbbdda279aee8a",
+  "notes": {
+   "se-p": "−5% load — it felt harder than expected while your 1RM slipped",
+   "se-s": "−5% load — it felt harder than expected while your 1RM slipped",
+   "se-a": "−5% load — it felt harder than expected while your 1RM slipped"
+  }
+ },
+ "hypertrophy/accumulation/40min/model/expected-down/tapped-easier": {
+  "hash": "4bcf9372fada18a88a53f6c57f85e30ec9ba9b4172eac0554c69bd1bcd191756",
+  "notes": {}
+ },
+ "hypertrophy/accumulation/40min/model/expected-down/tapped-as-expected": {
+  "hash": "e6be11badf9f424daeff36f378618f0dbf012d961a53e4ae72dfe7eda50f30a6",
+  "notes": {}
+ },
+ "hypertrophy/accumulation/40min/model/rated-high-missed/tapped-harder": {
+  "hash": "b224c67f3ce35c7f34d55df1e19e91ba582be6122d0d454d87a987dc6b2683f3",
+  "notes": {
+   "se-p": "−8% load — it felt harder than expected and you fell short of the prescribed reps",
+   "se-s": "−6.5% load — it felt harder than expected and you fell short of the prescribed reps",
+   "se-a": "−6% load — it felt harder than expected and you fell short of the prescribed reps"
+  }
+ },
+ "hypertrophy/accumulation/40min/model/rated-high-missed/tapped-easier": {
+  "hash": "e7db404ae18fee15b590537f21a0abdbe7162c7c3d10f56c7972bf966ed25b86",
+  "notes": {}
+ },
+ "hypertrophy/accumulation/40min/model/rated-high-missed/tapped-as-expected": {
+  "hash": "7b5040499d0a7eb22962c20ae7b364b06bd9e4ee2a13c18cc55bac2e0842e85e",
+  "notes": {}
+ },
+ "hypertrophy/accumulation/40min/model/rated-low-met/tapped-harder": {
+  "hash": "76dda62824a1c297fa9f9e9b3448c7de70141d202153a15dbc7e55ae88e09a4c",
+  "notes": {}
+ },
+ "hypertrophy/accumulation/40min/model/rated-low-met/tapped-easier": {
+  "hash": "7a31f267a50c975c2a99c63efab9b56d0e5075463f60dc546ce01dfdd636c46f",
+  "notes": {
+   "se-p": "+1 target rep — that felt easy, earning the next jump",
+   "se-s": "+1 target rep — that felt easy, earning the next jump",
+   "se-a": "+1 target rep — that felt easy, earning the next jump"
+  }
+ },
+ "hypertrophy/accumulation/40min/model/rated-low-met/tapped-as-expected": {
+  "hash": "685029140ae3bfb601d47ddd28edd3b5fa766778912dc10e1cb9f8e3ba64142e",
+  "notes": {}
+ },
+ "hypertrophy/accumulation/40min/model-fails/none/tapped-harder": {
+  "hash": "ae1368ceaee516d1d6c3dd5ade946b89404f2a14516d713f1d896afb1f7b9a09",
+  "notes": {}
+ },
+ "hypertrophy/accumulation/40min/model-fails/none/tapped-easier": {
+  "hash": "ae1368ceaee516d1d6c3dd5ade946b89404f2a14516d713f1d896afb1f7b9a09",
+  "notes": {}
+ },
+ "hypertrophy/accumulation/40min/model-fails/none/tapped-as-expected": {
+  "hash": "ae1368ceaee516d1d6c3dd5ade946b89404f2a14516d713f1d896afb1f7b9a09",
+  "notes": {}
+ },
+ "hypertrophy/accumulation/40min/model-fails/expected/tapped-harder": {
+  "hash": "fda821955b1c896aafc761654b142989c24d962bb1f8b65c8f888fda63125427",
+  "notes": {}
+ },
+ "hypertrophy/accumulation/40min/model-fails/expected/tapped-easier": {
+  "hash": "d22973ed5857b218105b309e0e84999dc4c6d841e94b0784f1878255e2a2e742",
+  "notes": {}
+ },
+ "hypertrophy/accumulation/40min/model-fails/expected/tapped-as-expected": {
+  "hash": "865211f9749c70e2ec97139a47f7fdcd8df09b1116e2341b3851dcb1162cdb8a",
+  "notes": {}
+ },
+ "hypertrophy/accumulation/40min/model-fails/expected-missed/tapped-harder": {
+  "hash": "3c0b732c6669ed81012f45579c3420d2fe148e3f3e87b9004c255e9243197aeb",
+  "notes": {}
+ },
+ "hypertrophy/accumulation/40min/model-fails/expected-missed/tapped-easier": {
+  "hash": "d5ebf3c4f68eefcbd4141a3f92cf3866cdd1d058847278533c85de8045d78992",
+  "notes": {}
+ },
+ "hypertrophy/accumulation/40min/model-fails/expected-missed/tapped-as-expected": {
+  "hash": "b9019735468dce56123b6245d1c1722f64e9ba1c75219630700bc201278ecef1",
+  "notes": {}
+ },
+ "hypertrophy/accumulation/40min/model-fails/expected-down/tapped-harder": {
+  "hash": "72959f1460bf68fc535bbcdaa0602cd9bb99f8a03baf77f0b2f1b77a59dabe71",
+  "notes": {}
+ },
+ "hypertrophy/accumulation/40min/model-fails/expected-down/tapped-easier": {
+  "hash": "2443e6cbbf17289c2dffaa8800c525ae4d7317a5e4439d540025cb37af6e4b1a",
+  "notes": {}
+ },
+ "hypertrophy/accumulation/40min/model-fails/expected-down/tapped-as-expected": {
+  "hash": "e46e939dc2c4b784787f6abbfe87e7ca9efee9af08fb4c04d9046376aeb21115",
+  "notes": {}
+ },
+ "hypertrophy/accumulation/40min/model-fails/rated-high-missed/tapped-harder": {
+  "hash": "27c6d8cbd3c75863633461bb848872bed83da76b997831d66b4bcd42bd57b923",
+  "notes": {}
+ },
+ "hypertrophy/accumulation/40min/model-fails/rated-high-missed/tapped-easier": {
+  "hash": "d58e9c5efd0b176258bbb5c6d9757ec56028cf7906af0a2d61a90d9dcd501aae",
+  "notes": {}
+ },
+ "hypertrophy/accumulation/40min/model-fails/rated-high-missed/tapped-as-expected": {
+  "hash": "54e2904f2bba131e75d3b13f28dc17c4e6c1f4404fe4f508237970665f0faeec",
+  "notes": {}
+ },
+ "hypertrophy/accumulation/40min/model-fails/rated-low-met/tapped-harder": {
+  "hash": "b143bd5f05779a14587e3147cb2d9ba13c4cdcc6c360841540914f008e9bf83c",
+  "notes": {}
+ },
+ "hypertrophy/accumulation/40min/model-fails/rated-low-met/tapped-easier": {
+  "hash": "32b601eb2aff5ee6e2e54f6b870d5660e9aed865b3bc01cb08c63b58869df7db",
+  "notes": {}
+ },
+ "hypertrophy/accumulation/40min/model-fails/rated-low-met/tapped-as-expected": {
+  "hash": "8cb43b46780a7e0aa5549944543458bd286a6e06bff80b25e409bbcd37905e77",
+  "notes": {}
+ },
+ "hypertrophy/intensification/90min/model/none/tapped-harder": {
+  "hash": "974f8839e30c2155830247aa646a2e412e983c17c18b1da3d4b319dcbb106dfa",
+  "notes": {}
+ },
+ "hypertrophy/intensification/90min/model/none/tapped-easier": {
+  "hash": "974f8839e30c2155830247aa646a2e412e983c17c18b1da3d4b319dcbb106dfa",
+  "notes": {}
+ },
+ "hypertrophy/intensification/90min/model/none/tapped-as-expected": {
+  "hash": "974f8839e30c2155830247aa646a2e412e983c17c18b1da3d4b319dcbb106dfa",
+  "notes": {}
+ },
+ "hypertrophy/intensification/90min/model/expected/tapped-harder": {
+  "hash": "3b6b940043c271ee4a796962e28d126d919ed27e4151be5bd4bb8ebeb6132cd5",
+  "notes": {}
+ },
+ "hypertrophy/intensification/90min/model/expected/tapped-easier": {
+  "hash": "e25f8e8425c53bde787847f3927aaac0630a7a23a5c8b217c24c8e5aed7c6ddf",
+  "notes": {
+   "se-p": "+1 target rep — that felt easy, earning the next jump",
+   "se-s": "+1 target rep — that felt easy, earning the next jump",
+   "se-a": "+1 target rep — that felt easy, earning the next jump"
+  }
+ },
+ "hypertrophy/intensification/90min/model/expected/tapped-as-expected": {
+  "hash": "590d3ff5ed6c9789387b1d9e6f1f9f1a7a6f8de6d31d94763271c2f51e6f996c",
+  "notes": {}
+ },
+ "hypertrophy/intensification/90min/model/expected-missed/tapped-harder": {
+  "hash": "421ec952d4364eaf3adb54631c3b556d1a991aae3b6204e04a4eb8e4d49efc00",
+  "notes": {
+   "se-p": "−8% load — it felt harder than expected and you fell short of the prescribed reps",
+   "se-s": "−6.5% load — it felt harder than expected and you fell short of the prescribed reps",
+   "se-a": "−6% load — it felt harder than expected and you fell short of the prescribed reps"
+  }
+ },
+ "hypertrophy/intensification/90min/model/expected-missed/tapped-easier": {
+  "hash": "055f5a6faaf3234118af15b96d0f35365907b7497f970f8fc963c155358a1478",
+  "notes": {}
+ },
+ "hypertrophy/intensification/90min/model/expected-missed/tapped-as-expected": {
+  "hash": "6a0f95069e8c78e6069a07aaaa60687dd56b5ee1d40bec0db70540473a08eb00",
+  "notes": {}
+ },
+ "hypertrophy/intensification/90min/model/expected-down/tapped-harder": {
+  "hash": "d8d5074f6f9621e2076e92c4b67b4dfc04ded2c230ca386d9bf81f099f0a9493",
+  "notes": {
+   "se-p": "−5% load — it felt harder than expected while your 1RM slipped",
+   "se-s": "−5% load — it felt harder than expected while your 1RM slipped",
+   "se-a": "−5% load — it felt harder than expected while your 1RM slipped"
+  }
+ },
+ "hypertrophy/intensification/90min/model/expected-down/tapped-easier": {
+  "hash": "1a563f5cf9d846f45b2416d843e848e4db982801901a555ba729e3dcc73b5786",
+  "notes": {}
+ },
+ "hypertrophy/intensification/90min/model/expected-down/tapped-as-expected": {
+  "hash": "a065e9d22d0dfdb0c49959964b47b51dda88ee7c55d42a25296a274f51fe1c82",
+  "notes": {}
+ },
+ "hypertrophy/intensification/90min/model/rated-high-missed/tapped-harder": {
+  "hash": "adc6817d59f5db8a8de072134b6786807c885010ff3833b0d86cd4587ad04262",
+  "notes": {
+   "se-p": "−8% load — it felt harder than expected and you fell short of the prescribed reps",
+   "se-s": "−6.5% load — it felt harder than expected and you fell short of the prescribed reps",
+   "se-a": "−6% load — it felt harder than expected and you fell short of the prescribed reps"
+  }
+ },
+ "hypertrophy/intensification/90min/model/rated-high-missed/tapped-easier": {
+  "hash": "554457349dea43e27a07fd3373d55f8f772e17006c9851385936e8941e95e43c",
+  "notes": {}
+ },
+ "hypertrophy/intensification/90min/model/rated-high-missed/tapped-as-expected": {
+  "hash": "423ca2cc6b820fe49d187278d6abef1ec47db27228ae1b81cde3cadb5e025228",
+  "notes": {}
+ },
+ "hypertrophy/intensification/90min/model/rated-low-met/tapped-harder": {
+  "hash": "dee0fc4bde3bee1efd8f88f7967c4c973adac13a121defca45b9f466abc2f54c",
+  "notes": {}
+ },
+ "hypertrophy/intensification/90min/model/rated-low-met/tapped-easier": {
+  "hash": "b8e718b3436da7a7ad4f2cc0c0267be7dd9a2322c524ffc679a36fe1eb412dbb",
+  "notes": {
+   "se-p": "+1 target rep — that felt easy, earning the next jump",
+   "se-s": "+1 target rep — that felt easy, earning the next jump",
+   "se-a": "+1 target rep — that felt easy, earning the next jump"
+  }
+ },
+ "hypertrophy/intensification/90min/model/rated-low-met/tapped-as-expected": {
+  "hash": "c3cee4f06384819aec56aa60aca8a7c81add902e79a4b57328d09e3b71ad7be6",
+  "notes": {}
+ },
+ "hypertrophy/intensification/90min/model-fails/none/tapped-harder": {
+  "hash": "7df1806b7dd4a2542459d5d0da195ee625049d495dd47dc9cfc87534e748b411",
+  "notes": {}
+ },
+ "hypertrophy/intensification/90min/model-fails/none/tapped-easier": {
+  "hash": "7df1806b7dd4a2542459d5d0da195ee625049d495dd47dc9cfc87534e748b411",
+  "notes": {}
+ },
+ "hypertrophy/intensification/90min/model-fails/none/tapped-as-expected": {
+  "hash": "7df1806b7dd4a2542459d5d0da195ee625049d495dd47dc9cfc87534e748b411",
+  "notes": {}
+ },
+ "hypertrophy/intensification/90min/model-fails/expected/tapped-harder": {
+  "hash": "0b7061fc37873c792f23a6e62e32d3ad4d61e50a0428e864c9237cb8f176efd0",
+  "notes": {}
+ },
+ "hypertrophy/intensification/90min/model-fails/expected/tapped-easier": {
+  "hash": "982c5c95db850f321a9f14e142d80dd01ef1455182f49a1d0bc1d3f68258fb01",
+  "notes": {}
+ },
+ "hypertrophy/intensification/90min/model-fails/expected/tapped-as-expected": {
+  "hash": "b03bde059dfee4184fb5f4f9c7c459e3850f7a8ca7e603606dadd809414d5626",
+  "notes": {}
+ },
+ "hypertrophy/intensification/90min/model-fails/expected-missed/tapped-harder": {
+  "hash": "c34052e0e5d26ebf8acb5b2cf037f1e0552452467a3f6969ff7ed24c7aac0312",
+  "notes": {}
+ },
+ "hypertrophy/intensification/90min/model-fails/expected-missed/tapped-easier": {
+  "hash": "3c2d606c1e328a94a6f7272b474e626dab2638a17d2cdac8d36cc7480b734b5f",
+  "notes": {}
+ },
+ "hypertrophy/intensification/90min/model-fails/expected-missed/tapped-as-expected": {
+  "hash": "dcdcc6d2ffe2bc44649e10d1a5abc074708f1434fa81ad8484e74a79d5b273ad",
+  "notes": {}
+ },
+ "hypertrophy/intensification/90min/model-fails/expected-down/tapped-harder": {
+  "hash": "9ae430abdf18179d4c4bc7b848afbd21d489c22ecdde0ea40140463dd9757c06",
+  "notes": {}
+ },
+ "hypertrophy/intensification/90min/model-fails/expected-down/tapped-easier": {
+  "hash": "b220efa6793ef085446129eb80aecb1bf69d50bd4f525e7e52f3086f29e5d419",
+  "notes": {}
+ },
+ "hypertrophy/intensification/90min/model-fails/expected-down/tapped-as-expected": {
+  "hash": "aec7fe5d981d5f82d70d4699b9a7778f1102aea84bbb9abc13d5885ac167e472",
+  "notes": {}
+ },
+ "hypertrophy/intensification/90min/model-fails/rated-high-missed/tapped-harder": {
+  "hash": "708214cffd3e4c305b05ba478d9a0b34b77f8abb51572e2ac47b9860b1ebafe4",
+  "notes": {}
+ },
+ "hypertrophy/intensification/90min/model-fails/rated-high-missed/tapped-easier": {
+  "hash": "3ac77354238b4879c2c04da11d6e3ff3c80d8e1cffd88023c8c315c0780fdf13",
+  "notes": {}
+ },
+ "hypertrophy/intensification/90min/model-fails/rated-high-missed/tapped-as-expected": {
+  "hash": "79dcae31fe463eb6ca0e1ae64bdde9bbebaf20ee395a4f9323e00119d8bfb3d8",
+  "notes": {}
+ },
+ "hypertrophy/intensification/90min/model-fails/rated-low-met/tapped-harder": {
+  "hash": "443fcbaeda70a3bcc322e91d16093965a76056c12873dbf1d81e93640fec512e",
+  "notes": {}
+ },
+ "hypertrophy/intensification/90min/model-fails/rated-low-met/tapped-easier": {
+  "hash": "b1aadf2da0e7d285bb00f58a1f483adb84bb9fc3236e65f438ceda7679a40669",
+  "notes": {}
+ },
+ "hypertrophy/intensification/90min/model-fails/rated-low-met/tapped-as-expected": {
+  "hash": "51eea00f3edd7235d00ff9f6c37905bae5832a230198251eb13339b7d47df5e2",
+  "notes": {}
+ },
+ "hypertrophy/intensification/40min/model/none/tapped-harder": {
+  "hash": "ad62da5bdec5ebaa6bfa2ace00a4aaa2d5773ed32eeb4c39f23b46ff3fa957f2",
+  "notes": {}
+ },
+ "hypertrophy/intensification/40min/model/none/tapped-easier": {
+  "hash": "ad62da5bdec5ebaa6bfa2ace00a4aaa2d5773ed32eeb4c39f23b46ff3fa957f2",
+  "notes": {}
+ },
+ "hypertrophy/intensification/40min/model/none/tapped-as-expected": {
+  "hash": "ad62da5bdec5ebaa6bfa2ace00a4aaa2d5773ed32eeb4c39f23b46ff3fa957f2",
+  "notes": {}
+ },
+ "hypertrophy/intensification/40min/model/expected/tapped-harder": {
+  "hash": "36aa6acd015540ed9ca0da0405d82aeb367aa032815d8866605129b7482cf0ac",
+  "notes": {}
+ },
+ "hypertrophy/intensification/40min/model/expected/tapped-easier": {
+  "hash": "8a4c05af930add0d0b9d866fbef2e10d0e1516af371f564b70f03996b514551e",
+  "notes": {
+   "se-p": "+1 target rep — that felt easy, earning the next jump",
+   "se-s": "+1 target rep — that felt easy, earning the next jump",
+   "se-a": "+1 target rep — that felt easy, earning the next jump"
+  }
+ },
+ "hypertrophy/intensification/40min/model/expected/tapped-as-expected": {
+  "hash": "87019904124d7bb7762e4a2a20c57fd56857876b27e73a3e64314b7ca4576004",
+  "notes": {}
+ },
+ "hypertrophy/intensification/40min/model/expected-missed/tapped-harder": {
+  "hash": "259106d823c67407b7c183d5a8e30f7f2268c70d60e58fd6db56e2e4d3ceac8d",
+  "notes": {
+   "se-p": "−8% load — it felt harder than expected and you fell short of the prescribed reps",
+   "se-s": "−6.5% load — it felt harder than expected and you fell short of the prescribed reps",
+   "se-a": "−6% load — it felt harder than expected and you fell short of the prescribed reps"
+  }
+ },
+ "hypertrophy/intensification/40min/model/expected-missed/tapped-easier": {
+  "hash": "b878fcf39985c0318c2c5eeab11e357d14b9eebbc1e9f0abb6e2c790bac0c2cf",
+  "notes": {}
+ },
+ "hypertrophy/intensification/40min/model/expected-missed/tapped-as-expected": {
+  "hash": "6609a84eecb613cc147012726f2c0b69529d020bd9d859de5af7e56f9d0f2a2d",
+  "notes": {}
+ },
+ "hypertrophy/intensification/40min/model/expected-down/tapped-harder": {
+  "hash": "a2a89c500257972a2233e133d6ab9281279a19ca0b043c36a8028f484e6d2453",
+  "notes": {
+   "se-p": "−5% load — it felt harder than expected while your 1RM slipped",
+   "se-s": "−5% load — it felt harder than expected while your 1RM slipped",
+   "se-a": "−5% load — it felt harder than expected while your 1RM slipped"
+  }
+ },
+ "hypertrophy/intensification/40min/model/expected-down/tapped-easier": {
+  "hash": "c1ad386b6d8ca50305699e27886c6149dfc8c26041825159e3187999662e4409",
+  "notes": {}
+ },
+ "hypertrophy/intensification/40min/model/expected-down/tapped-as-expected": {
+  "hash": "ffad6d2d0010346c366b8f9c9e4ea24e0e5f1055fd4aba88692718cdc926f7fe",
+  "notes": {}
+ },
+ "hypertrophy/intensification/40min/model/rated-high-missed/tapped-harder": {
+  "hash": "139deab3a2168942d90e98c0b57a704f592545739562681fcd51e36c2bdbfb6a",
+  "notes": {
+   "se-p": "−8% load — it felt harder than expected and you fell short of the prescribed reps",
+   "se-s": "−6.5% load — it felt harder than expected and you fell short of the prescribed reps",
+   "se-a": "−6% load — it felt harder than expected and you fell short of the prescribed reps"
+  }
+ },
+ "hypertrophy/intensification/40min/model/rated-high-missed/tapped-easier": {
+  "hash": "9ff1564e35cf8088602e5c0c79b75baad54b5ef8b9196f9cf255949c1b0d4514",
+  "notes": {}
+ },
+ "hypertrophy/intensification/40min/model/rated-high-missed/tapped-as-expected": {
+  "hash": "293e207f1e2619b173c864c75a87007b0e03d35f49c55d86c3dd45a8f0304e69",
+  "notes": {}
+ },
+ "hypertrophy/intensification/40min/model/rated-low-met/tapped-harder": {
+  "hash": "e85f19a18698e3693cfb1721afd058be0cfe0712d9b045b18a83d1ff38726004",
+  "notes": {}
+ },
+ "hypertrophy/intensification/40min/model/rated-low-met/tapped-easier": {
+  "hash": "b06a9deeaf65d074e0152cb5d0a509cf6944c5fad84a9a20027e08a1fb968978",
+  "notes": {
+   "se-p": "+1 target rep — that felt easy, earning the next jump",
+   "se-s": "+1 target rep — that felt easy, earning the next jump",
+   "se-a": "+1 target rep — that felt easy, earning the next jump"
+  }
+ },
+ "hypertrophy/intensification/40min/model/rated-low-met/tapped-as-expected": {
+  "hash": "2cbfbfc38a6505aa95a9ce036380063ce7836914e28c4350763eb2c59656d5b0",
+  "notes": {}
+ },
+ "hypertrophy/intensification/40min/model-fails/none/tapped-harder": {
+  "hash": "aa1329166cc83470cf783c1b48e56ebf86fdf07a48aaf27fcc14ab373c2fd874",
+  "notes": {}
+ },
+ "hypertrophy/intensification/40min/model-fails/none/tapped-easier": {
+  "hash": "aa1329166cc83470cf783c1b48e56ebf86fdf07a48aaf27fcc14ab373c2fd874",
+  "notes": {}
+ },
+ "hypertrophy/intensification/40min/model-fails/none/tapped-as-expected": {
+  "hash": "aa1329166cc83470cf783c1b48e56ebf86fdf07a48aaf27fcc14ab373c2fd874",
+  "notes": {}
+ },
+ "hypertrophy/intensification/40min/model-fails/expected/tapped-harder": {
+  "hash": "a06201051efbfb7313f2a235de80ba011b8cb87affe48e2e0d0b4880434eb5f4",
+  "notes": {}
+ },
+ "hypertrophy/intensification/40min/model-fails/expected/tapped-easier": {
+  "hash": "6e03ffc178e78fe0bb6ee7c757f8694400fa1117db54377474d5e57261a6dcdb",
+  "notes": {}
+ },
+ "hypertrophy/intensification/40min/model-fails/expected/tapped-as-expected": {
+  "hash": "8b864492278098f22bd09d412a2b02ee9657414eab97cc0f58fa3b6a27324cd8",
+  "notes": {}
+ },
+ "hypertrophy/intensification/40min/model-fails/expected-missed/tapped-harder": {
+  "hash": "aff3c6d512fb17663a9807af25ea15b8d1d33a15d75cb88e2308736bd8624613",
+  "notes": {}
+ },
+ "hypertrophy/intensification/40min/model-fails/expected-missed/tapped-easier": {
+  "hash": "da07f1ccd947845472ee746abf1620dd47819f202365d8e82d3ef46f729d5d6b",
+  "notes": {}
+ },
+ "hypertrophy/intensification/40min/model-fails/expected-missed/tapped-as-expected": {
+  "hash": "89fa92bba74045fc7d56c83ea51a7d4926aa59d38c443dfe641da031070e6d35",
+  "notes": {}
+ },
+ "hypertrophy/intensification/40min/model-fails/expected-down/tapped-harder": {
+  "hash": "6c8f9d92ead0d3d1c1bd1ad8606944a5f57d1754a5b95451b0292ce65dfc8ff3",
+  "notes": {}
+ },
+ "hypertrophy/intensification/40min/model-fails/expected-down/tapped-easier": {
+  "hash": "ef44d308586d3463b0b372639119c17f44ecfc15e453f0959ef00ac0e0107533",
+  "notes": {}
+ },
+ "hypertrophy/intensification/40min/model-fails/expected-down/tapped-as-expected": {
+  "hash": "47dc70ac0083f7c8c0c046ac83e89eb261e4211e6d22a27cca503c07864b8e14",
+  "notes": {}
+ },
+ "hypertrophy/intensification/40min/model-fails/rated-high-missed/tapped-harder": {
+  "hash": "59ba75e3dc81e0af5b24b95859ed274d5439b7d48a9dbbfc1b1f1ccaea3685af",
+  "notes": {}
+ },
+ "hypertrophy/intensification/40min/model-fails/rated-high-missed/tapped-easier": {
+  "hash": "bead82cb4dc0cc778b35b4e0df3705e67079704fae3d4209c1b17099f5219233",
+  "notes": {}
+ },
+ "hypertrophy/intensification/40min/model-fails/rated-high-missed/tapped-as-expected": {
+  "hash": "db257386c4b97d74fb62b4090a77d873c822b96f31389192fe46e86bcdfc3ed7",
+  "notes": {}
+ },
+ "hypertrophy/intensification/40min/model-fails/rated-low-met/tapped-harder": {
+  "hash": "ef8a8c0e7c45e558b5eeee4d991919357f9a851244ea837ea53ea8fababa3cf8",
+  "notes": {}
+ },
+ "hypertrophy/intensification/40min/model-fails/rated-low-met/tapped-easier": {
+  "hash": "af2c45ed33b6a7238d275223095bb798b2c76eabc2819417c27e4da6bba1926f",
+  "notes": {}
+ },
+ "hypertrophy/intensification/40min/model-fails/rated-low-met/tapped-as-expected": {
+  "hash": "0e9c860a29b21cdd96dffe723cced388b09979e906c98584019fb9dc9be03aec",
+  "notes": {}
+ },
+ "hypertrophy/realisation/90min/model/none/tapped-harder": {
+  "hash": "02217219cc4c2da5f7fc3666d4ce0da56a6cdb0e6e6f69e9627d87725148f3f0",
+  "notes": {}
+ },
+ "hypertrophy/realisation/90min/model/none/tapped-easier": {
+  "hash": "02217219cc4c2da5f7fc3666d4ce0da56a6cdb0e6e6f69e9627d87725148f3f0",
+  "notes": {}
+ },
+ "hypertrophy/realisation/90min/model/none/tapped-as-expected": {
+  "hash": "02217219cc4c2da5f7fc3666d4ce0da56a6cdb0e6e6f69e9627d87725148f3f0",
+  "notes": {}
+ },
+ "hypertrophy/realisation/90min/model/expected/tapped-harder": {
+  "hash": "17db75efca3f5f0df9a6dfc73a525a93fc9ba5e127ba9560a292a094348c0e80",
+  "notes": {}
+ },
+ "hypertrophy/realisation/90min/model/expected/tapped-easier": {
+  "hash": "dcb810ea00331be69bf44da11756929b1b8d9135bd2225d1db293964ead6eee8",
+  "notes": {}
+ },
+ "hypertrophy/realisation/90min/model/expected/tapped-as-expected": {
+  "hash": "218ae8c5a8bd4e8f42b5e5a5e0c440fa250bbaf99a1d509b4873f4dee5464143",
+  "notes": {}
+ },
+ "hypertrophy/realisation/90min/model/expected-missed/tapped-harder": {
+  "hash": "8064a407984cb76cbd741588825f0a88619a1d68ef62f00633edf6eec7a8c733",
+  "notes": {
+   "se-p": "−8% load — it felt harder than expected and you fell short of the prescribed reps",
+   "se-s": "−6.5% load — it felt harder than expected and you fell short of the prescribed reps",
+   "se-a": "−6% load — it felt harder than expected and you fell short of the prescribed reps"
+  }
+ },
+ "hypertrophy/realisation/90min/model/expected-missed/tapped-easier": {
+  "hash": "b8bb5afda833c8b380883196dc135d62a15acd004a08a0151408a0069fd663d6",
+  "notes": {}
+ },
+ "hypertrophy/realisation/90min/model/expected-missed/tapped-as-expected": {
+  "hash": "67affc935cad2a38ebe9d3118f40a97a55a3e065f374a9aef860ff8f7257b94a",
+  "notes": {}
+ },
+ "hypertrophy/realisation/90min/model/expected-down/tapped-harder": {
+  "hash": "d70379a9e123dbe808e4658a988b62334a444b5a8fc6bb007e82f900bbf501c3",
+  "notes": {
+   "se-p": "−5% load — it felt harder than expected while your 1RM slipped",
+   "se-s": "−5% load — it felt harder than expected while your 1RM slipped",
+   "se-a": "−5% load — it felt harder than expected while your 1RM slipped"
+  }
+ },
+ "hypertrophy/realisation/90min/model/expected-down/tapped-easier": {
+  "hash": "a28deee731aa4d1446a63286b58cad94291db976cabbfbf43c3b49d300930a27",
+  "notes": {}
+ },
+ "hypertrophy/realisation/90min/model/expected-down/tapped-as-expected": {
+  "hash": "6ea50b26ab5ec0a87063831db23999c4f495cda2121f198f9927fdcc72c200eb",
+  "notes": {}
+ },
+ "hypertrophy/realisation/90min/model/rated-high-missed/tapped-harder": {
+  "hash": "34a3b3c6c39eeaf3de449733251652c100cfb4afd0664a462f60a356086e5fa9",
+  "notes": {
+   "se-p": "−8% load — it felt harder than expected and you fell short of the prescribed reps",
+   "se-s": "−6.5% load — it felt harder than expected and you fell short of the prescribed reps",
+   "se-a": "−6% load — it felt harder than expected and you fell short of the prescribed reps"
+  }
+ },
+ "hypertrophy/realisation/90min/model/rated-high-missed/tapped-easier": {
+  "hash": "a26e36ac8636b9358cedd481303ed928a2fb644a9ddbb8071b142d863da774a0",
+  "notes": {}
+ },
+ "hypertrophy/realisation/90min/model/rated-high-missed/tapped-as-expected": {
+  "hash": "661d434c644da1cdb70eb4df4d6fa373fa6dc8dbdd3545799494bc9728a7c964",
+  "notes": {}
+ },
+ "hypertrophy/realisation/90min/model/rated-low-met/tapped-harder": {
+  "hash": "4d668a389c9e64ca5f46ef512652536eb09c35ac3a415e1dfcdf1626147de5d2",
+  "notes": {}
+ },
+ "hypertrophy/realisation/90min/model/rated-low-met/tapped-easier": {
+  "hash": "6ae8d5187a7b6e36bff5ddad65e3ca0f348a3809b09b7c453da10317915bd423",
+  "notes": {}
+ },
+ "hypertrophy/realisation/90min/model/rated-low-met/tapped-as-expected": {
+  "hash": "8866580174bce36bb049dc93935bd3e873b5ed9be39809dde8f5c60e8173a32d",
+  "notes": {}
+ },
+ "hypertrophy/realisation/90min/model-fails/none/tapped-harder": {
+  "hash": "9e7267a8a94dc4c6add3f831d4c0d5dd16dbfffb0ad32a48e4ad0814c05661f2",
+  "notes": {}
+ },
+ "hypertrophy/realisation/90min/model-fails/none/tapped-easier": {
+  "hash": "9e7267a8a94dc4c6add3f831d4c0d5dd16dbfffb0ad32a48e4ad0814c05661f2",
+  "notes": {}
+ },
+ "hypertrophy/realisation/90min/model-fails/none/tapped-as-expected": {
+  "hash": "9e7267a8a94dc4c6add3f831d4c0d5dd16dbfffb0ad32a48e4ad0814c05661f2",
+  "notes": {}
+ },
+ "hypertrophy/realisation/90min/model-fails/expected/tapped-harder": {
+  "hash": "a5bfddb79df50f6165b4ad9881b1b5a457afe9e799aea164fbfcb726495606e6",
+  "notes": {}
+ },
+ "hypertrophy/realisation/90min/model-fails/expected/tapped-easier": {
+  "hash": "d17305981891de49a4d96912dd22dea64649bc1f07a58ab7db66900d4f933e10",
+  "notes": {}
+ },
+ "hypertrophy/realisation/90min/model-fails/expected/tapped-as-expected": {
+  "hash": "61a774ec8f2d6bfe3023dd80cccba44a8275c1b691be39fdeded45f269c3a85d",
+  "notes": {}
+ },
+ "hypertrophy/realisation/90min/model-fails/expected-missed/tapped-harder": {
+  "hash": "c8b6130881dd6543a2c3e39cf9debabf7735a161ecca7469967a6f811c678ea9",
+  "notes": {}
+ },
+ "hypertrophy/realisation/90min/model-fails/expected-missed/tapped-easier": {
+  "hash": "c11aff330be2b36ac62bbd47b3e16b492c544a294378a912f4f350721d916c5d",
+  "notes": {}
+ },
+ "hypertrophy/realisation/90min/model-fails/expected-missed/tapped-as-expected": {
+  "hash": "e5005787d63a1c31a10ecb59ba9c507b4691edeef5400bc4e2836df17dd103f3",
+  "notes": {}
+ },
+ "hypertrophy/realisation/90min/model-fails/expected-down/tapped-harder": {
+  "hash": "ed47add825c462612316be3e71278fa28dfcc3075d01cfb5c967111b2ff344f9",
+  "notes": {}
+ },
+ "hypertrophy/realisation/90min/model-fails/expected-down/tapped-easier": {
+  "hash": "765cbb303f84081b7bba823d7ae0577f77ccceb55892c12f05c32b9e02b74197",
+  "notes": {}
+ },
+ "hypertrophy/realisation/90min/model-fails/expected-down/tapped-as-expected": {
+  "hash": "2266d0a85cdc3149db822334159b293147c624885b11435c2a4006ed7bb5861b",
+  "notes": {}
+ },
+ "hypertrophy/realisation/90min/model-fails/rated-high-missed/tapped-harder": {
+  "hash": "e9b3387fef3b583752395d971695bf5b29d613e03a918d42f929763a54893456",
+  "notes": {}
+ },
+ "hypertrophy/realisation/90min/model-fails/rated-high-missed/tapped-easier": {
+  "hash": "78dda83b8fc48b62536e32e64662cc8120dd0a3a2f2ad86ce1f1cf36b35109d5",
+  "notes": {}
+ },
+ "hypertrophy/realisation/90min/model-fails/rated-high-missed/tapped-as-expected": {
+  "hash": "ab7604bfa3acf28328d05985acb4f8ef010d1bf709f41ba9965723456c4d290f",
+  "notes": {}
+ },
+ "hypertrophy/realisation/90min/model-fails/rated-low-met/tapped-harder": {
+  "hash": "b9a1d988333c52a85d84f46721916470d3648aab17c83b83a4dba80440329828",
+  "notes": {}
+ },
+ "hypertrophy/realisation/90min/model-fails/rated-low-met/tapped-easier": {
+  "hash": "6524103adfe209588de8ea1504ae79722d343723837de3cbd4e87b9f7504c92a",
+  "notes": {}
+ },
+ "hypertrophy/realisation/90min/model-fails/rated-low-met/tapped-as-expected": {
+  "hash": "f9692eb34d241a7786f82b7e6dd8822742cdb85c46028708b3a8129c19aee411",
+  "notes": {}
+ },
+ "hypertrophy/realisation/40min/model/none/tapped-harder": {
+  "hash": "272f90e0369c6c730770218bf028f45dc86180fba58fc39eae4f71d442a8bcce",
+  "notes": {}
+ },
+ "hypertrophy/realisation/40min/model/none/tapped-easier": {
+  "hash": "272f90e0369c6c730770218bf028f45dc86180fba58fc39eae4f71d442a8bcce",
+  "notes": {}
+ },
+ "hypertrophy/realisation/40min/model/none/tapped-as-expected": {
+  "hash": "272f90e0369c6c730770218bf028f45dc86180fba58fc39eae4f71d442a8bcce",
+  "notes": {}
+ },
+ "hypertrophy/realisation/40min/model/expected/tapped-harder": {
+  "hash": "be5b9168beeda640bff352aa5ebe6ee7a68bead223e0552649e40e105e1673d8",
+  "notes": {}
+ },
+ "hypertrophy/realisation/40min/model/expected/tapped-easier": {
+  "hash": "96b0705962bc6149c1cc5e7cd499fddcbe333d66bafa00fb55d12c76b00078a5",
+  "notes": {}
+ },
+ "hypertrophy/realisation/40min/model/expected/tapped-as-expected": {
+  "hash": "ff9620efcbcf507cea5c282918d782dc339a15bde20f120047e99909c4495768",
+  "notes": {}
+ },
+ "hypertrophy/realisation/40min/model/expected-missed/tapped-harder": {
+  "hash": "02237d04f3a448056ebda7581a1232b3a82eb9ab82e05e5af2f0f20622fb9bad",
+  "notes": {
+   "se-p": "−8% load — it felt harder than expected and you fell short of the prescribed reps",
+   "se-s": "−6.5% load — it felt harder than expected and you fell short of the prescribed reps",
+   "se-a": "−6% load — it felt harder than expected and you fell short of the prescribed reps"
+  }
+ },
+ "hypertrophy/realisation/40min/model/expected-missed/tapped-easier": {
+  "hash": "68139a8b5c13f5b09ca946b4477bc041341e6cb99c71600e4eaf65d392cc2a08",
+  "notes": {}
+ },
+ "hypertrophy/realisation/40min/model/expected-missed/tapped-as-expected": {
+  "hash": "c94748c69c90f7fe0369283c72d65c91e37adcf01fd70266c9a6ce25598144fc",
+  "notes": {}
+ },
+ "hypertrophy/realisation/40min/model/expected-down/tapped-harder": {
+  "hash": "17a703ac70e4ba881f235f7f12a73655836e41907fc94a5ecf22f2dea5525e8f",
+  "notes": {
+   "se-p": "−5% load — it felt harder than expected while your 1RM slipped",
+   "se-s": "−5% load — it felt harder than expected while your 1RM slipped",
+   "se-a": "−5% load — it felt harder than expected while your 1RM slipped"
+  }
+ },
+ "hypertrophy/realisation/40min/model/expected-down/tapped-easier": {
+  "hash": "eeb79c629f86cf74bbf0739d2e0e738a50530dedf28a64a52e02e25ba6a7f73f",
+  "notes": {}
+ },
+ "hypertrophy/realisation/40min/model/expected-down/tapped-as-expected": {
+  "hash": "8221c5627ffb66d9986a2a309bb4c4b4e3aad6b20d6519925cb62957451202fa",
+  "notes": {}
+ },
+ "hypertrophy/realisation/40min/model/rated-high-missed/tapped-harder": {
+  "hash": "0492a6ec4a05ce8b28f0afd57eb84c01fd5b89d6e488c5b7de1d64fa1071461c",
+  "notes": {
+   "se-p": "−8% load — it felt harder than expected and you fell short of the prescribed reps",
+   "se-s": "−6.5% load — it felt harder than expected and you fell short of the prescribed reps",
+   "se-a": "−6% load — it felt harder than expected and you fell short of the prescribed reps"
+  }
+ },
+ "hypertrophy/realisation/40min/model/rated-high-missed/tapped-easier": {
+  "hash": "be2aaa7e3c335c3ef3f9e8f4f35f8a7d2dfaa42cae99230e2c6aaf64e64a85cc",
+  "notes": {}
+ },
+ "hypertrophy/realisation/40min/model/rated-high-missed/tapped-as-expected": {
+  "hash": "67386c05e44dde9fefcc1fb1340052359fababb552ae5cdafb9b61d932aa7222",
+  "notes": {}
+ },
+ "hypertrophy/realisation/40min/model/rated-low-met/tapped-harder": {
+  "hash": "2b21379942ab9d5894cff3e5e5c93811979a0207ee4697aafe7365d1d39b3833",
+  "notes": {}
+ },
+ "hypertrophy/realisation/40min/model/rated-low-met/tapped-easier": {
+  "hash": "286cda173c8bead63a173eec214ba1c9a6b156c8e84091ee7d404390ce526fb1",
+  "notes": {}
+ },
+ "hypertrophy/realisation/40min/model/rated-low-met/tapped-as-expected": {
+  "hash": "2e24e8bcb99f4267a67c66e79963cae5b9abd029d3701ef58657522189e1095a",
+  "notes": {}
+ },
+ "hypertrophy/realisation/40min/model-fails/none/tapped-harder": {
+  "hash": "8a5fee8c67547f97f5987b972713b3b75a33f2dcad3140813cae08ecaec0fb33",
+  "notes": {}
+ },
+ "hypertrophy/realisation/40min/model-fails/none/tapped-easier": {
+  "hash": "8a5fee8c67547f97f5987b972713b3b75a33f2dcad3140813cae08ecaec0fb33",
+  "notes": {}
+ },
+ "hypertrophy/realisation/40min/model-fails/none/tapped-as-expected": {
+  "hash": "8a5fee8c67547f97f5987b972713b3b75a33f2dcad3140813cae08ecaec0fb33",
+  "notes": {}
+ },
+ "hypertrophy/realisation/40min/model-fails/expected/tapped-harder": {
+  "hash": "a3d777d806a3de426e4c6affd9a97e9e2c10ffb8d7c97dfb64a7e6b467c022b0",
+  "notes": {}
+ },
+ "hypertrophy/realisation/40min/model-fails/expected/tapped-easier": {
+  "hash": "6762b0e5b6f2c2e8bd39fea81d8a6915d69caba842bb292dc6c1dec7ea5b4e7e",
+  "notes": {}
+ },
+ "hypertrophy/realisation/40min/model-fails/expected/tapped-as-expected": {
+  "hash": "485dd9edf4d4c4703ea4db218bffe2154fbbc5d85ca2c9848bcb2868cf38d828",
+  "notes": {}
+ },
+ "hypertrophy/realisation/40min/model-fails/expected-missed/tapped-harder": {
+  "hash": "bf056c2606ed7f0065976335b6eb3e5771afad758f7d6f1321fdbd7bd219cad9",
+  "notes": {}
+ },
+ "hypertrophy/realisation/40min/model-fails/expected-missed/tapped-easier": {
+  "hash": "33e169d1dc0cdcabb1b45a28420825c5b4f6977b675590b197e8b9f449ce9150",
+  "notes": {}
+ },
+ "hypertrophy/realisation/40min/model-fails/expected-missed/tapped-as-expected": {
+  "hash": "e4f19a7f38c7163148c1c4185f44f7629186d2b401d29589016911f56c8da86a",
+  "notes": {}
+ },
+ "hypertrophy/realisation/40min/model-fails/expected-down/tapped-harder": {
+  "hash": "48b27ba8fa5affeecd669130408aba80672ff68bef40b32c7575888d21ea49e7",
+  "notes": {}
+ },
+ "hypertrophy/realisation/40min/model-fails/expected-down/tapped-easier": {
+  "hash": "a5d125d26553f0ea0e332ca5ae0db4b8864ce80b838704630a5a82e37cb49f8d",
+  "notes": {}
+ },
+ "hypertrophy/realisation/40min/model-fails/expected-down/tapped-as-expected": {
+  "hash": "c907fab9f37f5ec06a431d377d4a923e5d9bc14080ca5e9aef022066251f0af7",
+  "notes": {}
+ },
+ "hypertrophy/realisation/40min/model-fails/rated-high-missed/tapped-harder": {
+  "hash": "4fbbbf95b9f80c22ffc8830061ea29588faa2c8fd5e748393615caceb6f25d56",
+  "notes": {}
+ },
+ "hypertrophy/realisation/40min/model-fails/rated-high-missed/tapped-easier": {
+  "hash": "ff3887c7354a2b244e58216b200c2c4feb2dcb1c34c9c395fd1c686c9a681e09",
+  "notes": {}
+ },
+ "hypertrophy/realisation/40min/model-fails/rated-high-missed/tapped-as-expected": {
+  "hash": "42656f9f4d4018238dcfd27cb0c517ac400bb89188de92c211fbe80ce08d8531",
+  "notes": {}
+ },
+ "hypertrophy/realisation/40min/model-fails/rated-low-met/tapped-harder": {
+  "hash": "332d7c23fc0aa39d66e53790490bf3a7303780e62bf99c8d66445e86ce2a9654",
+  "notes": {}
+ },
+ "hypertrophy/realisation/40min/model-fails/rated-low-met/tapped-easier": {
+  "hash": "f4656997c6790478a4935ae0710f16e02af52a893b492e8998e7a691ea9f6cc3",
+  "notes": {}
+ },
+ "hypertrophy/realisation/40min/model-fails/rated-low-met/tapped-as-expected": {
+  "hash": "53427c13006e9e3be1350b8334a3666a18892ea1b547dd05e27dc2d4d702f406",
+  "notes": {}
+ },
+ "hypertrophy/deload/90min/model/none/tapped-harder": {
+  "hash": "92b936f90955235ec3f1e9ede11b7f435ccc7f58881dd1501034c2c79a567ac8",
+  "notes": {}
+ },
+ "hypertrophy/deload/90min/model/none/tapped-easier": {
+  "hash": "92b936f90955235ec3f1e9ede11b7f435ccc7f58881dd1501034c2c79a567ac8",
+  "notes": {}
+ },
+ "hypertrophy/deload/90min/model/none/tapped-as-expected": {
+  "hash": "92b936f90955235ec3f1e9ede11b7f435ccc7f58881dd1501034c2c79a567ac8",
+  "notes": {}
+ },
+ "hypertrophy/deload/90min/model/expected/tapped-harder": {
+  "hash": "fa1587d5f50ee84a6928856547b027ae7c5b660f27b96aa73fc1e98244b8a59b",
+  "notes": {}
+ },
+ "hypertrophy/deload/90min/model/expected/tapped-easier": {
+  "hash": "9bdd38881e3c575afaed39be4ec9c3be52f619091fc784ff114b1fd1f941f95e",
+  "notes": {}
+ },
+ "hypertrophy/deload/90min/model/expected/tapped-as-expected": {
+  "hash": "f0d806689cb5caf152610037c0139c9d4707b02700d3daa18ebe29990a368ab4",
+  "notes": {}
+ },
+ "hypertrophy/deload/90min/model/expected-missed/tapped-harder": {
+  "hash": "be94ec513c09548ed23df37de989a20d658cea6d8ede7c271013804864c45b3f",
+  "notes": {}
+ },
+ "hypertrophy/deload/90min/model/expected-missed/tapped-easier": {
+  "hash": "be8b6cfc985e22bf306a1646deeb4d0893514dba85413d7b2834169fd3251cac",
+  "notes": {}
+ },
+ "hypertrophy/deload/90min/model/expected-missed/tapped-as-expected": {
+  "hash": "8baf49ca8af949ec24b2696967b789c0841911561990e0abebd6c754e187e700",
+  "notes": {}
+ },
+ "hypertrophy/deload/90min/model/expected-down/tapped-harder": {
+  "hash": "7a188fc25e19a984cde97f58c6f36ec0b453819099c111d83056a43cb0e9f4b1",
+  "notes": {}
+ },
+ "hypertrophy/deload/90min/model/expected-down/tapped-easier": {
+  "hash": "3fa32c1bdbb678fdbc47a8b17017b91fe3a749cf967d957572ec97f0baf37dbe",
+  "notes": {}
+ },
+ "hypertrophy/deload/90min/model/expected-down/tapped-as-expected": {
+  "hash": "5d7b9830803d88b152922efb96f8c137e296dae34d86e71d246c3474fe701f99",
+  "notes": {}
+ },
+ "hypertrophy/deload/90min/model/rated-high-missed/tapped-harder": {
+  "hash": "68c8510575f42d69dfafacef2946376edc917cf1ac29a28a8aba785b8e2cfc4e",
+  "notes": {}
+ },
+ "hypertrophy/deload/90min/model/rated-high-missed/tapped-easier": {
+  "hash": "0b937325c5e566fd5665e8c984f74f760e35f85ecc97a45bce2a63488c2aae22",
+  "notes": {}
+ },
+ "hypertrophy/deload/90min/model/rated-high-missed/tapped-as-expected": {
+  "hash": "c1986c33784be5810b38e0db2f92bcebb5146a6a497406ae1cd2432c79b4d0db",
+  "notes": {}
+ },
+ "hypertrophy/deload/90min/model/rated-low-met/tapped-harder": {
+  "hash": "9c706d7a3212a33f318606595383a800fca1301e8ae0193081c9b48dd47931e8",
+  "notes": {}
+ },
+ "hypertrophy/deload/90min/model/rated-low-met/tapped-easier": {
+  "hash": "4d4038498c87503b3a12d66be46d40f29a90cdf94c72674c98e3a2be6a9b6d21",
+  "notes": {}
+ },
+ "hypertrophy/deload/90min/model/rated-low-met/tapped-as-expected": {
+  "hash": "1b6c16834da823ac466531115349847726b42575de62c2ed82c1793fb801a462",
+  "notes": {}
+ },
+ "hypertrophy/deload/90min/model-fails/none/tapped-harder": {
+  "hash": "1a474328e69abb5c786a6d31d9586568fd6af5d118fffe210438aa919117fbd7",
+  "notes": {}
+ },
+ "hypertrophy/deload/90min/model-fails/none/tapped-easier": {
+  "hash": "1a474328e69abb5c786a6d31d9586568fd6af5d118fffe210438aa919117fbd7",
+  "notes": {}
+ },
+ "hypertrophy/deload/90min/model-fails/none/tapped-as-expected": {
+  "hash": "1a474328e69abb5c786a6d31d9586568fd6af5d118fffe210438aa919117fbd7",
+  "notes": {}
+ },
+ "hypertrophy/deload/90min/model-fails/expected/tapped-harder": {
+  "hash": "4d9e4c223551c90041ac0d4589baaa8713d8948ce52f47f2c15a0b89bc7bf8e1",
+  "notes": {}
+ },
+ "hypertrophy/deload/90min/model-fails/expected/tapped-easier": {
+  "hash": "226f7c61afd6e97649bcee7d81d64db74d7c56d38dc9d311d0555d18dad71d8b",
+  "notes": {}
+ },
+ "hypertrophy/deload/90min/model-fails/expected/tapped-as-expected": {
+  "hash": "32ab0799e387a637a3bab703c43cef340e4c7f112e9cfbf53e03ae57df6c58b7",
+  "notes": {}
+ },
+ "hypertrophy/deload/90min/model-fails/expected-missed/tapped-harder": {
+  "hash": "98f70af5fea2e5bf1ded1258ec6bb6f235745175bda11bbc18b604f2d5cd7227",
+  "notes": {}
+ },
+ "hypertrophy/deload/90min/model-fails/expected-missed/tapped-easier": {
+  "hash": "9ddcdffdd772296de8861ccca8434af5a5e6fe40a6e167ea04775bd4a0f49c19",
+  "notes": {}
+ },
+ "hypertrophy/deload/90min/model-fails/expected-missed/tapped-as-expected": {
+  "hash": "9223fd180a6747914d62b92ba6bee5948e3e95f11b218402a2400d09be6ec91f",
+  "notes": {}
+ },
+ "hypertrophy/deload/90min/model-fails/expected-down/tapped-harder": {
+  "hash": "564b58d04850a9da2cc0144d34037b3300dea61e39e29b30d4216ec3c2802d79",
+  "notes": {}
+ },
+ "hypertrophy/deload/90min/model-fails/expected-down/tapped-easier": {
+  "hash": "8f8d72525d8eaac616aa9358035ac1685db5ef80c21d40f84f4a1cc47b819b64",
+  "notes": {}
+ },
+ "hypertrophy/deload/90min/model-fails/expected-down/tapped-as-expected": {
+  "hash": "8485a5d7ca86dde111408ed26f8dfb04bc69389c42a981e475abc8abaf1c3e50",
+  "notes": {}
+ },
+ "hypertrophy/deload/90min/model-fails/rated-high-missed/tapped-harder": {
+  "hash": "d5712b534abcd652ae3dde9b1a3a9332a7ca73efac526a8901eda91c4dda955e",
+  "notes": {}
+ },
+ "hypertrophy/deload/90min/model-fails/rated-high-missed/tapped-easier": {
+  "hash": "178218ea59046cb5fad0a3554f9979e4d26a57158bf3b7929c7c06377a1b65c4",
+  "notes": {}
+ },
+ "hypertrophy/deload/90min/model-fails/rated-high-missed/tapped-as-expected": {
+  "hash": "b7787ffd5b46e00529ba9fa4afd051b2a3c05e229320fe40e3bb7dfab614028c",
+  "notes": {}
+ },
+ "hypertrophy/deload/90min/model-fails/rated-low-met/tapped-harder": {
+  "hash": "7419d6c8112f4a30d840e3c2aee28e6cd5465465af71882f4bde73a101b8510d",
+  "notes": {}
+ },
+ "hypertrophy/deload/90min/model-fails/rated-low-met/tapped-easier": {
+  "hash": "1faf955221ad77915df281d4b09965824766c9150f1929e182d72e660008cc17",
+  "notes": {}
+ },
+ "hypertrophy/deload/90min/model-fails/rated-low-met/tapped-as-expected": {
+  "hash": "408db310d00e7f240c7953f82ed834c55d3de4c50bb909149ba489f993c749b1",
+  "notes": {}
+ },
+ "hypertrophy/deload/40min/model/none/tapped-harder": {
+  "hash": "0cc394a4c11015551191c387c34b1c5792ecd828798974c8df46ab6b48598eb2",
+  "notes": {}
+ },
+ "hypertrophy/deload/40min/model/none/tapped-easier": {
+  "hash": "0cc394a4c11015551191c387c34b1c5792ecd828798974c8df46ab6b48598eb2",
+  "notes": {}
+ },
+ "hypertrophy/deload/40min/model/none/tapped-as-expected": {
+  "hash": "0cc394a4c11015551191c387c34b1c5792ecd828798974c8df46ab6b48598eb2",
+  "notes": {}
+ },
+ "hypertrophy/deload/40min/model/expected/tapped-harder": {
+  "hash": "16b14a5189a120278557d92518bf5deaca5700b70cf84b8e08e55b5b04ea0c88",
+  "notes": {}
+ },
+ "hypertrophy/deload/40min/model/expected/tapped-easier": {
+  "hash": "e1cfe49c9132366d2aa790d8b63078edd3d87389fe763bfe5a3b199ddd8b6552",
+  "notes": {}
+ },
+ "hypertrophy/deload/40min/model/expected/tapped-as-expected": {
+  "hash": "c0dc3f05124525f93d360c5babe38641a825d3e2f872e2272f930e4cb832a8cd",
+  "notes": {}
+ },
+ "hypertrophy/deload/40min/model/expected-missed/tapped-harder": {
+  "hash": "ae8cb015b6ee9c3b83651f637f27b29cda51ee66e52227b2adb58ea4ad249409",
+  "notes": {}
+ },
+ "hypertrophy/deload/40min/model/expected-missed/tapped-easier": {
+  "hash": "1552fb8ed896ad6685950774d8f4417d30a1cb9c9c0d5edba8a5da4760fe8fd4",
+  "notes": {}
+ },
+ "hypertrophy/deload/40min/model/expected-missed/tapped-as-expected": {
+  "hash": "7b0f73649d2f27e8132c9505789229924f1e4bcfb4b64936cb3cce2de5a24039",
+  "notes": {}
+ },
+ "hypertrophy/deload/40min/model/expected-down/tapped-harder": {
+  "hash": "ddf833b30840a4911b73e4d8cd6a1f40eac71d6a8b57a9ff935f21d83a758d24",
+  "notes": {}
+ },
+ "hypertrophy/deload/40min/model/expected-down/tapped-easier": {
+  "hash": "d2eec8d7ac087512a7a1022e8d17ce87430f6130b7c3497493c13fa9a2e58e00",
+  "notes": {}
+ },
+ "hypertrophy/deload/40min/model/expected-down/tapped-as-expected": {
+  "hash": "0a9db9268c04bb91baa2acea22ef612e405390c37dd6b81391e6e9103c7782a6",
+  "notes": {}
+ },
+ "hypertrophy/deload/40min/model/rated-high-missed/tapped-harder": {
+  "hash": "d676c3d51524ffaa01e2cb3436af011fc9a01a9f44df81138a8f0296ae33d2f9",
+  "notes": {}
+ },
+ "hypertrophy/deload/40min/model/rated-high-missed/tapped-easier": {
+  "hash": "3b44127cf471d972fe569d8c474a575fbc203caa0f58a47d86a9abcb5ffdc104",
+  "notes": {}
+ },
+ "hypertrophy/deload/40min/model/rated-high-missed/tapped-as-expected": {
+  "hash": "0fbfd709702e2ef8631b1281ea425050ec91a98a628652ec9696661db9bbe80b",
+  "notes": {}
+ },
+ "hypertrophy/deload/40min/model/rated-low-met/tapped-harder": {
+  "hash": "0dd6e92392f4d3c8a9e77574ac2002beb4a1cf560c6a3f9630885fdfe487596e",
+  "notes": {}
+ },
+ "hypertrophy/deload/40min/model/rated-low-met/tapped-easier": {
+  "hash": "9c309e10988b6fe7ff0cf8943a67f98948d6eecdb238e008c4c08912f63b014a",
+  "notes": {}
+ },
+ "hypertrophy/deload/40min/model/rated-low-met/tapped-as-expected": {
+  "hash": "597767ba1372eb0f2708a3ea7261b9ba5f35fcefa843b4dac1263e7c7c742f54",
+  "notes": {}
+ },
+ "hypertrophy/deload/40min/model-fails/none/tapped-harder": {
+  "hash": "539194a31a13da92bde035f8457e9c26cb6dea412c280b163a6d1c210c7062cb",
+  "notes": {}
+ },
+ "hypertrophy/deload/40min/model-fails/none/tapped-easier": {
+  "hash": "539194a31a13da92bde035f8457e9c26cb6dea412c280b163a6d1c210c7062cb",
+  "notes": {}
+ },
+ "hypertrophy/deload/40min/model-fails/none/tapped-as-expected": {
+  "hash": "539194a31a13da92bde035f8457e9c26cb6dea412c280b163a6d1c210c7062cb",
+  "notes": {}
+ },
+ "hypertrophy/deload/40min/model-fails/expected/tapped-harder": {
+  "hash": "ddf4a989bae7a831b4945e59a874b1f5162c6a435369e3e0a98a2259c7e838c7",
+  "notes": {}
+ },
+ "hypertrophy/deload/40min/model-fails/expected/tapped-easier": {
+  "hash": "0a3aba0a5235e9f3c78615ef44613d3acf2e6eed6bf127ee4c9de0e661cc6bde",
+  "notes": {}
+ },
+ "hypertrophy/deload/40min/model-fails/expected/tapped-as-expected": {
+  "hash": "95df438d145c1cc0def4de2e58e5e106a92515874baae055fa88e6c959514030",
+  "notes": {}
+ },
+ "hypertrophy/deload/40min/model-fails/expected-missed/tapped-harder": {
+  "hash": "dc113a5ea645f8561bc0c640114b2ef28216f78f69ea179b7cde20f4b1be2251",
+  "notes": {}
+ },
+ "hypertrophy/deload/40min/model-fails/expected-missed/tapped-easier": {
+  "hash": "226ef2b030a5d4c85d7c8c7316eb030765009650c49ef9d5614505dbbbf18a7d",
+  "notes": {}
+ },
+ "hypertrophy/deload/40min/model-fails/expected-missed/tapped-as-expected": {
+  "hash": "9688cd93c0eb93c55319e25ceec123384fd2a4fecac39ca92f96d3d8454c1f57",
+  "notes": {}
+ },
+ "hypertrophy/deload/40min/model-fails/expected-down/tapped-harder": {
+  "hash": "d78802682423afa16151cdb82e19a7ba0ed0c026327163c2fac6bf93cd3cc81b",
+  "notes": {}
+ },
+ "hypertrophy/deload/40min/model-fails/expected-down/tapped-easier": {
+  "hash": "b883eda64e9deefd89e53f4b47e564aa1c6982dc7b62b155a83d2a6fde35d48d",
+  "notes": {}
+ },
+ "hypertrophy/deload/40min/model-fails/expected-down/tapped-as-expected": {
+  "hash": "8824170a6df072d3631b8bedd4b680d6b2712d5422e92be7a9d6a84900a64a46",
+  "notes": {}
+ },
+ "hypertrophy/deload/40min/model-fails/rated-high-missed/tapped-harder": {
+  "hash": "00d6e7d93a54476aa9cb5610682fe4dbffda72a966ac7bda41e3b508c32d6c86",
+  "notes": {}
+ },
+ "hypertrophy/deload/40min/model-fails/rated-high-missed/tapped-easier": {
+  "hash": "b480183c7d425a2aa8e6b5f07fc786e2a9b0bd8cc9939bfb485bad30f916a109",
+  "notes": {}
+ },
+ "hypertrophy/deload/40min/model-fails/rated-high-missed/tapped-as-expected": {
+  "hash": "41702aa7f900e91f87219019ec6152559c1089dacd176f8ffd940230fee2fbaf",
+  "notes": {}
+ },
+ "hypertrophy/deload/40min/model-fails/rated-low-met/tapped-harder": {
+  "hash": "cb835a84c0bb130a775c47d2f7722edfa9d7d4ec09ff5934bdc22d357cac40f9",
+  "notes": {}
+ },
+ "hypertrophy/deload/40min/model-fails/rated-low-met/tapped-easier": {
+  "hash": "d61090dd775de9cc847ab1deff9b19d152b787a890d0219179f441498917a144",
+  "notes": {}
+ },
+ "hypertrophy/deload/40min/model-fails/rated-low-met/tapped-as-expected": {
+  "hash": "1daa1a3b009d72b8fb6a23c5f9332274f45eb638d44c200d11044c5c37e4c8e4",
+  "notes": {}
+ },
+ "powerbuilding/accumulation/90min/model/none/tapped-harder": {
+  "hash": "232fa40559058bb084cee750720cae807e0d6acf568d44596cc9cf66678d738e",
+  "notes": {}
+ },
+ "powerbuilding/accumulation/90min/model/none/tapped-easier": {
+  "hash": "232fa40559058bb084cee750720cae807e0d6acf568d44596cc9cf66678d738e",
+  "notes": {}
+ },
+ "powerbuilding/accumulation/90min/model/none/tapped-as-expected": {
+  "hash": "232fa40559058bb084cee750720cae807e0d6acf568d44596cc9cf66678d738e",
+  "notes": {}
+ },
+ "powerbuilding/accumulation/90min/model/expected/tapped-harder": {
+  "hash": "f557cc80e1580880c8357a7370b83e49ab84fb4b030610ab8c1146b3af3f435f",
+  "notes": {}
+ },
+ "powerbuilding/accumulation/90min/model/expected/tapped-easier": {
+  "hash": "70fc81487dac02011430ba81abb24246c760b508e0e0a31cc669a71ecd7cf096",
+  "notes": {
+   "se-p": "+1 target rep — that felt easy, earning the next jump",
+   "se-s": "+1 target rep — that felt easy, earning the next jump",
+   "se-a": "+1 target rep — that felt easy, earning the next jump"
+  }
+ },
+ "powerbuilding/accumulation/90min/model/expected/tapped-as-expected": {
+  "hash": "8a37a907894f68c04e381198a28bcd5e3fc1745645507c1683e0e1b61c542087",
+  "notes": {}
+ },
+ "powerbuilding/accumulation/90min/model/expected-missed/tapped-harder": {
+  "hash": "8d9ce174ac4e1355362cd82d8161eb50b1d4225c2ede98bc049f09ca1f1ed8b1",
+  "notes": {
+   "se-p": "−8% load — it felt harder than expected and you fell short of the prescribed reps",
+   "se-s": "−6.5% load — it felt harder than expected and you fell short of the prescribed reps",
+   "se-a": "−6% load — it felt harder than expected and you fell short of the prescribed reps"
+  }
+ },
+ "powerbuilding/accumulation/90min/model/expected-missed/tapped-easier": {
+  "hash": "be14a11c8999e3d6f1b605192432b4eeae2a4a7ee3eed3121528dfb13887169c",
+  "notes": {}
+ },
+ "powerbuilding/accumulation/90min/model/expected-missed/tapped-as-expected": {
+  "hash": "5bc99204d6e4f06ef3203e42078646ed9b44932c14d042221e7e2709774b34c6",
+  "notes": {}
+ },
+ "powerbuilding/accumulation/90min/model/expected-down/tapped-harder": {
+  "hash": "022594bd2a5def543929cf10fd48fb4e5416cb6248adaffc374b549303c473da",
+  "notes": {
+   "se-p": "−5% load — it felt harder than expected while your 1RM slipped",
+   "se-s": "−5% load — it felt harder than expected while your 1RM slipped",
+   "se-a": "−5% load — it felt harder than expected while your 1RM slipped"
+  }
+ },
+ "powerbuilding/accumulation/90min/model/expected-down/tapped-easier": {
+  "hash": "2eaeb201f83bde6e6797774ab676493487dcf07dee7628276d7c6d0eb3840061",
+  "notes": {}
+ },
+ "powerbuilding/accumulation/90min/model/expected-down/tapped-as-expected": {
+  "hash": "def50c82092a4a1d451645f9e53ab00fd30339210ba90f5106260cfabf7462ff",
+  "notes": {}
+ },
+ "powerbuilding/accumulation/90min/model/rated-high-missed/tapped-harder": {
+  "hash": "467d2e0b2b2ba09806f6a88d61735c242dcc5e3a9626caeaa841fccab9892a56",
+  "notes": {
+   "se-p": "−8% load — it felt harder than expected and you fell short of the prescribed reps",
+   "se-s": "−6.5% load — it felt harder than expected and you fell short of the prescribed reps",
+   "se-a": "−6% load — it felt harder than expected and you fell short of the prescribed reps"
+  }
+ },
+ "powerbuilding/accumulation/90min/model/rated-high-missed/tapped-easier": {
+  "hash": "bd697acdbc68f83563ad6a69dcf44503120067ab2d2839a84dee8e34f12abae6",
+  "notes": {}
+ },
+ "powerbuilding/accumulation/90min/model/rated-high-missed/tapped-as-expected": {
+  "hash": "c82b579555600a1d391b4a011825ff198616db6f5866f4bfba8d151dd4da294f",
+  "notes": {}
+ },
+ "powerbuilding/accumulation/90min/model/rated-low-met/tapped-harder": {
+  "hash": "3f521250bfc964a0782b85bd39186398fb47f575c8ee6b870fda92d81fb98019",
+  "notes": {}
+ },
+ "powerbuilding/accumulation/90min/model/rated-low-met/tapped-easier": {
+  "hash": "23fd974297f18cd4b8113b496fae17aedbcae681c6875d7d81529823a21f1988",
+  "notes": {
+   "se-p": "+1 target rep — that felt easy, earning the next jump",
+   "se-s": "+1 target rep — that felt easy, earning the next jump",
+   "se-a": "+1 target rep — that felt easy, earning the next jump"
+  }
+ },
+ "powerbuilding/accumulation/90min/model/rated-low-met/tapped-as-expected": {
+  "hash": "d3c586110c20f86add05f4cee744c4ed9b64669ff940a15bfb919bae44584b77",
+  "notes": {}
+ },
+ "powerbuilding/accumulation/90min/model-fails/none/tapped-harder": {
+  "hash": "4d437e7aa3609dcebbfb43d0424889f549fdef8079b209a4423bcb37c29d6c34",
+  "notes": {}
+ },
+ "powerbuilding/accumulation/90min/model-fails/none/tapped-easier": {
+  "hash": "4d437e7aa3609dcebbfb43d0424889f549fdef8079b209a4423bcb37c29d6c34",
+  "notes": {}
+ },
+ "powerbuilding/accumulation/90min/model-fails/none/tapped-as-expected": {
+  "hash": "4d437e7aa3609dcebbfb43d0424889f549fdef8079b209a4423bcb37c29d6c34",
+  "notes": {}
+ },
+ "powerbuilding/accumulation/90min/model-fails/expected/tapped-harder": {
+  "hash": "37f9fae3977b8f98bc0833e3bacf2d1438c8167dcff95127715237bb9cfe64de",
+  "notes": {}
+ },
+ "powerbuilding/accumulation/90min/model-fails/expected/tapped-easier": {
+  "hash": "01e5ea00ebb1796194608a025174f8529a9f8d89c796a764fa37b57e4da2a151",
+  "notes": {}
+ },
+ "powerbuilding/accumulation/90min/model-fails/expected/tapped-as-expected": {
+  "hash": "8b371772b1a7c9e6ff3f3a20f81bbaeb6b88f45f0c0b164c7da752057bea0b13",
+  "notes": {}
+ },
+ "powerbuilding/accumulation/90min/model-fails/expected-missed/tapped-harder": {
+  "hash": "ca0f1f8ed6e18dfdec47c915e8c5d539c9b0b759ba1039241b9bd08994daec7b",
+  "notes": {}
+ },
+ "powerbuilding/accumulation/90min/model-fails/expected-missed/tapped-easier": {
+  "hash": "0836584171ecbdfb16bfffffa1afd412e441adeb835f76d7fa9ebb8598e8ab6f",
+  "notes": {}
+ },
+ "powerbuilding/accumulation/90min/model-fails/expected-missed/tapped-as-expected": {
+  "hash": "4a415dbc45156b4b52b930f1f4381ff561a946c2b68366b6c363b7bc3cd10a29",
+  "notes": {}
+ },
+ "powerbuilding/accumulation/90min/model-fails/expected-down/tapped-harder": {
+  "hash": "219e87806f42f7353300c24f952ad3e8d1c7d8427f176300db9360b19f91cc7d",
+  "notes": {}
+ },
+ "powerbuilding/accumulation/90min/model-fails/expected-down/tapped-easier": {
+  "hash": "e0df1c5985052507f5cbe585980b7bbedfc80cdd83d1ad8939475c911e0a4c49",
+  "notes": {}
+ },
+ "powerbuilding/accumulation/90min/model-fails/expected-down/tapped-as-expected": {
+  "hash": "131f8e0093d88eac53e01b2cbc7506ee2d38fc55a7bb1103a9aee6a26ef43aa5",
+  "notes": {}
+ },
+ "powerbuilding/accumulation/90min/model-fails/rated-high-missed/tapped-harder": {
+  "hash": "ac4342ae8958a74420cb4a10e4f45c45442789703a03f11acdfe7f4b7169c3a3",
+  "notes": {}
+ },
+ "powerbuilding/accumulation/90min/model-fails/rated-high-missed/tapped-easier": {
+  "hash": "a061bfd0b29742ac002b660ab9598609fd7531e25062bf14e348ae500abf1922",
+  "notes": {}
+ },
+ "powerbuilding/accumulation/90min/model-fails/rated-high-missed/tapped-as-expected": {
+  "hash": "fd4b8d9c9209cb37bc7872fe0c775e69408edd5dbcdacfacf5bd728a581ebfbd",
+  "notes": {}
+ },
+ "powerbuilding/accumulation/90min/model-fails/rated-low-met/tapped-harder": {
+  "hash": "9905f14f3a26e63531531cfb41578b6382f2b187848b5cf102adc98fe3b4b4c3",
+  "notes": {}
+ },
+ "powerbuilding/accumulation/90min/model-fails/rated-low-met/tapped-easier": {
+  "hash": "d8652858706962ed8725acea150697d177a644ed4d6052f3310ebf7c2090febf",
+  "notes": {}
+ },
+ "powerbuilding/accumulation/90min/model-fails/rated-low-met/tapped-as-expected": {
+  "hash": "344a81421e0ec48c6c1dac23bb73a606458ffd86e9090af561dbd09bb5203063",
+  "notes": {}
+ },
+ "powerbuilding/accumulation/40min/model/none/tapped-harder": {
+  "hash": "a7b82f5cedb4e9b60e543c6522439ad63849b9a4c3d21c62e4d99c7552ee4664",
+  "notes": {}
+ },
+ "powerbuilding/accumulation/40min/model/none/tapped-easier": {
+  "hash": "a7b82f5cedb4e9b60e543c6522439ad63849b9a4c3d21c62e4d99c7552ee4664",
+  "notes": {}
+ },
+ "powerbuilding/accumulation/40min/model/none/tapped-as-expected": {
+  "hash": "a7b82f5cedb4e9b60e543c6522439ad63849b9a4c3d21c62e4d99c7552ee4664",
+  "notes": {}
+ },
+ "powerbuilding/accumulation/40min/model/expected/tapped-harder": {
+  "hash": "cd567990ed5d1d170c729177f3b544ec177076230fd0a7e7524277088b02efc5",
+  "notes": {}
+ },
+ "powerbuilding/accumulation/40min/model/expected/tapped-easier": {
+  "hash": "8ce6b68c3ac10976281f22010e655c8a39215ce535f45c87d4c888ab173c5374",
+  "notes": {
+   "se-p": "+1 target rep — that felt easy, earning the next jump",
+   "se-s": "+1 target rep — that felt easy, earning the next jump",
+   "se-a": "+1 target rep — that felt easy, earning the next jump"
+  }
+ },
+ "powerbuilding/accumulation/40min/model/expected/tapped-as-expected": {
+  "hash": "036b06d79d7be8b574dc88b226f255467b9645d42f1ec833b923d4c94bf932a7",
+  "notes": {}
+ },
+ "powerbuilding/accumulation/40min/model/expected-missed/tapped-harder": {
+  "hash": "0dd3a2e0e920434e9404868c6c040a0f2d570d34db875561c38373b4087154a2",
+  "notes": {
+   "se-p": "−8% load — it felt harder than expected and you fell short of the prescribed reps",
+   "se-s": "−6.5% load — it felt harder than expected and you fell short of the prescribed reps",
+   "se-a": "−6% load — it felt harder than expected and you fell short of the prescribed reps"
+  }
+ },
+ "powerbuilding/accumulation/40min/model/expected-missed/tapped-easier": {
+  "hash": "99b485a617909fbc2b0c08a60e0c8fa5235c8f2a56d4d9e6bbcbed9afdd3861d",
+  "notes": {}
+ },
+ "powerbuilding/accumulation/40min/model/expected-missed/tapped-as-expected": {
+  "hash": "5cacc47c25f0c207c069666209c69eb5bf1d558002a291262ab5dfc39cf3c0da",
+  "notes": {}
+ },
+ "powerbuilding/accumulation/40min/model/expected-down/tapped-harder": {
+  "hash": "7258e0409320f3dc509a11db821d01a7215a849b1fd29e65f4db51a333b7a5b0",
+  "notes": {
+   "se-p": "−5% load — it felt harder than expected while your 1RM slipped",
+   "se-s": "−5% load — it felt harder than expected while your 1RM slipped",
+   "se-a": "−5% load — it felt harder than expected while your 1RM slipped"
+  }
+ },
+ "powerbuilding/accumulation/40min/model/expected-down/tapped-easier": {
+  "hash": "899012ac98003c67ac4dae54f91638a21435cae93cc5769943d99bc8ac17d0c6",
+  "notes": {}
+ },
+ "powerbuilding/accumulation/40min/model/expected-down/tapped-as-expected": {
+  "hash": "b17aad0688794cfccc5b50c63ef99470a057adfa70b0c29e00bc33ba9ad3b03f",
+  "notes": {}
+ },
+ "powerbuilding/accumulation/40min/model/rated-high-missed/tapped-harder": {
+  "hash": "736e8f5b9c98e294418ed941d666b64d31aed6d38095f7aa9b3a711b0f97e018",
+  "notes": {
+   "se-p": "−8% load — it felt harder than expected and you fell short of the prescribed reps",
+   "se-s": "−6.5% load — it felt harder than expected and you fell short of the prescribed reps",
+   "se-a": "−6% load — it felt harder than expected and you fell short of the prescribed reps"
+  }
+ },
+ "powerbuilding/accumulation/40min/model/rated-high-missed/tapped-easier": {
+  "hash": "ea4c9a00b2645d8d05da530feb1aca6a96b2ca2f04999171be772d940b133d1d",
+  "notes": {}
+ },
+ "powerbuilding/accumulation/40min/model/rated-high-missed/tapped-as-expected": {
+  "hash": "cd7c8ddb6bd6d092375d17d5baad0a05434529158ce4d175b6691af661a07cce",
+  "notes": {}
+ },
+ "powerbuilding/accumulation/40min/model/rated-low-met/tapped-harder": {
+  "hash": "f69d6d12c5156617526adefd847725a8a873c45ea2abdd35120225a6a5c98635",
+  "notes": {}
+ },
+ "powerbuilding/accumulation/40min/model/rated-low-met/tapped-easier": {
+  "hash": "9960ac8ce36ef8770260578249d68d518add8274fa2207d211a73e476a399af0",
+  "notes": {
+   "se-p": "+1 target rep — that felt easy, earning the next jump",
+   "se-s": "+1 target rep — that felt easy, earning the next jump",
+   "se-a": "+1 target rep — that felt easy, earning the next jump"
+  }
+ },
+ "powerbuilding/accumulation/40min/model/rated-low-met/tapped-as-expected": {
+  "hash": "485fa4ddb25ddc0fff6daaddd00593b3af7d7c3d0b7a6d2a884b625dcbffe134",
+  "notes": {}
+ },
+ "powerbuilding/accumulation/40min/model-fails/none/tapped-harder": {
+  "hash": "519d250520c088b02cbafe73507ee4628785a89ef926200bcab4f6ca4da45ee8",
+  "notes": {}
+ },
+ "powerbuilding/accumulation/40min/model-fails/none/tapped-easier": {
+  "hash": "519d250520c088b02cbafe73507ee4628785a89ef926200bcab4f6ca4da45ee8",
+  "notes": {}
+ },
+ "powerbuilding/accumulation/40min/model-fails/none/tapped-as-expected": {
+  "hash": "519d250520c088b02cbafe73507ee4628785a89ef926200bcab4f6ca4da45ee8",
+  "notes": {}
+ },
+ "powerbuilding/accumulation/40min/model-fails/expected/tapped-harder": {
+  "hash": "ab2a9b26261ae39b556bfd1e086a7a7f95fe24fe7bbda2c2484bdaa38be2bb8d",
+  "notes": {}
+ },
+ "powerbuilding/accumulation/40min/model-fails/expected/tapped-easier": {
+  "hash": "a01ea0514d1e27b135341a8fb62e1b29b4a9fa83641c577c52c0359bedae1e16",
+  "notes": {}
+ },
+ "powerbuilding/accumulation/40min/model-fails/expected/tapped-as-expected": {
+  "hash": "3e6dff2787f6890f98008be988d8338a954d2843e99ae50ead3fa3e15b02d6c6",
+  "notes": {}
+ },
+ "powerbuilding/accumulation/40min/model-fails/expected-missed/tapped-harder": {
+  "hash": "8ff79df70510b67f7824e28849d4c2d0d4173cf099321dc4c59324c0e6dc0c9c",
+  "notes": {}
+ },
+ "powerbuilding/accumulation/40min/model-fails/expected-missed/tapped-easier": {
+  "hash": "69bf7832e16211de91657358b266e6725d5ddaa296c05d175e5bddbcf8d6afb5",
+  "notes": {}
+ },
+ "powerbuilding/accumulation/40min/model-fails/expected-missed/tapped-as-expected": {
+  "hash": "59dbd13944732e09b474f243c2bf3fccb9b6a04b565e206eeb25f7a1268af97d",
+  "notes": {}
+ },
+ "powerbuilding/accumulation/40min/model-fails/expected-down/tapped-harder": {
+  "hash": "7346eada3b153d2115cbc211aedcdc2c5a01474592b99c917689d8c4800da224",
+  "notes": {}
+ },
+ "powerbuilding/accumulation/40min/model-fails/expected-down/tapped-easier": {
+  "hash": "e9f5a8e61df9d3f47aae1a36d998084e315de3febc3e464d41876443f2ba3362",
+  "notes": {}
+ },
+ "powerbuilding/accumulation/40min/model-fails/expected-down/tapped-as-expected": {
+  "hash": "e552aedd3af2b5e49ba66a971bd23e803a85404196bbe3914682df862fc8469c",
+  "notes": {}
+ },
+ "powerbuilding/accumulation/40min/model-fails/rated-high-missed/tapped-harder": {
+  "hash": "d2d3bba2cfed7f461a9d23bb58d11fb0b0beefd1b45d5433bb2771e31d4ad254",
+  "notes": {}
+ },
+ "powerbuilding/accumulation/40min/model-fails/rated-high-missed/tapped-easier": {
+  "hash": "ed1a8c1722f9b788ec88b2180c62c285f279ff942b077dee0ae97f48a42d74d6",
+  "notes": {}
+ },
+ "powerbuilding/accumulation/40min/model-fails/rated-high-missed/tapped-as-expected": {
+  "hash": "3dd866fa553e2b7c0f71246601c27b089d4d657929a82ea86817752cbfc51fa0",
+  "notes": {}
+ },
+ "powerbuilding/accumulation/40min/model-fails/rated-low-met/tapped-harder": {
+  "hash": "62706015fefffa17d382092cbac2b5085b8a37b6b58e6cb37a67162223687ad6",
+  "notes": {}
+ },
+ "powerbuilding/accumulation/40min/model-fails/rated-low-met/tapped-easier": {
+  "hash": "05a80471f10f0ddd530cd4f96b6668d5516688e9906e9af8461fd61158f4806f",
+  "notes": {}
+ },
+ "powerbuilding/accumulation/40min/model-fails/rated-low-met/tapped-as-expected": {
+  "hash": "60e1ed962575dd9bb5fbef04ab43cd1f605b6ff016feac467cc5e92d40461379",
+  "notes": {}
+ },
+ "powerbuilding/intensification/90min/model/none/tapped-harder": {
+  "hash": "a4eb7242072f62ac4d9e3dcbbae11419309470f54c47f241048cb122305f2903",
+  "notes": {}
+ },
+ "powerbuilding/intensification/90min/model/none/tapped-easier": {
+  "hash": "a4eb7242072f62ac4d9e3dcbbae11419309470f54c47f241048cb122305f2903",
+  "notes": {}
+ },
+ "powerbuilding/intensification/90min/model/none/tapped-as-expected": {
+  "hash": "a4eb7242072f62ac4d9e3dcbbae11419309470f54c47f241048cb122305f2903",
+  "notes": {}
+ },
+ "powerbuilding/intensification/90min/model/expected/tapped-harder": {
+  "hash": "37603f2a58192500bbcd2862a6f310999d7ffc6d375a0373297058a4a6e7ea84",
+  "notes": {}
+ },
+ "powerbuilding/intensification/90min/model/expected/tapped-easier": {
+  "hash": "72767acd145b36da9921ab39652887a7ced7518a7e7a364cc344235c25d6fd02",
+  "notes": {
+   "se-p": "+1 target rep — that felt easy, earning the next jump",
+   "se-s": "+1 target rep — that felt easy, earning the next jump",
+   "se-a": "+1 target rep — that felt easy, earning the next jump"
+  }
+ },
+ "powerbuilding/intensification/90min/model/expected/tapped-as-expected": {
+  "hash": "460df9fe6168cbc7fb4cf6c16e87437faf3ad0aabd63f4a8c3b8c02a7d6705af",
+  "notes": {}
+ },
+ "powerbuilding/intensification/90min/model/expected-missed/tapped-harder": {
+  "hash": "3b4562087478fa718925bc50b376f3d7a7521ebc22d55640ebab6f6590eda486",
+  "notes": {
+   "se-p": "−8% load — it felt harder than expected and you fell short of the prescribed reps",
+   "se-s": "−6.5% load — it felt harder than expected and you fell short of the prescribed reps",
+   "se-a": "−6% load — it felt harder than expected and you fell short of the prescribed reps"
+  }
+ },
+ "powerbuilding/intensification/90min/model/expected-missed/tapped-easier": {
+  "hash": "3268d39c991b4bc15fbfa02d5495674c79406bec4d30f07d5169abda127e9dd1",
+  "notes": {}
+ },
+ "powerbuilding/intensification/90min/model/expected-missed/tapped-as-expected": {
+  "hash": "9cc85ae6146f354de367052fd82e1d70d06fa75c8adaa6b7a3119b5974ea34f7",
+  "notes": {}
+ },
+ "powerbuilding/intensification/90min/model/expected-down/tapped-harder": {
+  "hash": "885df9c6ef749ebf77309da1249dd38dd9975f6b53dfb974fef4b791e5ec165b",
+  "notes": {
+   "se-p": "−5% load — it felt harder than expected while your 1RM slipped",
+   "se-s": "−5% load — it felt harder than expected while your 1RM slipped",
+   "se-a": "−5% load — it felt harder than expected while your 1RM slipped"
+  }
+ },
+ "powerbuilding/intensification/90min/model/expected-down/tapped-easier": {
+  "hash": "a8ffe5ecb5dd1684ae4f51144fcda48cf65e0131729c339ad80fac4537b62cc8",
+  "notes": {}
+ },
+ "powerbuilding/intensification/90min/model/expected-down/tapped-as-expected": {
+  "hash": "b8350fca6ef0c98ec1ae219d5bb8223e0573ae784573ff78ff4da51450057d21",
+  "notes": {}
+ },
+ "powerbuilding/intensification/90min/model/rated-high-missed/tapped-harder": {
+  "hash": "cd552bba596a2c609f5ae3520af8d56f2f0f4a08e347d2fe90a0b6a3632ec448",
+  "notes": {
+   "se-p": "−8% load — it felt harder than expected and you fell short of the prescribed reps",
+   "se-s": "−6.5% load — it felt harder than expected and you fell short of the prescribed reps",
+   "se-a": "−6% load — it felt harder than expected and you fell short of the prescribed reps"
+  }
+ },
+ "powerbuilding/intensification/90min/model/rated-high-missed/tapped-easier": {
+  "hash": "8c0f9c044f51419f5e7ee8fa4063d6bad5ca311056d30c2b1f2779026e818d61",
+  "notes": {}
+ },
+ "powerbuilding/intensification/90min/model/rated-high-missed/tapped-as-expected": {
+  "hash": "4e7de3077cd997312398c1fb3bf9d51df3b52f051f926cbdc8973f913a8cd4b4",
+  "notes": {}
+ },
+ "powerbuilding/intensification/90min/model/rated-low-met/tapped-harder": {
+  "hash": "5e3bd3dd16037c4dfd405a74042bc43d9365d5f28e8d1d63c3a19995851fe166",
+  "notes": {}
+ },
+ "powerbuilding/intensification/90min/model/rated-low-met/tapped-easier": {
+  "hash": "ecae1d56a607fb43fe759f806c2d6f522100b6c993c317fb8636178f3d302e93",
+  "notes": {
+   "se-p": "+1 target rep — that felt easy, earning the next jump",
+   "se-s": "+1 target rep — that felt easy, earning the next jump",
+   "se-a": "+1 target rep — that felt easy, earning the next jump"
+  }
+ },
+ "powerbuilding/intensification/90min/model/rated-low-met/tapped-as-expected": {
+  "hash": "40018636c6242f0a33b4647b0849d4fbe9b7746ed5ae1b318348d173a9000b50",
+  "notes": {}
+ },
+ "powerbuilding/intensification/90min/model-fails/none/tapped-harder": {
+  "hash": "c5e4e374806ee2509a2851e871c458f7c0e063c4845a889e98a2685612bb0363",
+  "notes": {}
+ },
+ "powerbuilding/intensification/90min/model-fails/none/tapped-easier": {
+  "hash": "c5e4e374806ee2509a2851e871c458f7c0e063c4845a889e98a2685612bb0363",
+  "notes": {}
+ },
+ "powerbuilding/intensification/90min/model-fails/none/tapped-as-expected": {
+  "hash": "c5e4e374806ee2509a2851e871c458f7c0e063c4845a889e98a2685612bb0363",
+  "notes": {}
+ },
+ "powerbuilding/intensification/90min/model-fails/expected/tapped-harder": {
+  "hash": "abd18a21baf75cc76755f161d2b89f9b29d9f172abf12a8dd58fa4e3abe3855e",
+  "notes": {}
+ },
+ "powerbuilding/intensification/90min/model-fails/expected/tapped-easier": {
+  "hash": "7bca98688d53e525737eb54b0811fc6a16d20bad349acac6455599144328451d",
+  "notes": {}
+ },
+ "powerbuilding/intensification/90min/model-fails/expected/tapped-as-expected": {
+  "hash": "518da3ebdcbdee238d1bfcfa7e60cbe7610e8bac21a0091fc0a2e39d0e8ab587",
+  "notes": {}
+ },
+ "powerbuilding/intensification/90min/model-fails/expected-missed/tapped-harder": {
+  "hash": "49562e3d122526f7b3b4c222d4ff03b5551f5b0bc34a52fd105a6dcb9e9b41aa",
+  "notes": {}
+ },
+ "powerbuilding/intensification/90min/model-fails/expected-missed/tapped-easier": {
+  "hash": "f2af41ee362a277672bf573bb9e7244d8ca7c1333caadb9756088c7a5b535383",
+  "notes": {}
+ },
+ "powerbuilding/intensification/90min/model-fails/expected-missed/tapped-as-expected": {
+  "hash": "fce0b658fe24da11cad25f0c33d4f25040462706ef720b43c51fa20b4727f825",
+  "notes": {}
+ },
+ "powerbuilding/intensification/90min/model-fails/expected-down/tapped-harder": {
+  "hash": "151dded09464d366ba810ed9e515a58e206c23917fe917d1f6f2ef97b23f057a",
+  "notes": {}
+ },
+ "powerbuilding/intensification/90min/model-fails/expected-down/tapped-easier": {
+  "hash": "19ab204fa8e22b47d5b2f54a84ff0593f079952034a471e820c1ce883d9926a3",
+  "notes": {}
+ },
+ "powerbuilding/intensification/90min/model-fails/expected-down/tapped-as-expected": {
+  "hash": "5ca67be01163a42d54188633bf21903d6962fed1be886a7017964440a89d8256",
+  "notes": {}
+ },
+ "powerbuilding/intensification/90min/model-fails/rated-high-missed/tapped-harder": {
+  "hash": "32ce97046604ee15485d0d8f6d59d79150eaaa3d8af21691d421e2c29a5e19e1",
+  "notes": {}
+ },
+ "powerbuilding/intensification/90min/model-fails/rated-high-missed/tapped-easier": {
+  "hash": "018ff74dd90d60da91e44999e30bc9f28c8554a40b284d880df949400b8b499a",
+  "notes": {}
+ },
+ "powerbuilding/intensification/90min/model-fails/rated-high-missed/tapped-as-expected": {
+  "hash": "3174bc9bb227ac6c68916231a76b3546cc2674a52aae8a514ab713fd96f5532e",
+  "notes": {}
+ },
+ "powerbuilding/intensification/90min/model-fails/rated-low-met/tapped-harder": {
+  "hash": "5a0aded56f2ad192c88510f023be7b3a0b94f393646172439d2143586212a90c",
+  "notes": {}
+ },
+ "powerbuilding/intensification/90min/model-fails/rated-low-met/tapped-easier": {
+  "hash": "7002922b601369b3630949e79666bc28aaedf8497fff803f26a5ea978a9e7fb8",
+  "notes": {}
+ },
+ "powerbuilding/intensification/90min/model-fails/rated-low-met/tapped-as-expected": {
+  "hash": "10261c4179c5d8ce4d9f089cec77a99a7ceb489a86f02189467a868280c1bb14",
+  "notes": {}
+ },
+ "powerbuilding/intensification/40min/model/none/tapped-harder": {
+  "hash": "b68e502ade295df0b831cc6a44cef85e7974720cdc01229e38ffe29de6d26185",
+  "notes": {}
+ },
+ "powerbuilding/intensification/40min/model/none/tapped-easier": {
+  "hash": "b68e502ade295df0b831cc6a44cef85e7974720cdc01229e38ffe29de6d26185",
+  "notes": {}
+ },
+ "powerbuilding/intensification/40min/model/none/tapped-as-expected": {
+  "hash": "b68e502ade295df0b831cc6a44cef85e7974720cdc01229e38ffe29de6d26185",
+  "notes": {}
+ },
+ "powerbuilding/intensification/40min/model/expected/tapped-harder": {
+  "hash": "ee2644a657664cdaef3b46434bdb7058cd4c2444edc37a5ddb29d3d148113788",
+  "notes": {}
+ },
+ "powerbuilding/intensification/40min/model/expected/tapped-easier": {
+  "hash": "a0b0307f0b6d23cacfbda9b429b52be64d7074c2262b2716c5c897b9b43a13a6",
+  "notes": {
+   "se-p": "+1 target rep — that felt easy, earning the next jump",
+   "se-s": "+1 target rep — that felt easy, earning the next jump",
+   "se-a": "+1 target rep — that felt easy, earning the next jump"
+  }
+ },
+ "powerbuilding/intensification/40min/model/expected/tapped-as-expected": {
+  "hash": "5111da4d7c4387cfaa4e2bf491e92d92ba20231e8ccbfbc1bc0661b017c58725",
+  "notes": {}
+ },
+ "powerbuilding/intensification/40min/model/expected-missed/tapped-harder": {
+  "hash": "7d3e2f7ffc748dd701ec3d932fd9bbdd5a2138564e8ab0786ba4b77f2ad77133",
+  "notes": {
+   "se-p": "−8% load — it felt harder than expected and you fell short of the prescribed reps",
+   "se-s": "−6.5% load — it felt harder than expected and you fell short of the prescribed reps",
+   "se-a": "−6% load — it felt harder than expected and you fell short of the prescribed reps"
+  }
+ },
+ "powerbuilding/intensification/40min/model/expected-missed/tapped-easier": {
+  "hash": "a906277895ca5145419039fa17c35eaecced9df3e524b07f333177ec386c5167",
+  "notes": {}
+ },
+ "powerbuilding/intensification/40min/model/expected-missed/tapped-as-expected": {
+  "hash": "8d38592c7ee0ea55f1b48b236a524f677f70598943d16c111a33d872abcd3980",
+  "notes": {}
+ },
+ "powerbuilding/intensification/40min/model/expected-down/tapped-harder": {
+  "hash": "fbfd1ff90baeda19a1d16ba0a8913940acc8109d15b9a38a4931972efaf908f1",
+  "notes": {
+   "se-p": "−5% load — it felt harder than expected while your 1RM slipped",
+   "se-s": "−5% load — it felt harder than expected while your 1RM slipped",
+   "se-a": "−5% load — it felt harder than expected while your 1RM slipped"
+  }
+ },
+ "powerbuilding/intensification/40min/model/expected-down/tapped-easier": {
+  "hash": "4d1b42d2c23d18420719ec2a4e00cf7e3bf8d2c291ffb621abf84498f8603e52",
+  "notes": {}
+ },
+ "powerbuilding/intensification/40min/model/expected-down/tapped-as-expected": {
+  "hash": "3d6d70d4db5084620608e050d66cf56672c05fe2ced85a429c278eb63b336f06",
+  "notes": {}
+ },
+ "powerbuilding/intensification/40min/model/rated-high-missed/tapped-harder": {
+  "hash": "e9d89b75568eb727d55628c0bb5c234a0282ac0f1d7e0c87ff85377f4976a41f",
+  "notes": {
+   "se-p": "−8% load — it felt harder than expected and you fell short of the prescribed reps",
+   "se-s": "−6.5% load — it felt harder than expected and you fell short of the prescribed reps",
+   "se-a": "−6% load — it felt harder than expected and you fell short of the prescribed reps"
+  }
+ },
+ "powerbuilding/intensification/40min/model/rated-high-missed/tapped-easier": {
+  "hash": "45846a10c8ca2028dc9def51b482d8782a831a364c1ff291220b3131b19ed6b2",
+  "notes": {}
+ },
+ "powerbuilding/intensification/40min/model/rated-high-missed/tapped-as-expected": {
+  "hash": "8be184655525b19c92d57e733ce79637cba52a1809ffd3d6f43a9c0af07c332b",
+  "notes": {}
+ },
+ "powerbuilding/intensification/40min/model/rated-low-met/tapped-harder": {
+  "hash": "a065f55b9fb8442ea92e51be05344dfa325cc927a9714434c26fbf221d37f424",
+  "notes": {}
+ },
+ "powerbuilding/intensification/40min/model/rated-low-met/tapped-easier": {
+  "hash": "10a458d6b30cd01302c5113834923032fd567c4ef8e63811689925142eba665e",
+  "notes": {
+   "se-p": "+1 target rep — that felt easy, earning the next jump",
+   "se-s": "+1 target rep — that felt easy, earning the next jump",
+   "se-a": "+1 target rep — that felt easy, earning the next jump"
+  }
+ },
+ "powerbuilding/intensification/40min/model/rated-low-met/tapped-as-expected": {
+  "hash": "59bcbf97261a005e7add2fb2a23a21f2954b1bdc02cb277beca0e1ab9d0c552f",
+  "notes": {}
+ },
+ "powerbuilding/intensification/40min/model-fails/none/tapped-harder": {
+  "hash": "9f2468bf85283a6a65caa71868f21aba313cd8e7ca3befd4a5000c6c09b59119",
+  "notes": {}
+ },
+ "powerbuilding/intensification/40min/model-fails/none/tapped-easier": {
+  "hash": "9f2468bf85283a6a65caa71868f21aba313cd8e7ca3befd4a5000c6c09b59119",
+  "notes": {}
+ },
+ "powerbuilding/intensification/40min/model-fails/none/tapped-as-expected": {
+  "hash": "9f2468bf85283a6a65caa71868f21aba313cd8e7ca3befd4a5000c6c09b59119",
+  "notes": {}
+ },
+ "powerbuilding/intensification/40min/model-fails/expected/tapped-harder": {
+  "hash": "ebab34bf40b627cfc7223c2bb28c92d29616a6d7ca0814a902e92f0cbdb77362",
+  "notes": {}
+ },
+ "powerbuilding/intensification/40min/model-fails/expected/tapped-easier": {
+  "hash": "5d1457dd1d658befb3841049101e9adcc3f87331c6933a9f1694da5afb74128e",
+  "notes": {}
+ },
+ "powerbuilding/intensification/40min/model-fails/expected/tapped-as-expected": {
+  "hash": "a3cccff92a22a77197957536044c860296f12d38a643ad89640389a3c8b73e4f",
+  "notes": {}
+ },
+ "powerbuilding/intensification/40min/model-fails/expected-missed/tapped-harder": {
+  "hash": "2e184289378ab1406fe46a8c6ce1704d5ef706c596cbd17c51dd2fd19842170d",
+  "notes": {}
+ },
+ "powerbuilding/intensification/40min/model-fails/expected-missed/tapped-easier": {
+  "hash": "3853745118009bdb9654044c9ae8a20af6054f18a8ae779f6d27a1fccd2130e9",
+  "notes": {}
+ },
+ "powerbuilding/intensification/40min/model-fails/expected-missed/tapped-as-expected": {
+  "hash": "cde09e547e23f7cf92ee3bf482628b87e3ec5de4ca953fc3f72f67a282138751",
+  "notes": {}
+ },
+ "powerbuilding/intensification/40min/model-fails/expected-down/tapped-harder": {
+  "hash": "82aa130719f03f4d7de094fd34ec9cc21f9e60ea4eb49827165364b9fff1993f",
+  "notes": {}
+ },
+ "powerbuilding/intensification/40min/model-fails/expected-down/tapped-easier": {
+  "hash": "97950a8739b3f64ef8a82e69989f9175ae64aaefa3b49a9ad93007c8d3a42b5d",
+  "notes": {}
+ },
+ "powerbuilding/intensification/40min/model-fails/expected-down/tapped-as-expected": {
+  "hash": "2c76f6418ffc7a389a2f44517cbf9911d145f0452bdac1e568a33c897458e17a",
+  "notes": {}
+ },
+ "powerbuilding/intensification/40min/model-fails/rated-high-missed/tapped-harder": {
+  "hash": "18e9bddd3f16f88797f858f134c133705d2603064cf72e1fc2b19ecc2e023067",
+  "notes": {}
+ },
+ "powerbuilding/intensification/40min/model-fails/rated-high-missed/tapped-easier": {
+  "hash": "461e82b07d504783c7e40ab0c4df6fe8d7fcd8697f6b7c304a85aa2631c32975",
+  "notes": {}
+ },
+ "powerbuilding/intensification/40min/model-fails/rated-high-missed/tapped-as-expected": {
+  "hash": "20da4c82bc55d7d623707eed9b81e0560f7ed3922c67cce100d3682733fd0a3e",
+  "notes": {}
+ },
+ "powerbuilding/intensification/40min/model-fails/rated-low-met/tapped-harder": {
+  "hash": "7e73b6c21bb71f47bfd63372f2d3d317fa71fd85ec691c0ee20355a6e22de018",
+  "notes": {}
+ },
+ "powerbuilding/intensification/40min/model-fails/rated-low-met/tapped-easier": {
+  "hash": "717509e0fb68b16463975d8006765a593f4be0687b14360b243d5441ff014ac0",
+  "notes": {}
+ },
+ "powerbuilding/intensification/40min/model-fails/rated-low-met/tapped-as-expected": {
+  "hash": "3b22e2511fb3e4af1dfa6622268c72038a4323cb0a2de8e72e7e476a40ba3178",
+  "notes": {}
+ },
+ "powerbuilding/realisation/90min/model/none/tapped-harder": {
+  "hash": "0276d1204888a89735d7291dadd9b3b67948cad17c5db43053903054af1eccfe",
+  "notes": {}
+ },
+ "powerbuilding/realisation/90min/model/none/tapped-easier": {
+  "hash": "0276d1204888a89735d7291dadd9b3b67948cad17c5db43053903054af1eccfe",
+  "notes": {}
+ },
+ "powerbuilding/realisation/90min/model/none/tapped-as-expected": {
+  "hash": "0276d1204888a89735d7291dadd9b3b67948cad17c5db43053903054af1eccfe",
+  "notes": {}
+ },
+ "powerbuilding/realisation/90min/model/expected/tapped-harder": {
+  "hash": "f1cc16db0a1c2193c071ed353a3d34e6d031ca0f682b0ed369edff9466fa013c",
+  "notes": {}
+ },
+ "powerbuilding/realisation/90min/model/expected/tapped-easier": {
+  "hash": "2c2a48670b0e7375781b5f6c497a418c5cce9a1ab81ae6785dc2cc499d125c14",
+  "notes": {}
+ },
+ "powerbuilding/realisation/90min/model/expected/tapped-as-expected": {
+  "hash": "6fa69cb5128409b8941dec8200dec6a4436d0542b74005019fa4569ea382d943",
+  "notes": {}
+ },
+ "powerbuilding/realisation/90min/model/expected-missed/tapped-harder": {
+  "hash": "e8e2605357098e55f19f970f6dc17b13ebc770f9a815cad73a1991631eca7281",
+  "notes": {
+   "se-p": "−8% load — it felt harder than expected and you fell short of the prescribed reps",
+   "se-s": "−6.5% load — it felt harder than expected and you fell short of the prescribed reps",
+   "se-a": "−6% load — it felt harder than expected and you fell short of the prescribed reps"
+  }
+ },
+ "powerbuilding/realisation/90min/model/expected-missed/tapped-easier": {
+  "hash": "f287961323664b4618dcee17e6fb05ba36cbd8a6be6addc54fa24372e67ae027",
+  "notes": {}
+ },
+ "powerbuilding/realisation/90min/model/expected-missed/tapped-as-expected": {
+  "hash": "c005618c8a653b132eb043fe7e3e954528e01bb8975c1007a2b080e2945958fb",
+  "notes": {}
+ },
+ "powerbuilding/realisation/90min/model/expected-down/tapped-harder": {
+  "hash": "01920b40cdc9e7f2dd4318773aa049b304d85a9c6bd290ca7d7dcdb32635e8f4",
+  "notes": {
+   "se-p": "−5% load — it felt harder than expected while your 1RM slipped",
+   "se-s": "−5% load — it felt harder than expected while your 1RM slipped",
+   "se-a": "−5% load — it felt harder than expected while your 1RM slipped"
+  }
+ },
+ "powerbuilding/realisation/90min/model/expected-down/tapped-easier": {
+  "hash": "7b7899604d4d07ecd5476f9acd6a2000842ef7787651b1477b6b19d78631a689",
+  "notes": {}
+ },
+ "powerbuilding/realisation/90min/model/expected-down/tapped-as-expected": {
+  "hash": "d615443350b98075885ea6ba5f5bf0042ec1a0c1033ac6450717326c0abd3781",
+  "notes": {}
+ },
+ "powerbuilding/realisation/90min/model/rated-high-missed/tapped-harder": {
+  "hash": "93400a43e4c2488415ad846ae0a03fc399e1bfdd8a02de0b288801dc1dea8da4",
+  "notes": {
+   "se-p": "−8% load — it felt harder than expected and you fell short of the prescribed reps",
+   "se-s": "−6.5% load — it felt harder than expected and you fell short of the prescribed reps",
+   "se-a": "−6% load — it felt harder than expected and you fell short of the prescribed reps"
+  }
+ },
+ "powerbuilding/realisation/90min/model/rated-high-missed/tapped-easier": {
+  "hash": "886799b342d5ac175eb0761ce5f704e1f5d450da1ac017f6ca08262cbccb7bca",
+  "notes": {}
+ },
+ "powerbuilding/realisation/90min/model/rated-high-missed/tapped-as-expected": {
+  "hash": "eae5ebaf2098ff64cc97cceb8364498e40d3b07c3b309eb247c45e0348ee3f3f",
+  "notes": {}
+ },
+ "powerbuilding/realisation/90min/model/rated-low-met/tapped-harder": {
+  "hash": "9b93d99859eada8e6b64fea6488633eeac1eb3a71d1862763520433b46e497f1",
+  "notes": {}
+ },
+ "powerbuilding/realisation/90min/model/rated-low-met/tapped-easier": {
+  "hash": "d0a3952921f5f02971febc0d49d2b88e26ddff541419f73f36975d84df0d8469",
+  "notes": {}
+ },
+ "powerbuilding/realisation/90min/model/rated-low-met/tapped-as-expected": {
+  "hash": "a13210c7da2a7e8a2389323eab84fe2a98d48df1592393dcd02622e14282ccdf",
+  "notes": {}
+ },
+ "powerbuilding/realisation/90min/model-fails/none/tapped-harder": {
+  "hash": "23fcbf11e0ebcfcc0a59ac68bf2db5e70d7c12d94c1f51ebf83caf023593716e",
+  "notes": {}
+ },
+ "powerbuilding/realisation/90min/model-fails/none/tapped-easier": {
+  "hash": "23fcbf11e0ebcfcc0a59ac68bf2db5e70d7c12d94c1f51ebf83caf023593716e",
+  "notes": {}
+ },
+ "powerbuilding/realisation/90min/model-fails/none/tapped-as-expected": {
+  "hash": "23fcbf11e0ebcfcc0a59ac68bf2db5e70d7c12d94c1f51ebf83caf023593716e",
+  "notes": {}
+ },
+ "powerbuilding/realisation/90min/model-fails/expected/tapped-harder": {
+  "hash": "b955bc24f44c3079931cc9afc2e4ceb4c5119bb4a3baf3314698121d25f6ec1a",
+  "notes": {}
+ },
+ "powerbuilding/realisation/90min/model-fails/expected/tapped-easier": {
+  "hash": "91006b6a804078c525e4804c29c5bf5886f84e9ed1ceab8c4d7534fa0be96caa",
+  "notes": {}
+ },
+ "powerbuilding/realisation/90min/model-fails/expected/tapped-as-expected": {
+  "hash": "679400f7a937bb7ea080cd0cc53a3eaf7243ec7822278a22a674c276e00ea52a",
+  "notes": {}
+ },
+ "powerbuilding/realisation/90min/model-fails/expected-missed/tapped-harder": {
+  "hash": "011f0de913dc53a24c44a4d9ad73e9e38a1f36ab12299601ebb5d4242d844b38",
+  "notes": {}
+ },
+ "powerbuilding/realisation/90min/model-fails/expected-missed/tapped-easier": {
+  "hash": "9797bc64e67fb93dda94fa7aef561b6d6983bc569fcfc290174aff651e23554b",
+  "notes": {}
+ },
+ "powerbuilding/realisation/90min/model-fails/expected-missed/tapped-as-expected": {
+  "hash": "86fe29567bc0534cfa2327c422ecf8c82cf4067532960962a40238a6e270e142",
+  "notes": {}
+ },
+ "powerbuilding/realisation/90min/model-fails/expected-down/tapped-harder": {
+  "hash": "2e406b7f919a6b5dec7ab835259ee3d9aa184c48e7874d35389a6485bf9e1e30",
+  "notes": {}
+ },
+ "powerbuilding/realisation/90min/model-fails/expected-down/tapped-easier": {
+  "hash": "e79d6b341ff4b7dd13aa2b800dfd94aa140fb4342d947890058a1d1164f00eaa",
+  "notes": {}
+ },
+ "powerbuilding/realisation/90min/model-fails/expected-down/tapped-as-expected": {
+  "hash": "9999872f93feb6b3e1718e10b7d7717803429452d9be309a00e37fa78606db0f",
+  "notes": {}
+ },
+ "powerbuilding/realisation/90min/model-fails/rated-high-missed/tapped-harder": {
+  "hash": "911a4e54092b25fc74e41f5ba038c8a816e8b1529281c0c70a850f8a598e8050",
+  "notes": {}
+ },
+ "powerbuilding/realisation/90min/model-fails/rated-high-missed/tapped-easier": {
+  "hash": "ab903ba1f0516f3c498fd88aad4089222e51cc1893d0535cfa50e523c4a1f348",
+  "notes": {}
+ },
+ "powerbuilding/realisation/90min/model-fails/rated-high-missed/tapped-as-expected": {
+  "hash": "07a4e6fa17b2824eade8ec7493facc2cd17a61934593770bd7b8549cfec1d7ad",
+  "notes": {}
+ },
+ "powerbuilding/realisation/90min/model-fails/rated-low-met/tapped-harder": {
+  "hash": "ce6eebc46934dab839c46278692d33aad090ac4d8598c06c0878f17d7d18a257",
+  "notes": {}
+ },
+ "powerbuilding/realisation/90min/model-fails/rated-low-met/tapped-easier": {
+  "hash": "7a92e2926aab3ec4aae6d32f0b72a2a0cde6701b7645c26ec1b919e570d8e67e",
+  "notes": {}
+ },
+ "powerbuilding/realisation/90min/model-fails/rated-low-met/tapped-as-expected": {
+  "hash": "3dc266a6724ae2a48c432315580fb3364566f7c07302d13dbb10c32b5aab43ee",
+  "notes": {}
+ },
+ "powerbuilding/realisation/40min/model/none/tapped-harder": {
+  "hash": "d5f8e14e064b099599d6935e1583cc61c1afa52c4c89a21d3e590c13a6403df1",
+  "notes": {}
+ },
+ "powerbuilding/realisation/40min/model/none/tapped-easier": {
+  "hash": "d5f8e14e064b099599d6935e1583cc61c1afa52c4c89a21d3e590c13a6403df1",
+  "notes": {}
+ },
+ "powerbuilding/realisation/40min/model/none/tapped-as-expected": {
+  "hash": "d5f8e14e064b099599d6935e1583cc61c1afa52c4c89a21d3e590c13a6403df1",
+  "notes": {}
+ },
+ "powerbuilding/realisation/40min/model/expected/tapped-harder": {
+  "hash": "41cc6c00a14a096ec1e676b90d10435529f188c619ca0cb9ba7ebe0c9a739d7f",
+  "notes": {}
+ },
+ "powerbuilding/realisation/40min/model/expected/tapped-easier": {
+  "hash": "c0e4f2a477f816c40434ccdfce0fa901437ff4c55eeb56d358215a37612abfac",
+  "notes": {}
+ },
+ "powerbuilding/realisation/40min/model/expected/tapped-as-expected": {
+  "hash": "92581cdfbe45f16b3e310a8e3af29c56df6eb1a9599aa44bf02ed55a1a389166",
+  "notes": {}
+ },
+ "powerbuilding/realisation/40min/model/expected-missed/tapped-harder": {
+  "hash": "9fbccd27ffec5633ed65d5d92b5495d70763c7fe47d9238790d14b09726303f8",
+  "notes": {
+   "se-p": "−8% load — it felt harder than expected and you fell short of the prescribed reps",
+   "se-s": "−6.5% load — it felt harder than expected and you fell short of the prescribed reps",
+   "se-a": "−6% load — it felt harder than expected and you fell short of the prescribed reps"
+  }
+ },
+ "powerbuilding/realisation/40min/model/expected-missed/tapped-easier": {
+  "hash": "1553f2ef71eae4b90214732106a718ec8c02496e51f215b6c2f9209e27a7a4a1",
+  "notes": {}
+ },
+ "powerbuilding/realisation/40min/model/expected-missed/tapped-as-expected": {
+  "hash": "cd7dc79cc9f70382745669ed35c8eb87a3b4863d47ea94eedf35cdd612b98fac",
+  "notes": {}
+ },
+ "powerbuilding/realisation/40min/model/expected-down/tapped-harder": {
+  "hash": "09de13859748236402f5ef4068c26ba0cd8073f08f7e7d1ef0fe2ed06cfaf242",
+  "notes": {
+   "se-p": "−5% load — it felt harder than expected while your 1RM slipped",
+   "se-s": "−5% load — it felt harder than expected while your 1RM slipped",
+   "se-a": "−5% load — it felt harder than expected while your 1RM slipped"
+  }
+ },
+ "powerbuilding/realisation/40min/model/expected-down/tapped-easier": {
+  "hash": "ffc18b9288e1b5125ea18e303abeefc4c493c6eb5ec353e60249f9b242760cec",
+  "notes": {}
+ },
+ "powerbuilding/realisation/40min/model/expected-down/tapped-as-expected": {
+  "hash": "ccdcfe27f9f1ebb48146a3b81bc1663cf43ac3075eb5a45e58dd42433e909822",
+  "notes": {}
+ },
+ "powerbuilding/realisation/40min/model/rated-high-missed/tapped-harder": {
+  "hash": "b32bdb71c7742553754f9be097e683f567e7a81dc5d5bc3c2445ffead10af9d2",
+  "notes": {
+   "se-p": "−8% load — it felt harder than expected and you fell short of the prescribed reps",
+   "se-s": "−6.5% load — it felt harder than expected and you fell short of the prescribed reps",
+   "se-a": "−6% load — it felt harder than expected and you fell short of the prescribed reps"
+  }
+ },
+ "powerbuilding/realisation/40min/model/rated-high-missed/tapped-easier": {
+  "hash": "4edb57cde9b44828b48ac4cff8c878a707f39cb6511de515e4eca6cf7fadd560",
+  "notes": {}
+ },
+ "powerbuilding/realisation/40min/model/rated-high-missed/tapped-as-expected": {
+  "hash": "3d9ebb10028b0d443a6a9f5b452b22cab40433787ddddf47d4153a9712da3dba",
+  "notes": {}
+ },
+ "powerbuilding/realisation/40min/model/rated-low-met/tapped-harder": {
+  "hash": "3158044cff41383d6fe0f66dc85baee59208df6cb3e053bb602c469bd802dcf5",
+  "notes": {}
+ },
+ "powerbuilding/realisation/40min/model/rated-low-met/tapped-easier": {
+  "hash": "204c124615caf676860dc4090b5f6381d8956f9ae8b16925378b4560bfd7d473",
+  "notes": {}
+ },
+ "powerbuilding/realisation/40min/model/rated-low-met/tapped-as-expected": {
+  "hash": "42a8fe9016079dc23b7850c54092ce616692c04892b127d92ebf88a548b39424",
+  "notes": {}
+ },
+ "powerbuilding/realisation/40min/model-fails/none/tapped-harder": {
+  "hash": "32179232495f57aa1396c29bed9b1d366f3d1fa1a4c30a2fe23e611252cd7c8a",
+  "notes": {}
+ },
+ "powerbuilding/realisation/40min/model-fails/none/tapped-easier": {
+  "hash": "32179232495f57aa1396c29bed9b1d366f3d1fa1a4c30a2fe23e611252cd7c8a",
+  "notes": {}
+ },
+ "powerbuilding/realisation/40min/model-fails/none/tapped-as-expected": {
+  "hash": "32179232495f57aa1396c29bed9b1d366f3d1fa1a4c30a2fe23e611252cd7c8a",
+  "notes": {}
+ },
+ "powerbuilding/realisation/40min/model-fails/expected/tapped-harder": {
+  "hash": "f08c66e5a686815435a95e30831438363ee3ffa2a1d6926bb5becd4de45a7a39",
+  "notes": {}
+ },
+ "powerbuilding/realisation/40min/model-fails/expected/tapped-easier": {
+  "hash": "a7992f6a683e8e6330ad596a98b839ac62ec4aacfb2c62723bb582aadc7dd55a",
+  "notes": {}
+ },
+ "powerbuilding/realisation/40min/model-fails/expected/tapped-as-expected": {
+  "hash": "8794b6d34c5cf321f1b95ae19923cc9854abb83293f29602e988b16d05964702",
+  "notes": {}
+ },
+ "powerbuilding/realisation/40min/model-fails/expected-missed/tapped-harder": {
+  "hash": "8735038cae98576f7cbd3de4600c815240e31a5eb802428279b52525b548374a",
+  "notes": {}
+ },
+ "powerbuilding/realisation/40min/model-fails/expected-missed/tapped-easier": {
+  "hash": "d7edf0052e1f68a9e9f4a2f6a826196391ddbd26215efc4b74dad710f7aa8910",
+  "notes": {}
+ },
+ "powerbuilding/realisation/40min/model-fails/expected-missed/tapped-as-expected": {
+  "hash": "9952f3c1ae0f08faed081ff1994dcec197324a787d705c66041539c373c11491",
+  "notes": {}
+ },
+ "powerbuilding/realisation/40min/model-fails/expected-down/tapped-harder": {
+  "hash": "61b1d8b7fc78e0f616d9e466ee90f8fa9a97a711055011e42aa3a153827f2868",
+  "notes": {}
+ },
+ "powerbuilding/realisation/40min/model-fails/expected-down/tapped-easier": {
+  "hash": "020385c70c99195b8ae5393f9c1ad027a3b48ec8db3071140f77c567520aaf3e",
+  "notes": {}
+ },
+ "powerbuilding/realisation/40min/model-fails/expected-down/tapped-as-expected": {
+  "hash": "cc6118abe24e2507206e7f7aeac82626b30097fcda9e95e90ea0d03716e8e3c1",
+  "notes": {}
+ },
+ "powerbuilding/realisation/40min/model-fails/rated-high-missed/tapped-harder": {
+  "hash": "f76b21d669e003dbec62a04b6407f79e0c30bd04b09d4a2930616c9e9dd54a20",
+  "notes": {}
+ },
+ "powerbuilding/realisation/40min/model-fails/rated-high-missed/tapped-easier": {
+  "hash": "ecab40702c14f0b4d11667dc6d3f9eb1795c279a304b4dc57d099844df5a67c1",
+  "notes": {}
+ },
+ "powerbuilding/realisation/40min/model-fails/rated-high-missed/tapped-as-expected": {
+  "hash": "8341db650aca4ff66a989c406495ccc2d36556045390ef6c099d894eabd238a5",
+  "notes": {}
+ },
+ "powerbuilding/realisation/40min/model-fails/rated-low-met/tapped-harder": {
+  "hash": "71e767375098468e5d5d4d3d2394a15f014f5ffe7e42fce7fb94c342c4e12744",
+  "notes": {}
+ },
+ "powerbuilding/realisation/40min/model-fails/rated-low-met/tapped-easier": {
+  "hash": "af70528599ae2b9d28a63272d09e26c343c6daf98ebf0614081bd011eda85aa3",
+  "notes": {}
+ },
+ "powerbuilding/realisation/40min/model-fails/rated-low-met/tapped-as-expected": {
+  "hash": "7a2b00a295ad6cb9db61ecd873cd6909352f40afe4c7186adba86e4f0edeffff",
+  "notes": {}
+ },
+ "powerbuilding/deload/90min/model/none/tapped-harder": {
+  "hash": "0ab3235bd646e9bbe89cb4d0d8d17a03bad28802b062d710b6414fad40d436bf",
+  "notes": {}
+ },
+ "powerbuilding/deload/90min/model/none/tapped-easier": {
+  "hash": "0ab3235bd646e9bbe89cb4d0d8d17a03bad28802b062d710b6414fad40d436bf",
+  "notes": {}
+ },
+ "powerbuilding/deload/90min/model/none/tapped-as-expected": {
+  "hash": "0ab3235bd646e9bbe89cb4d0d8d17a03bad28802b062d710b6414fad40d436bf",
+  "notes": {}
+ },
+ "powerbuilding/deload/90min/model/expected/tapped-harder": {
+  "hash": "0e03067a7c570c645e8ab4967b9e74f23ac1dee7a1a87048adb2f839f038fce7",
+  "notes": {}
+ },
+ "powerbuilding/deload/90min/model/expected/tapped-easier": {
+  "hash": "0c34aa362161a147cdb02f926ebf126e2647a08a79dc5367679f520fd185b14c",
+  "notes": {}
+ },
+ "powerbuilding/deload/90min/model/expected/tapped-as-expected": {
+  "hash": "ca10251b0f11c3ba0f131c68745e93961975a2a7f65c2642a07f9ca258e50fb5",
+  "notes": {}
+ },
+ "powerbuilding/deload/90min/model/expected-missed/tapped-harder": {
+  "hash": "07e25d41e19bfa26fd8ad7be80c4bbed1b8cf9febfaee8ff5225d49094804dfb",
+  "notes": {}
+ },
+ "powerbuilding/deload/90min/model/expected-missed/tapped-easier": {
+  "hash": "a815c724d24c106f32c3097aa2743484d288ce9021c7ae73330e763fd414f4cb",
+  "notes": {}
+ },
+ "powerbuilding/deload/90min/model/expected-missed/tapped-as-expected": {
+  "hash": "33c73a0136bd3b0f5c6332a239d719d1beb3833739895d2c4867392afbcf8757",
+  "notes": {}
+ },
+ "powerbuilding/deload/90min/model/expected-down/tapped-harder": {
+  "hash": "f414631c6e500ec3a7a24952f2561f228d1c02b249ea134a8016e80a8b9d4c14",
+  "notes": {}
+ },
+ "powerbuilding/deload/90min/model/expected-down/tapped-easier": {
+  "hash": "5c003f00f16d1ad1e5a1849e2155ed4872613e043e97d4d4a3a9e732d064cb17",
+  "notes": {}
+ },
+ "powerbuilding/deload/90min/model/expected-down/tapped-as-expected": {
+  "hash": "a326cfe44cf615992b1cbbb02550308a19fb5d2143defc8a97053c012c9ece26",
+  "notes": {}
+ },
+ "powerbuilding/deload/90min/model/rated-high-missed/tapped-harder": {
+  "hash": "a23f7ee811bfede80e76ead97b319bc4d4972b95bfabfcb25d5dd36519bfa215",
+  "notes": {}
+ },
+ "powerbuilding/deload/90min/model/rated-high-missed/tapped-easier": {
+  "hash": "f606d308953daaa96af0f62d4b3df9069b9f18e6d9140489ba43f95fd25e1385",
+  "notes": {}
+ },
+ "powerbuilding/deload/90min/model/rated-high-missed/tapped-as-expected": {
+  "hash": "3c8c3da0f90a0590ca0ab6b1f28d82d1e90fb003f5b8355fb41e49c819a611df",
+  "notes": {}
+ },
+ "powerbuilding/deload/90min/model/rated-low-met/tapped-harder": {
+  "hash": "aa17cd8101ce02816fa922e1300c0272cf267dab928e1b6a1a26c1f840b6c436",
+  "notes": {}
+ },
+ "powerbuilding/deload/90min/model/rated-low-met/tapped-easier": {
+  "hash": "b3b6215caceabedfa480354ce3966546b961ac1e52a19662a730bc3adc71312b",
+  "notes": {}
+ },
+ "powerbuilding/deload/90min/model/rated-low-met/tapped-as-expected": {
+  "hash": "b6ee147a35ad4c0b6e4a2ff0c636a5f846a86b58367041670154c30ebc988139",
+  "notes": {}
+ },
+ "powerbuilding/deload/90min/model-fails/none/tapped-harder": {
+  "hash": "2bbee19a8d14a335ca211874ca237fd227feca70b79c227fdd9e0173a17e5d61",
+  "notes": {}
+ },
+ "powerbuilding/deload/90min/model-fails/none/tapped-easier": {
+  "hash": "2bbee19a8d14a335ca211874ca237fd227feca70b79c227fdd9e0173a17e5d61",
+  "notes": {}
+ },
+ "powerbuilding/deload/90min/model-fails/none/tapped-as-expected": {
+  "hash": "2bbee19a8d14a335ca211874ca237fd227feca70b79c227fdd9e0173a17e5d61",
+  "notes": {}
+ },
+ "powerbuilding/deload/90min/model-fails/expected/tapped-harder": {
+  "hash": "912cd4fcfdb73faab3c0e7a263de25b1326f9c9cfc90f8d4319099bbef654da7",
+  "notes": {}
+ },
+ "powerbuilding/deload/90min/model-fails/expected/tapped-easier": {
+  "hash": "4a6dff7b8316da93a31e3a08d4f06b711028aed72f3fbb38c3a8a59329499630",
+  "notes": {}
+ },
+ "powerbuilding/deload/90min/model-fails/expected/tapped-as-expected": {
+  "hash": "688af60e4bf9067c3f68db86121e3a1f4e496d9e3eac85fd136b220b80d42412",
+  "notes": {}
+ },
+ "powerbuilding/deload/90min/model-fails/expected-missed/tapped-harder": {
+  "hash": "bb6dfaaf2debd025df892d801829c470700f0947df4c84cf8be9f65ac437f6e0",
+  "notes": {}
+ },
+ "powerbuilding/deload/90min/model-fails/expected-missed/tapped-easier": {
+  "hash": "ff67864374aa15c9acab676397c66eaae2eba9692b96e161a7d482e14c95cbcd",
+  "notes": {}
+ },
+ "powerbuilding/deload/90min/model-fails/expected-missed/tapped-as-expected": {
+  "hash": "06aebc66bbdd8f035e8ec13cda6d4d1af672d76418a96d7d4bcde7ff8e0f07ff",
+  "notes": {}
+ },
+ "powerbuilding/deload/90min/model-fails/expected-down/tapped-harder": {
+  "hash": "ab0140b8db2f155505bf47203bbeb92c982c6628a0e365835c1bae933f1aea9b",
+  "notes": {}
+ },
+ "powerbuilding/deload/90min/model-fails/expected-down/tapped-easier": {
+  "hash": "982e8c83672cb56073fb16676ddd0ad32a28e8b71d969f37d7231e386009b7b0",
+  "notes": {}
+ },
+ "powerbuilding/deload/90min/model-fails/expected-down/tapped-as-expected": {
+  "hash": "07d3d3c226caa82552887be27c6c6d7f40727deefbbb3bc073b4a4727249715c",
+  "notes": {}
+ },
+ "powerbuilding/deload/90min/model-fails/rated-high-missed/tapped-harder": {
+  "hash": "6274e3da38d46ffa54df7510165325b65a496aa22319a5eb61feb9e51c180662",
+  "notes": {}
+ },
+ "powerbuilding/deload/90min/model-fails/rated-high-missed/tapped-easier": {
+  "hash": "9ef3bfecd66f14706ee6467d0d740c833b7a6c5d4cadf644d07134682035c507",
+  "notes": {}
+ },
+ "powerbuilding/deload/90min/model-fails/rated-high-missed/tapped-as-expected": {
+  "hash": "d9a7999c0550717a95b095da9a38740d9e120bcffdbb74137951d0f2b4f5e246",
+  "notes": {}
+ },
+ "powerbuilding/deload/90min/model-fails/rated-low-met/tapped-harder": {
+  "hash": "919881b87939b64dadfcba3a3999ce79b538c591956e6e8898953e9600db86f5",
+  "notes": {}
+ },
+ "powerbuilding/deload/90min/model-fails/rated-low-met/tapped-easier": {
+  "hash": "18d183c164d5d355bdd84daa14be7444e44cfd1611276d524cd87316fb6b74f9",
+  "notes": {}
+ },
+ "powerbuilding/deload/90min/model-fails/rated-low-met/tapped-as-expected": {
+  "hash": "d697ff8900e3bb9ec0b1b8df5c0e4c0d74b1595b38b3fa19c5e0ff768806c126",
+  "notes": {}
+ },
+ "powerbuilding/deload/40min/model/none/tapped-harder": {
+  "hash": "80c4843183027fb34f90ff47640263f4b65025625e4d75be4656ba4d398c1359",
+  "notes": {}
+ },
+ "powerbuilding/deload/40min/model/none/tapped-easier": {
+  "hash": "80c4843183027fb34f90ff47640263f4b65025625e4d75be4656ba4d398c1359",
+  "notes": {}
+ },
+ "powerbuilding/deload/40min/model/none/tapped-as-expected": {
+  "hash": "80c4843183027fb34f90ff47640263f4b65025625e4d75be4656ba4d398c1359",
+  "notes": {}
+ },
+ "powerbuilding/deload/40min/model/expected/tapped-harder": {
+  "hash": "3ce123aafd46488ee53513793bfbefc481a8ca023adf2b89bf9cc86c8882e071",
+  "notes": {}
+ },
+ "powerbuilding/deload/40min/model/expected/tapped-easier": {
+  "hash": "77deae1100e164e9a2fd18ad05d33b84bcb7fae1e3b584de3e6f814f43e48d49",
+  "notes": {}
+ },
+ "powerbuilding/deload/40min/model/expected/tapped-as-expected": {
+  "hash": "5aa109db6e43ffb9fad80b79ef9345b6481d073f4188a5803b48444aedc4ec77",
+  "notes": {}
+ },
+ "powerbuilding/deload/40min/model/expected-missed/tapped-harder": {
+  "hash": "e7932bb7f8bf38047720f33e66444cc0dc80a62fdb01b400d08de461d7678143",
+  "notes": {}
+ },
+ "powerbuilding/deload/40min/model/expected-missed/tapped-easier": {
+  "hash": "f8e2a5afd58373115e1e50c4e0d53945574d2d271fb709c8124e299176769024",
+  "notes": {}
+ },
+ "powerbuilding/deload/40min/model/expected-missed/tapped-as-expected": {
+  "hash": "6f8a11d7c1d5c62a17df2ee96e01f32619212cf9b46a6a5254347970d2e5b174",
+  "notes": {}
+ },
+ "powerbuilding/deload/40min/model/expected-down/tapped-harder": {
+  "hash": "3937f0afc79d37fb0a3034cc3fa9e6157952c30a77bf979b9e333e448472c17e",
+  "notes": {}
+ },
+ "powerbuilding/deload/40min/model/expected-down/tapped-easier": {
+  "hash": "40556e6ffae2a5c0e656ceb62be530e9fcbdea707223152483bd054ed8f7ee69",
+  "notes": {}
+ },
+ "powerbuilding/deload/40min/model/expected-down/tapped-as-expected": {
+  "hash": "67382812402f6e59be3d83acf77a5b62129278a9a0b6aea43387a1af56bb4055",
+  "notes": {}
+ },
+ "powerbuilding/deload/40min/model/rated-high-missed/tapped-harder": {
+  "hash": "408ebcb34aff9378b8a5f7a0f636ddbfc364d6278542ce5116fde8bdee84e7fd",
+  "notes": {}
+ },
+ "powerbuilding/deload/40min/model/rated-high-missed/tapped-easier": {
+  "hash": "29bd9ca50c1862efc3f0f9bdb369fd1a629d550ff25263549de0f65393c447c9",
+  "notes": {}
+ },
+ "powerbuilding/deload/40min/model/rated-high-missed/tapped-as-expected": {
+  "hash": "93d6624eb4269d2c3733fd520ef1115cff6436e3adaacb5c42d3e638b67efb38",
+  "notes": {}
+ },
+ "powerbuilding/deload/40min/model/rated-low-met/tapped-harder": {
+  "hash": "0d37da415b43bbf9c3cab95cc7d07186046d5c1efb2cee79a6fb32f52c30c278",
+  "notes": {}
+ },
+ "powerbuilding/deload/40min/model/rated-low-met/tapped-easier": {
+  "hash": "77a60cd82b5d928cb8486f3d830c40a332e802fde5ca66868dad8033f0a9e371",
+  "notes": {}
+ },
+ "powerbuilding/deload/40min/model/rated-low-met/tapped-as-expected": {
+  "hash": "a42fc135a82fad1f5622eeb26885157a56096bb29f1287628d32aa8c04787daf",
+  "notes": {}
+ },
+ "powerbuilding/deload/40min/model-fails/none/tapped-harder": {
+  "hash": "b18d2bd78bb8e316566f8b380565fc2791450204570d1b39988ffb72e1b53b28",
+  "notes": {}
+ },
+ "powerbuilding/deload/40min/model-fails/none/tapped-easier": {
+  "hash": "b18d2bd78bb8e316566f8b380565fc2791450204570d1b39988ffb72e1b53b28",
+  "notes": {}
+ },
+ "powerbuilding/deload/40min/model-fails/none/tapped-as-expected": {
+  "hash": "b18d2bd78bb8e316566f8b380565fc2791450204570d1b39988ffb72e1b53b28",
+  "notes": {}
+ },
+ "powerbuilding/deload/40min/model-fails/expected/tapped-harder": {
+  "hash": "b75a9fb59431d9608dc4f694670e55fbecfd2f50b96c2688deb2dcc1e1b9162f",
+  "notes": {}
+ },
+ "powerbuilding/deload/40min/model-fails/expected/tapped-easier": {
+  "hash": "9010b34400b83e895edd1f2ea7535b8a00aef728d3df771fd8692f4bd2bc5f26",
+  "notes": {}
+ },
+ "powerbuilding/deload/40min/model-fails/expected/tapped-as-expected": {
+  "hash": "4a6711b717d0af5ee24dd36e74b47aa1f89b02931fb5ddc28a9e97cd45523a28",
+  "notes": {}
+ },
+ "powerbuilding/deload/40min/model-fails/expected-missed/tapped-harder": {
+  "hash": "dcdcbd56a0e06410979c2335839892152da28b21fc5367871fb0e756b7ea9cff",
+  "notes": {}
+ },
+ "powerbuilding/deload/40min/model-fails/expected-missed/tapped-easier": {
+  "hash": "ebf605eb9dd23b361a05434ad78b52266fd7a127499bfdaede7184dd7f868bd8",
+  "notes": {}
+ },
+ "powerbuilding/deload/40min/model-fails/expected-missed/tapped-as-expected": {
+  "hash": "e70573f221477d2d5fdddfa7f49c7696700fd6054c5712c672b7311cfa118bb2",
+  "notes": {}
+ },
+ "powerbuilding/deload/40min/model-fails/expected-down/tapped-harder": {
+  "hash": "18a890bb9ed713473627243c14dca66b0cc2332304da1386b404554cbf40655f",
+  "notes": {}
+ },
+ "powerbuilding/deload/40min/model-fails/expected-down/tapped-easier": {
+  "hash": "cd1aca2cc815c0c488c9098cab9c13130b9e5d9c7b97940a8a4f39d9811425cc",
+  "notes": {}
+ },
+ "powerbuilding/deload/40min/model-fails/expected-down/tapped-as-expected": {
+  "hash": "e14dbd151778f0bb36fd338445ccd9e3ebcbf16ccaba8eca3923bf9860b6f96a",
+  "notes": {}
+ },
+ "powerbuilding/deload/40min/model-fails/rated-high-missed/tapped-harder": {
+  "hash": "1986c0b9fcfeb5715172fcc43139724085001b7561065dbf9b08ae59740d3c72",
+  "notes": {}
+ },
+ "powerbuilding/deload/40min/model-fails/rated-high-missed/tapped-easier": {
+  "hash": "f89aa929cc62463acd5f6b886a4d9b72e63c63f63ef561f7fec4a8e4e75eef57",
+  "notes": {}
+ },
+ "powerbuilding/deload/40min/model-fails/rated-high-missed/tapped-as-expected": {
+  "hash": "c902cfbdaf6733f77f666ff5c52bb41968fd21fb08a85627dc107236462eafc0",
+  "notes": {}
+ },
+ "powerbuilding/deload/40min/model-fails/rated-low-met/tapped-harder": {
+  "hash": "b3e51d7a73b29d60894962721ab1453277d6fd057ce765dac8e02e76031b2930",
+  "notes": {}
+ },
+ "powerbuilding/deload/40min/model-fails/rated-low-met/tapped-easier": {
+  "hash": "776edd6c662122657f11f1ca7a956447fd4f66cc608131ad83de4639e2cee0da",
+  "notes": {}
+ },
+ "powerbuilding/deload/40min/model-fails/rated-low-met/tapped-as-expected": {
+  "hash": "ae7addeaad48c559f07352c1abd6e1f4f09b459e6acf433e9df6104434400bda",
+  "notes": {}
+ }
+}

@@ -65,6 +65,31 @@ export function isStatementTimeout(err: unknown): boolean {
   return false
 }
 
+/**
+ * #4080: a Coach apply that gave up waiting for a lock. 55P03 is `lock_timeout` (the bounded wait in
+ * `lib/coach/lock-wait.ts`), 57014 the pool's `statement_timeout` for a wait that ran past it anyway.
+ * Same cause-chain walk as `isStatementTimeout`.
+ */
+export function isLockWaitTimeout(err: unknown): boolean {
+  for (let e: unknown = err, depth = 0; e && typeof e === 'object' && depth < 5; e = (e as { cause?: unknown }).cause, depth++) {
+    const code = (e as { code?: unknown }).code
+    if (code === '55P03' || code === '57014') return true
+  }
+  return false
+}
+
+/**
+ * #4080: only the bounded lock wait's own timeout (55P03), never the statement timeout. For a Coach
+ * handler that is not wrapped in a transaction, 55P03 means the wait failed before any write, while a
+ * 57014 can land after one.
+ */
+export function isBoundedLockTimeout(err: unknown): boolean {
+  for (let e: unknown = err, depth = 0; e && typeof e === 'object' && depth < 5; e = (e as { cause?: unknown }).cause, depth++) {
+    if ((e as { code?: unknown }).code === '55P03') return true
+  }
+  return false
+}
+
 /** The 409 a rename answers when it timed out waiting for a lock; nothing was changed. */
 export function renameBusyResponse(): NextResponse {
   return NextResponse.json({ error: 'The exercise is busy right now. Nothing was changed; try the rename again in a moment.' }, { status: 409 })

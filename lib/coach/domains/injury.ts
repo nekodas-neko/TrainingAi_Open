@@ -3,6 +3,7 @@ import * as s from '@/lib/data/postgres/schema'
 import { normalizeMuscle } from '@trainingai/shared/muscles'
 import type { Consequence, DomainHandler, Db, PreviewResult } from './types'
 import { driftAgainst } from './types'
+import { withBoundedLockWait } from '../lock-wait'
 
 /**
  * Logging an injury, and nothing else.
@@ -171,38 +172,47 @@ export const injuryHandler = (today: string): DomainHandler => ({
     if (!muscleChange) return { ok: false, reason: 'invalid', detail: 'No body area given' }
     const muscleName = muscleChange.to as string
 
-    const existing = await activeInjury(db, userId, muscleName)
-    if (existing) {
-      // Already logged and unresolved — update rather than stacking a duplicate, which would make
-      // `activeInjuredMusclesInSession` count the same problem twice.
-      await db.update(s.injuries)
-        .set({ ...(severity ? { severity } : {}), ...(notes !== undefined ? { notes } : {}), updatedAt: new Date() })
-        .where(and(eq(s.injuries.id, existing.id), eq(s.injuries.userId, userId)))
+    // #4076: `injuries` has no unique key on the muscle, so "read, then insert if none" had nothing to
+    // stop a double tap stacking two live rows for one muscle. The lock is per user and muscle, taken
+    // before the read and held to the end of this transaction, so the second apply waits and then
+    // finds the first's row and updates it. (Nested in a caller's transaction this is a savepoint and
+    // the lock lasts to the outer commit.)
+    return db.transaction(async tx => {
+      const t = tx as unknown as Db
+      await withBoundedLockWait(t, () => t.execute(sql`SELECT pg_advisory_xact_lock(hashtext('injuries:muscle'), hashtext(${`${userId}:${muscleName}`}))`))
+      const existing = await activeInjury(t, userId, muscleName)
+      if (existing) {
+        // Already logged and unresolved — update rather than stacking a duplicate, which would make
+        // `activeInjuredMusclesInSession` count the same problem twice.
+        await t.update(s.injuries)
+          .set({ ...(severity ? { severity } : {}), ...(notes !== undefined ? { notes } : {}), updatedAt: new Date() })
+          .where(and(eq(s.injuries.id, existing.id), eq(s.injuries.userId, userId)))
+        return {
+          ok: true,
+          summary: `Updated ${muscleName} injury (${severity ?? existing.severity})`,
+          beforeState: { severity: existing.severity, notes: existing.notes, existed: true },
+          targetId: existing.id,
+        }
+      }
+
+      const [created] = await t
+        .insert(s.injuries)
+        .values({
+          userId,
+          muscleName,
+          severity: severity ?? ASSUMED_SEVERITY,
+          notes: notes ?? null,
+          startedDate: today,
+        })
+        .returning({ id: s.injuries.id })
+
       return {
         ok: true,
-        summary: `Updated ${muscleName} injury (${severity ?? existing.severity})`,
-        beforeState: { severity: existing.severity, notes: existing.notes, existed: true },
-        targetId: existing.id,
+        summary: `Logged ${muscleName} injury (${severity ?? ASSUMED_SEVERITY})`,
+        beforeState: { existed: false },
+        targetId: created.id,
       }
-    }
-
-    const [created] = await db
-      .insert(s.injuries)
-      .values({
-        userId,
-        muscleName,
-        severity: severity ?? ASSUMED_SEVERITY,
-        notes: notes ?? null,
-        startedDate: today,
-      })
-      .returning({ id: s.injuries.id })
-
-    return {
-      ok: true,
-      summary: `Logged ${muscleName} injury (${severity ?? ASSUMED_SEVERITY})`,
-      beforeState: { existed: false },
-      targetId: created.id,
-    }
+    })
   },
 
   async undo(db, userId, targetId, before) {
