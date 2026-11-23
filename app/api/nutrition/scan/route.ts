@@ -13,7 +13,7 @@ import { fetchPublicUrl, type SafeFetchFailure } from '@/lib/net/safe-fetch'
 import { z } from 'zod'
 import { PROSE_FIELD_GUARDS } from '@/lib/ai/prompt-guards'
 import { scanImageKind, scanImagePrompt } from '@trainingai/shared/nutrition/scan-prompt'
-import { ModelIngredientSchema } from '@trainingai/shared/nutrition/ingredient-schema'
+import { ScanSchema, type CandidateSchema } from '@trainingai/shared/nutrition/model-output-schemas'
 import { matchConfidence } from '@trainingai/shared/nutrition/food-reference/resolve'
 import { resolveModelIngredients } from '@/lib/nutrition/ingredient-densities'
 import type { NutritionIngredient } from '@trainingai/shared/types/nutrition'
@@ -24,30 +24,6 @@ const REGION_CONTEXT: Record<string, string> = {
   UK: "Assume products from UK supermarkets (Tesco, Sainsbury's, ASDA) where applicable.",
   NZ: 'Assume products from New Zealand supermarkets (Countdown, Pak\'nSave, New World) where applicable.',
 }
-
-// One dish. Previously these fields WERE the schema, so a week of meal-prep containers or a "5
-// lunches" roundup page was flattened into one merged estimate (BF-11b).
-//
-// #3749: no `confidence`. The badge it fed was the model's opinion of itself; it is now decided in
-// code from how many ingredients took their numbers from a saved food or the bundled table.
-const CandidateSchema = z.object({
-  name: z.string(),
-  brand: z.string().nullable(),
-  notes: z.string().nullable(),
-  fiberG: z.number(),
-  sugarG: z.number(),
-  sodiumMg: z.number(),
-  satFatG: z.number(),
-  ingredients: z.array(ModelIngredientSchema),
-})
-
-// The model returns candidates only; the route builds the response's top level from
-// `candidates[0]`. Asking for both would mean the first dish is described twice and could disagree
-// with itself — the top level and the array are produced by one function below for the same reason.
-const ScanSchema = z.object({
-  identified: z.boolean(),
-  candidates: z.array(CandidateSchema),
-})
 
 /** A hallucinated 40-way split must not reach the client. Generous against any real meal-prep photo. */
 const MAX_CANDIDATES = 8

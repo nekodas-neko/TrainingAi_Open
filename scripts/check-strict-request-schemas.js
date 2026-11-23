@@ -106,6 +106,11 @@
 // So the remaining count is a floor, not a debt. **The ratchet stays** — it is the mechanism that
 // keeps a NEW non-strict request schema out, which is what Q-464 was actually for.
 //
+// #4060: the six `generateObject` RESPONSE schemas above moved out of their route files into
+// `packages/shared/src/{workout,nutrition}/model-output-schemas.ts` (outside ROOTS: model output, never
+// a request) so the Gemini schema check can import them; those six routes reached zero and their rows
+// are gone.
+//
 // Reproduce the count: node scripts/check-strict-request-schemas.js --print
 'use strict';
 const fs = require('fs');
@@ -130,22 +135,16 @@ const BASELINE = {
   // #3750: the exercise-and-session RESPONSE shape both program routes ask the model for moved to
   // `packages/shared/src/workout/model-program.ts` (outside ROOTS: it is model output, never a
   // request), so builder-chat and generate-program each drop from 2 to 1.
-  'app/api/builder-chat/route.ts': 1,
   'app/api/coach/route.ts': 1,
-  'app/api/exercises/generate/route.ts': 1,
-  'app/api/generate-program/route.ts': 1,
   'app/api/hr-ingest/route.ts': 1,
   // Q-495 moved this schema out of the route so it could be unit-tested; the exemption moves with
   // it, for the same reason as before — the Tasker payload's exact shape is not in this repo.
   'packages/shared/src/validation/health-connect-ingest.ts': 1,
-  'app/api/nutrition/meal-plans/generate/meal/route.ts': 1,
-  'app/api/nutrition/meal-plans/generate/route.ts': 1,
   // BF-11b split the single-meal fields out into `CandidateSchema` so the route can return one
   // entry per meal. Both here are `generateObject` RESPONSE schemas — the model's output, not a
   // client's input — which is the exemption class this file's header describes. The third, the
   // ingredient, moved to the shared `ModelIngredientSchema` (#3749). The route parses no request schema at all; it reads `body.text`,
   // `body.url` and `body.image` by hand with explicit type and size guards.
-  'app/api/nutrition/scan/route.ts': 2,
   // #2895 review, item 6: Oura's verification GET. Oura is the client and its query is not ours to
   // fix; a parameter it adds later would 400 every subscription's verification, so the schema
   // ignores unknown keys. The constant-time token compare is the check that matters.

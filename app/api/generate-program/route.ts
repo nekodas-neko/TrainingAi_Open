@@ -12,7 +12,8 @@ import type { GeneratedProgram } from '@trainingai/shared/types/builder'
 import { KNOWN_STYLES, GOAL_STYLE_RULES } from '@trainingai/shared/workout/known-styles'
 import { buildEquipmentSet, equipmentEligible } from '@trainingai/shared/workout/equipment'
 import { buildExerciseNameResolver } from '@trainingai/shared/workout/exercise-name-resolver'
-import { cleanModelProgram, ModelSessionSchema } from '@trainingai/shared/workout/model-program'
+import { cleanModelProgram } from '@trainingai/shared/workout/model-program'
+import { GeneratedProgramModelSchema } from '@trainingai/shared/workout/model-output-schemas'
 import { splitForDays } from '@trainingai/shared/workout/program-split'
 import { checkGeneratedProgram } from '@trainingai/shared/workout/program-check'
 import { activeInjuries, activeInjuredMuscles, formatInjuryContext } from '@trainingai/shared/workout/injury-context'
@@ -81,19 +82,6 @@ const GOAL_PHASE_SET_MAP: Record<string, string> = {
   strength:               'Strength Progression',
 }
 
-// The exercise and session shapes are `ModelSessionSchema`, shared with `/api/builder-chat` (#3750).
-// They carry no muscles (RV-76): `cleanModelProgram` writes the library's over anything the model
-// would return, so asking for them bought two string arrays per exercise on the slowest call in
-// the app. The request-side `GeneratedExerciseSchema` in
-// packages/shared/src/validation/generated-program.ts keeps both; the builder client posts them.
-//
-// #3751: the session NAME is not asked for. Code picks the split and the names (`splitForDays`) and
-// lists them in the prompt; the model fills them in order, and the names are written on by index.
-const GeneratedProgramSchema = z.object({
-  name: z.string(),
-  sessions: z.array(ModelSessionSchema.omit({ name: true })),
-  reasoning: z.string(),
-})
 export async function POST(req: Request) {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -334,7 +322,7 @@ ${exerciseList}${injuryBlock}${referenceBlock}`
       { section: 'generate-program', userId, fingerprint: userPrompt },
       (signal, settings) => generateObject({
         ...settings,
-        schema: GeneratedProgramSchema,
+        schema: GeneratedProgramModelSchema,
         system: `${systemPrompt}\n\n${PROSE_FIELD_GUARDS}`,
         prompt: userPrompt,
         abortSignal: signal,

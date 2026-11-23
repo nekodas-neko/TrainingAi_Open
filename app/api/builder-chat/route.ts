@@ -13,7 +13,8 @@ import type { GeneratedProgram, ChatMessage } from '@trainingai/shared/types/bui
 import { KNOWN_STYLES, GOAL_STYLE_RULES } from '@trainingai/shared/workout/known-styles'
 import { buildEquipmentSet, equipmentEligible } from '@trainingai/shared/workout/equipment'
 import { buildExerciseNameResolver } from '@trainingai/shared/workout/exercise-name-resolver'
-import { cleanModelProgram, ModelSessionSchema } from '@trainingai/shared/workout/model-program'
+import { cleanModelProgram } from '@trainingai/shared/workout/model-program'
+import { BuilderChatObjectSchema } from '@trainingai/shared/workout/model-output-schemas'
 import { styleWorkSec, workingBudgetMin, TRANSITION_SEC_BARBELL, TRANSITION_SEC_STANDARD } from '@trainingai/shared/workout/duration-model'
 import { activeInjuredMuscles, formatInjuryContext } from '@trainingai/shared/workout/injury-context'
 import { excludeInjuredExercises } from '@trainingai/shared/workout/injury-substitution'
@@ -41,18 +42,6 @@ const RequestSchema = z.object({
   goal: z.enum(['hypertrophy', 'strength+hypertrophy', 'powerbuilding', 'strength']).optional(),
   timePerSessionMinutes: z.number().int().min(20).max(180).nullable().optional(),
 }).strict()
-
-// The exercise and session shapes are `ModelSessionSchema`, shared with `/api/generate-program`
-// (#3750). They carry no muscles (RV-76): `cleanModelProgram` writes the library's. The request-side
-// `GeneratedExerciseSchema` keeps both: it is `.strict()` and the builder client posts its live
-// program state wholesale, muscles included.
-const BuilderChatObjectSchema = z.object({
-  response: z.string(),
-  program: z.object({
-    name: z.string(),
-    sessions: z.array(ModelSessionSchema),
-  }),
-})
 
 const EQUIPMENT_LABEL: Record<string, string> = {
   barbell: 'Barbell', dumbbell: 'Dumbbells', cable: 'Cables',
