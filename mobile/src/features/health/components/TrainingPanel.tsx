@@ -3,7 +3,6 @@ import { useState, type ReactNode } from 'react';
 import { shiftDateStr, startOfWeekInTz, weekStartForDay } from '@trainingai/shared/date-utils';
 import { plural } from '@trainingai/shared/format/plural';
 import {
-  AppButton,
   AppText,
   Card,
   Icon,
@@ -13,14 +12,12 @@ import {
   ProgressBar,
   Sheet,
   Stack,
-  TouchSurface,
 } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { weeklySpec } from '../../workouts/data/models';
 import { WeeklyTrainingCard } from '../../progress/WeeklyTrainingCard';
 import { ResourceStatus } from '../../workouts/components/ResourceStatus';
-import { SessionGlyph } from '../../workouts/components/SessionGlyph';
 import { useHealthData } from '../data/HealthDataProvider';
 import {
   activityHistorySpec,
