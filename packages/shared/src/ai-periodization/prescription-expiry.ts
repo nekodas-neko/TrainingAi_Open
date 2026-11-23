@@ -17,6 +17,11 @@ export const PRESCRIPTION_TTL_MS = 7 * 86_400_000
 export interface ExpiryContext {
   /** The emergency deload fired on the lifter's own sick report (`EmergencyTrigger.kind === 'illness'`). */
   illnessTriggered?: boolean
+  /** #3900 review (F): the plan is for an `ai_dynamic` program, where a deload the engine prescribes is
+   *  stored applied. There every one-day deload answers today, whatever triggered it: kept for the
+   *  week, an applied one would be held (`holdsOneDayDeload`) at deload loads for days after its
+   *  trigger had cleared. The other program kinds keep the rule above unchanged. */
+  aiPlan?: boolean
 }
 
 /**
@@ -40,7 +45,7 @@ export function isOneDayPrescription(
 ): boolean {
   if (prescription.phaseAction === 'rest_day_recommended') return true
   if (prescription.phaseAction === 'session_swap_recommended') return true
-  return prescription.phaseAction === 'deload_recommended' && ctx.illnessTriggered === true
+  return prescription.phaseAction === 'deload_recommended' && (ctx.illnessTriggered === true || ctx.aiPlan === true)
 }
 
 /**

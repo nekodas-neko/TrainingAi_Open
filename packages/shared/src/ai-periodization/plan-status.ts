@@ -77,3 +77,18 @@ export function aiPlanCardState(
       : null,
   }
 }
+
+/**
+ * #3900 review (C, D): how far back a session that is not finished, with a set logged, still counts as
+ * under way. Not "today": a workout started at 23:50 and logged at 00:05 is the same workout, and
+ * the local date must not decide whether it is re-planned or its plan voided under it. 36 hours is
+ * longer than any workout and short enough that a session left open and never finished stops
+ * holding its plan by the second day.
+ */
+export const SESSION_UNDER_WAY_WINDOW_MS = 36 * 60 * 60 * 1000
+
+/** The slot holds a plan the session being trained runs on (C, D): kept while it is under way. */
+export function slotHoldsPlan(state: { prescription: unknown; prescriptionStatus: PrescriptionStatus | null }): boolean {
+  return state.prescription != null
+    && (state.prescriptionStatus === 'pending' || state.prescriptionStatus === 'auto_applied' || state.prescriptionStatus === 'accepted')
+}

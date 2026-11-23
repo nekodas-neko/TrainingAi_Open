@@ -5,6 +5,7 @@ import * as s from '../schema'
 import { shiftDateStr, dateStrMidnightInTz } from '@trainingai/shared/date-utils'
 import { normalizeMuscle } from '@trainingai/shared/muscles'
 import { holdsOneDayDeload } from '@trainingai/shared/ai-periodization/one-day-deload'
+import { SESSION_UNDER_WAY_WINDOW_MS, slotHoldsPlan } from '@trainingai/shared/ai-periodization/plan-status'
 import { oneRmImplausible, MAX_PLAUSIBLE_ONE_RM_KG } from '@trainingai/shared/validation/plausibility'
 import {
   joiningPhaseFor, programMoveMark,
@@ -113,6 +114,42 @@ async function lockProgramRows(tx: Tx, userId: string, programId: string): Promi
     .orderBy(asc(s.sessionPeriodization.id))
     .for('update', { of: s.sessionPeriodization })
   return rows.map(r => mapPeriodization(r.sp))
+}
+
+/**
+ * #3900 review (C): the session types with a workout under way: started since `since`, not finished,
+ * not deleted, with at least one logged set. Not filtered on the local date, so a workout that crosses
+ * midnight is still under way after it.
+ */
+export async function listUnfinishedLoggedSessions(db: Db | Tx, userId: string, since: Date): Promise<string[]> {
+  const rows = await db.execute(sql`
+    SELECT DISTINCT ws.session_id AS program_session_id
+    FROM workout_sessions ws
+    WHERE ws.user_id = ${userId}
+      AND ws.session_id IS NOT NULL
+      AND ws.deleted_at IS NULL
+      AND ws.completed_at IS NULL
+      AND ws.started_at >= ${since.toISOString()}::timestamptz
+      AND EXISTS (SELECT 1 FROM exercise_logs el WHERE el.workout_session_id = ws.id AND el.deleted_at IS NULL)
+  `)
+  return (rows.rows as Array<{ program_session_id: string }>).map(r => r.program_session_id)
+}
+
+/**
+ * #3900 review (D): on the AI plan a program move must not void the plan of a session that is being
+ * trained. Its plan is applied by itself, and the slot voided under it left the bar on the base
+ * numbers and the next read re-planning it mid-session. The rows of such sessions are returned so the
+ * move spares their plan, as it spares a held one-day deload; the session's next plan, after it is
+ * finished, is made in the new phase. Other program kinds void as before.
+ */
+async function underWaySlots(tx: Tx, userId: string, programId: string, rows: SessionPeriodization[]): Promise<Set<string>> {
+  const [program] = await tx.select({ phaseMode: s.programs.phaseMode }).from(s.programs)
+    .where(and(eq(s.programs.id, programId), eq(s.programs.userId, userId)))
+  if (program?.phaseMode !== 'ai_dynamic') return new Set()
+  const withPlan = rows.filter(slotHoldsPlan)
+  if (withPlan.length === 0) return new Set()
+  const underWay = new Set(await listUnfinishedLoggedSessions(tx, userId, new Date(Date.now() - SESSION_UNDER_WAY_WINDOW_MS)))
+  return new Set(withPlan.filter(r => underWay.has(r.programSessionId)).map(r => r.id))
 }
 
 /** `phase_started_at` equals a JS Date, at the Date's millisecond precision. A start written by SQL
@@ -285,7 +322,8 @@ export async function recordBaselineAnchors(
  * Move the WHOLE program's phase (#3766): every session type whose baseline is done gets the same
  * phase and the same start, in one transaction, and loses its stored plan so the next open plans it
  * in the new phase. Two plans survive: `voidAll` (none by default) and any slot holding an
- * unexpired one-day deload (#3799), which belongs to that day, not to the phase. Every row gets the
+ * unexpired one-day deload (#3799), which belongs to that day, not to the phase, and on the AI plan
+ * the plan of a session under way (`underWaySlots`, #3900 review D). Every row gets the
  * program's mark (`programMoveMark`), with the scheduled short block when one is given.
  *
  * The rows are read and written under one lock. With `expect`, nothing is written unless the program
@@ -317,7 +355,8 @@ export async function setProgramPhase(
       if (off > 0) return false
     }
     const voidAll = new Set(opts.voidAll ?? [])
-    const toVoid = phased.filter(r => voidAll.has(r.programSessionId) || !holdsOneDayDeload(r)).map(r => r.id)
+    const spared = await underWaySlots(tx, userId, programId, phased)
+    const toVoid = phased.filter(r => voidAll.has(r.programSessionId) || (!holdsOneDayDeload(r) && !spared.has(r.id))).map(r => r.id)
     const now = new Date()
     await tx.update(s.sessionPeriodization)
       .set({
@@ -364,7 +403,8 @@ export async function realignProgramPhase(db: Db, userId: string, programId: str
       await tx.update(s.sessionPeriodization)
         .set({ phase: target.phase, phaseStartedAt: target.phaseStartedAt, sessionsInPhase: 0, pendingTransition: pending, updatedAt: now })
         .where(and(eq(s.sessionPeriodization.userId, userId), inArray(s.sessionPeriodization.id, behind.map(r => r.id))))
-      const toVoid = behind.filter(r => !holdsOneDayDeload(r)).map(r => r.id)
+      const spared = await underWaySlots(tx, userId, programId, behind)
+      const toVoid = behind.filter(r => !holdsOneDayDeload(r) && !spared.has(r.id)).map(r => r.id)
       if (toVoid.length > 0) await voidPlans(tx, userId, toVoid, now)
     }
     await tx.update(s.sessionPeriodization)
@@ -607,6 +647,28 @@ export async function voidSessionPrescription(db: Db, userId: string, programSes
       eq(s.sessionPeriodization.userId, userId),
       eq(s.sessionPeriodization.programSessionId, programSessionId),
     ))
+}
+
+/**
+ * #3900 review (H): a plan stored `pending` before #3900, brought under the AI plan's rule where it is
+ * served: its status (and, for a one-day deload, its expiry) only, the plan itself untouched. Written
+ * only while the slot still holds that same pending plan (status and generation time, at millisecond
+ * precision), so a plan stored or answered meanwhile is never overwritten. True when it wrote.
+ */
+export async function adoptPendingPrescription(
+  db: Db, userId: string, programSessionId: string, generatedAt: Date, status: PrescriptionStatus, expiresAt: Date,
+): Promise<boolean> {
+  const rows = await db
+    .update(s.sessionPeriodization)
+    .set({ prescriptionStatus: status, prescriptionExpiresAt: expiresAt, updatedAt: new Date() })
+    .where(and(
+      eq(s.sessionPeriodization.userId, userId),
+      eq(s.sessionPeriodization.programSessionId, programSessionId),
+      eq(s.sessionPeriodization.prescriptionStatus, 'pending'),
+      sql`date_trunc('milliseconds', ${s.sessionPeriodization.prescriptionGeneratedAt}) = ${generatedAt.toISOString()}::timestamptz`,
+    ))
+    .returning({ id: s.sessionPeriodization.id })
+  return rows.length > 0
 }
 
 export async function updatePrescriptionStatus(db: Db, userId: string, programSessionId: string, status: PrescriptionStatus): Promise<void> {

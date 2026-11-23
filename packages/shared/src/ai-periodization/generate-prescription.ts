@@ -12,7 +12,7 @@ import { prescriptionExpiresAt } from '@trainingai/shared/ai-periodization/presc
  */
 const RULES_PRESCRIPTION_TTL_MS = 6 * 60 * 60 * 1000
 import { aggregateSignals } from '@trainingai/shared/ai-periodization/signals'
-import { buildSystemPrompt, buildUserPrompt, intensityZoneForRole } from '@trainingai/shared/ai-periodization/prompt'
+import { buildSystemPrompt, buildUserPrompt, intensityZoneForRole, phaseRestBounds } from '@trainingai/shared/ai-periodization/prompt'
 import { settleAccessory } from '@trainingai/shared/ai-periodization/goal-ranges'
 import { pctForExpectedRpe } from '@trainingai/shared/ai-periodization/expected-rpe'
 import {
@@ -34,7 +34,7 @@ import { holdsOneDayDeload } from '@trainingai/shared/ai-periodization/one-day-d
 import { computePerExerciseDeload } from '@trainingai/shared/ai-periodization/per-exercise-deload'
 import { buildTransitionRationale } from '@trainingai/shared/ai-periodization/transition-rationale'
 import { syncProgramPhase, applyProgramPhaseCap, programMoveTarget, collectVotes, programDeloadFinished, guardMoveTarget, NEXT_PROGRAM_PHASE } from '@trainingai/shared/ai-periodization/program-phase'
-import { aiPlanStatus, isAiPlanProgram } from '@trainingai/shared/ai-periodization/plan-status'
+import { aiPlanStatus, isAiPlanProgram, SESSION_UNDER_WAY_WINDOW_MS } from '@trainingai/shared/ai-periodization/plan-status'
 import { DELOAD_LOWER_PCT, DELOAD_REPS, DELOAD_SETS, DELOAD_REST } from '@trainingai/shared/ai-periodization/deload-constants'
 import { generateObject } from 'ai'
 import { loggedGenerateObject } from '@/lib/ai/instrument'
@@ -412,12 +412,12 @@ async function runPrescriptionGeneration(
   // `automatic` and `manual` programs are decided exactly as before.
   const aiPlan = isAiPlanProgram(activeProgram)
 
-  // #3900 / #3907: a session of this type already under way today (a set logged, not finished) is not
+  // #3900 / #3907: a session of this type already under way (a set logged, not finished) is not
   // re-planned: its type was fixed at Start and by its first log, and the plan it is training stays the
   // plan. Nothing here moves a phase, ends a deload or stores a plan. Only the AI plan, where a plan made
   // now would apply by itself; the other kinds re-plan as before.
   if (aiPlan) {
-    const underWay = await sessionUnderWay(repo, userId, programSessionId, today, tz, state)
+    const underWay = await sessionUnderWay(repo, userId, programSessionId, state)
     if (underWay) return underWay
   }
 
@@ -575,7 +575,8 @@ async function runPrescriptionGeneration(
     // #3700: a deload fired by the lifter's own sick report answers today only, so it ends at the
     // next local midnight and the next open asks again. The other triggers describe the block and
     // keep the week.
-    const expiresAt = prescriptionExpiresAt(prescription, tz, startedAt, { illnessTriggered: trigger?.kind === 'illness' })
+    // #3900 review (F): on the AI plan every one-day deload ends at local midnight, whatever fired it.
+    const expiresAt = prescriptionExpiresAt(prescription, tz, startedAt, { illnessTriggered: trigger?.kind === 'illness', aiPlan })
     // #3900: on the AI plan it is the day's plan without a tap (`AI_PRESCRIBED_DELOAD_APPLIES`).
     const status = aiPlan ? aiPlanStatus({ phaseAction: prescription.phaseAction, movesPhase: false }) : 'pending'
     if (await storePrescription(prescription, expiresAt, status, generatedFor) === false) return PHASE_MOVED
@@ -794,15 +795,23 @@ async function runPrescriptionGeneration(
   // row is first put inside the new phase's zone, load, reps and sets: the numbers the prompt tells the
   // model to use in that phase. A row the per-exercise deload cut keeps its deload numbers, and an
   // accessory keeps the goal's own band, as on every plan. Every rule after the model then runs on it.
-  if (forcedMove != null) {
+  //
+  // #3900 review (B): on the AI plan every plan is stored applied, so the zone's reps, sets and rest
+  // bound every compound row the model wrote, on a stay and an earned move too, not only on a forced
+  // move. The load is already clamped below (`clampPrescribedPct`); a forced move also puts it inside
+  // the new zone. An answer already inside the zone is left exactly as it was.
+  // A forced move INTO the planned deload week is built from the engine's own deload (review G, below).
+  if (aiPlan) {
     const roleOf = new Map(signals.exercises.map(e => [e.sessionExerciseId, e.role]))
-    const intoZone = <T extends { sets: number; reps: number; pct: number }>(row: T, role: string): T => {
-      const zone = intensityZoneForRole(signals.trainingGoal, forcedMove, role)
+    const rest = phaseRestBounds(loadPhase)
+    type Numbers = { sets: number; reps: number; pct: number; restSec: number }
+    const intoZone = (row: Numbers, role: string): Numbers => {
+      const zone = intensityZoneForRole(signals.trainingGoal, loadPhase, role)
       return {
-        ...row,
-        pct: Math.min(zone.pctMax, Math.max(zone.pctMin, row.pct)),
+        pct: forcedMove != null ? Math.min(zone.pctMax, Math.max(zone.pctMin, row.pct)) : row.pct,
         reps: Math.min(zone.repMax, Math.max(zone.repMin, row.reps)),
         sets: Math.min(zone.setsMax, Math.max(zone.setsMin, row.sets)),
+        restSec: Math.min(rest.restSecMax, Math.max(rest.restSecMin, row.restSec)),
       }
     }
     for (const ex of parsed.exercises) {
@@ -811,10 +820,11 @@ async function runPrescriptionGeneration(
       if (deloadedIds.has(ex.session_exercise_id)) {
         // What Full puts back on a row the soreness deload cut: the new phase's numbers too.
         const full = preDeloadById.get(ex.session_exercise_id)
-        if (full) preDeloadById.set(ex.session_exercise_id, intoZone(full, role))
+        if (full && forcedMove != null) preDeloadById.set(ex.session_exercise_id, { ...full, ...intoZone(full, role) })
         continue
       }
-      Object.assign(ex, intoZone(ex, role))
+      const bounded = intoZone({ sets: ex.sets, reps: ex.reps, pct: ex.pct, restSec: ex.rest_sec }, role)
+      Object.assign(ex, { sets: bounded.sets, reps: bounded.reps, pct: bounded.pct, rest_sec: bounded.restSec })
     }
   }
 
@@ -823,7 +833,9 @@ async function runPrescriptionGeneration(
   // per-exercise deload cut. The reps are clamped into the range before autoregulation, which then
   // judges the lift against the range rather than the goal's band, so it cannot climb back out of it.
   const preferencesApply = preferenceAppliesIn({
-    deload: isDeloadPlan(state.phase, parsed.phase_action) || loadPhase === 'deload',
+    // #3900 review (A): a move a guard forces out of a deload is planned in the phase it moves to, so the
+    // lifter's preferences and the check-in's hold apply there as in any plan of that phase.
+    deload: isDeloadPlan(forcedMove ?? state.phase, parsed.phase_action) || loadPhase === 'deload',
     baseline: state.phase === 'baseline',
   })
   const signalById = new Map(signals.exercises.map(e => [e.sessionExerciseId, e]))
@@ -1022,7 +1034,25 @@ async function runPrescriptionGeneration(
   const weeklyVolumeContribution = budget.weeklyVolumeContribution
   parsed.reasoning = reasoningWithBudgetNote(refitBaseline.reasoning, budget.budgetNote)
 
-  const aiPrescription: AiPrescription = {
+  // #3900 review (G): a forced move INTO the planned deload week is that week's plan as the engine
+  // builds it (`buildWholeSessionDeloadPrescription`: `DELOAD_*` numbers on every row, fitted by trimming
+  // only, with the program's own numbers as what Full restores), the same plan the rules path serves in
+  // a deload phase (#2402). The deload zone's numbers were a second source for one thing (3×6 @ 55 %
+  // against the engine's 2×6 @ 50 % on strength). The guards below then write the move on it as on any
+  // plan; the phase and action are the model's settled ones so they can.
+  const engineDeload = forcedMove === 'deload'
+    ? buildWholeSessionDeloadPrescription(signals, parsed.reasoning)
+    : null
+  const aiPrescription: AiPrescription = engineDeload ? {
+    ...engineDeload,
+    phase: parsed.phase as PeriodizationPhase,
+    phaseAction: parsed.phase_action,
+    confidence: signals.confidence,
+    confidenceReasons: signals.confidenceReasons,
+    durationPreset: durationPreset ?? 'standard',
+    sessionTimeBudgetMinutes: validSession.timeBudgetMinutes,
+    ...(checkinFitMin != null && { checkinBudgetMin: checkinFitMin }),
+  } : {
     phase: parsed.phase as PeriodizationPhase,
     phaseAction: parsed.phase_action,
     exercises: parsed.exercises.map(ex => ({
@@ -1143,7 +1173,8 @@ async function runPrescriptionGeneration(
 
   // #3700: a rest-day recommendation is sized on today's readiness and ends at the next local
   // midnight; a plan sized on the block keeps its week.
-  const expiresAt = prescriptionExpiresAt(prescription, tz, startedAt)
+  // #3900 review (F): on the AI plan the model's own one-day deload ends at local midnight too.
+  const expiresAt = prescriptionExpiresAt(prescription, tz, startedAt, { aiPlan })
   // Content and status in ONE write. Previously this stored the prescription (which resets the
   // status to 'pending') and then set 'auto_applied' in a second statement; two concurrent
   // generations for this session could interleave between them and leave the status describing the
@@ -1158,7 +1189,8 @@ async function runPrescriptionGeneration(
     modelPhase, modelPhaseAction, final: prescription, rules: buildRulesPrescription(signals, ''), modelExercises,
   })))().catch(err => console.error('[prescribe] shadow record failed (ignored):', err))
 
-  return { ok: true, prescription, prescriptionStatus, estimatedSessionDurationMin }
+  // The stored plan's own estimate (a forced move into deload is costed by the engine's deload, review G).
+  return { ok: true, prescription, prescriptionStatus, estimatedSessionDurationMin: prescription.estimatedSessionDurationMin }
 }
 
 /** #3766: while the program waits for its switch-over, a move on offer is this type's alone (the
@@ -1198,31 +1230,34 @@ function joinNotes(...notes: Array<string | undefined>): string | undefined {
 }
 
 /**
- * #3900 / #3907: the answer for a session of this type already under way today (a set logged, not yet
+ * #3900 / #3907: the answer for a session of this type already under way (a set logged, not yet
  * finished), or null when there is none. Its plan stays the plan: a pending, applied or accepted one is
  * returned as stored; one the lifter turned down is not replaced mid-session by a plan that would
  * apply by itself. A slot with no plan in it (`none`, or `consumed` by a Coach change or an edit the
  * lifter made) is planned as before. A failed read is taken as under way when a plan is in the slot,
  * so a database hiccup never re-plans a session that is being trained.
+ *
+ * #3900 review (C): under way is any unfinished session of this type with a set logged that started in
+ * the last `SESSION_UNDER_WAY_WINDOW_MS`, whatever its local date. It read today's sessions, so a
+ * workout started at 23:50 and logged at 00:05 was re-planned after midnight, and the program could
+ * move under it at the cap.
  */
 async function sessionUnderWay(
   repo: WorkoutRepository,
   userId: string,
   programSessionId: string,
-  today: string,
-  tz: string,
   state: Awaited<ReturnType<WorkoutRepository['ensureSessionPeriodization']>>,
 ): Promise<GeneratePrescriptionResult | null> {
   const status = state.prescriptionStatus
   const held = state.prescription
   if (held == null || status === 'none' || status === 'consumed') return null
-  if (typeof repo.getDaySessionSummaries !== 'function') return null
+  if (typeof repo.listUnfinishedLoggedSessions !== 'function') return null
   let underWay: boolean
   try {
-    const sessions = await repo.getDaySessionSummaries(userId, today.replace(/-/g, '/'), tz)
-    underWay = sessions.some(s => s.sessionId === programSessionId && s.completedAt == null)
+    const ids = await repo.listUnfinishedLoggedSessions(userId, new Date(Date.now() - SESSION_UNDER_WAY_WINDOW_MS))
+    underWay = (ids ?? []).includes(programSessionId)
   } catch (err) {
-    console.error('[prescribe] reading today\'s sessions failed; keeping the stored plan:', err)
+    console.error('[prescribe] reading the sessions under way failed; keeping the stored plan:', err)
     underWay = true
   }
   if (!underWay) return null

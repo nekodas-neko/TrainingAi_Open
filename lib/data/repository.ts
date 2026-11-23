@@ -1476,6 +1476,12 @@ export interface WorkoutRepository {
   recordPrescriptionShadow(userId: string, programSessionId: string, shadow: import('@trainingai/shared/ai-periodization/prescription-shadow').PrescriptionShadow): Promise<void>
   clearProgramPrescriptions(userId: string, programId: string): Promise<void>
   updatePrescriptionStatus(userId: string, programSessionId: string, status: PrescriptionStatus): Promise<void>
+  /** #3900 review (C): the session types with a workout under way (started since `since`, not finished,
+   *  a set logged), whatever its local date. Optional: without it generation treats none as under way. */
+  listUnfinishedLoggedSessions?(userId: string, since: Date): Promise<string[]>
+  /** #3900 review (H): bring a plan stored `pending` before #3900 under the AI plan's rule, only while it
+   *  is still that plan (`pending`, generated at `generatedAt`). True when it wrote. */
+  adoptPendingPrescription?(userId: string, programSessionId: string, generatedAt: Date, status: PrescriptionStatus, expiresAt: Date): Promise<boolean>
   /** #3766: void one session's stored plan so the next open regenerates it. */
   voidSessionPrescription(userId: string, programSessionId: string): Promise<void>
   updatePrescriptionExercisesCache(userId: string, programSessionId: string, prescription: AiPrescription): Promise<void>

@@ -29,6 +29,7 @@ import { rateLimit } from "@/lib/rate-limit";
 import { estimateProgramSessionMin } from "@trainingai/shared/workout/program-session-duration";
 import { generatePrescriptionForSession } from "@trainingai/shared/ai-periodization/generate-prescription";
 import { fitStoredPlanToCheckinBudget } from "@trainingai/shared/ai-periodization/checkin-plan-budget";
+import { adoptPendingAiPlan } from "@trainingai/shared/ai-periodization/pending-plan-adoption";
 import { regeneratePrescriptionInBackground as regeneratePrescriptionSingleFlight } from "@trainingai/shared/ai-periodization/regenerate-in-background";
 import { loadLiftPreferences } from "@trainingai/shared/ai-periodization/lift-preference-read";
 import { readSessionFromStoredState } from "@trainingai/shared/workout/read-session";
@@ -284,6 +285,10 @@ async function handleWorkoutData(req: NextRequest) {
           .then(() => repo.getSessionPeriodization(userId, programSession.id))
           // #3890: in the applies-to week, the weekly check-in's shorter session (no model call).
           .then(state => state && fitStoredPlanToCheckinBudget(userId, programSession.id, repo, tz, state))
+          // #3900 review (H): a plan left `pending` from before the AI plan applied every plan by itself.
+          .then(state => state && adoptPendingAiPlan(userId, programSession.id, repo, tz, program, state, {
+            onRegenerate: () => regeneratePrescriptionInBackground(userId, programSession.id, repo, tz),
+          }))
       : Promise.resolve(null),
     repo.listPersonalRecords(userId),
     repo.getExerciseEstimates(userId).catch(() => []),

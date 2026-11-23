@@ -23,6 +23,7 @@ import { shouldTriggerEmergencyDeload } from '../emergency-deload'
 import { reevaluatePrescriptionForToday } from '../reevaluate'
 import { prescriptionDrivesLoad } from '../apply-prescription'
 import { rowUnderFull } from '../prescription-figures'
+import { pendingPlanAdoption, adoptPendingAiPlan } from '../pending-plan-adoption'
 
 const mocks = vi.hoisted(() => ({
   signals: null as unknown, answer: null as unknown, fail: false, calls: 0, prompts: [] as string[],
@@ -43,7 +44,7 @@ vi.mock('ai', async importOriginal => ({
 vi.mock('@/lib/ai/instrument', () => ({
   loggedGenerateObject: async (_meta: unknown, run: (s: undefined, settings: object) => Promise<unknown>) => run(undefined, {}),
 }))
-const { generatePrescriptionForSession } = await import('../generate-prescription')
+const { generatePrescriptionForSession, buildWholeSessionDeloadPrescription } = await import('../generate-prescription')
 
 const BRISBANE = 'Australia/Brisbane'
 const DAY = 86_400_000
@@ -101,7 +102,7 @@ let users = 0
  */
 function program(opts: {
   kind?: Kind; tz?: string; now: Date; phase?: PeriodizationPhase; weeksDone: number
-  voters?: boolean; waiting?: boolean; underWay?: boolean | 'throws'; checkinBudgetMin?: number | null
+  voters?: boolean; waiting?: boolean; underWay?: boolean | 'throws' | { startedAt: Date }; checkinBudgetMin?: number | null
   stored?: { prescription: AiPrescription; status: PrescriptionStatus; expiresAt?: Date }
 }) {
   const tz = opts.tz ?? BRISBANE
@@ -158,9 +159,20 @@ function program(opts: {
     realignProgramPhase: async () => undefined,
     voidSessionPrescription: async () => undefined,
     recordPrescriptionShadow: async () => undefined,
-    getDaySessionSummaries: async () => {
+    // main's read (before review C): today's sessions only, by local date, as the adapter filters them.
+    getDaySessionSummaries: async (_u: string, date: string, tz: string) => {
       if (opts.underWay === 'throws') throw new Error('read failed')
-      return opts.underWay ? [{ sessionId: 'push', sessionName: 'Push', startedAt: new Date(opts.now.getTime() - 1_800_000) }] : []
+      if (!opts.underWay) return []
+      const startedAt = opts.underWay === true ? new Date(opts.now.getTime() - 1_800_000) : opts.underWay.startedAt
+      const local = new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(startedAt).replace(/-/g, '/')
+      return local === date ? [{ sessionId: 'push', sessionName: 'Push', startedAt }] : []
+    },
+    // The adapter's query: unfinished sessions with a set logged, started since `since`, any local date.
+    listUnfinishedLoggedSessions: async (_u: string, since: Date) => {
+      if (opts.underWay === 'throws') throw new Error('read failed')
+      if (!opts.underWay) return []
+      const startedAt = opts.underWay === true ? new Date(opts.now.getTime() - 1_800_000) : opts.underWay.startedAt
+      return startedAt >= since ? ['push'] : []
     },
     // The adapter's compare-and-set: the move lands only on rows still on the expected phase and start.
     advanceProgramPhase: async (_u: string, id: string, newPhase: PeriodizationPhase, expected?: { phase: string; phaseStartedAt: Date }) => {
@@ -313,8 +325,10 @@ describe('a move forced by the window cap applies with its loads in the new phas
       // Not merely inside the clamp's floor: the primary is in the new phase's own zone, load and reps.
       expect(inZone('strength', to, r.prescription.exercises.find(e => e.sessionExerciseId === 'p')!)).toBe(true)
       expect(inClamp('strength', to, r.prescription.exercises.find(e => e.sessionExerciseId === 's')!, 'secondary')).toBe(true)
-      // The loads are recorded as the new phase's, so a re-fit caps against it (#3713).
-      expect(r.prescription.refitBaseline?.phase).toBe(to)
+      // The loads are recorded as the new phase's, so a re-fit caps against it (#3713). A move into the
+      // planned deload week is the engine's own deload (review G), which a re-fit serves as stored.
+      if (to === 'deload') expect(r.prescription.refitBaseline).toBeUndefined()
+      else expect(r.prescription.refitBaseline?.phase).toBe(to)
       // The same rationale an earned move gets (there is none written for the planned deload week).
       if (to !== 'deload') expect(r.prescription.transitionRationale).toBeTruthy()
       // A move into the planned deload week is a deload plan, from the phase (#3877).
@@ -554,12 +568,17 @@ describe('a deload the engine prescribes is the day\'s plan, with Full as the ov
 
 describe('a rest-day or swap suggestion never gates anything', () => {
   for (const action of ['rest_day_recommended', 'session_swap_recommended'] as const) {
-    it(`${action} is applied, keeps its action as data for the card's note, and drives the bar`, async () => {
+    it(`${action} is applied, keeps its action as data for the card's note, and leaves the bar alone`, async () => {
       mocks.answer = answer('accumulation', action)
       const r = ok(await program({ kind: 'ai_dynamic', now: NOW, weeksDone: 2 }).run())
       expect(r.prescriptionStatus).toBe('auto_applied')
       expect(r.prescription.phaseAction).toBe(action)
-      expect(prescriptionDrivesLoad(action, r.prescriptionStatus)).toBe(true)
+      // Review E: a suggestion is a note until tapped. The bar serves what main serves for a pending
+      // one (the program's base numbers), not the model's sick-day rows.
+      expect(prescriptionDrivesLoad(action, r.prescriptionStatus)).toBe(false)
+      expect(prescriptionDrivesLoad(action, 'auto_applied')).toBe(prescriptionDrivesLoad(action, 'pending'))
+      // Tapped (accepted), it drives the bar as it always did.
+      expect(prescriptionDrivesLoad(action, 'accepted')).toBe(true)
       expect(aiPlanCardState(r.prescription, r.prescriptionStatus).suggestion).toBe(action === 'rest_day_recommended' ? 'rest_day' : 'session_swap')
       expect(aiPlanCardState(r.prescription, r.prescriptionStatus).applied).toBe(true)
     })
@@ -653,5 +672,216 @@ describe('guardMoveTarget is the guards\' own move, worked out before the clamps
     expect(guardMoveTarget(view({ trainingWeeksDone: 6 }), null, 'accumulation', 'transition_recommended')).toBeNull()
     expect(guardMoveTarget(view({ aligned: false, phase: null, trainingWeeksDone: 9 }), null, 'accumulation', 'stay')).toBeNull()
     expect(guardMoveTarget(view({ trainingWeeksDone: 6 }), null, 'baseline', 'stay')).toBeNull()
+  })
+})
+
+// ── After review ─────────────────────────────────────────────────────────────────────────────────
+// Each block below failed on the PR's first head (747f137f) and passes after the fix it names.
+
+describe('review A: a move forced out of a deload is planned with the lifter\'s preferences and the check-in hold', () => {
+  it('strength, the vote moves the program out of deload: the rep range, the rest and the hold all apply', async () => {
+    mocks.signals = signals({
+      phase: 'deload',
+      exercises: [
+        exercise('p', 'primary', 'quadriceps', { liftPreference: { preference: { repRange: null, restSec: null, oneShot: null, checkinHold: { weekStart: '2026-11-23', barKg: 60 } }, basisKg: 100 } } as Partial<Ex>),
+        exercise('s', 'secondary', 'back', { liftPreference: { preference: { repRange: { min: 8, max: 10 }, restSec: 100, oneShot: null }, basisKg: 90 } } as Partial<Ex>),
+        exercise('a', 'accessory', 'biceps'),
+      ],
+    })
+    mocks.answer = answer('deload', 'stay', 55, 6)
+    const h = program({ kind: 'ai_dynamic', now: NOW, phase: 'deload', weeksDone: 0, voters: true })
+    const r = ok(await h.run())
+    expect(r.prescription.phase).toBe('accumulation')
+    expect(r.prescriptionStatus).toBe('auto_applied')
+    expect(h.log.moves).toEqual([['deload', 'accumulation']])
+    const p = r.prescription.exercises.find(e => e.sessionExerciseId === 'p')!
+    const sec = r.prescription.exercises.find(e => e.sessionExerciseId === 's')!
+    // The hold: no heavier than the 60 kg bar of a 100 kg 1RM.
+    expect(r.prescription.checkinHold).toBeTruthy()
+    expect(p.pct).toBeLessThanOrEqual(60)
+    // The rep range and the preferred rest.
+    expect(sec.reps).toBeGreaterThanOrEqual(8)
+    expect(sec.reps).toBeLessThanOrEqual(10)
+    expect(sec.liftPreference).toBeTruthy()
+    expect(r.prescription.deload).toBe(false)
+  })
+})
+
+describe('review B: every AI-plan compound row is bounded by its phase zone, not only a forced move\'s', () => {
+  const extreme = (phase: string, action: string) => ({
+    phase, phase_action: action, deload: false, confidence: 0.95, reasoning: 'Model says.',
+    exercises: [
+      { session_exercise_id: 'p', name: 'Lift p', sets: 10, reps: 30, pct: 72, rest_sec: 600 },
+      { session_exercise_id: 's', name: 'Lift s', sets: 10, reps: 30, pct: 68, rest_sec: 600 },
+      { session_exercise_id: 'a', name: 'Lift a', sets: 3, reps: 12, pct: 60, rest_sec: 90 },
+    ],
+  })
+  for (const [label, phase, action, opts] of [
+    ['a stay', 'accumulation', 'stay', {}],
+    ['a move the model earned', 'intensification', 'transition_recommended', { voters: true }],
+  ] as const) {
+    it(`${label}: reps 30, sets 10, rest 600 at any confidence is stored inside the zone`, async () => {
+      mocks.signals = signals({ confidence: 0.4 })
+      mocks.answer = extreme(phase, action)
+      const r = ok(await program({ kind: 'ai_dynamic', now: NOW, weeksDone: 2, ...opts }).run())
+      expect(r.prescriptionStatus).toBe('auto_applied')
+      expect(r.prescription.phase).toBe(phase)
+      for (const id of ['p', 's']) {
+        const row = r.prescription.exercises.find(e => e.sessionExerciseId === id)!
+        const zone = intensityZoneForRole('strength', phase, id === 'p' ? 'primary' : 'secondary')
+        expect(row.reps).toBeLessThanOrEqual(zone.repMax)
+        expect(row.sets).toBeLessThanOrEqual(zone.setsMax)
+        expect(row.restSec).toBeLessThanOrEqual(phase === 'accumulation' ? 240 : 300)
+      }
+    })
+  }
+
+  it('an answer already inside the zone is left exactly as it was', async () => {
+    mocks.answer = answer('accumulation', 'stay', 72, 6)
+    const ai = ok(await program({ kind: 'ai_dynamic', now: NOW, weeksDone: 2 }).run())
+    const auto = ok(await program({ kind: 'automatic', now: NOW, weeksDone: 2 }).run())
+    expect(ai.prescription).toEqual(auto.prescription)
+  })
+
+  it('the other program kinds are not bounded here (their plans are byte-identical to main)', async () => {
+    mocks.answer = extreme('accumulation', 'stay')
+    const r = ok(await program({ kind: 'automatic', now: NOW, weeksDone: 2 }).run())
+    expect(r.prescription.exercises.find(e => e.sessionExerciseId === 'p')!.restSec).toBe(600)
+  })
+})
+
+describe('review C: a workout that crosses local midnight is still under way', () => {
+  const TZ = 'America/Chicago'
+  const held = { phase: 'accumulation', phaseAction: 'stay', reasoning: 'Held.', confidence: 0.9, deload: false,
+    estimatedSessionDurationMin: 50, weeklyVolumeContribution: {},
+    exercises: [{ sessionExerciseId: 'p', name: 'Lift p', sets: 3, reps: 5, pct: 70, restSec: 180 }] } as AiPrescription
+  const startedAt = new Date('2026-11-24T23:50:00-06:00')
+  for (const [side, now] of [['before', new Date('2026-11-24T23:58:00-06:00')], ['after', new Date('2026-11-25T00:05:00-06:00')]] as const) {
+    it(`${side} midnight, at the window cap: the stored plan, no model call, no move`, async () => {
+      vi.setSystemTime(now)
+      const h = program({ kind: 'ai_dynamic', tz: TZ, now, weeksDone: CAP.accumulation, underWay: { startedAt }, stored: { prescription: held, status: 'auto_applied' } })
+      const r = ok(await h.run())
+      expect(r.prescription).toEqual(held)
+      expect(mocks.calls).toBe(0)
+      expect(h.log.moves).toEqual([])
+      expect(h.log.stores).toEqual([])
+    })
+  }
+  it('a session left open for longer than the window is not under way: the slot is planned', async () => {
+    const now = new Date('2026-11-26T12:00:00-06:00') // 36 h 10 min after the start
+    vi.setSystemTime(now)
+    const h = program({ kind: 'ai_dynamic', tz: TZ, now, weeksDone: 2, underWay: { startedAt }, stored: { prescription: held, status: 'auto_applied', expiresAt: new Date(now.getTime() - 1) } })
+    ok(await h.run())
+    expect(h.log.stores).toHaveLength(1)
+  })
+})
+
+describe('review F: every one-day deload applied by itself ends at local midnight', () => {
+  const midnight = new Date('2026-11-26T00:00:00+10:00') // Brisbane, after NOW (Wed 12:00)
+  for (const [label, sig] of [
+    ['the training load', { acwr: 1.8 }],
+    ['the effort trend', { rpeTrend: { delta: 2.5 } }],
+    ['missed reps', { repCompletionRate: 0.5 }],
+    ['four days in a row', { consecutiveSessionDaysOfThisType: 4 }],
+  ] as const) {
+    it(`an emergency deload fired by ${label}: midnight on the AI plan, the week elsewhere`, async () => {
+      mocks.signals = signals(sig as Partial<PrescriptionSignals>)
+      const ai = program({ kind: 'ai_dynamic', now: NOW, weeksDone: 2 })
+      const auto = program({ kind: 'automatic', now: NOW, weeksDone: 2 })
+      expect(ok(await ai.run()).prescription.phaseAction).toBe('deload_recommended')
+      ok(await auto.run())
+      expect(ai.db.get('push')!.prescriptionExpiresAt).toEqual(midnight)
+      expect(auto.db.get('push')!.prescriptionExpiresAt).toEqual(new Date(NOW.getTime() + 7 * DAY))
+      // After midnight the applied deload no longer holds the slot.
+      expect(holdsOneDayDeload(ai.db.get('push')!, new Date(midnight.getTime() + 60_000))).toBe(false)
+    })
+  }
+  it('the model\'s own one-day deload: midnight on the AI plan', async () => {
+    mocks.answer = answer('deload', 'deload_recommended', 55, 6)
+    const h = program({ kind: 'ai_dynamic', now: NOW, weeksDone: 2 })
+    ok(await h.run())
+    expect(h.db.get('push')!.prescriptionExpiresAt).toEqual(midnight)
+  })
+})
+
+describe('review G: a forced move into the planned deload week uses the engine\'s own deload numbers', () => {
+  it('realisation → deload at the cap, strength: every compound 2×6 @ 50 %, rest 120', async () => {
+    mocks.signals = signals({ phase: 'realisation' })
+    mocks.answer = answer('realisation', 'stay', 90, 2)
+    const h = program({ kind: 'ai_dynamic', now: NOW, phase: 'realisation', weeksDone: CAP.realisation })
+    const r = ok(await h.run())
+    expect(r.prescription.phase).toBe('deload')
+    expect(r.prescription.deload).toBe(true)
+    for (const id of ['p', 's']) {
+      expect(r.prescription.exercises.find(e => e.sessionExerciseId === id)).toMatchObject({ sets: 2, reps: 6, pct: 50, restSec: 120, deloaded: true })
+    }
+    // The same rows the engine's deload-week plan has (the rules path in a deload phase, #2402).
+    const engine = buildWholeSessionDeloadPrescription(mocks.signals as PrescriptionSignals, 'x')
+    expect(r.prescription.exercises).toEqual(engine.exercises)
+    expect(r.prescriptionStatus).toBe('auto_applied')
+    expect(h.log.moves).toEqual([['realisation', 'deload']])
+  })
+})
+
+describe('review H: a plan left pending from before #3900 is brought under the new rule where it is served', () => {
+  const plan = (over: Partial<AiPrescription>) => ({
+    phase: 'accumulation', phaseAction: 'stay', reasoning: 'x', confidence: 0.5, deload: false,
+    estimatedSessionDurationMin: 50, weeklyVolumeContribution: {},
+    exercises: [{ sessionExerciseId: 'p', name: 'Lift p', sets: 3, reps: 5, pct: 70, restSec: 180 }], ...over,
+  }) as AiPrescription
+  const generatedAt = new Date(NOW.getTime() - 2 * 3_600_000) // this morning, Brisbane
+  const midnight = new Date('2026-11-26T00:00:00+10:00')
+  const state = (p: AiPrescription, over: Record<string, unknown> = {}) => ({
+    prescription: p, prescriptionStatus: 'pending' as PrescriptionStatus,
+    prescriptionExpiresAt: new Date(generatedAt.getTime() + 7 * DAY), prescriptionGeneratedAt: generatedAt, ...over,
+  })
+
+  it('promotes a stay and a suggestion in place, with their expiry', () => {
+    for (const a of ['stay', 'rest_day_recommended', 'session_swap_recommended'] as const) {
+      const st = state(plan({ phaseAction: a }))
+      expect(pendingPlanAdoption(st, BRISBANE, NOW)).toEqual({ kind: 'promote', expiresAt: st.prescriptionExpiresAt })
+    }
+  })
+  it('promotes a one-day deload with the local-midnight expiry of the day it was made for', () => {
+    const st = state(plan({ phase: 'deload', phaseAction: 'deload_recommended', deload: true }))
+    expect(pendingPlanAdoption(st, BRISBANE, NOW)).toEqual({ kind: 'promote', expiresAt: midnight })
+  })
+  it('ends a one-day deload made on a past day rather than applying it today', () => {
+    const st = state(plan({ phase: 'deload', phaseAction: 'deload_recommended', deload: true }), { prescriptionGeneratedAt: new Date(generatedAt.getTime() - 2 * DAY) })
+    expect(pendingPlanAdoption(st, BRISBANE, NOW)).toEqual({ kind: 'end', expiresAt: new Date(midnight.getTime() - 2 * DAY) })
+  })
+  it('asks for a new plan for a move on an aligned program (its loads are the old phase\'s); a waiting program\'s move still waits', () => {
+    expect(pendingPlanAdoption(state(plan({ phase: 'intensification', phaseAction: 'transition_recommended' })), BRISBANE, NOW)).toEqual({ kind: 'regenerate' })
+    expect(pendingPlanAdoption(state(plan({ phase: 'intensification', phaseAction: 'transition_recommended', typeOnlyMove: true })), BRISBANE, NOW)).toBeNull()
+  })
+  it('leaves everything else alone: not pending, expired, or no plan', () => {
+    expect(pendingPlanAdoption(state(plan({}), { prescriptionStatus: 'auto_applied' }), BRISBANE, NOW)).toBeNull()
+    expect(pendingPlanAdoption(state(plan({}), { prescriptionStatus: 'accepted' }), BRISBANE, NOW)).toBeNull()
+    expect(pendingPlanAdoption(state(plan({}), { prescriptionExpiresAt: new Date(NOW.getTime() - 1) }), BRISBANE, NOW)).toBeNull()
+    expect(pendingPlanAdoption(state(null as unknown as AiPrescription), BRISBANE, NOW)).toBeNull()
+  })
+
+  it('writes on the AI plan only, compare-and-set, and never re-plans', async () => {
+    const writes: unknown[][] = []
+    const regenerations: number[] = []
+    const repo = { adoptPendingPrescription: async (...a: unknown[]) => { writes.push(a); return true } } as unknown as WorkoutRepository
+    const deload = state(plan({ phase: 'deload', phaseAction: 'deload_recommended', deload: true })) as never
+    const served = await adoptPendingAiPlan('u', 'push', repo, BRISBANE, { phaseMode: 'ai_dynamic' }, deload, { now: NOW })
+    expect(served).toMatchObject({ prescriptionStatus: 'auto_applied', prescriptionExpiresAt: midnight })
+    expect(writes).toEqual([['u', 'push', generatedAt, 'auto_applied', midnight]])
+    for (const kind of ['automatic', 'manual', undefined]) {
+      expect(await adoptPendingAiPlan('u', 'push', repo, BRISBANE, { phaseMode: kind }, deload, { now: NOW })).toBe(deload)
+    }
+    expect(writes).toHaveLength(1)
+    const move = state(plan({ phase: 'intensification', phaseAction: 'transition_recommended' })) as never
+    expect(await adoptPendingAiPlan('u', 'push', repo, BRISBANE, { phaseMode: 'ai_dynamic' }, move, { now: NOW, onRegenerate: () => regenerations.push(1) })).toBe(move)
+    expect(regenerations).toEqual([1])
+    expect(writes).toHaveLength(1)
+  })
+
+  it('a lost write (the plan was answered or replaced meanwhile) serves the state as it was read', async () => {
+    const repo = { adoptPendingPrescription: async () => false } as unknown as WorkoutRepository
+    const st = state(plan({})) as never
+    expect(await adoptPendingAiPlan('u', 'push', repo, BRISBANE, { phaseMode: 'ai_dynamic' }, st, { now: NOW })).toBe(st)
   })
 })

@@ -7,7 +7,10 @@
 //   - the next plan moves nothing more;
 //   - a session under way (a set logged today) is never re-planned;
 //   - a model deload is the day's plan, and the phase stays;
-//   - a plan stored `pending` before this change is served as it was and not regenerated.
+//   - a plan stored `pending` before this change is brought under the new rule where it is served
+//     (review H): a stay or a one-day deload is applied in place, a move is planned again;
+//   - a workout under way is found whatever its local date (review C), and a move another session
+//     type makes spares its plan on the AI plan only (review D).
 // Runs only with DATABASE_URL. Fake user and lifts; every row it adds is removed in `afterAll`,
 // which runs on failure too (the library row by id).
 import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from 'vitest'
@@ -203,17 +206,85 @@ describe.skipIf(!canRun)('the AI plan applies by itself (#3900)', () => {
     expect(rows.find(r => r.program_session_id === push)!.prescription_status).toBe('auto_applied')
   })
 
-  it('a plan stored pending before this change is served as it was and not regenerated', async () => {
+  const storePlan = async (session: string, plan: object, status: string, expiresSql = "now() + interval '3 days'", generatedSql = "now() - interval '2 hours'") =>
+    pool.query(
+      `UPDATE session_periodization SET prescription=$3::jsonb, prescription_status=$4, prescription_expires_at=${expiresSql}, prescription_generated_at=${generatedSql}
+       WHERE user_id=$1 AND program_session_id=$2`, [USER, session, JSON.stringify(plan), status])
+  const underWay = async (session: string, name: string, startedSql: string) => {
+    const ws = (await pool.query(
+      `INSERT INTO workout_sessions (user_id, session_id, session_name, started_at) VALUES ($1,$2,$3, ${startedSql}) RETURNING id`, [USER, session, name])).rows[0].id
+    await pool.query(`INSERT INTO exercise_logs (workout_session_id, exercise_name, exercise_id, logged_at) VALUES ($1,$2,$3, now() - interval '5 minutes')`, [ws, LIFT, libIds[0]])
+    return ws as string
+  }
+
+  // Review H: a plan stored `pending` before this change is brought under the new rule where it is
+  // served. Its content is untouched; a stay is promoted in place, with no model call.
+  it('a stay stored pending before this change is applied in place where it is served, unchanged', async () => {
     const plan = { phase: 'accumulation', phaseAction: 'stay', reasoning: 'From before.', confidence: 0.9, deload: false, estimatedSessionDurationMin: 40, weeklyVolumeContribution: {},
       exercises: [{ sessionExerciseId: pushLift, name: LIFT, sets: 3, reps: 5, pct: 71, restSec: 180 }] }
-    await pool.query(
-      `UPDATE session_periodization SET prescription=$3::jsonb, prescription_status='pending', prescription_expires_at=now() + interval '3 days', prescription_generated_at=now() - interval '2 hours'
-       WHERE user_id=$1 AND program_session_id=$2`, [USER, push, JSON.stringify(plan)])
+    await storePlan(push, plan, 'pending')
     const served = await serve()
     expect(served.aiPrescriptionPending).toBe(false)
     expect(regen.calls).toBe(0)
     expect(model.calls).toBe(0)
     expect(served.exercises.find(e => e.sessionExerciseId === pushLift)!.progressionStyle?.every(s => s.pct === 71)).toBe(true)
+    const row = (await rowsOf()).find(r => r.program_session_id === push)!
+    expect(row.prescription_status).toBe('auto_applied')
+    expect(row.prescription).toEqual(plan)
+  })
+
+  it('a one-day deload stored pending is applied, until local midnight, and is on the bar', async () => {
+    const plan = { phase: 'deload', phaseAction: 'deload_recommended', reasoning: 'Emergency deload: x.', confidence: 1, deload: true, estimatedSessionDurationMin: 30, weeklyVolumeContribution: {},
+      exercises: [{ sessionExerciseId: pushLift, name: LIFT, sets: 2, reps: 6, pct: 50, restSec: 120, deloaded: true }] }
+    await storePlan(push, plan, 'pending', "now() + interval '6 days'", 'now()')
+    const served = await serve()
+    expect(served.exercises.find(e => e.sessionExerciseId === pushLift)!.progressionStyle?.every(s => s.pct === 50)).toBe(true)
+    const { rows: [r] } = await pool.query(`SELECT prescription_status, prescription_expires_at FROM session_periodization WHERE user_id=$1 AND program_session_id=$2`, [USER, push])
+    expect(r.prescription_status).toBe('auto_applied')
+    expect(new Date(r.prescription_expires_at).getTime()).toBeLessThanOrEqual(dateStrMidnightInTz(shiftDateStr(todayInTz(TZ), 1), TZ).getTime())
+    expect(model.calls).toBe(0)
+  })
+
+  it('a move stored pending (its loads the old phase\'s) is planned again; until then it is served as it was', async () => {
+    const plan = { phase: 'intensification', phaseAction: 'transition_recommended', reasoning: 'Cap.', confidence: 0.9, deload: false, estimatedSessionDurationMin: 40, weeklyVolumeContribution: {},
+      exercises: [{ sessionExerciseId: pushLift, name: LIFT, sets: 3, reps: 5, pct: 72, restSec: 180 }] }
+    await storePlan(push, plan, 'pending')
+    await serve()
+    expect(regen.calls).toBe(1)
     expect((await rowsOf()).find(r => r.program_session_id === push)!.prescription_status).toBe('pending')
+  })
+
+  // Review C: under way is not "started today".
+  it('a workout started 30 hours ago and not finished, with a set logged, is under way; one 40 hours ago is not', async () => {
+    await underWay(push, 'Push 3900', "now() - interval '30 hours'")
+    expect(await repo.listUnfinishedLoggedSessions!(USER, new Date(Date.now() - 36 * 3_600_000))).toEqual([push])
+    await pool.query(`UPDATE workout_sessions SET started_at = now() - interval '40 hours' WHERE user_id = $1 AND session_id = $2`, [USER, push])
+    expect(await repo.listUnfinishedLoggedSessions!(USER, new Date(Date.now() - 36 * 3_600_000))).toEqual([])
+  })
+
+  // Review D: a move another session type makes spares the plan of a session under way.
+  it('the cap move made by Push leaves Legs\' plan alone while Legs is being trained', async () => {
+    const legsPlan = { phase: 'accumulation', phaseAction: 'stay', reasoning: 'Legs today.', confidence: 0.9, deload: false, estimatedSessionDurationMin: 40, weeklyVolumeContribution: {},
+      exercises: [{ sessionExerciseId: pushLift, name: LIFT, sets: 4, reps: 6, pct: 72, restSec: 180 }] }
+    await storePlan(legs, legsPlan, 'auto_applied')
+    await underWay(legs, 'Legs 3900', "now() - interval '20 minutes'")
+    model.answer = stay(70)
+    const res = await generate(USER, push, repo, TZ)
+    expect(res.ok && res.prescriptionStatus).toBe('auto_applied')
+    const rows = await rowsOf()
+    expect(rows.every(r => r.phase === 'intensification')).toBe(true)
+    const legsRow = rows.find(r => r.program_session_id === legs)!
+    expect(legsRow.prescription_status).toBe('auto_applied')
+    expect(legsRow.prescription).toEqual(legsPlan)
+  })
+
+  it('on the other program kinds a move voids that plan as before', async () => {
+    await pool.query(`UPDATE programs SET phase_mode = 'automatic' WHERE user_id = $1`, [USER])
+    await storePlan(legs, { phase: 'accumulation', phaseAction: 'stay', reasoning: 'x', confidence: 0.9, deload: false, estimatedSessionDurationMin: 40, weeklyVolumeContribution: {}, exercises: [] }, 'auto_applied')
+    await underWay(legs, 'Legs 3900', "now() - interval '20 minutes'")
+    await repo.advanceProgramPhase(USER, push, 'intensification')
+    const legsRow = (await rowsOf()).find(r => r.program_session_id === legs)!
+    expect(legsRow.prescription_status).toBe('consumed')
+    expect(legsRow.prescription).toBeNull()
   })
 })
