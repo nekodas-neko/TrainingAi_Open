@@ -12,7 +12,7 @@ import { prescriptionExpiresAt } from '@trainingai/shared/ai-periodization/presc
  */
 const RULES_PRESCRIPTION_TTL_MS = 6 * 60 * 60 * 1000
 import { aggregateSignals } from '@trainingai/shared/ai-periodization/signals'
-import { buildSystemPrompt, buildUserPrompt, intensityZoneForRole, phaseRestBounds } from '@trainingai/shared/ai-periodization/prompt'
+import { buildSystemPrompt, buildUserPrompt, intensityZoneForRole, phaseRestBounds, phaseSetsMax } from '@trainingai/shared/ai-periodization/prompt'
 import { settleAccessory } from '@trainingai/shared/ai-periodization/goal-ranges'
 import { pctForExpectedRpe } from '@trainingai/shared/ai-periodization/expected-rpe'
 import {
@@ -102,10 +102,7 @@ export function buildWholeSessionDeloadPrescription(
   // 1RM. There are no model numbers to keep here, so the full session is the program's own — the
   // same plan the rules prescriber builds. An exercise with no base style gets none, and stays
   // deloaded under `Full`, which is also what the per-exercise path does without a record.
-  const fullById = new Map(
-    (buildProgramAsWrittenPrescription(signals, reasoning)?.exercises ?? [])
-      .map(e => [e.sessionExerciseId, { sets: e.sets, reps: e.reps, pct: e.pct, restSec: e.restSec }]),
-  )
+  const fullById = programFullNumbersById(buildProgramAsWrittenPrescription(signals, reasoning))
   const pct = DELOAD_LOWER_PCT[goal] ?? 50
   const reps = DELOAD_REPS[goal] ?? 8
 
@@ -156,6 +153,89 @@ export function buildWholeSessionDeloadPrescription(
     deload: true,
     reasoning,
     confidence: 1.0,
+  }
+}
+
+/** The numbers a row records as what `Full` puts back (`preDeload`): the program's own, by exercise id.
+ *  The one reading of the as-written plan that the whole-session deload and a model-written deload
+ *  (`recordFullSessionOnModelDeload`) both use. */
+function programFullNumbersById(
+  asWritten: AiPrescription | null,
+): Map<string, NonNullable<AiPrescriptionExercise['preDeload']>> {
+  return new Map(
+    (asWritten?.exercises ?? [])
+      .map(e => [e.sessionExerciseId, { sets: e.sets, reps: e.reps, pct: e.pct, restSec: e.restSec }]),
+  )
+}
+
+/** #4087: the note on every row of a deload the model wrote, when no more specific reason rode on it. */
+export const MODEL_DELOAD_NOTE = 'Deload \u2014 prescribed by your plan'
+
+/**
+ * #4087. A deload the MODEL writes (`deload_recommended`, in the normal generation path) is stored with
+ * the model's own rows, which carried no `deloaded` flag and no record of a full session. On the AI plan
+ * such a plan applies by itself and the screen offers "Train full instead", and `Full` had nothing to
+ * put back: the session was logged as full while the bar kept the deload's loads. The two rules-built
+ * deloads record the program's own numbers (BF-198); this records them for the model's the same way.
+ *
+ * Every row is marked `deloaded` and gets `preDeload`: the numbers `buildProgramAsWrittenPrescription`
+ * gives it (the one function `buildWholeSessionDeloadPrescription` reads too), so the lift preferences
+ * and the weekly check-in's hold are in them as on any full plan. The deload's own sets, reps, load and
+ * rest are not touched. What `Full` restores is bounded as the plan's other rows are (#4088), in the
+ * phase the session is in (`fullPhase`): sets no more than the phase's cap (the cap `reevaluate`'s revert
+ * uses), and on a compound row reps, load and rest inside the phase's zone, except where the lifter's own
+ * preference chose them (a rep range, a rest) or the check-in's hold lowered the bar. A row with no
+ * program numbers (no base style) stays deloaded under `Full` with what it had. `fullSession` is costed
+ * over the restored rows through `prescriptionFigures`, as everywhere.
+ */
+export function recordFullSessionOnModelDeload(
+  plan: AiPrescription,
+  signals: PrescriptionSignals,
+  fullPhase: PeriodizationPhase,
+): AiPrescription {
+  const asWritten = buildProgramAsWrittenPrescription(signals, plan.reasoning)
+  const fullById = programFullNumbersById(asWritten)
+  const appliedById = new Map((asWritten?.exercises ?? []).map(e => [e.sessionExerciseId, e.liftPreference]))
+  const heldRows = asWritten?.checkinHold?.rows ?? {}
+  const roleById = new Map(signals.exercises.map(e => [e.sessionExerciseId, e.role]))
+  const rest = phaseRestBounds(fullPhase)
+  const setsCap = phaseSetsMax(signals.trainingGoal, fullPhase) ?? Infinity
+
+  const bounded = (id: string, full: NonNullable<AiPrescriptionExercise['preDeload']>) => {
+    const role = roleById.get(id) ?? UNCLASSIFIED_EXERCISE_ROLE
+    const sets = Math.max(1, Math.min(full.sets, setsCap))
+    // An accessory is held to the goal's own band by the rules that make it, not to the phase's zone
+    // (#4088 leaves its rows alone too), so only its sets are capped. Sets are capped and not raised to
+    // the zone's floor: the time budget trims a plan below it on a short day, and the program's count
+    // here is already the one that fits (`buildProgramAsWrittenPrescription`).
+    if (role === 'accessory') return { ...full, sets }
+    const zone = intensityZoneForRole(signals.trainingGoal, fullPhase, role)
+    const applied = appliedById.get(id)
+    return {
+      sets,
+      reps: applied?.repRange ? full.reps : Math.min(zone.repMax, Math.max(zone.repMin, full.reps)),
+      pct: heldRows[id] ? Math.min(zone.pctMax, full.pct) : clampPrescribedPct(full.pct, zone),
+      restSec: applied?.restSec != null ? full.restSec : Math.min(rest.restSecMax, Math.max(rest.restSecMin, full.restSec)),
+    }
+  }
+
+  const exercises: AiPrescriptionExercise[] = plan.exercises.map(row => {
+    const full = fullById.get(row.sessionExerciseId)
+    const preDeload = full ? bounded(row.sessionExerciseId, full) : row.preDeload
+    return {
+      ...row,
+      deloaded: true,
+      deloadNote: row.deloadNote ?? MODEL_DELOAD_NOTE,
+      ...(preDeload && { preDeload }),
+    }
+  })
+  const { fullSession: _recordedAgainstTheModelsRows, ...withoutFullSession } = plan
+  return {
+    ...withoutFullSession,
+    exercises,
+    ...(hasFullSessionRevert(exercises) && {
+      fullSession: prescriptionFigures(exercises.map(rowUnderFull), signals),
+    }),
   }
 }
 
@@ -1044,7 +1124,7 @@ async function runPrescriptionGeneration(
   const engineDeload = forcedMove === 'deload'
     ? buildWholeSessionDeloadPrescription(signals, parsed.reasoning)
     : null
-  const aiPrescription: AiPrescription = engineDeload ? {
+  const builtPrescription: AiPrescription = engineDeload ? {
     ...engineDeload,
     phase: parsed.phase as PeriodizationPhase,
     phaseAction: parsed.phase_action,
@@ -1094,6 +1174,12 @@ async function runPrescriptionGeneration(
     refitBaseline,
     ...(droppedIdSet.size > 0 && { droppedExerciseIds: [...droppedIdSet] }),
   }
+
+  // #4087: a deload the model wrote itself applies by itself on the AI plan, so `Full` has to have the
+  // program's numbers to put back, as it has on the engine's deloads. Rows stay the model's.
+  const aiPrescription = aiPlan && !engineDeload && builtPrescription.phaseAction === 'deload_recommended' && state.phase !== 'baseline'
+    ? recordFullSessionOnModelDeload(builtPrescription, signals, state.phase)
+    : builtPrescription
 
   // Phase guards: force a transition recommendation at the phase's cap so ambiguous signals can't
   // keep a "stay" running forever. #3766: the cap is the program's, in training weeks. Other session
