@@ -236,7 +236,10 @@ describe.skipIf(!canRun)('the AI plan applies by itself (#3900)', () => {
     expect(served.exercises.find(e => e.sessionExerciseId === pushLift)!.progressionStyle?.every(s => s.pct === 71)).toBe(true)
     const row = (await rowsOf()).find(r => r.program_session_id === push)!
     expect(row.prescription_status).toBe('auto_applied')
-    expect(row.prescription).toEqual(plan)
+    // The serve path's re-evaluation may stamp `reevaluatedInputsKey` on the cached plan (a background
+    // write, as on main); the plan's own content is what must be unchanged.
+    const { reevaluatedInputsKey: _stamp, ...content } = row.prescription!
+    expect(content).toEqual(plan)
   })
 
   it('a one-day deload stored pending is applied, until local midnight, and is on the bar', async () => {
