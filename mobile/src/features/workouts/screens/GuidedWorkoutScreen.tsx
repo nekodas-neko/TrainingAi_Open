@@ -410,19 +410,18 @@ export function GuidedWorkoutScreen({
                   />
                   <LiveHrCard sinceMs={workout.rest?.startedAt ?? null} profile={zoneProfile} />
                   {exercise.exerciseType !== 'bodyweight' &&
-                    exerciseResult(workout, exercise).estimate !== null && (
+                    oneRmText(exerciseResult(workout, exercise).estimate, exercise.exerciseType) !==
+                      null && (
                       <AppText
                         variant="caption"
                         tone="brand"
                         style={{ textAlign: 'center' }}
                       >
                         Live 1RM ·{' '}
-                        {
-                          displayOneRm(
-                            exerciseResult(workout, exercise).estimate!,
-                            exercise.exerciseType,
-                          ).text
-                        }
+                        {oneRmText(
+                          exerciseResult(workout, exercise).estimate,
+                          exercise.exerciseType,
+                        )}
                       </AppText>
                     )}
                 </>
@@ -599,7 +598,7 @@ export function GuidedWorkoutScreen({
             }}
           />
         ) : shownPanel === 'history' ? (
-          <ExerciseHistory name={exercise.name} />
+          <ExerciseHistory name={exercise.name} sessionExerciseId={exercise.relogOf ?? exercise.id} />
         ) : shownPanel === 'muscles' ? (
           <>
             <AppText variant="heading">
