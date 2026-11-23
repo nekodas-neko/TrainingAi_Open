@@ -40,7 +40,7 @@ const PCT = 70
 const REPS = 10
 const HIGH_RPE = 9 // a rep short: 9 − 6.82 = +2.18, at or above the Harder delta
 const LOW_RPE = 6 // reps met: 6 − 7.82 = −1.82, inside (−2, Easier delta]
-const HARDER_ALL_REPS = 'You said it felt harder. You hit every rep, so the weight stays.'
+const HARDER_ALL_REPS = "You said it felt harder. Your logged reps were on target, so your answer doesn't change the plan."
 const local = (day: string, hour: number) => new Date(dateStrMidnightInTz(day, TZ).getTime() + hour * 3_600_000)
 
 interface Latest {
@@ -193,11 +193,11 @@ describe.skipIf(!canRun)('the tapped effort answer in the next plan (#4061)', ()
     expect(none.note).toBeNull()
   })
 
-  it('tapped Easier with a missed rep: nothing changes and the note says why', async () => {
+  it('tapped Easier with a missed rep: the answer changes nothing and the note says why', async () => {
     const none = await plan({ ...untouched, reps: REPS - 1 })
     const easier = await plan({ ...untouched, reps: REPS - 1, effort: { vsPlan: -1, source: 'tapped' } })
     expect({ ...easier, note: null, prompt: null }).toEqual({ ...none, note: null, prompt: null })
-    expect(easier.note).toBe('You said it felt easier, but a rep was missed, so nothing changes.')
+    expect(easier.note).toBe("You said it felt easier, but your logged reps fell short of your target, so your answer doesn't change the plan.")
   })
 
   it('As expected adds no note; a tap that changed the plan keeps the rule\'s own note', async () => {

@@ -1,7 +1,7 @@
 // #4079: a tapped Harder or Easier the rule read and changed nothing for is said back in the lift's
 // note. One test per sentence, one per case that must stay silent, and the guarantee that no number
 // of the plan moves. The grid differential is effort-answer-identity-4061.test.ts (its #4079 block);
-// the database path is lib/data/postgres/__tests__/effort-answer-note-4079.test.ts.
+// the database path is lib/data/postgres/__tests__/effort-answer-plan-4061.test.ts.
 import { describe, it, expect } from 'vitest'
 import {
   applyAutoregulation, computeRpeAdjustment, effortRpeDelta, unactedEffortNote,
@@ -17,39 +17,51 @@ const tap = (answer: -1 | 1, over: Partial<AutoregSignal> = {}): AutoregSignal =
 })
 const note = (sig: AutoregSignal, ctx = ctxOf()) => unactedEffortNote(sig, ctx)
 
+const TAIL = "so your answer doesn't change the plan."
+
 describe('the sentences (#4079)', () => {
-  it('Harder, every rep done', () => {
-    expect(note(tap(1))).toBe('You said it felt harder. You hit every rep, so the weight stays.')
+  it('Harder, logged reps on target', () => {
+    expect(note(tap(1))).toBe(`You said it felt harder. Your logged reps were on target, ${TAIL}`)
   })
-  it('Harder, within a rep of the target (the rule counts 95% as met)', () => {
-    expect(note(tap(1, { repCompletionRate: 0.97 }))).toBe('You said it felt harder. You were within a rep of the target, so the weight stays.')
+  it('Harder, just short of the target reps (the rule counts 95% as met)', () => {
+    expect(note(tap(1, { repCompletionRate: 0.97 }))).toBe(`You said it felt harder. Your logged reps were just short of your target reps, ${TAIL}`)
   })
-  it('Harder, with no rep counts to check', () => {
-    expect(note(tap(1, { repCompletionRate: null }))).toBe('You said it felt harder. There are no rep counts to check, so the weight stays.')
+  it('Harder, with no way to compare the reps', () => {
+    expect(note(tap(1, { repCompletionRate: null }))).toBe(`You said it felt harder. The app could not compare your reps with the plan, ${TAIL}`)
   })
-  it('Easier, with a missed rep', () => {
-    expect(note(tap(-1, { repCompletionRate: 0.9 }))).toBe('You said it felt easier, but a rep was missed, so nothing changes.')
+  it('Easier, with logged reps short of target', () => {
+    expect(note(tap(-1, { repCompletionRate: 0.9 }))).toBe(`You said it felt easier, but your logged reps fell short of your target, ${TAIL}`)
   })
   it('Easier, with a falling 1RM', () => {
-    expect(note(tap(-1, { rm1Trend: 'down' }))).toBe('You said it felt easier, but your 1RM slipped, so nothing changes.')
+    expect(note(tap(-1, { rm1Trend: 'down' }))).toBe(`You said it felt easier, but your 1RM slipped, ${TAIL}`)
   })
-  it('Easier, with no rep counts to check', () => {
-    expect(note(tap(-1, { repCompletionRate: null }))).toBe('You said it felt easier. There are no rep counts to check, so nothing changes.')
+  it('Easier, with no way to compare the reps', () => {
+    expect(note(tap(-1, { repCompletionRate: null }))).toBe(`You said it felt easier. The app could not compare your reps with the plan, ${TAIL}`)
   })
   it('Easier in a realisation phase (no rep pushes in a peak block)', () => {
-    expect(note(tap(-1), ctxOf('realisation'))).toBe('You said it felt easier. Realisation does not add reps, so nothing changes.')
+    expect(note(tap(-1), ctxOf('realisation'))).toBe(`You said it felt easier. Realisation does not add reps, ${TAIL}`)
   })
   it('Easier on a compound at the top of its rep range', () => {
-    expect(note(tap(-1), ctxOf('accumulation', 10))).toBe('You said it felt easier. You are at the top of the rep range, so nothing changes until your 1RM rises.')
+    expect(note(tap(-1), ctxOf('accumulation', 10))).toBe(`You said it felt easier. You are at the top of the rep range, ${TAIL}`)
   })
-  it.each(['deload', 'baseline'])('either tap in a %s week', phase => {
-    expect(note(tap(1), ctxOf(phase))).toBe(`You said it felt harder. This is a ${phase} week, so nothing changes.`)
-    expect(note(tap(-1), ctxOf(phase))).toBe(`You said it felt easier. This is a ${phase} week, so nothing changes.`)
+  it('either tap in a deload week', () => {
+    expect(note(tap(1), ctxOf('deload'))).toBe(`You said it felt harder. This is a deload week, ${TAIL}`)
+    expect(note(tap(-1), ctxOf('deload'))).toBe(`You said it felt easier. This is a deload week, ${TAIL}`)
   })
-  it('Harder in a realisation phase with every rep done is the ordinary Harder sentence (the rule cuts there too)', () => {
-    expect(note(tap(1), ctxOf('realisation'))).toBe('You said it felt harder. You hit every rep, so the weight stays.')
+  it('a baseline week gets no sentence: the generator stops an incomplete baseline before this runs', () => {
+    expect(note(tap(1), ctxOf('baseline'))).toBeNull()
+    expect(note(tap(-1), ctxOf('baseline'))).toBeNull()
   })
-  it('every sentence is one sentence of plain words with no figure', () => {
+  it('Harder in a realisation phase with reps on target is the ordinary Harder sentence (the rule cuts there too)', () => {
+    expect(note(tap(1), ctxOf('realisation'))).toBe(`You said it felt harder. Your logged reps were on target, ${TAIL}`)
+  })
+  it('3 sets planned, 2 logged at target: completion is 1, so the sentence says "logged", never "every rep"', () => {
+    // rep-completion.ts: a skipped planned set leaves no row, so 2 of 3 sets on target reads as 1.
+    const n = note(tap(1, { repCompletionRate: 1 }))!
+    expect(n).toContain('Your logged reps were on target')
+    expect(n).not.toMatch(/every rep/i)
+  })
+  it('no sentence claims what the plan does', () => {
     const all = [
       note(tap(1)), note(tap(1, { repCompletionRate: 0.97 })), note(tap(1, { repCompletionRate: null })),
       note(tap(-1, { repCompletionRate: 0.9 })), note(tap(-1, { rm1Trend: 'down' })), note(tap(-1, { repCompletionRate: null })),
@@ -58,7 +70,10 @@ describe('the sentences (#4079)', () => {
     for (const n of all) {
       expect(n).toMatch(/^You said it felt (harder|easier)[.,]/)
       expect(n!.replace('1RM', '')).not.toMatch(/\d/) // the only digit is the word 1RM
-      expect(n!.endsWith('.')).toBe(true)
+      expect(n!.endsWith(TAIL)).toBe(true)
+      for (const banned of ['the weight stays', 'nothing changes', 'every rep', 'within a rep', 'no rep counts']) {
+        expect(n!.toLowerCase(), banned).not.toContain(banned)
+      }
     }
   })
 })
@@ -104,6 +119,7 @@ describe('what stays silent (#4079)', () => {
             const changed = rule.pctMultiplier !== 1 || rule.repDelta !== 0 || rule.setDelta !== 0
             expect(rule.note !== null, 'the rule writes a note exactly when it changes the plan').toBe(changed)
             if (changed) continue
+            if (phase === 'baseline') { expect(n).toBeNull(); continue } // unreachable in the generator, no sentence
             expect(n, JSON.stringify({ answer, role, phase, currentReps, rm1Trend, repCompletionRate })).not.toBeNull()
             said++
             silent++
@@ -136,8 +152,8 @@ describe('no number of the plan moves (#4079)', () => {
 
   it('the sentence lands on the lift the rule left alone and nowhere else', () => {
     const out = applyAutoregulation(exercises, sigs, 'strength', 'accumulation')
-    expect(out.notes['harder-met']).toBe('You said it felt harder. You hit every rep, so the weight stays.')
-    expect(out.notes['easier-missed']).toBe('You said it felt easier, but a rep was missed, so nothing changes.')
+    expect(out.notes['harder-met']).toBe(`You said it felt harder. Your logged reps were on target, ${TAIL}`)
+    expect(out.notes['easier-missed']).toBe(`You said it felt easier, but your logged reps fell short of your target, ${TAIL}`)
     expect(out.notes['harder-missed']).toMatch(/^−\d/) // the cut's own note, untouched
     expect(out.notes['easier-met']).toMatch(/^\+1 target rep/) // the push's own note, untouched
   })

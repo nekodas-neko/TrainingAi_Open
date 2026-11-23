@@ -155,35 +155,45 @@ export function computeRpeAdjustment(sig: AutoregSignal, ctx: AutoregContext): A
  * returned no note (a tap that did change the plan keeps that rule's own note). It changes no number.
  * Null for no tap, and for an answer that is not Harder or Easier.
  *
+ * Every sentence says what the ANSWER did, never what the plan does: the load is set after this rule
+ * (accessory floats, secondary floors and caps, the anchor cap, a check-in hold, the zone clamp, the
+ * Coach's restate and the budget re-fit), so the plan can still differ from last session's.
+ * "Reps" are the logged ones: a skipped planned set leaves no row (rep-completion.ts), so a completion
+ * of 1 means the logged sets were on target, not that every planned set was done. A null completion
+ * means no comparison was possible (nothing logged, or the log did not run the prescription).
+ *
  * The reasons follow the rule's own order: a phase that takes no adjustment, then (Harder) the rule's
  * two triggers not being met, or (Easier) its three conditions, then the top of the band.
+ * Baseline is not worded: the generator returns 400 for an incomplete baseline before this runs, so
+ * the phase cannot reach here, and an untested sentence for it was removed.
  */
 export function unactedEffortNote(sig: AutoregSignal, ctx: AutoregContext): string | null {
   if (sig.effortFromAnswer !== true) return null
   const said = sig.effortAnswer === 1 ? 'harder' : sig.effortAnswer === -1 ? 'easier' : null
   if (said == null) return null
   const lead = `You said it felt ${said}.`
+  const butLead = `You said it felt ${said},`
+  const tail = "so your answer doesn't change the plan."
 
-  // Deload and baseline weeks take no adjustment at all (the rule returns before reading the answer).
-  if (ctx.phase === 'deload' || ctx.phase === 'baseline') {
-    return `${lead} This is a ${ctx.phase} week, so nothing changes.`
-  }
+  // Deload weeks take no adjustment at all (the rule returns before reading the answer).
+  if (ctx.phase === 'deload') return `${lead} This is a deload week, ${tail}`
+  if (ctx.phase === 'baseline') return null
 
   const rate = sig.repCompletionRate
   if (sig.effortAnswer === 1) {
     // Reached only when the cut did not fire: reps not proven short and the 1RM not falling.
-    if (rate == null) return `${lead} There are no rep counts to check, so the weight stays.`
-    if (rate >= 1) return `${lead} You hit every rep, so the weight stays.`
-    return `${lead} You were within a rep of the target, so the weight stays.`
+    if (rate == null) return `${lead} The app could not compare your reps with the plan, ${tail}`
+    if (rate >= 1) return `${lead} Your logged reps were on target, ${tail}`
+    return `${lead} Your logged reps were just short of your target reps, ${tail}`
   }
 
-  // Easier. A push needs every rep met and a 1RM that is not falling.
-  if (rate == null) return `${lead} There are no rep counts to check, so nothing changes.`
-  if (rate < 1) return `${lead.slice(0, -1)}, but a rep was missed, so nothing changes.`
-  if (sig.rm1Trend === 'down') return `${lead.slice(0, -1)}, but your 1RM slipped, so nothing changes.`
-  if (ctx.phase === 'realisation') return `${lead} Realisation does not add reps, so nothing changes.`
+  // Easier. A push needs every logged rep met and a 1RM that is not falling.
+  if (rate == null) return `${lead} The app could not compare your reps with the plan, ${tail}`
+  if (rate < 1) return `${butLead} but your logged reps fell short of your target, ${tail}`
+  if (sig.rm1Trend === 'down') return `${butLead} but your 1RM slipped, ${tail}`
+  if (ctx.phase === 'realisation') return `${lead} Realisation does not add reps, ${tail}`
   // Every condition met and still no change: a compound at the top of its rep band.
-  return `${lead} You are at the top of the rep range, so nothing changes until your 1RM rises.`
+  return `${lead} You are at the top of the rep range, ${tail}`
 }
 
 export interface AutoregExercise {
