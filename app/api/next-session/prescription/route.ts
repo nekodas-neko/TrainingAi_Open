@@ -4,6 +4,9 @@ import { getRepository } from "@/lib/data";
 import { DEFAULT_TZ, startOfWeekInTz, todayInTz } from "@trainingai/shared/date-utils";
 import { readProgramDeloadCheck } from "@trainingai/shared/ai-periodization/program-phase";
 import { fitStoredPlanToCheckinBudget } from "@trainingai/shared/ai-periodization/checkin-plan-budget";
+import { isSessionUnderWay } from "@trainingai/shared/ai-periodization/session-under-way";
+import { slotHoldsPlan } from "@trainingai/shared/ai-periodization/plan-status";
+import { adoptPendingAiPlan } from "@trainingai/shared/ai-periodization/pending-plan-adoption";
 import { prescribedBar } from "@trainingai/shared/workout/load-rounding";
 import { loadLiftPreferences } from "@trainingai/shared/ai-periodization/lift-preference-read";
 import { rateLimit } from "@/lib/rate-limit";
@@ -92,6 +95,8 @@ export async function GET() {
     isAiDynamic
       ? repo.getSessionPeriodization(userId, programSession.id)
           .then(st => st && fitStoredPlanToCheckinBudget(userId, programSession.id, repo, tz, st))
+          // #3900 review (H): a plan left `pending` from before the AI plan applied every plan by itself.
+          .then(st => st && adoptPendingAiPlan(userId, programSession.id, repo, tz, program, st))
       : Promise.resolve(null),
     repo.getExerciseEstimates(userId).catch(() => []),
     // #4019 / #3890: the lift preferences and this week's check-in hold, as the session screen reads them.
@@ -113,6 +118,8 @@ export async function GET() {
     program, programSession, todayStr, allPhases,
     thisSessionCount: sessionCounts.get(programSession.id) ?? 0,
     periodization, programDeload,
+    underWay: isAiDynamic && periodization != null && slotHoldsPlan(periodization)
+      ? await isSessionUnderWay(repo, userId, programSession.id) : false,
     loggedTodayInThisSession: new Set<string>(),
     shared: { lastLogs, lastRealOneRm, prMap, estimateMap, styleById, styleByName, styles, libByName, liftPreferences },
   });

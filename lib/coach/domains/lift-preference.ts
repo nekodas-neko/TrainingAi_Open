@@ -48,6 +48,8 @@ import { rewriteHeldRow, sameHoldRecord } from '@trainingai/shared/ai-periodizat
 import { normalizeStoredPrescription } from '@trainingai/shared/ai-periodization/reconcile-prescription'
 import { prescriptionDrivesLoad } from '@trainingai/shared/ai-periodization/apply-prescription'
 import { isAiPrescriptionPending } from '@trainingai/shared/ai-periodization/prescription-pending'
+import { sessionUnderWayCheck } from '@trainingai/shared/ai-periodization/session-under-way'
+import { listUnfinishedLoggedSessions } from '@/lib/data/postgres/slices/periodization'
 import { prescribedBar } from '@trainingai/shared/workout/load-rounding'
 import { resolveWorkingBasisWithSource } from '@trainingai/shared/1rm'
 import type { AiPrescription, PeriodizationPhase, PrescriptionStatus } from '@trainingai/shared/types/ai-periodization'
@@ -194,6 +196,8 @@ interface StoredPlan {
   prescription: AiPrescription
   status: PrescriptionStatus
   periodization: NonNullable<Parameters<typeof isAiPrescriptionPending>[0]>
+  /** A workout of this session type is under way (#3900 third review): its plan keeps driving the bar. */
+  underWay: boolean
 }
 
 interface Context {
@@ -264,6 +268,10 @@ async function readContext(db: Db, getBasis: () => Promise<BasisInputs>, userId:
       inArray(s.sessionPeriodization.programSessionId, sessionIds),
     ))
     : []
+  // One read, and only when there is a plan to describe (`sessionUnderWayCheck`: a failed read says under way).
+  const underWayFor = periodization.some(p => p.prescription != null)
+    ? await sessionUnderWayCheck({ listUnfinishedLoggedSessions: (u, since) => listUnfinishedLoggedSessions(db, u, since) }, userId)
+    : () => false
   const plans: StoredPlan[] = periodization
     .filter(p => p.prescription != null)
     .map(p => ({
@@ -272,6 +280,7 @@ async function readContext(db: Db, getBasis: () => Promise<BasisInputs>, userId:
       phase: p.phase as PeriodizationPhase,
       prescription: p.prescription as AiPrescription,
       status: p.prescriptionStatus as PrescriptionStatus,
+      underWay: underWayFor(p.programSessionId),
       periodization: {
         prescription: p.prescription as AiPrescription,
         prescriptionExpiresAt: p.prescriptionExpiresAt,
@@ -473,7 +482,7 @@ function measure(ctx: Context, before: PrefColumns, after: PrefColumns, accepted
         consequences.push({ kind: 'good', text: `Next ${ctx.target.sessionName}: ${name} ${line(now)} (was ${line(was)})${rest}.` })
       }
       const drives = prescriptionDrivesLoad(plan.prescription.phaseAction, plan.status)
-        && !isAiPrescriptionPending(plan.periodization, { isAiDynamic: true, isBaselinePhase: plan.phase === 'baseline' }, new Date())
+        && !isAiPrescriptionPending(plan.periodization, { isAiDynamic: true, isBaselinePhase: plan.phase === 'baseline', underWay: plan.underWay }, new Date())
       if (!drives) consequences.push({ kind: 'info', text: 'That plan is still waiting to be accepted or remade; these are its numbers.' })
     }
   }

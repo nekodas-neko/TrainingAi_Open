@@ -448,6 +448,16 @@ describe('POST …/session/[sessionId]/transition — one-day vs planned deload 
     expect(updatePrescriptionStatus.mock.calls[0][2]).toBe('accepted')
   })
 
+  it('#3900: "Move to Deload" on a deload the AI plan already applied takes it again and writes nothing', async () => {
+    getSessionPeriodization.mockResolvedValue(state({ prescription: oneDay(), prescriptionStatus: 'auto_applied' }))
+    const res = await transitionPost({ newPhase: 'deload' })
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body).toMatchObject({ phaseMoved: false, prescriptionStatus: 'auto_applied' })
+    expect(advancePhase).not.toHaveBeenCalled()
+    expect(updatePrescriptionStatus).not.toHaveBeenCalled()
+  })
+
   it('a one-day offer in realisation (deload is the adjacent phase) still leaves the phase', async () => {
     getSessionPeriodization.mockResolvedValue(state({ phase: 'realisation', prescription: oneDay(), prescriptionStatus: 'pending' }))
     await transitionPost({ newPhase: 'deload' })

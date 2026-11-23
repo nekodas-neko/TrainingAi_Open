@@ -1,6 +1,6 @@
 import type { AiPrescription, AiPrescriptionExercise } from '@trainingai/shared/types/ai-periodization'
 import { computePerExerciseDeload, RECENTLY_TRAINED_NOTE_PREFIX, type PerExerciseDeloadInput } from './per-exercise-deload'
-import { shouldTriggerEmergencyDeload, type EmergencySignals, type EmergencyState } from './emergency-deload'
+import { shouldTriggerEmergencyDeload, emergencyDeloadTrigger, type EmergencySignals, type EmergencyState } from './emergency-deload'
 import type { IllnessFlag } from '@trainingai/shared/health/illness-radar'
 import { recostPrescription, rowNumbersMoved, type FigureSignals } from './prescription-figures'
 import { prescriptionAgedOut } from './prescription-expiry'
@@ -106,7 +106,12 @@ export function reevaluatePrescriptionForToday(
   signals: ReevaluationSignals,
   // `sessionsInPhase` (#3876): absent, a finished deload is not checked (`deloadEndDue`).
   // `programDeload`: an aligned program's deload ends at the program's cap instead.
-  state: EmergencyState & { sessionsInPhase?: number; programDeload?: ProgramDeloadCheck | null },
+  state: EmergencyState & { sessionsInPhase?: number; programDeload?: ProgramDeloadCheck | null;
+    // #3900 third review (3): a workout of this type is under way (`isSessionUnderWay`). Time passing
+    // (an expiry, a deload's end) does not re-plan it, and a signal that would re-plan it (a sick or
+    // heavy-soreness report) lightens its remaining rows here instead, because generation holds an
+    // under-way plan and a re-plan could not land. Absent, every line below is as it was.
+    underWay?: boolean },
   now = new Date(),
   // Issue 2592: the inputs `prescriptionFigures` costs a row with. Present, a deload or revert that
   // moves a row's numbers re-costs the two whole-session figures through that one function; absent
@@ -139,10 +144,11 @@ export function reevaluatePrescriptionForToday(
   // the emergency-deload suppression below owned. That suppression only reads an UNEXPIRED pending
   // deload, so ageing an expired offer out cannot race it, and the exemption left every expired offer
   // in place: a week-old rest day (#3700) and a pending stay, which drives load (#3714).
-  if (prescriptionAgedOut(state, now)) {
+  const underWay = state.underWay === true
+  if (!underWay && prescriptionAgedOut(state, now)) {
     return { prescription, changed: false, needsRegenerate: true }
   }
-  if (deloadEndDue(prescription, state, state.programDeload)) {
+  if (!underWay && deloadEndDue(prescription, state, state.programDeload)) {
     return { prescription, changed: false, needsRegenerate: true }
   }
 
@@ -161,7 +167,8 @@ export function reevaluatePrescriptionForToday(
     repCompletionRate: null,
     selfReportedSick: signals.selfReportedSick,
   }
-  if (shouldTriggerEmergencyDeload(emergencySignals, state, now)) {
+  const emergency = shouldTriggerEmergencyDeload(emergencySignals, state, now)
+  if (emergency && !underWay) {
     return { prescription, changed: false, needsRegenerate: true }
   }
 
@@ -173,13 +180,28 @@ export function reevaluatePrescriptionForToday(
     signals.recentlyTrainedMusclesInSession ?? [],
   )
 
-  if (perEx.outcome === 'whole_session') {
+  if (perEx.outcome === 'whole_session' && !underWay) {
     return { prescription, changed: false, needsRegenerate: true }
   }
 
   const illnessDeload = signals.illnessFlag === 'elevated' || signals.illnessFlag === 'fever'
   const nowDeloadedIds = perEx.outcome === 'per_exercise' ? new Set(perEx.deloadedIds) : new Set<string>()
   const notes: Record<string, string> = { ...perEx.notes }
+  // Under way, the re-plan a signal calls for cannot land, so every row is lightened (the per-exercise
+  // deload, applied to the whole session) with the reason the re-plan would have given.
+  if (underWay && (emergency || perEx.outcome === 'whole_session')) {
+    // The reason shown is the one that fired: the emergency trigger's own note (illness, or several
+    // sore muscles after a recent session), never "unwell" for a session lightened for soreness.
+    const emergencyNote = emergency ? emergencyDeloadTrigger(emergencySignals)?.note : undefined
+    const soreNote = perEx.outcome === 'whole_session' && perEx.matchedMuscles.length > 0
+      ? `Deload — ${perEx.matchedMuscles.map(m => m.toLowerCase()).join(' & ')} still sore`
+      : undefined
+    const wholeNote = soreNote ?? emergencyNote ?? 'Deload — several muscles are sore'
+    for (const ex of signals.exercises) {
+      nowDeloadedIds.add(ex.sessionExerciseId)
+      if (!notes[ex.sessionExerciseId]) notes[ex.sessionExerciseId] = wholeNote
+    }
+  }
   if (illnessDeload) {
     for (const ex of signals.exercises) {
       nowDeloadedIds.add(ex.sessionExerciseId)

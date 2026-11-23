@@ -22,10 +22,18 @@ export function prescriptionDrivesLoad(
   phaseAction: string,
   status: PrescriptionStatus,
 ): boolean {
-  if (status === 'accepted' || status === 'auto_applied') return true
+  if (status === 'accepted') return true
+  // #3900 review (E): on the AI plan a rest-day or swap suggestion is stored `auto_applied` so it is not
+  // an offer to answer, but it is a note with its own button, not a plan: it changes nothing on the bar
+  // until tapped, exactly as a pending one (the program's base numbers). No other program kind ever
+  // stores a suggestion `auto_applied`, so for them this is the rule it always was.
+  if (status === 'auto_applied') return !SUGGESTION_ACTIONS.has(phaseAction)
   if (status === 'pending' && PENDING_ACTIONS_THAT_DRIVE_LOAD.has(phaseAction)) return true
   return false
 }
+
+/** A suggestion about WHETHER or WHAT to train today, rather than how: shown as a note, never on the bar. */
+const SUGGESTION_ACTIONS = new Set(['rest_day_recommended', 'session_swap_recommended'])
 
 // Expand a single prescription exercise ({ sets, reps, pct, restSec }) into the per-set
 // progression style the workout screen consumes. A genuine working-pct set carries the

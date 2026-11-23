@@ -3,9 +3,9 @@ import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { buildCardExerciseSignals } from '@trainingai/shared/ai-periodization/signals'
 import { normalizeStoredPrescription } from '@trainingai/shared/ai-periodization/reconcile-prescription'
-import { servePrescriptionState } from '@trainingai/shared/ai-periodization/prescription-expiry'
 import { fitStoredPlanToCheckinBudget } from '@trainingai/shared/ai-periodization/checkin-plan-budget'
-import { readProgramDeloadCheck } from '@trainingai/shared/ai-periodization/program-phase'
+import { adoptPendingAiPlan } from '@trainingai/shared/ai-periodization/pending-plan-adoption'
+import { serveStoredPrescription } from '@trainingai/shared/ai-periodization/program-phase'
 import { DEFAULT_TZ } from '@trainingai/shared/date-utils'
 import type { Baseline1rmEntry } from '@trainingai/shared/types/ai-periodization'
 import { invalidUuidResponse } from '@/lib/api/route-errors'
@@ -33,6 +33,8 @@ export async function GET(
   // #3890: in the applies-to week, the weekly check-in's shorter session (no model call, no query for
   // a person without one).
   state = await fitStoredPlanToCheckinBudget(userId, sessionId, repo, session?.user?.timezone ?? DEFAULT_TZ, state)
+  // #3900 review (H): a plan left `pending` from before the AI plan applied every plan by itself.
+  state = await adoptPendingAiPlan(userId, sessionId, repo, session?.user?.timezone ?? DEFAULT_TZ, program, state)
 
   // BF-143. "Has this session been trained since its baseline phase began?" — the only honest test
   // of the interruption the auto-heal below exists to repair, and the one the old condition lacked.
@@ -94,10 +96,9 @@ export async function GET(
   // #3876: so does a plan whose deload has ended. Served, its `deload: true` was adopted by the
   // Deload toggle, and Preview trained a third deload session after the exit. On an aligned program
   // the program's cap decides that (`readProgramDeloadCheck`); a failed read falls back to the type's count.
-  const programDeload = program?.phaseMode === 'ai_dynamic'
-    ? await readProgramDeloadCheck(repo, userId, program.id, state, session?.user?.timezone ?? DEFAULT_TZ).catch(() => null)
-    : null
-  const served = servePrescriptionState(state, new Date(), programDeload)
+  // #3900 third review (1): a plan held because its workout is under way is served as the plan, as
+  // `/api/workout-data` keeps driving the bar by it (`serveStoredPrescription`).
+  const served = await serveStoredPrescription(repo, userId, program, state, session?.user?.timezone ?? DEFAULT_TZ)
 
   // A stored prescription can carry a no-op transition (target phase === current phase)
   // from before the generation-time guard landed; those rows live up to 7 days. Normalise

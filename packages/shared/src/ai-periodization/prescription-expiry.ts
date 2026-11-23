@@ -17,6 +17,11 @@ export const PRESCRIPTION_TTL_MS = 7 * 86_400_000
 export interface ExpiryContext {
   /** The emergency deload fired on the lifter's own sick report (`EmergencyTrigger.kind === 'illness'`). */
   illnessTriggered?: boolean
+  /** #3900 review (F): the plan is for an `ai_dynamic` program, where a deload the engine prescribes is
+   *  stored applied. There every one-day deload answers today, whatever triggered it: kept for the
+   *  week, an applied one would be held (`holdsOneDayDeload`) at deload loads for days after its
+   *  trigger had cleared. The other program kinds keep the rule above unchanged. */
+  aiPlan?: boolean
 }
 
 /**
@@ -40,7 +45,7 @@ export function isOneDayPrescription(
 ): boolean {
   if (prescription.phaseAction === 'rest_day_recommended') return true
   if (prescription.phaseAction === 'session_swap_recommended') return true
-  return prescription.phaseAction === 'deload_recommended' && ctx.illnessTriggered === true
+  return prescription.phaseAction === 'deload_recommended' && (ctx.illnessTriggered === true || ctx.aiPlan === true)
 }
 
 /**
@@ -67,7 +72,8 @@ export function prescriptionExpiresAt(
  *  be exempt, on the grounds that the emergency-deload suppression owned an offer's expiry. It only
  *  ever owned an UNEXPIRED pending deload, so nothing retired an expired offer: #3700 found a week-old
  *  sick-day rest offer served as the plan, and #3714 a pending stay. A stay is stored `pending`
- *  whenever `autoApplyPrescriptions` is off or the model's confidence is under the auto-apply bar,
+ *  whenever `autoApplyPrescriptions` is off or the model's confidence is under the auto-apply bar
+ *  (on `automatic` and `manual` programs; on the AI plan every plan applies by itself since #3900),
  *  and it drives load, so a session left unused for over a week kept replaying its last plan: the
  *  Q-229 / BF-179 class through the one status those fixes exempted. Past its expiry, an offer of
  *  any kind is pending regeneration.
@@ -112,6 +118,18 @@ export function servePrescriptionState<T extends Pick<SessionPeriodization, 'pre
     && deloadEndDue(state.prescription, { phase: state.phase, sessionsInPhase: state.sessionsInPhase }, programDeload)
   if (!deloadEnded && !prescriptionAgedOut(state, now)) return state
   return { ...state, prescription: null, prescriptionAgedOut: true } as ServedPrescriptionState<T>
+}
+
+/**
+ * #3900 third review (1): a stored plan served while a workout of its type is under way. Its plan
+ * keeps driving the bar (`/api/workout-data`), so the session-state reads must not call it aged out
+ * either: they return it, and an expiry already past goes out as `null` ("no expiry"), because the
+ * screens (web and native) also read the expiry off the wire and would hide the card by it. The
+ * stored row is untouched; a future expiry is left as it is so a cached copy still ages out.
+ */
+export function holdPrescriptionUnderWay<T extends Pick<SessionPeriodization, 'prescriptionExpiresAt'>>(state: T, now = new Date()): T {
+  if (state.prescriptionExpiresAt == null || state.prescriptionExpiresAt > now) return state
+  return { ...state, prescriptionExpiresAt: null }
 }
 
 /** The client's side of `servePrescriptionState`, for a state read off the wire or a cache. */
