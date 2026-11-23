@@ -210,12 +210,18 @@ const ok = (r: Awaited<ReturnType<typeof generatePrescriptionForSession>>) => {
   if (!r.ok) throw new Error(`generation failed: ${r.error}`)
   return r
 }
+/** Inside the clamp every plan's compounds are held to (the zone's ceiling, a back-off under its floor). */
 const inClamp = (goal: string, phase: PeriodizationPhase, row: AiPrescription['exercises'][number], role: 'primary' | 'secondary') => {
   const zone = intensityZoneForRole(goal as never, phase, role)
   const primary = intensityZoneForRole(goal as never, phase, 'primary')
   const lo = clampPrescribedPct(-1, zone)
   const hi = role === 'secondary' ? (primary.pctMax ?? 85) : (zone.pctMax ?? Infinity)
   return row.pct >= lo && row.pct <= hi
+}
+/** Inside the phase's own zone, load and reps: what the prompt tells the model to use there. */
+const inZone = (goal: string, phase: PeriodizationPhase, row: AiPrescription['exercises'][number]) => {
+  const zone = intensityZoneForRole(goal as never, phase, 'primary')
+  return row.pct >= zone.pctMin && row.pct <= zone.pctMax && row.reps >= zone.repMin && row.reps <= zone.repMax
 }
 
 describe('the status decision (aiPlanStatus)', () => {
@@ -304,6 +310,8 @@ describe('a move forced by the window cap applies with its loads in the new phas
       expect(r.prescriptionStatus).toBe('auto_applied')
       expect(r.prescription.phase).toBe(to)
       expect(inClamp('strength', to, r.prescription.exercises.find(e => e.sessionExerciseId === 'p')!, 'primary')).toBe(true)
+      // Not merely inside the clamp's floor: the primary is in the new phase's own zone, load and reps.
+      expect(inZone('strength', to, r.prescription.exercises.find(e => e.sessionExerciseId === 'p')!)).toBe(true)
       expect(inClamp('strength', to, r.prescription.exercises.find(e => e.sessionExerciseId === 's')!, 'secondary')).toBe(true)
       // The loads are recorded as the new phase's, so a re-fit caps against it (#3713).
       expect(r.prescription.refitBaseline?.phase).toBe(to)
@@ -315,6 +323,35 @@ describe('a move forced by the window cap applies with its loads in the new phas
       expect([...h.db.values()].every(row => row.phase === to)).toBe(true)
     })
   }
+
+  it('every rule after the model still runs on the moved rows: a tapped Harder cuts below the zone\'s floor', async () => {
+    mocks.signals = signals({
+      exercises: [
+        exercise('p', 'primary', 'quadriceps', { rpeDelta: 1.5, effortAnswer: 1, rm1Trend: 'down' } as Partial<Ex>),
+        exercise('s', 'secondary', 'back'), exercise('a', 'accessory', 'biceps'),
+      ],
+    })
+    mocks.answer = answer('accumulation', 'stay', 70, 6)
+    const r = ok(await program({ kind: 'ai_dynamic', now: NOW, weeksDone: CAP.accumulation }).run())
+    const p = r.prescription.exercises.find(e => e.sessionExerciseId === 'p')!
+    const zone = intensityZoneForRole('strength', 'intensification', 'primary')
+    expect(p.autoregNote).toMatch(/felt harder/)
+    expect(p.pct).toBeLessThan(zone.pctMin)
+    expect(inClamp('strength', 'intensification', p, 'primary')).toBe(true)
+  })
+
+  it('a row the soreness deload cut keeps its deload numbers, and Full puts back the new phase\'s', async () => {
+    mocks.signals = signals({ soreMusclesInSession: ['quadriceps'], sorenessLogDate: 'today', hoursSinceLastSession: 60 })
+    mocks.answer = answer('accumulation', 'stay', 70, 6)
+    const r = ok(await program({ kind: 'ai_dynamic', now: NOW, weeksDone: CAP.accumulation }).run())
+    expect(r.prescriptionStatus).toBe('auto_applied')
+    const p = r.prescription.exercises.find(e => e.sessionExerciseId === 'p')!
+    expect(p.deloaded).toBe(true)
+    const zone = intensityZoneForRole('strength', 'intensification', 'primary')
+    expect(p.pct).toBeLessThan(zone.pctMin)
+    expect(p.preDeload!.pct).toBeGreaterThanOrEqual(zone.pctMin)
+    expect(p.preDeload!.reps).toBeLessThanOrEqual(zone.repMax)
+  })
 
   it('the same answer on main\'s path (automatic) keeps the old phase\'s loads and waits', async () => {
     mocks.answer = answer('accumulation', 'stay', 70, 5)
@@ -332,7 +369,7 @@ describe('a move forced by the window cap applies with its loads in the new phas
     const r = ok(await h.run())
     expect(r.prescription.phase).toBe('intensification')
     expect(r.prescriptionStatus).toBe('auto_applied')
-    expect(inClamp('strength', 'intensification', r.prescription.exercises[0], 'primary')).toBe(true)
+    expect(inZone('strength', 'intensification', r.prescription.exercises[0])).toBe(true)
     expect(h.log.moves).toEqual([['accumulation', 'intensification']])
   })
 
@@ -382,7 +419,7 @@ describe('the window cap across a week boundary, in a timezone that is not the d
     const r = ok(await h.run())
     expect(r.prescription.phase).toBe('intensification')
     expect(r.prescriptionStatus).toBe('auto_applied')
-    expect(inClamp('strength', 'intensification', r.prescription.exercises[0], 'primary')).toBe(true)
+    expect(inZone('strength', 'intensification', r.prescription.exercises[0])).toBe(true)
     expect(inClamp('strength', 'intensification', r.prescription.exercises[1], 'secondary')).toBe(true)
     expect(h.log.moves).toEqual([['accumulation', 'intensification']])
   })

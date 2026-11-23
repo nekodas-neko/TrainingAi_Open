@@ -788,6 +788,35 @@ async function runPrescriptionGeneration(
     ? guardMoveTarget(programPhase, programMove, state.phase, parsed.phase_action)
     : null
   const loadPhase = (forcedMove ?? parsed.phase) as typeof parsed.phase
+  // The model wrote its rows for the phase it was asked in. The clamp below alone would keep a load the
+  // old phase's zone gave (its floor is one back-off under the zone's, room left for autoregulation), so
+  // the first session of the new phase would still be trained at the old phase's numbers. Each compound
+  // row is first put inside the new phase's zone, load, reps and sets: the numbers the prompt tells the
+  // model to use in that phase. A row the per-exercise deload cut keeps its deload numbers, and an
+  // accessory keeps the goal's own band, as on every plan. Every rule after the model then runs on it.
+  if (forcedMove != null) {
+    const roleOf = new Map(signals.exercises.map(e => [e.sessionExerciseId, e.role]))
+    const intoZone = <T extends { sets: number; reps: number; pct: number }>(row: T, role: string): T => {
+      const zone = intensityZoneForRole(signals.trainingGoal, forcedMove, role)
+      return {
+        ...row,
+        pct: Math.min(zone.pctMax, Math.max(zone.pctMin, row.pct)),
+        reps: Math.min(zone.repMax, Math.max(zone.repMin, row.reps)),
+        sets: Math.min(zone.setsMax, Math.max(zone.setsMin, row.sets)),
+      }
+    }
+    for (const ex of parsed.exercises) {
+      const role = roleOf.get(ex.session_exercise_id) ?? UNCLASSIFIED_EXERCISE_ROLE
+      if (role === 'accessory') continue
+      if (deloadedIds.has(ex.session_exercise_id)) {
+        // What Full puts back on a row the soreness deload cut: the new phase's numbers too.
+        const full = preDeloadById.get(ex.session_exercise_id)
+        if (full) preDeloadById.set(ex.session_exercise_id, intoZone(full, role))
+        continue
+      }
+      Object.assign(ex, intoZone(ex, role))
+    }
+  }
 
   // #3896: a lift's stored preference, enforced after the model. Nothing the model said gates it; the
   // prompt only told it the range. Not in a deload or a baseline (design §3a), and never on a row the
