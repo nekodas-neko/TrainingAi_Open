@@ -1,4 +1,4 @@
-import { bodyweightRepMax, displayOneRm, isEstimatedOneRm, oneRmLabel } from '@trainingai/shared/1rm';
+import { bodyweightRepMax, isEstimatedOneRm, oneRmLabel, oneRmText } from '@trainingai/shared/1rm';
 import { View } from 'react-native';
 import { Pressable } from '../../../shared/ui/Pressable';
 import { AppText, Card, Icon, Stack } from '../../../shared/ui';
@@ -7,6 +7,7 @@ import { formatDuration } from '../../../shared/hooks/useClock';
 import type { WorkoutExercise, WorkoutRecord } from '../logging/workout';
 import { exerciseResult } from '../logging/summary';
 import { formatSetLoad } from '../logging/targets';
+import { loadLabel } from '../logging/preferences';
 import { RestCard } from './WorkoutClocks';
 import { EffortQuestion } from './EffortQuestion';
 import { effortQuestionExercises } from '../logging/effort';
@@ -90,7 +91,7 @@ export function ExerciseSummary({
             <AppText variant="label" tone="muted">
               {next.exerciseType === 'bodyweight' && Number(next.sets[0].weight) === 0
                 ? 'Bodyweight'
-                : `${next.sets[0].weight} kg`}
+                : loadLabel(next.sets[0].weight, next.weightUnit)}
             </AppText>
           </Stack>
         </Card>
@@ -173,7 +174,7 @@ export function ExerciseSummary({
                 ? '—'
                 : exercise.exerciseType === 'bodyweight'
                   ? `${previous} RM`
-                  : displayOneRm(previous, exercise.exerciseType).text}
+                  : (oneRmText(previous, exercise.exerciseType) ?? '—')}
             </AppText>
           </Stack>
           {difference !== null && (
@@ -189,9 +190,7 @@ export function ExerciseSummary({
             <AppText variant="heading" style={{ color }}>
               {result.repMax !== null
                 ? `${result.repMax} RM`
-                : result.estimate === null
-                  ? '—'
-                  : displayOneRm(result.estimate, exercise.exerciseType).text}
+                : (oneRmText(result.estimate, exercise.exerciseType) ?? '—')}
             </AppText>
           </Stack>
         </Stack>

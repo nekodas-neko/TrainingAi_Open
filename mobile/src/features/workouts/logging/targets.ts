@@ -67,7 +67,7 @@ export function isUnloadedSet(
 }
 
 export function formatSetLoad(
-  exercise: Pick<WorkoutExercise, 'exerciseType'>,
+  exercise: Pick<WorkoutExercise, 'exerciseType'> & Partial<Pick<WorkoutExercise, 'weightUnit'>>,
   set: Pick<WorkoutSet, 'weight' | 'reps'>,
 ) {
   if (isUnloadedSet(exercise, set)) {
@@ -75,7 +75,7 @@ export function formatSetLoad(
   }
   const prefix =
     exercise.exerciseType === 'bodyweight' && Number(set.weight) > 0 ? '+' : '';
-  return `${prefix}${loadLabel(set.weight)} × ${set.reps} reps`;
+  return `${prefix}${loadLabel(set.weight, exercise.weightUnit)} × ${set.reps} reps`;
 }
 
 // #4061: this only fires after a rated set. Preview's set card no longer has an RPE row, so for new
@@ -150,7 +150,7 @@ export function loadBasis(exercise: WorkoutExercise, set: WorkoutSet) {
       : exercise.target80 !== null || exercise.estimated1rm !== null
         ? `Suggested from the saved strength target, rounded to ${step} kg increments.`
         : exercise.latestWeight !== null
-          ? `Starting suggestion from the last saved load (${loadLabel(exercise.latestWeight)}), rounded to equipment increments.`
+          ? `Starting suggestion from the last saved load (${loadLabel(exercise.latestWeight, exercise.weightUnit)}), rounded to equipment increments.`
           : 'Default starting load; no personalised strength or previous-load basis is available. Choose a suitable load.';
   return `${basis} Your edits change this workout's entered load; the original prescription stays saved.`;
 }

@@ -3,6 +3,7 @@ import { AppButton, AppText, Card, IconButton, Stack } from '../../../shared/ui'
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { useWorkoutJournal } from '../logging/WorkoutJournalProvider';
 import { loadSuggestion } from '../logging/targets';
+import { loadLabel } from '../logging/preferences';
 import type { WorkoutExercise, WorkoutRecord, WorkoutSet } from '../logging/workout';
 
 export function LoadSuggestion({
@@ -31,7 +32,7 @@ export function LoadSuggestion({
       <Stack direction="row" align="center" gap="sm">
         <View style={{ flex: 1, minWidth: 0 }}>
           <AppText variant="caption" style={{ color: theme.anatomy.secondary }}>
-            Drop to {suggestion.weightKg} kg?
+            Drop to {loadLabel(suggestion.weightKg, exercise.weightUnit)}?
           </AppText>
           <AppText variant="micro" tone="muted" numberOfLines={1}>
             {suggestion.note}

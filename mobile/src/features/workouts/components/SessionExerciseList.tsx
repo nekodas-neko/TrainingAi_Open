@@ -6,6 +6,8 @@ import { useTheme } from '../../../shared/theme/ThemeProvider';
 import type { ExercisePreview } from '../catalog';
 import { ExerciseThumbnail } from './ExerciseHeading';
 import { formatSetLoad } from '../logging/targets';
+import { weightUnitOf } from '../logging/preferences';
+import { useWeightUnits } from '../logging/WorkoutJournalProvider';
 import { normalizeMuscle } from '@trainingai/shared/muscles';
 
 export function SessionExerciseList({
@@ -23,6 +25,7 @@ export function SessionExerciseList({
   trailing?: (exercise: ExercisePreview) => ReactNode;
 }) {
   const { theme } = useTheme();
+  const units = useWeightUnits();
   return (
     <Stack gap="sm">
       {exercises.map((exercise, index) => {
@@ -62,7 +65,7 @@ export function SessionExerciseList({
                         </AppText>
                         <AppText variant="micro" tone="muted">
                           {exercise.lastReps?.length
-                            ? `Last: ${exercise.lastReps.map((reps, index) => formatSetLoad(exercise, { weight: String(exercise.lastWeights[index] ?? exercise.lastWeights.at(-1) ?? 0), reps: String(reps) })).join(', ')}${exercise.lastDate ? ` · ${exercise.lastDate}` : ''}`
+                            ? `Last: ${exercise.lastReps.map((reps, index) => formatSetLoad({ ...exercise, weightUnit: weightUnitOf(units, exercise.id) }, { weight: String(exercise.lastWeights[index] ?? exercise.lastWeights.at(-1) ?? 0), reps: String(reps) })).join(', ')}${exercise.lastDate ? ` · ${exercise.lastDate}` : ''}`
                             : 'No previous data'}
                         </AppText>
                       </>

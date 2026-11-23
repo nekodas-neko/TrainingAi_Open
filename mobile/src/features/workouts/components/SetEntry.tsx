@@ -167,7 +167,7 @@ export function SetEntry({
             title={
               Number(set.weight) === 0
                 ? 'Add load / assistance'
-                : `${Number(set.weight) > 0 ? '+' : ''}${loadLabel(set.weight)} load / assistance`
+                : `${Number(set.weight) > 0 ? '+' : ''}${loadLabel(set.weight, unit)} load / assistance`
             }
           >
             {units}
