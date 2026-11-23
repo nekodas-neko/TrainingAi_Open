@@ -886,6 +886,8 @@ export async function getLatestExerciseEfforts(
   const out = new Map<string, { vsPlan: number | null; source: string | null }>()
   if (workoutSessionIds.length === 0 || exerciseNames.length === 0) return out
   const list = (xs: string[]) => sql`${sql.raw('ARRAY[')}${sql.join(xs.map(x => sql`${x}`), sql`, `)}${sql.raw(']::text[]')}`
+  // Cast the parameter array, not the column, so `workout_session_id`'s index stays usable.
+  const uuidList = (xs: string[]) => sql`${sql.raw('ARRAY[')}${sql.join(xs.map(x => sql`${x}`), sql`, `)}${sql.raw(']::uuid[]')}`
   const res = await db.execute(sql`
     WITH lifts AS (
       SELECT n.name AS lift, l.id AS lib_id
@@ -896,7 +898,7 @@ export async function getLatestExerciseEfforts(
       FROM lifts
       JOIN exercise_logs el
         ON el.deleted_at IS NULL
-       AND el.workout_session_id::text = ANY(${list(workoutSessionIds)})
+       AND el.workout_session_id = ANY(${uuidList(workoutSessionIds)})
        AND (
          (lifts.lib_id IS NOT NULL AND el.exercise_id = lifts.lib_id)
          OR (el.exercise_name = lifts.lift AND (el.exercise_id IS NULL OR lifts.lib_id IS NULL OR el.exercise_id = lifts.lib_id))

@@ -8,7 +8,9 @@ import type { WorkoutExercise, WorkoutRecord } from './workout.ts';
 // #3745: "how did this exercise feel?", asked once per exercise on the rest card after its last
 // set. The question starts on As expected (owner, 20 Nov), stored as `default` until a tap makes it
 // `tapped`. An exercise left before its last set, or a workout abandoned with the question still
-// open, stores nothing. Nothing reads the answer yet; it is only kept and uploaded.
+// open, stores nothing. #4061: a tapped Easier or Harder is the plan's effort signal in place of rated
+// RPE (the set card no longer has an RPE row), read server-side when the next plan for this session
+// type is made. A default (untouched) answer is not read.
 
 /** How long the picture-in-picture window offers the three answers, from the rest's start. */
 export const EFFORT_PIP_MS = 20_000;

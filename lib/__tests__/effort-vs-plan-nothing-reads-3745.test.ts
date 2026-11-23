@@ -174,7 +174,7 @@ const LIVE_READERS: Record<string, Carrier> = {
       "import { EFFORT_VS_PLAN_LABELS } from '@trainingai/shared/workout/effort-vs-plan'",
       'const effortAnswers = signals.exercises',
       '.filter(ex => ex.effortAnswer === 1 || ex.effortAnswer === -1)',
-      '.map(ex => `${ex.name}: ${EFFORT_VS_PLAN_LABELS[ex.effortAnswer!].toLowerCase()}`)',
+      '.map(ex => `${promptLineName(ex.name)}: ${EFFORT_VS_PLAN_LABELS[ex.effortAnswer!].toLowerCase()}`)',
       'const effortInfo = effortAnswers.length > 0',
       "? `\\nEffort answer (the lifter's tap after the lift's last set, latest session; read in place of RPE for that lift): ${effortAnswers.join('; ')}`",
     ],

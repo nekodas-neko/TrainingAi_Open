@@ -45,6 +45,8 @@ export function buildRecapFacts({ session, recentDurationsMin, restSecByStyleSet
     ),
   )
 
+  // #4061: Preview's set card has no RPE row, so its new sets are never rated and this drift is null
+  // for them. The tapped end-of-lift answer is not read here (#4068).
   const rpeDeltas: number[] = []
   for (const ex of session.exercises) {
     // #3893: a pre-filled effort is not an answer, so an untouched picker cannot read as "no climb".

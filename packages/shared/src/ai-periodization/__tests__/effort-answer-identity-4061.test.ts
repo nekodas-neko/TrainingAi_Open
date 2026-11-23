@@ -271,6 +271,20 @@ describe.skipIf(!!process.env.EFFORT_4061_RECORD)('a tapped answer gives the pla
     }
   }, 60_000)
 
+  it('a tapped As expected on the latest log cancels a rated delta on the same log', async () => {
+    // Rated sets running +2 high with a rep short would cut the load. The same log with a tapped
+    // As expected reads as no signal, so the plan is the one for untouched sets with the same miss.
+    let cut = 0
+    for (const base of equivalenceGrid) {
+      const rated = await generate({ ...base, history: 'rated-high-missed', answer: 'none' })
+      const cancelled = await generate({ ...base, history: 'rated-high-missed', answer: 'tapped-as-expected' })
+      const noSignal = await generate({ ...base, history: 'expected-missed', answer: 'none' })
+      expect(figures(cancelled.stored), label(base)).toEqual(figures(noSignal.stored))
+      if (JSON.stringify(figures(rated.stored)) !== JSON.stringify(figures(cancelled.stored))) cut++
+    }
+    expect(cut, 'the rated delta alone must have moved some plans, or this proves nothing').toBeGreaterThan(0)
+  }, 60_000)
+
   it('the answer moves the plan exactly where the rule acts', () => {
     // Harder with a miss or a falling 1RM cuts; Easier with reps met bumps (not in a realisation
     // block, which takes no rep push). Harder alone, and Easier with a miss, move nothing. Deload

@@ -235,6 +235,12 @@ function phaseLine(signals: PrescriptionSignals): string {
   return `${signals.phase} for the whole program (training week ${p.trainingWeeksDone + 1}; ${p.trainingWeeksDone} training weeks done${cap}; ${own})`
 }
 
+/** A user-named exercise as one prompt line's worth of text: line breaks and runs of whitespace become
+ *  single spaces, so a name cannot imitate a prompt line of its own (#4061). Ordinary names are unchanged. */
+export function promptLineName(name: string): string {
+  return name.replace(/\s+/g, ' ').trim()
+}
+
 export function buildUserPrompt(
   signals: PrescriptionSignals,
   state: SessionPeriodization,
@@ -281,7 +287,7 @@ export function buildUserPrompt(
     const holdStr = holdBar != null && holdBar > 0
       ? `, held_this_week: no heavier than ${holdBar} kg (the lifter called last week heavy; do not add load)`
       : ''
-    return `  - ${ex.name} (id: ${ex.sessionExerciseId}, role: ${ex.role}, muscles: ${musclesStr}, ` +
+    return `  - ${promptLineName(ex.name)} (id: ${ex.sessionExerciseId}, role: ${ex.role}, muscles: ${musclesStr}, ` +
       `baseline_1rm: ${oneRm(ex.baseline1rm)} [anchor only — do not use for trend], ` +
       `current_1rm: ${oneRm(ex.current1rm)}, ` +
       `rm1_trend: ${ex.rm1Trend} ${rm1Change(ex)}, ` +
@@ -297,7 +303,7 @@ export function buildUserPrompt(
   // does not argue with it. Written from the stored value only; no line when no lift has one.
   const effortAnswers = signals.exercises
     .filter(ex => ex.effortAnswer === 1 || ex.effortAnswer === -1)
-    .map(ex => `${ex.name}: ${EFFORT_VS_PLAN_LABELS[ex.effortAnswer!].toLowerCase()}`)
+    .map(ex => `${promptLineName(ex.name)}: ${EFFORT_VS_PLAN_LABELS[ex.effortAnswer!].toLowerCase()}`)
   const effortInfo = effortAnswers.length > 0
     ? `\nEffort answer (the lifter's tap after the lift's last set, latest session; read in place of RPE for that lift): ${effortAnswers.join('; ')}`
     : ''

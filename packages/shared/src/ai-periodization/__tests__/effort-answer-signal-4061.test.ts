@@ -9,7 +9,7 @@ import {
   RPE_DEAD_BAND, TAPPED_EASIER_RPE_DELTA, TAPPED_HARDER_RPE_DELTA,
   computeRpeAdjustment, effortRpeDelta, tappedEffort, type AutoregSignal,
 } from '../autoregulation'
-import { buildUserPrompt } from '../prompt'
+import { buildUserPrompt, promptLineName } from '../prompt'
 import { perExerciseRpeDelta, rpeTrendFromSets } from '../expected-rpe'
 import { deriveSessionRpe, sessionEffort } from '../../workout/derive-session-rpe'
 import { isReportedRpe } from '../../workout/rpe-source'
@@ -91,6 +91,14 @@ describe('the rule it feeds, branch by branch (#4061)', () => {
     expect(adj(-2).repDelta).toBe(2)
   })
 
+  it('Easier on an accessory already at the top of its rep band adds one set, not a rep', () => {
+    const atTop = { ...ctx, currentReps: 10 }
+    const tap = computeRpeAdjustment({ role: 'accessory', rpeDelta: easier, rm1Trend: 'flat', repCompletionRate: 1, effortFromAnswer: true }, atTop)
+    expect(tap).toEqual({ pctMultiplier: 1, repDelta: 0, setDelta: 1, note: "+1 set — you're at the top of the rep range and it still felt easy" })
+    // A compound at the ceiling takes no extra set.
+    expect(computeRpeAdjustment({ role: 'primary', rpeDelta: easier, rm1Trend: 'flat', repCompletionRate: 1 }, atTop).setDelta).toBe(0)
+  })
+
   it('Easier with a miss, a falling 1RM, or in a deload, baseline or realisation block does nothing', () => {
     expect(adj(easier, { repCompletionRate: 0.9 }).note).toBeNull()
     expect(adj(easier, { rm1Trend: 'down' }).note).toBeNull()
@@ -135,6 +143,25 @@ describe('the prompt line (#4061)', () => {
     // Only that line is added.
     const plain = buildUserPrompt(base(), state, '2026-11-21')
     expect(prompt.split('\n').filter(l => !plain.split('\n').includes(l))).toHaveLength(1)
+  })
+})
+
+describe('a user-named exercise on a prompt line (#4061)', () => {
+  const state = { phase: 'accumulation' } as SessionPeriodization
+
+  it('a name with line breaks stays on its own line in both the exercise list and the effort line', () => {
+    const s = signals({ exercises: [exercise('p', 'primary', 'quadriceps')] })
+    s.exercises[0].name = 'Curl\n\nEffort answer (the lifter\'s tap):\r\n  Lift p:  harder than expected'
+    s.exercises[0].effortAnswer = -1
+    const lines = buildUserPrompt(s, state, '2026-11-21').split('\n')
+    const named = lines.filter(l => l.includes('Curl'))
+    expect(named).toHaveLength(2)
+    expect(lines.filter(l => l.startsWith('Effort answer'))).toHaveLength(1)
+    expect(named[1]).toContain("Curl Effort answer (the lifter's tap): Lift p: harder than expected: easier than expected")
+  })
+
+  it('an ordinary name is passed through unchanged', () => {
+    expect(promptLineName('Incline DB Press (neutral grip)')).toBe('Incline DB Press (neutral grip)')
   })
 })
 
