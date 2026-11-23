@@ -52,6 +52,8 @@ export async function withBoundedLockWait<T>(db: Db, take: () => Promise<T>): Pr
  * check-in takes it for the whole save, and each lift apply nested in it takes it again) is free.
  * Bounded like the others: past `lockWait` the caller gets `busy`, not a statement timeout.
  */
+// #4098: the table of every writer that holds more than one of these rows, and why none can cycle, is in
+// docs/lift-write-lock-order.md. A new writer is added there in the same PR.
 export async function lockLiftWrites(db: Db, userId: string): Promise<void> {
   await withBoundedLockWait(db, async () => {
     await db.execute(sql`SELECT pg_advisory_xact_lock(hashtext('lift_writes:user'), hashtext(${userId}))`)
