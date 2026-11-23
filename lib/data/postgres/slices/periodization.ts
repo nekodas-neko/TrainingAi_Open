@@ -875,13 +875,21 @@ export async function reconcileSessionsInPhase(db: Db, userId: string, programId
   // now: it runs on most reads and is self-healing, so it skips rather than queue behind a check-in (and
   // a writer that never waits cannot be one side of a cycle). The next read repairs what it skipped.
   //
-  // #4082 review 2: the try-lock is part of the same statement (`got`, read by the WHERE only for a row that
-  // really drifted), not a BEGIN / try-lock / UPDATE / COMMIT of its own: this runs on most
-  // `/api/workout-data` reads, and four round trips there was a cost for the common read that has nothing
-  // to repair. One statement is one implicit transaction, so the advisory lock is released with it; a read
-  // with nothing to repair never takes the lock at all, and one that has something costs the same single
-  // round trip it did before the lock. While the lock is held no other lift-lock taker holds any row, and
-  // the lock-free writers hold one row for one statement, so the scan order of the update cannot cycle.
+  // #4082 review 2: the try-lock is part of the same statement (`got`), not a BEGIN / try-lock / UPDATE /
+  // COMMIT of its own: this runs on most `/api/workout-data` reads, and four round trips there was a cost
+  // for the common read. One statement is one implicit transaction, so the advisory lock is released with it.
+  //
+  // #4098: what the statement does, exactly. The try-lock runs FIRST ON EVERY CALL (the planner's One-Time
+  // Filter evaluates `got` once, before any row is looked at), so every read takes the person's lift lock
+  // for the length of this one statement, drift or not; the WHERE only lets the update write while it was
+  // free. A check-in that arrives meanwhile waits milliseconds behind it. It does not queue the other way:
+  // a read that finds the lock held skips the repair.
+  //
+  // Row order: the update does not lock its rows in id order, and no cycle follows. It writes only while it
+  // holds the lift lock, and while it does no other lift-lock taker holds a plan row (each takes the lift
+  // lock before its first row); the lock-free writers (`recordBaselineAnchors` partial, the restate, the
+  // store) hold one row for one statement and wait for nothing while holding it. So it never waits on a
+  // row held by a writer that is itself waiting for this one's rows.
   await db.execute(sql`
     WITH got AS (SELECT pg_try_advisory_xact_lock(hashtext('lift_writes:user'), hashtext(${userId})) AS ok)
     UPDATE session_periodization sp

@@ -9,12 +9,20 @@
  *
  * Real Postgres only (DATABASE_URL). Made-up user; everything removed in `afterAll`.
  */
-import { describe, it, expect, beforeAll, beforeEach, afterAll } from 'vitest'
+import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from 'vitest'
+
+vi.mock('@/lib/observability', () => ({ reportServerError: vi.fn() }))
 import { isBusyError } from '@trainingai/shared/errors'
 
 const canRun = !!process.env.DATABASE_URL
 const TZ = 'Australia/Brisbane'
 const U = '00000000-0000-4000-8000-000000004098'
+const GATE = 40981 // advisory key the triggers below wait on
+const PROGRAM = '00000000-0000-4000-8000-0000000040a1'
+const SLOT = '00000000-0000-4000-8000-0000000040a2'
+const LIFT = 'Q4098 Squat'
+const ALT = 'Q4098 Hack Squat'
+const RENAMED = 'Q4098 Back Squat'
 
 describe.skipIf(!canRun)('lock follow-ups (#4098)', () => {
   let pool: import('pg').Pool
@@ -136,6 +144,112 @@ describe.skipIf(!canRun)('lock follow-ups (#4098)', () => {
       expect(stored.baseline_1rm[exercises[0].id]).toEqual({ kg: 100, source: 'amrap' })
       expect(stored.baseline_1rm[exercises[1].id]).toEqual({ kg: 80, source: 'amrap' })
       expect(stored.baseline_complete, 'the lock was busy, so the phase is completed by the self-heal').toBe(false)
+    })
+  })
+
+  // ── item 5: a check-in's swap accept against an exercise rename, for the same person ───────────────────
+  describe('item 5: swap accept against an exercise rename (same person)', () => {
+    const libIds: string[] = []
+    const ids = {} as Record<string, string>
+    let engine: typeof import('@/lib/weekly-checkin/engine')
+    let checkin: string
+    beforeAll(async () => {
+      engine = await import('@/lib/weekly-checkin/engine')
+      // Gates: while the test holds the advisory lock exclusively, an update of the slot row (the swap) or of
+      // the program row (the rename's bump) waits holding the rows it already locked.
+      await pool.query(`CREATE OR REPLACE FUNCTION test_4098_gate() RETURNS trigger LANGUAGE plpgsql AS $f$
+        BEGIN PERFORM pg_advisory_xact_lock_shared(${GATE}, 1); RETURN NEW; END $f$`)
+    })
+    afterAll(async () => {
+      await pool.query(`DROP TRIGGER IF EXISTS test_4098_slot ON session_exercises`).catch(() => undefined)
+      await pool.query(`DROP TRIGGER IF EXISTS test_4098_program ON programs`).catch(() => undefined)
+      await pool.query(`DROP FUNCTION IF EXISTS test_4098_gate()`).catch(() => undefined)
+      await pool.query(`DELETE FROM exercise_library WHERE id = ANY($1::uuid[]) OR name = ANY($2)`, [libIds, [LIFT, ALT, RENAMED]])
+    })
+    beforeEach(async () => {
+      await pool.query(`DROP TRIGGER IF EXISTS test_4098_slot ON session_exercises`)
+      await pool.query(`DROP TRIGGER IF EXISTS test_4098_program ON programs`)
+      await pool.query(`DELETE FROM exercise_library WHERE name = ANY($1)`, [[LIFT, ALT, RENAMED]])
+      libIds.length = 0
+      const lib: Record<string, string> = {}
+      for (const name of [LIFT, ALT]) {
+        lib[name] = (await pool.query(
+          `INSERT INTO exercise_library (name, equipment, muscles, created_by) VALUES ($1, ARRAY['barbell'], $2::jsonb, $3) RETURNING id`,
+          [name, JSON.stringify([{ muscle: 'q4098-quads', role: 'main' }]), U])).rows[0].id
+        libIds.push(lib[name])
+      }
+      await pool.query(`INSERT INTO programs (id, user_id, name, phase_mode, is_active) VALUES ($1,$2,'Q4098 swap','manual',true)`, [PROGRAM, U])
+      const session = (await pool.query(`INSERT INTO program_sessions (program_id, name, position) VALUES ($1,'Day',0) RETURNING id`, [PROGRAM])).rows[0].id
+      await pool.query(`INSERT INTO session_exercises (id, session_id, exercise_name, exercise_id, position, exercise_role, muscle_groups) VALUES ($1,$2,$3,$4,0,'primary',ARRAY['quadriceps'])`, [SLOT, session, LIFT, lib[LIFT]])
+      await pool.query(`INSERT INTO exercise_preferences (user_id, exercise_name, exercise_id, rep_min, rep_max, source) VALUES ($1,$2,$3,6,8,'coach')`, [U, LIFT, lib[LIFT]])
+      checkin = (await pool.query(
+        `INSERT INTO weekly_checkins (user_id, week_start, applies_week_start, status, saved_at, swap_exercise_name, swap_exercise_id, swap_offer_status)
+         VALUES ($1, '2026-11-09', '2026-11-16', 'saved', now(), $2, $3, 'open') RETURNING id`, [U, LIFT, lib[LIFT]])).rows[0].id
+      ids.alt = lib[ALT]
+      ids.lift = lib[LIFT]
+    })
+
+    const waitUntil = async (what: string, test: () => Promise<boolean>) => {
+      const deadline = Date.now() + 8000
+      while (!(await test())) {
+        if (Date.now() > deadline) throw new Error(`never reached: ${what}`)
+        await new Promise(r => setTimeout(r, 10))
+      }
+    }
+    const blockedBy = async (pid: number) =>
+      (await pool.query(`SELECT pid FROM pg_stat_activity WHERE $1 = ANY(pg_blocking_pids(pid))`, [pid])).rows.map(r => r.pid as number)
+    const code = (err: unknown) => {
+      for (let e: unknown = err, i = 0; e && typeof e === 'object' && i < 5; e = (e as { cause?: unknown }).cause, i++) {
+        const c = (e as { code?: unknown }).code
+        if (typeof c === 'string') return `pg ${c}: ${(e as Error).message}`
+      }
+      return String(err)
+    }
+    const outcome = (r: PromiseSettledResult<unknown>) => (r.status === 'rejected' ? code(r.reason) : 'ok')
+
+    const accept = async () => {
+      const ctx = { db, repo, userId: U, tz: TZ, now: new Date() }
+      return engine.resolveOffer(ctx as never, checkin, { kind: 'swap', toExerciseId: ids.alt } as never, 'accept')
+    }
+    const rename = () => repo.renameExercise(U, ids.lift, RENAMED)
+
+    /** `first` runs until it stops at the gate, holding what it took; `second` queues behind it; the gate opens. */
+    const gated = async (first: () => Promise<unknown>, second: () => Promise<unknown>) => {
+      const gate = await pool.connect()
+      try {
+        await gate.query('BEGIN')
+        await gate.query(`SELECT pg_advisory_xact_lock(${GATE}, 1)`)
+        const gatePid = (await gate.query(`SELECT pg_backend_pid() AS pid`)).rows[0].pid as number
+        const a = first(); a.catch(() => undefined)
+        let firstPid = 0
+        await waitUntil('the first writer held at the gate', async () => { firstPid = (await blockedBy(gatePid))[0] ?? 0; return firstPid > 0 })
+        const b = second(); b.catch(() => undefined)
+        await waitUntil('the second writer queued behind the first', async () => (await blockedBy(firstPid)).length > 0)
+        await gate.query('COMMIT')
+        return await Promise.allSettled([a, b])
+      } finally {
+        await gate.query('ROLLBACK').catch(() => undefined)
+        gate.release()
+      }
+    }
+
+    it('the accept holds the slot row, the rename queues behind it: both finish, no deadlock', async () => {
+      await pool.query(`CREATE TRIGGER test_4098_slot BEFORE UPDATE ON session_exercises FOR EACH ROW WHEN (OLD.id = '${SLOT}'::uuid) EXECUTE FUNCTION test_4098_gate()`)
+      const [accepted, renamed] = await gated(accept, rename)
+      expect(outcome(accepted)).toBe('ok')
+      expect(outcome(renamed)).toBe('ok')
+      expect((await pool.query(`SELECT exercise_name FROM session_exercises WHERE id = $1`, [SLOT])).rows[0].exercise_name).toBe(ALT)
+      expect((await pool.query(`SELECT name FROM exercise_library WHERE id = $1`, [ids.lift])).rows[0].name).toBe(RENAMED)
+    })
+
+    it('the rename holds the slot row, the accept queues behind it: both finish, no deadlock', async () => {
+      // The rename's second statement bumps the program, after its first statement locked the slot row.
+      await pool.query(`CREATE TRIGGER test_4098_program BEFORE UPDATE ON programs FOR EACH ROW WHEN (OLD.id = '${PROGRAM}'::uuid) EXECUTE FUNCTION test_4098_gate()`)
+      const [renamed, accepted] = await gated(rename, accept)
+      expect(outcome(renamed)).toBe('ok')
+      expect(outcome(accepted)).toBe('ok')
+      expect((await pool.query(`SELECT exercise_name FROM session_exercises WHERE id = $1`, [SLOT])).rows[0].exercise_name).toBe(ALT)
+      expect((await pool.query(`SELECT name FROM exercise_library WHERE id = $1`, [ids.lift])).rows[0].name).toBe(RENAMED)
     })
   })
 })

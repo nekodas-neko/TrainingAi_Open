@@ -503,7 +503,7 @@ describe.skipIf(!canRun)('the other multi-row writers in the lift-write lock ord
       expect(outcome(joined)).toBe('ok')
     }, 30_000)
 
-    it('a read with nothing to repair takes no lock and writes nothing; one with drift repairs in one statement', async () => {
+    it('a read with nothing to repair writes nothing and holds the lift lock for its one statement only; one with drift repairs in one statement (#4098: the lock is tried on every call)', async () => {
       await seed()
       await pool.query(`UPDATE session_periodization SET sessions_in_phase = 9 WHERE user_id = $1 AND baseline_complete`, [U])
       await period.reconcileSessionsInPhase(db, U, ids.program)
@@ -512,6 +512,11 @@ describe.skipIf(!canRun)('the other multi-row writers in the lift-write lock ord
       // Nothing left to repair now: runs while the lift lock is held by someone else, and changes nothing.
       await withLiftLockHeld(async () => { await period.reconcileSessionsInPhase(db, U, ids.program) })
       expect(await counters()).toEqual(settled)
+      // The lock the call tried is gone with its statement: another connection takes it at once.
+      await period.reconcileSessionsInPhase(db, U, ids.program)
+      const free = (await pool.query(`SELECT pg_try_advisory_lock(hashtext('lift_writes:user'), hashtext($1)) AS ok`, [U])).rows[0].ok
+      await pool.query(`SELECT pg_advisory_unlock_all()`)
+      expect(free).toBe(true)
     })
 
     it('costs ONE statement per read, with and without drift (it was one on main, four on the first fix)', async () => {
