@@ -9,6 +9,9 @@ import type { AiPrescription, PeriodizationPhase } from '@trainingai/shared/type
 // were ambiguous enough that a cap had to break the tie, which is exactly when the lifter should
 // decide rather than be told. Both arguments are the pre-guard model answer vs the post-guard
 // prescription; they agree only when the model asked for the transition itself.
+// #3900: on the AI plan (`ai_dynamic`) a guard's move no longer waits for this. Its loads are made in
+// the new phase before the plan is stored (`guardMoveTarget`, `generate-prescription.ts`), which
+// removes the first reason, and the owner chose a phase that never outlives its window over the second.
 export function canAutoApplyTransition(
   modelPhaseAction: string,
   modelPhase: string,

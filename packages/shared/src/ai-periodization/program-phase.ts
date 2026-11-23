@@ -184,7 +184,8 @@ export function programDeloadFinished(view: ProgramPhaseView): boolean {
 /**
  * At the cap, a plain "stay" becomes the program's move to the next phase. Recovery actions are
  * left alone, as the per-type ceilings did. The loads stay the current phase's, so (as with the old
- * ceilings) `canAutoApplyTransition` refuses to apply it without a tap.
+ * ceilings) `canAutoApplyTransition` refuses to apply it without a tap. On the AI plan (#3900) the
+ * loads are clamped in the next phase instead (`guardMoveTarget`) and the move applies by itself.
  */
 export function applyProgramPhaseCap(prescription: AiPrescription, view: ProgramPhaseView): AiPrescription {
   const { phase, capWeeks, trainingWeeksDone } = view
@@ -202,6 +203,27 @@ export function applyProgramPhaseCap(prescription: AiPrescription, view: Program
     phaseAction: 'transition_recommended',
     reasoning: `${why} ${prescription.reasoning}`.trim(),
   }
+}
+
+/**
+ * #3900: the move the phase guards will impose on this plan after the model has answered, worked out
+ * BEFORE the loads are clamped, so on the AI plan they can be clamped in the phase the program is
+ * moving to. It is the composition generation applies afterwards, `withProgramMove(applyProgramPhaseCap
+ * (plan, view), programMove, currentPhase)`: the window cap first (a plain stay at the cap becomes the
+ * move to the next phase), then the other session types' agreement (`programMoveTarget`). Null when
+ * neither fires, when the program is not aligned (a waiting program's moves are one type's and wait
+ * for a tap), or when this session type is not on the program's phase.
+ */
+export function guardMoveTarget(
+  view: ProgramPhaseView,
+  programMove: PeriodizationPhase | null,
+  currentPhase: PeriodizationPhase,
+  phaseAction: string,
+): PeriodizationPhase | null {
+  if (!view.aligned || view.phase == null || view.phase !== currentPhase || phaseAction !== 'stay') return null
+  if (view.capWeeks != null && view.trainingWeeksDone >= view.capWeeks) return NEXT_PROGRAM_PHASE[view.phase]
+  if (programMove != null && programMove !== currentPhase) return programMove
+  return null
 }
 
 /**

@@ -67,7 +67,8 @@ export function prescriptionExpiresAt(
  *  be exempt, on the grounds that the emergency-deload suppression owned an offer's expiry. It only
  *  ever owned an UNEXPIRED pending deload, so nothing retired an expired offer: #3700 found a week-old
  *  sick-day rest offer served as the plan, and #3714 a pending stay. A stay is stored `pending`
- *  whenever `autoApplyPrescriptions` is off or the model's confidence is under the auto-apply bar,
+ *  whenever `autoApplyPrescriptions` is off or the model's confidence is under the auto-apply bar
+ *  (on `automatic` and `manual` programs; on the AI plan every plan applies by itself since #3900),
  *  and it drives load, so a session left unused for over a week kept replaying its last plan: the
  *  Q-229 / BF-179 class through the one status those fixes exempted. Past its expiry, an offer of
  *  any kind is pending regeneration.

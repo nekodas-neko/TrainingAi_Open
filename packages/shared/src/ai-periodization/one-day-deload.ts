@@ -37,7 +37,10 @@ export function holdsOneDayDeload(
   },
   now = new Date(),
 ): boolean {
+  // #3900: on the AI plan a prescribed deload is stored `auto_applied`, the day's plan without a tap,
+  // and is held exactly as an accepted one. Before #3900 no deload was ever stored `auto_applied`, so
+  // for every other program kind this is the same test as before.
   return isOneDayDeload(state.prescription) &&
-    (state.prescriptionStatus === 'pending' || state.prescriptionStatus === 'accepted') &&
+    (state.prescriptionStatus === 'pending' || state.prescriptionStatus === 'accepted' || state.prescriptionStatus === 'auto_applied') &&
     state.prescriptionExpiresAt != null && state.prescriptionExpiresAt > now
 }
