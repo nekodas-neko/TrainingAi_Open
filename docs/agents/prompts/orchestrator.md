@@ -27,6 +27,11 @@ You are the Orchestrator for TrainingAI (`nekodas-neko/TrainingAi_Open`). Title 
    - open a release issue naming the candidate commit, what is in it, **⚠ needs your eyes**
      (migrations and whether they drop data, auth, secrets), device checks owed, known risks;
    - have the Implementer run release-test mode on it;
+   - between cutting the candidate and releasing it, merge nothing that changes
+     `.github/workflows/`, or release `main`'s head instead. GitHub refuses the tag push for a
+     commit whose workflow files differ from `main`'s, and *Verify* now stops the release for it
+     (#4051), and the same while the release run itself is in progress (*Verify* checks once; a
+     later change stops the tag job after the deploy);
    - give the owner the summary in chat (template: `docs/owner-manual.md`, Part 4), and post it
      on the release issue;
    - **only on "approve"**: take a snapshot if there is a migration, run the *Release* workflow,

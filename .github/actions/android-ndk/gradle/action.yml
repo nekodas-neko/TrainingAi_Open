@@ -4,8 +4,9 @@ description: >
   $RUNNER_TEMP/gradle-retry.sh, which runs a Gradle command and retries it once, only when its log
   shows a dependency or plugin could not be downloaded or resolved. Run it after `expo prebuild`
   (which writes android/gradle.properties with a 2 GiB heap that D8 ran out of in
-  :app:mergeExtDexRelease, #4025) and before any Gradle step. Used by native-side-by-side.yml and
-  mobile.yml, so a fix to the heap or the retry lands in both. It lives under android-ndk/ so the
+  :app:mergeExtDexRelease, #4025) and before any Gradle step. Used by native-side-by-side.yml,
+  mobile.yml, native-release.yml and android.yml (#4033), so a fix to the heap or the retry lands in
+  all four. Wrap only a Gradle build or test with the helper, never a signing or publishing step. It lives under android-ndk/ so the
   path filters that already watch that folder also watch this one.
 
 runs:

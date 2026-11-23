@@ -19,7 +19,7 @@ import {
 } from '../../../shared/ui';
 import { energySpec } from '../../health/data/models';
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
-import { balanceProvenance, budgetLine } from '../data/budget-line';
+import { balanceProvenance, budgetLine, earnedChipText } from '../data/budget-line';
 import { useNutrition } from '../data/NutritionProvider';
 import { macroShares } from '@trainingai/shared/nutrition/macro-energy';
 import { nutritionEnergyModel, remainingText } from '../data/energy-model';
@@ -44,6 +44,7 @@ export function NutritionEnergyCard({ date, onGoals }: { date: string; onGoals: 
   const colors = [theme.macros.protein, theme.macros.carbs, theme.macros.fat];
   const fraction = total && goal && goal > 0 ? Math.min(1, total.calories / goal) : 0;
   const provenance = balanceProvenance(b);
+  const earnedChip = earnedChipText(b);
   // The band's own colour, always with its label beside it (colour is never the only signal).
   const zone =
     total && goal != null
@@ -69,28 +70,37 @@ export function NutritionEnergyCard({ date, onGoals }: { date: string; onGoals: 
           </AppText>
         </SegmentRing>
         <Stack gap="md" style={{ flex: 1, minWidth: 0 }}>
-          <Stack direction="row" align="center" gap="xs">
-            {remaining == null ? (
-              <AppText variant="caption" tone="muted" style={{ flex: 1 }}>
-                Set a calorie goal to see what’s left
-              </AppText>
-            ) : (
-              <>
-                <AppText variant="remainingValue" style={{ fontVariant: ['tabular-nums'] }}>
-                  {remainingText(remaining).value}
-                </AppText>
+          <Stack gap="none">
+            <Stack direction="row" align="center" gap="xs">
+              {remaining == null ? (
                 <AppText variant="caption" tone="muted" style={{ flex: 1 }}>
-                  {remainingText(remaining).label}
+                  Set a calorie goal to see what’s left
                 </AppText>
-              </>
+              ) : (
+                <>
+                  <AppText variant="remainingValue" style={{ fontVariant: ['tabular-nums'] }}>
+                    {remainingText(remaining).value}
+                  </AppText>
+                  <AppText variant="caption" tone="muted" style={{ flex: 1 }}>
+                    {remainingText(remaining).label}
+                  </AppText>
+                </>
+              )}
+              <StatusIndicator
+                label="Calorie budget"
+                busy={state.loading || state.refreshing}
+                error={state.error}
+                message={pending ? 'Budget is saved from before this upload.' : null}
+                onRetry={state.refresh}
+              />
+            </Stack>
+            {/* The slot beside "kcal left" is full at 384 dp (its status indicator keeps a touch target),
+                so the current app's chip sits on the line under it. */}
+            {earnedChip && (
+              <AppText variant="caption" tone="muted" style={{ fontVariant: ['tabular-nums'] }}>
+                {earnedChip}
+              </AppText>
             )}
-            <StatusIndicator
-              label="Calorie budget"
-              busy={state.loading || state.refreshing}
-              error={state.error}
-              message={pending ? 'Budget is saved from before this upload.' : null}
-              onRetry={state.refresh}
-            />
           </Stack>
           {/* Plain columns, as the current app draws them (energy-card.tsx MacroColumn): the share
               in the macro's colour, grams over target, then the name. */}

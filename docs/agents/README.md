@@ -192,7 +192,9 @@ arrives labelled `needs: owner-review`; an agent removes that label only after t
 5. The **Orchestrator** merges agent PRs on green CI. **Every Tuesday** (on demand while the native app lands, with the owner's yes) it prepares the release —
    everything merged since the last one — gives the owner the summary, and runs it on "approve". The
    GitHub Release it creates lists every PR it carried; that is the record of what shipped. The Implementer's
-   **release-test mode** tests the candidate first. A hotfix goes out off-schedule only when
+   **release-test mode** tests the candidate first. Between cutting a candidate and releasing it,
+   nothing that changes `.github/workflows/` is merged, or `main`'s head is released instead (the
+   release's *Verify* step refuses a commit whose workflow files differ from `main`'s). A hotfix goes out off-schedule only when
    production is broken.
 
 ## Who may do what
