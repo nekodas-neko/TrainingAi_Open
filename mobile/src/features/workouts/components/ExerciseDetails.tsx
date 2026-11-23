@@ -9,7 +9,6 @@ import {
   roundLoad,
   weightStep,
 } from '../logging/targets';
-import { loadLabel } from '../logging/preferences';
 
 export function ExerciseDetails({
   workout,
@@ -64,7 +63,7 @@ export function ExerciseDetails({
           )}
           {cap !== null && (
             <AppText variant="caption" tone="muted">
-              Automatic target capped at {loadLabel(cap, exercise.weightUnit)}.
+              Automatic target capped at {cap} kg.
             </AppText>
           )}
           {!workout.isBaseline &&
@@ -110,11 +109,7 @@ export function ExerciseDetails({
                 {x.pct}%
               </AppText>
               <AppText variant="label">
-                {loadLabel(
-                  roundLoad((weight * x.pct) / 100, weightStep(exercise.equipment)),
-                  exercise.weightUnit,
-                )}{' '}
-                ×{' '}
+                {roundLoad((weight * x.pct) / 100, weightStep(exercise.equipment))} kg ×{' '}
                 {x.reps} reps
               </AppText>
             </Stack>

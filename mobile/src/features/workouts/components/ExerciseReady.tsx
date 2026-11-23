@@ -76,7 +76,7 @@ export function ExerciseReady({
       )}
       {cap !== null && (
         <AppText variant="caption" tone="muted" style={{ textAlign: 'center' }}>
-          Automatic target capped at {loadLabel(cap, exercise.weightUnit)} · the calculated load is above the loading
+          Automatic target capped at {cap} kg · the calculated load is above the loading
           limit.
         </AppText>
       )}
