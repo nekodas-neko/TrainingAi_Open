@@ -43,11 +43,14 @@ export function CoachHistory({
     try {
       await coach.actions.undo(id);
     } catch (error) {
-      if ((error as { status?: number })?.status === 409) setClosed((ids) => [...ids, id]);
+      // A busy 409 changed nothing: the row stays open and says to try again (#4084).
+      const moved =
+        (error as { status?: number })?.status === 409 && (error as { busy?: boolean }).busy !== true;
+      if (moved) setClosed((ids) => [...ids, id]);
       setRefusal((state) => ({
         ...state,
         [id]:
-          (error as { status?: number })?.status === 409
+          moved
             ? 'This change can no longer be undone because your training or settings have moved on.'
             : coachError(error, 'undo this change'),
       }));

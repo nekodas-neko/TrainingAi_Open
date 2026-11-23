@@ -1,6 +1,8 @@
 import { AppText, Badge, Card, Disclosure, Stack } from '../../../shared/ui';
 import type { ExercisePreview } from '../catalog';
 import { prescribedWeight } from '../logging/targets';
+import { loadLabel, weightUnitOf } from '../logging/preferences';
+import { useWeightUnits } from '../logging/WorkoutJournalProvider';
 
 export function ExercisePreviewCard({
   exercise,
@@ -9,6 +11,7 @@ export function ExercisePreviewCard({
   exercise: ExercisePreview;
   position: number;
 }) {
+  const unit = weightUnitOf(useWeightUnits(), exercise.id);
   return (
     <Card>
       <AppText variant="eyebrow" tone="muted">
@@ -39,7 +42,7 @@ export function ExercisePreviewCard({
                 : ''}
               {prescribedWeight(exercise, set) === null
                 ? ''
-                : ` · ${prescribedWeight(exercise, set)} kg`}
+                : ` · ${loadLabel(prescribedWeight(exercise, set)!, unit)}`}
             </AppText>
             <AppText variant="caption" tone="muted">
               {set.restSeconds} sec rest

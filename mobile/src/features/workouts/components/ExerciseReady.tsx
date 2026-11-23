@@ -5,6 +5,7 @@ import { barShareOfOneRm } from '@trainingai/shared/1rm';
 import { AppText, Badge, Card, IconButton, Stack } from '../../../shared/ui';
 import type { WorkoutExercise, WorkoutRecord, WorkoutSet } from '../logging/workout';
 import { formatSetLoad } from '../logging/targets';
+import { loadLabel } from '../logging/preferences';
 import { ExerciseHeading } from './ExerciseHeading';
 import { ReadyProgress } from './WorkoutClocks';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
@@ -54,7 +55,7 @@ export function ExerciseReady({
             Suggested working load
           </AppText>
           <AppText variant="display" tone="brand" style={{ textAlign: 'center' }}>
-            {set.weight} kg
+            {loadLabel(set.weight, exercise.weightUnit)}
           </AppText>
           {set.planned && (
             <AppText variant="caption" tone="muted" style={{ textAlign: 'center' }}>

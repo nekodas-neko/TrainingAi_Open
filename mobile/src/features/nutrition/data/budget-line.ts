@@ -1,3 +1,4 @@
+import { formatCount } from '@trainingai/shared/format/number';
 import { budgetProvenance, budgetProvenanceText } from '@trainingai/shared/nutrition/calorie-balance';
 import { movementSummary } from '@trainingai/shared/nutrition/movement-breakdown';
 import type { z } from 'zod';
@@ -43,6 +44,18 @@ export function balanceProvenance(b: Balance | null | undefined): BudgetProvenan
     stepCreditKcal: typeof b.stepCreditKcal === 'number' ? b.stepCreditKcal : null,
     ownTargetKcal: typeof b.ownTargetKcal === 'number' ? b.ownTargetKcal : null,
   });
+}
+
+/**
+ * The "+N earned" chip beside "kcal left" (#4089): the movement addend of the budget, from the same
+ * `budgetProvenance` call the current app's energy card reads (`budget.earned`), so it explains the
+ * budget and never changes it. Null when it is zero or unknown, so no chip is drawn.
+ */
+export function earnedChipText(b: Balance | null | undefined): string | null {
+  const earned = balanceProvenance(b)?.earned;
+  return typeof earned === 'number' && Number.isFinite(earned) && Math.round(earned) > 0
+    ? `+${formatCount(earned)} earned`
+    : null;
 }
 
 /**
