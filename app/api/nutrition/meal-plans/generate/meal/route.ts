@@ -12,7 +12,7 @@ import { sumIngredients } from '@trainingai/shared/nutrition/scan-totals'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 import { invalidBodyResponse } from '@/lib/api/route-errors'
 import { PROSE_FIELD_GUARDS } from '@/lib/ai/prompt-guards'
-import { ModelIngredientSchema } from '@trainingai/shared/nutrition/ingredient-schema'
+import { MealSchema } from '@trainingai/shared/nutrition/model-output-schemas'
 import { resolveModelIngredients } from '@/lib/nutrition/ingredient-densities'
 
 // Same shape as the plan route plus one meal's ingredients. 256 KB is generous.
@@ -68,12 +68,6 @@ const RequestSchema = z.object({
     ingredients: z.array(IngredientInputSchema).max(30),
   }).strict().optional(),
 }).strict()
-
-const MealSchema = z.object({
-  name: z.string().describe('Meal name, e.g. "Greek yoghurt with berries and oats"'),
-  ingredients: z.array(ModelIngredientSchema),
-  notes: z.string().describe('One short line: prep time, swaps, or where to buy it'),
-})
 
 export async function POST(req: Request) {
   const session = await auth()

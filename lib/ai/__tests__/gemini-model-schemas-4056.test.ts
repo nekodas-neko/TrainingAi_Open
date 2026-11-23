@@ -2,11 +2,9 @@
 // lib/coach/__tests__/gemini-tool-schemas-4056.test.ts), contain nothing Gemini refuses. Mocks only:
 // the Google provider builds the real request and `fetch` captures it.
 //
-// Not covered here because they are module-local to a Next route file, which may export only route
-// handlers: ExerciseGenSchema (app/api/exercises/generate), GeneratedProgramSchema
-// (app/api/generate-program), BuilderChatObjectSchema (app/api/builder-chat), DraftSchema
-// (app/api/nutrition/meal-plans/generate), MealSchema (…/generate/meal), ScanSchema
-// (app/api/nutrition/scan). Read by hand for #4056: none has a number or boolean literal or enum.
+// Every schema a `generateObject` call hands the model is in the list below, including the six that
+// used to be local to a route file (#4060). `model-schemas-covered-4060.test.ts` fails when a call
+// site's schema is defined in a route file or is missing from this list.
 import { describe, it, expect, vi } from 'vitest'
 import type { ToolSet } from 'ai'
 import type { z } from 'zod'
@@ -19,6 +17,12 @@ describe('structured-output schemas as Gemini receives them (#4056)', () => {
     ['PrescriptionSchema (ai-periodization/generate-prescription)', async () => (await import('@trainingai/shared/ai-periodization/prescription-schema')).PrescriptionSchema],
     ['GeneratedProgramSchema (shared validation, builder-chat)', async () => (await import('@trainingai/shared/validation/generated-program')).GeneratedProgramSchema],
     ['TopUpSchema (nutrition/meal-top-up)', async () => (await import('@/lib/nutrition/meal-top-up')).TopUpSchema],
+    ['ExerciseGenSchema (exercises/generate)', async () => (await import('@trainingai/shared/workout/model-output-schemas')).ExerciseGenSchema],
+    ['GeneratedProgramModelSchema (generate-program)', async () => (await import('@trainingai/shared/workout/model-output-schemas')).GeneratedProgramModelSchema],
+    ['BuilderChatObjectSchema (builder-chat)', async () => (await import('@trainingai/shared/workout/model-output-schemas')).BuilderChatObjectSchema],
+    ['DraftSchema (nutrition/meal-plans/generate)', async () => (await import('@trainingai/shared/nutrition/model-output-schemas')).DraftSchema],
+    ['MealSchema (nutrition/meal-plans/generate/meal)', async () => (await import('@trainingai/shared/nutrition/model-output-schemas')).MealSchema],
+    ['ScanSchema (nutrition/scan)', async () => (await import('@trainingai/shared/nutrition/model-output-schemas')).ScanSchema],
   ]
   it.each(schemas)('%s', async (_name, load) => {
     const converted = await responseSchemaFor(await load())
