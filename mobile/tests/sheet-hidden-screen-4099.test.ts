@@ -71,10 +71,14 @@ if (!skip) {
   const warn = console.warn;
   console.warn = () => {};
   const React = await import('react');
-  const { createRoot } = await import('react-dom/client');
+  // A variable specifier: this directory has no types for react-dom.
+  const client = 'react-dom/client';
+  const { createRoot } = (await import(client)) as {
+    createRoot: (node: unknown) => Api['root'];
+  };
   api = {
     act: (React as unknown as { act: Api['act'] }).act,
-    root: createRoot(w.document.getElementById('root')!),
+    root: createRoot(w.document.getElementById('root')),
     h: React.createElement as Api['h'],
     Activity: (React as unknown as { Activity: unknown }).Activity,
     Sheet: (await import(sheet)).Sheet,
