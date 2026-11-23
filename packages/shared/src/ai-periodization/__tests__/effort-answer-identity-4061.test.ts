@@ -11,6 +11,11 @@
 // `TAPPED_HARDER_RPE_DELTA` high gives, and a tapped Easier the plan of one running
 // `TAPPED_EASIER_RPE_DELTA` low: every number, every set, every rep, every load.
 //
+// #4079 (note only). For a tapped Harder, Easier or As expected, the plan WITHOUT its notes must hash
+// as `main`'s did (effort-answer-note-4079.golden.json, recorded on `main` 19345a8ee, before the note
+// existed), the prompt too, and a lift's note may differ only by gaining the sentence where `main`
+// had none. A person with no tapped answer is the 4061 golden above, untouched.
+//
 // 0 real model calls: the model is a mock that records the prompt it was sent.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs'
@@ -304,4 +309,79 @@ describe.skipIf(!!process.env.EFFORT_4061_RECORD)('a tapped answer gives the pla
     expect(counts.identityDiffered).toBe(0)
     expect(counts.equivalenceDiffered).toBe(0)
   })
+})
+
+
+// ── #4079: a tapped answer the rule did not act on is said in the note, and nothing else moves ────
+
+const GOLDEN_NOTES = join(__dirname, 'fixtures', 'effort-answer-note-4079.golden.json')
+interface NoteGolden { hash: string; notes: Record<string, string> }
+const goldenNotes: Record<string, NoteGolden> = existsSync(GOLDEN_NOTES) ? JSON.parse(readFileSync(GOLDEN_NOTES, 'utf8')) : {}
+const recordedNotes: Record<string, NoteGolden> = {}
+const noteCounts = { compared: 0, planDiffered: 0, gainedNote: 0, kept: 0, silent: 0 }
+const SAID = /^You said it felt (harder|easier)[.,]/
+
+/** The plan and the prompt with every lift's note removed, as one hash, plus the notes by lift. */
+function stripNotes(r: Awaited<ReturnType<typeof generate>>): NoteGolden {
+  const notes: Record<string, string> = {}
+  const stored = r.stored && {
+    ...r.stored,
+    exercises: r.stored.exercises.map(e => {
+      if (e.autoregNote !== undefined) notes[e.sessionExerciseId] = e.autoregNote
+      const { autoregNote: _note, ...rest } = e
+      return rest
+    }),
+  }
+  const hash = createHash('sha256').update(JSON.stringify({ ok: r.ok, stored, prompt: r.prompt }, null, 2)).digest('hex')
+  return { hash, notes }
+}
+
+describe.skipIf(!!process.env.EFFORT_4061_RECORD)('a tapped answer the rule did not act on gains a note and moves nothing (#4079)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(NOW)
+  })
+  afterEach(() => { vi.useRealTimers() })
+
+  it(`${grid.length} cases × 3 tapped answers: the plan without its notes is main's`, async () => {
+    for (const c of grid) {
+      for (const answer of ['tapped-harder', 'tapped-easier', 'tapped-as-expected'] as const) {
+        const key = `${label(c)}/${answer}`
+        const now = stripNotes(await generate({ ...c, answer }))
+        if (process.env.EFFORT_4079_RECORD) { recordedNotes[key] = now; continue }
+        const main = goldenNotes[key]
+        expect(main, `no golden recorded for ${key}`).toBeDefined()
+        noteCounts.compared++
+        if (now.hash !== main.hash) noteCounts.planDiffered++
+        expect(now.hash, `${key}: a value, the prompt or the stored plan moved`).toBe(main.hash)
+        for (const id of LIFTS.map(l => l.id)) {
+          const before = main.notes[id]
+          const after = now.notes[id]
+          if (before !== undefined) {
+            // A rule that acted keeps its note word for word; the sentence is never added over it.
+            expect(after, key).toBe(before)
+            noteCounts.kept++
+          } else if (after !== undefined) {
+            noteCounts.gainedNote++
+            expect(answer, `${key}: a note without a Harder or Easier tap`).not.toBe('tapped-as-expected')
+            expect(after, key).toMatch(SAID)
+            expect(after.endsWith('.'), key).toBe(true)
+          } else noteCounts.silent++
+        }
+      }
+    }
+    if (process.env.EFFORT_4079_RECORD) {
+      const dir = join(__dirname, '__check_fixture__')
+      mkdirSync(dir, { recursive: true })
+      writeFileSync(join(dir, 'effort-answer-note-4079.golden.json'), JSON.stringify(recordedNotes, null, 1) + '\n')
+    } else {
+      console.info(`[4079] ${noteCounts.compared} cases compared, ${noteCounts.planDiffered} plans (without notes) differed; lift notes: ${noteCounts.gainedNote} gained, ${noteCounts.kept} kept as main had them, ${noteCounts.silent} silent`)
+      expect(noteCounts.planDiffered).toBe(0)
+      // Pinned, so a rule change that adds or drops a note shows up here and is looked at. Silent lifts are
+      // As expected taps, the rules fallback (which never runs autoregulation, so never read the tap),
+      // and a lift with no history (nothing logged, nothing to read).
+      expect({ compared: noteCounts.compared, gainedNote: noteCounts.gainedNote, kept: noteCounts.kept, silent: noteCounts.silent })
+        .toEqual({ compared: 864, gainedNote: 494, kept: 226, silent: 1872 })
+    }
+  }, 300_000)
 })

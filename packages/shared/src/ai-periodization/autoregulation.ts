@@ -66,6 +66,9 @@ export interface AutoregSignal {
   repCompletionRate: number | null // actual reps ÷ prescribed reps last session (null = unknown)
   /** #4061: set when `rpeDelta` came from the lifter's tapped answer, so the note says what they said. */
   effortFromAnswer?: true
+  /** #4079: which way the tap went (-1 easier, 1 harder), so a tap the rule did not act on can be said
+   *  back to the lifter. As expected is never passed: it is no signal and earns no note. */
+  effortAnswer?: -1 | 1
 }
 
 export interface AutoregContext {
@@ -145,6 +148,44 @@ export function computeRpeAdjustment(sig: AutoregSignal, ctx: AutoregContext): A
   return NONE
 }
 
+/**
+ * #4079: one plain sentence for a lift whose tapped Harder or Easier the rule read and changed
+ * nothing for, so the lifter is not left wondering whether the tap counted. Written here from the same
+ * stored values the rule reads, never by the model, and only called when `computeRpeAdjustment`
+ * returned no note (a tap that did change the plan keeps that rule's own note). It changes no number.
+ * Null for no tap, and for an answer that is not Harder or Easier.
+ *
+ * The reasons follow the rule's own order: a phase that takes no adjustment, then (Harder) the rule's
+ * two triggers not being met, or (Easier) its three conditions, then the top of the band.
+ */
+export function unactedEffortNote(sig: AutoregSignal, ctx: AutoregContext): string | null {
+  if (sig.effortFromAnswer !== true) return null
+  const said = sig.effortAnswer === 1 ? 'harder' : sig.effortAnswer === -1 ? 'easier' : null
+  if (said == null) return null
+  const lead = `You said it felt ${said}.`
+
+  // Deload and baseline weeks take no adjustment at all (the rule returns before reading the answer).
+  if (ctx.phase === 'deload' || ctx.phase === 'baseline') {
+    return `${lead} This is a ${ctx.phase} week, so nothing changes.`
+  }
+
+  const rate = sig.repCompletionRate
+  if (sig.effortAnswer === 1) {
+    // Reached only when the cut did not fire: reps not proven short and the 1RM not falling.
+    if (rate == null) return `${lead} There are no rep counts to check, so the weight stays.`
+    if (rate >= 1) return `${lead} You hit every rep, so the weight stays.`
+    return `${lead} You were within a rep of the target, so the weight stays.`
+  }
+
+  // Easier. A push needs every rep met and a 1RM that is not falling.
+  if (rate == null) return `${lead} There are no rep counts to check, so nothing changes.`
+  if (rate < 1) return `${lead.slice(0, -1)}, but a rep was missed, so nothing changes.`
+  if (sig.rm1Trend === 'down') return `${lead.slice(0, -1)}, but your 1RM slipped, so nothing changes.`
+  if (ctx.phase === 'realisation') return `${lead} Realisation does not add reps, so nothing changes.`
+  // Every condition met and still no change: a compound at the top of its rep band.
+  return `${lead} You are at the top of the rep range, so nothing changes until your 1RM rises.`
+}
+
 export interface AutoregExercise {
   sessionExerciseId: string
   sets: number
@@ -177,7 +218,12 @@ export function applyAutoregulation(
 
     const band = sig.repBand ?? goalRange(trainingGoal, sig.role)
     const adj = computeRpeAdjustment(sig, { phase, currentReps: ex.reps, band })
-    if (!adj.note) return { ...ex }
+    if (!adj.note) {
+      // #4079: nothing changed; a tapped answer the rule did not act on is said back in the note.
+      const unacted = unactedEffortNote(sig, { phase, currentReps: ex.reps, band })
+      if (unacted) notes[ex.sessionExerciseId] = unacted
+      return { ...ex }
+    }
 
     const pct =
       adj.pctMultiplier === 1
