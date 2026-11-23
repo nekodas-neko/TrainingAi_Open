@@ -282,6 +282,7 @@ describe.skipIf(!canRun)('the other multi-row writers in the lift-write lock ord
       })
       expect(await busyEvents(1)).toBe(1)
       expect((await planRows()).find(r => r.id === ROW_B)).toMatchObject({ done: false, phase: 'baseline' })
+      lockWait.ms = wasWait // the retry runs at the real bound, not the shortened one
       await writer()
       expect((await planRows()).find(r => r.id === ROW_B)).toMatchObject({ done: true, phase: 'accumulation' })
     }, 30_000)
@@ -360,6 +361,7 @@ describe.skipIf(!canRun)('the other multi-row writers in the lift-write lock ord
       expect(await busyEvents(1)).toBe(1)
       expect(await planRows()).toHaveLength(3)
       expect((await pool.query(`SELECT count(*)::int AS n FROM programs WHERE id = $1`, [ids.program])).rows[0].n).toBe(1)
+      lockWait.ms = wasWait // the retry runs at the real bound, not the shortened one
       await programs.deleteProgram(db, U, ids.program)
       expect(await planRows()).toHaveLength(0)
     }, 30_000)
@@ -382,6 +384,7 @@ describe.skipIf(!canRun)('the other multi-row writers in the lift-write lock ord
       })
       expect((await pool.query(`SELECT name FROM programs WHERE id = $1`, [ids.program])).rows[0].name).toBe('Program audit')
       expect((await planRows()).filter(r => r.id !== ROW_B).map(r => r.voided)).toEqual([false, false])
+      lockWait.ms = wasWait // the retry runs at the real bound, not the shortened one
       await programs.saveProgram(db, U, programPayload('Program audit edited'), { voidPrescriptions: true })
       expect((await pool.query(`SELECT name FROM programs WHERE id = $1`, [ids.program])).rows[0].name).toBe('Program audit edited')
       expect((await planRows()).map(r => r.voided)).toEqual([true, true, true])
