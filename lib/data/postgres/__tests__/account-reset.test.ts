@@ -138,6 +138,13 @@ describe.skipIf(!canRun)('admin reset of a user\'s data (#3369)', () => {
   afterAll(async () => {
     if (!canRun) return
     await sweep()
+    // The fixture inserts an exercise_library row per seeded user (created_by is SET NULL, so
+    // dropping the user anonymises it and keeps it). Removed here by id rather than left for
+    // account-deletion's pattern sweep, which only catches them if it happens to run later (#4055).
+    for (const seeded of [r, o]) {
+      const id = seeded?.rows.get('exercise_library')?.id
+      if (id) await pool.query(`DELETE FROM exercise_library WHERE id = $1`, [id]).catch(() => {})
+    }
     for (const row of createdCatalogue.reverse()) {
       const { __table, ...key } = row as { __table: string } & Record<string, unknown>
       const cols = Object.keys(key)

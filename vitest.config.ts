@@ -77,6 +77,8 @@ export default defineConfig({
           environment: 'node',
           env: { OURA_CONSTANTS_DIR: CONSTANTS_DIR },
           setupFiles: ['./vitest.setup.ts'],
+          // #4055: compares exercise_library before and after the whole run; see the file.
+          globalSetup: ['./scripts/vitest-catalogue-leak-guard.ts'],
           // LA-83: the same contention the `rollup` project above already names, reaching the 189
           // DB-gated files in this project — which kept the 5-second default while `rollup` was
           // given 60. Two of them went red on one full run and green on the next two with no code
