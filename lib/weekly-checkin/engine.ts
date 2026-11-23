@@ -87,6 +87,8 @@ export class CheckinRefusal extends Error {
   constructor(readonly status: 400 | 404 | 409, readonly code: string, message: string) { super(message) }
 }
 const notFound = () => new CheckinRefusal(404, 'not_found', 'Not found')
+/** The check-in's existing "try again" refusal (409), for a save that timed out waiting for a lock (#4080). */
+const CHECKIN_BUSY = () => new CheckinRefusal(409, 'stale', 'Another change is still saving; nothing was saved. Try again in a moment.')
 
 export interface EngineCtx {
   db: Db
@@ -360,6 +362,10 @@ async function applyLoadStep(
   ])
   const res = await applyCoachPatch(db, ctx.userId, patch, [marker], today, ctx.tz, { source: 'checkin' })
   if (res.ok) return { ok: true, changeId: res.changeId }
+  // #4080: timed out waiting for the lift's lock. Unlike a refusal, this is not an answer about the lift,
+  // so the save does not carry on without it ("held", recorded as not applied): it fails whole and the
+  // caller's transaction rolls back every write of it. Reported by `applyCoachPatch`.
+  if (res.reason === 'busy') throw CHECKIN_BUSY()
   return { ok: false, detail: res.reason === 'invalid' ? res.detail : res.reason === 'stale' ? 'The lift changed while saving.' : 'Not found' }
 }
 
@@ -711,7 +717,7 @@ export async function resolveOffer(
           ...(offer.severity ? [{ id: `${marker}:severity`, field: 'severity' as const, from: null, to: offer.severity }] : []),
         ])
         const res = await applyCoachPatch(tx, ctx.userId, patch, patch.changes.map(c => c.id), today, ctx.tz)
-        if (!res.ok) throw new CheckinRefusal(409, 'refused', res.reason === 'invalid' ? res.detail : 'Could not log the injury')
+        if (!res.ok) throw res.reason === 'busy' ? CHECKIN_BUSY() : new CheckinRefusal(409, 'refused', res.reason === 'invalid' ? res.detail : 'Could not log the injury')
         // The injury the Coach writer logged or updated, checked to be this user's before it is stored.
         const [owned] = await tx.select({ id: s.injuries.id }).from(s.injuries)
           .innerJoin(s.coachChanges, eq(s.coachChanges.targetId, s.injuries.id))
@@ -741,7 +747,7 @@ export async function resolveOffer(
         { id: marker, field: 'exerciseName', from: slot.exerciseName, to: alt.name },
       ])
       const res = await applyCoachPatch(tx, ctx.userId, patch, [marker], today, ctx.tz)
-      if (!res.ok) throw new CheckinRefusal(409, 'refused', res.reason === 'invalid' ? res.detail : 'Could not swap the lift')
+      if (!res.ok) throw res.reason === 'busy' ? CHECKIN_BUSY() : new CheckinRefusal(409, 'refused', res.reason === 'invalid' ? res.detail : 'Could not swap the lift')
       changeId = res.changeId
     }
     const res = await tx.update(s.weeklyCheckins)

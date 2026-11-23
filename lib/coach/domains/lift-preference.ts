@@ -33,6 +33,7 @@ import { buildWorkoutExercises } from '@trainingai/shared/workout/session-data'
 import { buildAutomaticPhaseStatus, isEarlyDeloadWeek } from '@trainingai/shared/phase-engine'
 import { getScheduledSessionsPerWeek } from '@trainingai/shared/schedule-utils'
 import { loadTarget, type TargetRow } from './session-exercise'
+import { withBoundedLockWait } from '../lock-wait'
 import type { Consequence, Db, DomainHandler, Drift, PreviewResult } from './types'
 import {
   DURATION_LABEL, LIFT_PREFERENCE_DURATION, REP_RANGE_DEFAULT, REP_RANGE_REQUESTS, liftPreferenceValueLabel,
@@ -118,8 +119,12 @@ async function findRow(db: Db, userId: string, name: string, libId: string | nul
  * A hash collision only makes two unrelated lifts queue; it cannot let two writers of one lift through.
  */
 export async function lockLiftPreference(db: Db, userId: string, name: string, libId: string | null): Promise<void> {
-  await db.execute(sql`SELECT pg_advisory_xact_lock(hashtext('exercise_preferences:name'), hashtext(${`${userId}:${name}`}))`)
-  if (libId) await db.execute(sql`SELECT pg_advisory_xact_lock(hashtext('exercise_preferences:lib'), hashtext(${`${userId}:${libId}`}))`)
+  // Bounded (lib/coach/lock-wait.ts): a holder that keeps the lock for longer than a few seconds makes
+  // this throw 55P03, which `applyCoachPatch` answers as "busy", not as a 500 at the statement timeout.
+  await withBoundedLockWait(db, async () => {
+    await db.execute(sql`SELECT pg_advisory_xact_lock(hashtext('exercise_preferences:name'), hashtext(${`${userId}:${name}`}))`)
+    if (libId) await db.execute(sql`SELECT pg_advisory_xact_lock(hashtext('exercise_preferences:lib'), hashtext(${`${userId}:${libId}`}))`)
+  })
 }
 
 async function rowById(db: Db, userId: string, id: string, lock: boolean): Promise<PrefRow | null> {

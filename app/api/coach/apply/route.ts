@@ -12,6 +12,8 @@ import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 // A patch of at most 8 changes plus up to 8 accepted ids. 256 KB is far past any real patch.
 const MAX_BODY_BYTES = 256 * 1024
 
+const COACH_BUSY_MESSAGE = 'Another change to this is still saving. Nothing was changed; try again in a moment.'
+
 const BodySchema = z.object({
   patch: CoachPatchSchema,
   /** Only these change ids are written. The rest of the patch is recorded but not applied — what
@@ -68,6 +70,11 @@ export async function POST(req: Request) {
         // 409, not 400: the request was well-formed, the world moved. The widget renders this as
         // "out of date — ask again" rather than a generic failure.
         return NextResponse.json({ error: 'This suggestion is out of date', drift: result.drift }, { status: 409 })
+      }
+      if (result.reason === 'busy') {
+        // 409 with its own sentence, not the `stale` one: nothing is out of date, another save held the
+        // lift for longer than the wait and nothing was written. The same request can be sent again.
+        return NextResponse.json({ error: COACH_BUSY_MESSAGE, busy: true }, { status: 409 })
       }
       return NextResponse.json({ error: result.detail }, { status: 400 })
     }

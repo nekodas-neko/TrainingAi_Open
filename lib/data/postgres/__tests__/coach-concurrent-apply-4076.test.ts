@@ -9,7 +9,14 @@
  *
  * Runs only against a real Postgres (DATABASE_URL). Made-up names and numbers only.
  */
-import { describe, it, expect, beforeAll, beforeEach, afterAll } from 'vitest'
+import { sql } from 'drizzle-orm'
+import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from 'vitest'
+
+// The error report goes to the error_events table; here it is counted (a stuck lock must be reported, once).
+const reportServerError = vi.hoisted(() => vi.fn())
+vi.mock('@/lib/observability', () => ({ reportServerError }))
+// The route is driven as the signed-in user.
+vi.mock('@/auth', () => ({ auth: async () => ({ user: { id: '00000000-0000-4000-8000-0000040760a1', timezone: 'Australia/Brisbane' } }) }))
 
 const canRun = !!process.env.DATABASE_URL
 const TZ = 'Australia/Brisbane'
@@ -60,6 +67,7 @@ describe.skipIf(!canRun)('concurrent Coach applies on a missing row (#4076)', ()
   })
 
   beforeEach(async () => {
+    reportServerError.mockClear()
     await pool.query(`DELETE FROM exercise_preferences WHERE user_id = $1`, [USER])
     await pool.query(`DELETE FROM coach_changes WHERE user_id = $1`, [USER])
     await pool.query(`DELETE FROM injuries WHERE user_id = $1`, [USER])
@@ -171,6 +179,205 @@ describe.skipIf(!canRun)('concurrent Coach applies on a missing row (#4076)', ()
       expect(undone.ok).toBe(true)
       expect((await prefRows())[0].deleted_at).not.toBeNull()
     }
+  })
+
+  // ── The wait for the lock is bounded (#4080 review) ───────────────────────────────────────────
+  // A holder that keeps the lock longer than the apply will wait used to run the apply into the pool's
+  // 15 s statement timeout and out as a 500. The wait is now `lockWait.ms`; the tests shorten it instead
+  // of sleeping 15 s.
+  describe('a lock held for longer than the apply waits', () => {
+    let lockWait: typeof import('@/lib/coach/lock-wait').lockWait
+    let was: number
+    beforeAll(async () => { lockWait = (await import('@/lib/coach/lock-wait')).lockWait; was = lockWait.ms; lockWait.ms = 300 })
+    afterAll(() => { if (lockWait) lockWait.ms = was })
+
+    /** Another session holds a lock and does not let go until `release`. */
+    const hold = async (setup: (c: import('pg').PoolClient) => Promise<void>) => {
+      const c = await pool.connect()
+      await c.query('BEGIN')
+      await setup(c)
+      return { release: async () => { await c.query('ROLLBACK').catch(() => undefined); c.release() } }
+    }
+    const holdLift = () => hold(async c => {
+      await c.query(`SELECT pg_advisory_xact_lock(hashtext('exercise_preferences:name'), hashtext($1))`, [`${USER}:${LIFT}`])
+      await c.query(`SELECT pg_advisory_xact_lock(hashtext('exercise_preferences:lib'), hashtext($1))`, [`${USER}:${libId}`])
+    })
+    const timed = async <T,>(run: () => Promise<T>) => { const t0 = Date.now(); const out = await run(); return { out, ms: Date.now() - t0 } }
+
+    it('lift preference: refused as busy within the wait, nothing written, reported once; after release a retry succeeds', async () => {
+      const holder = await holdLift()
+      try {
+        const { out, ms } = await timed(() => applyLift(rest('x', 60)))
+        expect(out).toEqual({ ok: false, reason: 'busy' })
+        expect(ms).toBeGreaterThanOrEqual(250)
+        expect(ms).toBeLessThan(3000) // nowhere near the 15 s statement timeout
+        expect(await prefRows()).toEqual([])
+        expect(await historyCount()).toBe(0)
+        expect(reportServerError).toHaveBeenCalledTimes(1)
+        // SET LOCAL did not reach the pooled connection the apply used.
+        expect((await pool.query(`SHOW lock_timeout`)).rows[0].lock_timeout).toBe('0')
+      } finally { await holder.release() }
+      const retry = await applyLift(rest('x', 60))
+      expect(retry).toMatchObject({ ok: true })
+      expect((await prefRows()).map(r => r.rest_sec)).toEqual([60])
+      expect(await historyCount()).toBe(1)
+    })
+
+    it('the bound ends with the wait: inside a caller\'s transaction the earlier lock_timeout is back once the lock is taken', async () => {
+      await db.transaction(async tx => {
+        await tx.execute(sql`SET LOCAL lock_timeout = '7s'`)
+        const res = await applyLift(rest('x', 60), 'checkin', tx as unknown as typeof db)
+        expect(res).toMatchObject({ ok: true })
+        const now = (await tx.execute(sql`SHOW lock_timeout`)).rows[0] as { lock_timeout: string }
+        expect(now.lock_timeout).toBe('7s')
+      })
+    })
+
+    it('POST /api/coach/apply answers 409 busy (its own sentence, no drift), nothing written, reported once', async () => {
+      const { POST } = await import('@/app/api/coach/apply/route')
+      const send = () => POST(new Request('http://localhost/api/coach/apply', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ patch: { domain: 'lift_preference', targetId: ids.lift, changes: rest('x', 60) }, acceptedChangeIds: ['x'] }),
+      }))
+      const holder = await holdLift()
+      try {
+        const res = await send()
+        expect(res.status).toBe(409)
+        const body = await res.json()
+        expect(body).toEqual({ error: expect.stringMatching(/try again/i), busy: true })
+        expect(body.error).not.toMatch(/out of date/i)
+        expect(await prefRows()).toEqual([])
+        expect(await historyCount()).toBe(0)
+        expect(reportServerError).toHaveBeenCalledTimes(1)
+      } finally { await holder.release() }
+      expect((await send()).status).toBe(200)
+      expect(await prefRows()).toHaveLength(1)
+    })
+
+    it('injury: refused as busy, no row, reported once; a retry after release logs it', async () => {
+      const log = () => apply.applyCoachPatch(db, USER, {
+        domain: 'injury', targetId: null,
+        changes: [{ id: 'm', field: 'muscleName', from: null, to: 'left shoulder' }],
+      } as never, ['m'], '2026-11-22', TZ)
+      const holder = await hold(c => c.query(`SELECT pg_advisory_xact_lock(hashtext('injuries:muscle'), hashtext($1))`, [`${USER}:left shoulder`]).then(() => undefined))
+      try {
+        expect(await log()).toEqual({ ok: false, reason: 'busy' })
+        expect((await pool.query(`SELECT count(*)::int AS n FROM injuries WHERE user_id = $1`, [USER])).rows[0].n).toBe(0)
+        expect(await historyCount()).toBe(0)
+        expect(reportServerError).toHaveBeenCalledTimes(1)
+      } finally { await holder.release() }
+      expect(await log()).toMatchObject({ ok: true })
+    })
+
+    it('create-on-swap: waits on the other admin\'s uncommitted library row, is refused as busy, the slot is unchanged; a retry lands', async () => {
+      await pool.query(`UPDATE session_exercises SET exercise_name = 'Q4076 Slot A', exercise_id = NULL WHERE id = $1`, [ids.slotA])
+      const swap = () => apply.applyCoachPatch(db, USER, {
+        domain: 'session_exercise', targetId: ids.slotA,
+        changes: [{ id: 'e1', field: 'exerciseName', from: 'Q4076 Slot A', to: NEW_LIFT }, { id: 'e2', field: 'newExerciseMuscles', from: null, to: 'chest' }],
+      } as never, ['e1', 'e2'], '2026-11-22', TZ)
+      const holder = await hold(c => c.query(`INSERT INTO exercise_library (name, equipment) VALUES ($1, ARRAY['Cable'])`, [NEW_LIFT]).then(() => undefined))
+      try {
+        expect(await swap()).toEqual({ ok: false, reason: 'busy' })
+        expect((await pool.query(`SELECT exercise_name FROM session_exercises WHERE id = $1`, [ids.slotA])).rows[0].exercise_name).toBe('Q4076 Slot A')
+        expect(await historyCount()).toBe(0)
+        expect(reportServerError).toHaveBeenCalledTimes(1)
+      } finally { await holder.release() }
+      expect(await swap()).toMatchObject({ ok: true })
+      expect((await pool.query(`SELECT exercise_name FROM session_exercises WHERE id = $1`, [ids.slotA])).rows[0].exercise_name).toBe(NEW_LIFT)
+    })
+
+    it('a check-in\'s own transaction: the apply inside it reports busy, and what the caller wrote before it rolls back with it', async () => {
+      const holder = await holdLift()
+      let seen: unknown = null
+      try {
+        await expect(db.transaction(async tx => {
+          await tx.execute(sql`INSERT INTO injuries (user_id, muscle_name, severity, started_date) VALUES (${USER}, 'marker 4076', 'mild', '2026-11-22')`)
+          seen = await applyLift(rest('k1', 60), 'checkin', tx as unknown as typeof db)
+          // What the engine does with it: the whole save fails.
+          throw new Error('check-in refused')
+        })).rejects.toThrow('check-in refused')
+      } finally { await holder.release() }
+      expect(seen).toEqual({ ok: false, reason: 'busy' })
+      expect((await pool.query(`SELECT count(*)::int AS n FROM injuries WHERE user_id = $1`, [USER])).rows[0].n).toBe(0)
+      expect(await prefRows()).toEqual([])
+      expect(await historyCount()).toBe(0)
+    })
+  })
+
+  // ── An apply that races an undo of the change it follows ───────────────────────────────────────
+  describe('an apply against an undo of the same change', () => {
+    /** The db with the undo's transaction held back until `go`: the undo has read its record and the
+     *  row's state and not yet taken the row lock. `reached` resolves when it is waiting. */
+    const gatedUndoDb = () => {
+      let go!: () => void
+      let reachedResolve!: () => void
+      const gate = new Promise<void>(r => { go = r })
+      const reached = new Promise<void>(r => { reachedResolve = r })
+      const gated = new Proxy(db as object, {
+        get(target, prop) {
+          const v = Reflect.get(target, prop, target)
+          if (prop === 'transaction') return async (fn: unknown, cfg: unknown) => { reachedResolve(); await gate; return (v as (a: unknown, b: unknown) => unknown).call(target, fn, cfg) }
+          return typeof v === 'function' ? v.bind(target) : v
+        },
+      }) as typeof db
+      return { gated, go, reached }
+    }
+
+    it('the apply lands first: the undo, already past its read, is refused as stale and writes nothing; the apply stands', async () => {
+      const first = await applyLift(rest('a', 60))
+      expect(first).toMatchObject({ ok: true })
+      const firstId = (first as { changeId: string }).changeId
+
+      const { gated, go, reached } = gatedUndoDb()
+      const undo = apply.undoCoachChange(gated, USER, firstId)
+      await reached // the undo has read; it has not locked the row
+      const second = await applyLift([{ id: 'b', field: 'restSec', from: 60, to: 90 }])
+      expect(second).toMatchObject({ ok: true })
+      go()
+      expect(await undo).toMatchObject({ ok: false, reason: 'stale' })
+
+      const [row] = await prefRows()
+      expect(row.rest_sec).toBe(90) // the apply's value, not put back to the start
+      expect(row.deleted_at).toBeNull()
+      const history = (await pool.query(`SELECT id, undone_at FROM coach_changes WHERE user_id = $1 ORDER BY applied_at`, [USER])).rows
+      expect(history).toHaveLength(2)
+      expect(history.every(h => h.undone_at === null)).toBe(true) // the undo marked nothing
+
+      // The apply's own undo still goes back one step, to the first change's value.
+      expect(await apply.undoCoachChange(db, USER, (second as { changeId: string }).changeId)).toMatchObject({ ok: true })
+      expect((await prefRows())[0].rest_sec).toBe(60)
+    })
+
+    it('the apply queues behind an undo that holds the row: it lands on the restored state when its `from` is the state before the change', async () => {
+      const first = await applyLift(rest('a', 60))
+      const firstId = (first as { changeId: string }).changeId
+      let release!: () => void
+      const gate = new Promise<void>(r => { release = r })
+      let backend = 0
+      let undone: Awaited<ReturnType<typeof apply.undoCoachChange>> | null = null
+      const holder = db.transaction(async tx => {
+        backend = (await tx.execute(sql`SELECT pg_backend_pid() AS pid`)).rows[0].pid as number
+        undone = await apply.undoCoachChange(tx as unknown as typeof db, USER, firstId)
+        await gate // the undo's writes are in this transaction, uncommitted, row locked
+      })
+      while (!undone) await new Promise(r => setTimeout(r, 10))
+      const racing = applyLift(rest('b', 90)) // from null: written against the state before the first change
+      racing.catch(() => undefined)
+      const deadline = Date.now() + 5000
+      for (;;) {
+        if ((await pool.query(`SELECT 1 FROM pg_stat_activity WHERE $1 = ANY(pg_blocking_pids(pid))`, [backend])).rows.length > 0) break
+        if (Date.now() > deadline) throw new Error('the apply never queued behind the undo')
+        await new Promise(r => setTimeout(r, 10))
+      }
+      release()
+      await holder
+      expect(undone).toMatchObject({ ok: true })
+      expect(await racing).toMatchObject({ ok: true })
+      const [row] = await prefRows()
+      expect([row.rest_sec, row.deleted_at]).toEqual([90, null])
+      const history = (await pool.query(`SELECT undone_at FROM coach_changes WHERE user_id = $1 ORDER BY applied_at`, [USER])).rows
+      expect(history.map(h => h.undone_at !== null)).toEqual([true, false]) // first undone, second live
+    })
   })
 
   it('injury: six applies at once for one muscle leave one live row, not six', async () => {

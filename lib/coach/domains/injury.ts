@@ -3,6 +3,7 @@ import * as s from '@/lib/data/postgres/schema'
 import { normalizeMuscle } from '@trainingai/shared/muscles'
 import type { Consequence, DomainHandler, Db, PreviewResult } from './types'
 import { driftAgainst } from './types'
+import { withBoundedLockWait } from '../lock-wait'
 
 /**
  * Logging an injury, and nothing else.
@@ -178,7 +179,7 @@ export const injuryHandler = (today: string): DomainHandler => ({
     // the lock lasts to the outer commit.)
     return db.transaction(async tx => {
       const t = tx as unknown as Db
-      await t.execute(sql`SELECT pg_advisory_xact_lock(hashtext('injuries:muscle'), hashtext(${`${userId}:${muscleName}`}))`)
+      await withBoundedLockWait(t, () => t.execute(sql`SELECT pg_advisory_xact_lock(hashtext('injuries:muscle'), hashtext(${`${userId}:${muscleName}`}))`))
       const existing = await activeInjury(t, userId, muscleName)
       if (existing) {
         // Already logged and unresolved — update rather than stacking a duplicate, which would make

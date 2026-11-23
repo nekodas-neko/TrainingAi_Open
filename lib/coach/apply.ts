@@ -10,6 +10,8 @@ import { programPhaseHandler } from './domains/program-phase'
 import { earlyDeloadHandler } from './domains/early-deload'
 import { liftPreferenceHandler, StaleLiftPreference, type LiftPreferenceSource } from './domains/lift-preference'
 import { DEFAULT_TZ, todayInTz } from '@trainingai/shared/date-utils'
+import { isLockWaitTimeout } from '@/lib/api/route-errors'
+import { reportServerError } from '@/lib/observability'
 
 export type { ApplyOutcome } from './domains/types'
 
@@ -70,8 +72,25 @@ export async function applyCoachPatch(
   }
 
   const handler = handlerFor(patch.domain, today, timezone, opts.source)
-  if (handler.transactional) return applyInTransaction(db, userId, patch, accepted, handler)
+  try {
+    if (handler.transactional) return await applyInTransaction(db, userId, patch, accepted, handler)
+    return await applyOutsideTransaction(db, userId, patch, accepted, handler)
+  } catch (err) {
+    // #4080: gave up waiting for a lock (our bounded wait, or the statement timeout it stays under).
+    // The transaction or savepoint that was waiting has rolled back, so nothing is written. A caller
+    // that holds its own transaction (the weekly check-in) gets the refusal and fails as a whole.
+    // Reported, so a lock that stays held shows up: 57014 is also any slow statement.
+    if (isLockWaitTimeout(err)) {
+      reportServerError(err, { userId, url: '/api/coach/apply' })
+      return { ok: false, reason: 'busy' }
+    }
+    throw err
+  }
+}
 
+async function applyOutsideTransaction(
+  db: Db, userId: string, patch: CoachPatch, accepted: CoachPatch['changes'], handler: DomainHandler,
+): Promise<ApplyOutcome> {
   const result = await handler.apply(db, userId, patch, accepted)
   if (!result.ok) return result
 
