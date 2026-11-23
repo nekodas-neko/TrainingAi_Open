@@ -10,17 +10,20 @@ import { activityIcon, activityTypesSpec, type ActivityType } from '../data/mode
 export function ActivityPicker({
   visible,
   onClose,
+  onDismiss,
   onSelect,
   busy = false,
 }: {
   visible: boolean;
   onClose: () => void;
+  /** The sheet has finished closing. */
+  onDismiss?: () => void;
   onSelect: (type: ActivityType) => void;
   busy?: boolean;
 }) {
   const state = useWorkoutResource(activityTypesSpec, visible);
   return (
-    <Sheet visible={visible} title="Log Activity" onClose={onClose}>
+    <Sheet visible={visible} title="Log Activity" onClose={onClose} onDismiss={onDismiss}>
       <StatusIndicator
         label="Activity types"
         busy={state.loading || busy}

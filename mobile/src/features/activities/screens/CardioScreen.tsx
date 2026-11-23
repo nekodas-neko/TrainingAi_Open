@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
+import { openAfterClose, type AfterClose } from '../data/open-after-close';
+import { pickActivity } from '../data/pick-activity';
 import {
   zoneLabel,
   ANY_ACTIVITY,
@@ -125,21 +127,54 @@ export function CardioScreen({
         },
       })
     : null;
-  async function select(type: ActivityType) {
-    if (!activity.store || busy) {
-      return;
-    }
+  // One start at a time: `busy` is state and lags a second tap in the same frame, this does not.
+  const working = useRef(false);
+  // A sheet's close and the navigation it leads to are never in the same commit (#4099): the
+  // Modal has to finish closing before this screen is hidden behind the next one.
+  const later = useRef<AfterClose | null>(null);
+  useEffect(() => () => later.current?.cancel(), []);
+  function afterSheet(next: () => void) {
+    later.current?.cancel();
+    later.current = openAfterClose(next);
+  }
+  const select = (type: ActivityType) =>
+    pickActivity(
+      working,
+      {
+        store: activity.store,
+        hasSession: !!activity.session,
+        closeSheet: () => setPicker(false),
+        afterSheet,
+        openActivity,
+        setBusy,
+        setError,
+      },
+      type,
+    );
+  // The Treadmill walk buttons: record it, then open it, once.
+  function recordTreadmill(minutes: number) {
+    if (!activity.store || working.current) return;
+    working.current = true;
     setBusy(true);
     setError(null);
-    try {
-      await activity.store.start(type);
-      setPicker(false);
-      openActivity();
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not start activity.');
-    } finally {
-      setBusy(false);
-    }
+    void activity.store
+      .recordCompleted(
+        {
+          id: 'treadmill',
+          label: 'Treadmill walk',
+          icon: 'PersonSimpleWalk',
+          isDistanceBased: false,
+        },
+        minutes,
+      )
+      .then(openActivity)
+      .catch((cause) =>
+        setError(cause instanceof Error ? cause.message : 'Could not open the activity.'),
+      )
+      .finally(() => {
+        working.current = false;
+        setBusy(false);
+      });
   }
   return (
     <PageLayout
@@ -189,27 +224,7 @@ export function CardioScreen({
                       busy={busy || !!activity.session}
                       onGuidedWalk={openWalk}
                       onOther={() => setPicker(true)}
-                      onTreadmill={() => {
-                        if (!activity.store) return;
-                        setBusy(true);
-                        void activity.store
-                          .recordCompleted(
-                            {
-                              id: 'treadmill',
-                              label: 'Treadmill walk',
-                              icon: 'PersonSimpleWalk',
-                              isDistanceBased: false,
-                            },
-                            walking.targets.activeMinutesPerDay,
-                          )
-                          .then(openActivity)
-                          .catch((cause) =>
-                            setError(
-                              cause instanceof Error ? cause.message : 'Could not open the activity.',
-                            ),
-                          )
-                          .finally(() => setBusy(false));
-                      }}
+                      onTreadmill={() => recordTreadmill(walking.targets.activeMinutesPerDay)}
                     />
                   </>
                 )}
@@ -349,28 +364,7 @@ export function CardioScreen({
                                 variant="surface"
                                 disabled={busy || !!activity.session}
                                 style={{ flex: 1 }}
-                                onPress={() => {
-                                  setBusy(true);
-                                  void activity
-                                    .store!.recordCompleted(
-                                      {
-                                        id: 'treadmill',
-                                        label: 'Treadmill walk',
-                                        icon: 'PersonSimpleWalk',
-                                        isDistanceBased: false,
-                                      },
-                                      minutes,
-                                    )
-                                    .then(openActivity)
-                                    .catch((cause) =>
-                                      setError(
-                                        cause instanceof Error
-                                          ? cause.message
-                                          : 'Could not open the activity.',
-                                      ),
-                                    )
-                                    .finally(() => setBusy(false));
-                                }}
+                                onPress={() => recordTreadmill(minutes)}
                               />
                             ))}
                           </Stack>
@@ -453,12 +447,14 @@ export function CardioScreen({
         visible={picker}
         busy={busy}
         onClose={() => setPicker(false)}
+        onDismiss={() => later.current?.closed()}
         onSelect={(type) => void select(type)}
       />
       <Sheet
         visible={timePicker}
         title="How much time do you have?"
         onClose={() => setTimePicker(false)}
+        onDismiss={() => later.current?.closed()}
       >
         <ChoiceTiles
           label="Time available"
@@ -487,8 +483,8 @@ export function CardioScreen({
             title="Run"
             variant="surface"
             onPress={() => {
+              afterSheet(openRunning);
               setTimePicker(false);
-              openRunning();
             }}
           />
           <AppButton
@@ -496,8 +492,8 @@ export function CardioScreen({
             title="Walk"
             variant="surface"
             onPress={() => {
+              afterSheet(openWalk);
               setTimePicker(false);
-              openWalk();
             }}
           />
         </Stack>
@@ -505,8 +501,8 @@ export function CardioScreen({
           title="Log activity"
           disabled={!activity.ready || !!activity.session}
           onPress={() => {
+            afterSheet(() => setPicker(true));
             setTimePicker(false);
-            setPicker(true);
           }}
         />
       </Sheet>

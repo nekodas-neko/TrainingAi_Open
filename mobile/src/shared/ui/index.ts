@@ -22,6 +22,7 @@ export { Disclosure } from './Disclosure';
 export { DisclosureIcon } from './DisclosureIcon';
 export { StepProgress } from './StepProgress';
 export { StateCard } from './StateCard';
+export { ScreenBoundary } from './ScreenBoundary';
 export { TextField } from './TextField';
 export { NumericStepper } from './NumericStepper';
 export { ChoiceScale } from './ChoiceScale';

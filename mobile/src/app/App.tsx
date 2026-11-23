@@ -15,7 +15,7 @@ import { LocalStorageProvider } from './providers/LocalStorageProvider';
 import { AppStartupGate } from './providers/AppStartupGate';
 import { useTheme } from '../shared/theme/ThemeProvider';
 import { useGeistFonts } from '../shared/theme/font-loading';
-import { PageLayout, Notice } from '../shared/ui';
+import { PageLayout, Notice, ScreenBoundary } from '../shared/ui';
 import { useHealthContext } from '../features/health/HealthProvider';
 import { useHealthData } from '../features/health/data/HealthDataProvider';
 import { useHome } from '../features/home/data/HomeProvider';
@@ -263,7 +263,11 @@ function AppShell() {
           />
         );
       case 'activity-recording':
-        return <ActivityScreen key={accountKey} onBack={back} onSaved={back} />;
+        return (
+          <ScreenBoundary title="Activity" screen="activity-recording" onBack={back}>
+            <ActivityScreen key={accountKey} onBack={back} onSaved={back} />
+          </ScreenBoundary>
+        );
       case 'more-data':
         return <DataSyncScreen onBack={back} />;
       case 'more-about':
