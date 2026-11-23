@@ -21,6 +21,17 @@ function BackControl({ onBack, backLabel = BACK_LABEL, backIcon = 'back' }: Back
 // this (subtitle, detail) grows the bar downward and never moves Back or the actions.
 const rowSlot = { minHeight: headerMetrics.back.height, justifyContent: 'center' as const };
 
+/**
+ * A subtitle that does not fit wraps at its " · " separators, never inside a part and never with a
+ * dot left to start a line: each part's spaces are held together and the dot stays with the part
+ * before it. The characters look the same as before, so a subtitle that fits is unchanged (#4058).
+ */
+export function breakAtSeparators(text: string): string {
+  const parts = text.split(' · ');
+  if (parts.length < 2) return text;
+  return parts.map((part) => part.replace(/ /g, '\u00A0')).join('\u00A0· ');
+}
+
 export type PageHeaderProps =
   | ({
       mode?: 'bar';
@@ -104,7 +115,7 @@ export function PageHeader(props: PageHeaderProps) {
         {subtitle ? (
           typeof subtitle === 'string' ? (
             <AppText variant="body" tone="muted">
-              {subtitle}
+              {breakAtSeparators(subtitle)}
             </AppText>
           ) : (
             subtitle

@@ -5,6 +5,7 @@ import type {
 import { loadLabel } from '../logging/preferences.ts';
 import { pipPhaseFor, workoutPhaseOf } from '../pip/pip.ts';
 import { nextExerciseFlow, workoutFlow } from '../logging/flow.ts';
+import { readyTimer } from '../logging/ready-timer.ts';
 import type { WorkoutExercise, WorkoutRecord } from '../logging/workout.ts';
 
 // The Android ongoing notification / Live Update (#3249): a view of the active workout, derived
@@ -68,6 +69,9 @@ function statusWhileRunning(workout: WorkoutRecord | null): WorkoutStatusPayload
     nextUpLoad: null,
     effortAsk: null,
     accent: null,
+    heartColor: null,
+    readyStartedAt: null,
+    readySeconds: null,
   };
   if (phase === 'idle') return null;
   if (phase === 'pre') return { ...base, phase: 'ready', label: 'Warm-up' };
@@ -102,9 +106,12 @@ function statusWhileRunning(workout: WorkoutRecord | null): WorkoutStatusPayload
     after && after.stage !== 'review'
       ? workout.exercises.find((x) => x.id === after.exerciseId)
       : undefined;
+  const prep = phase === 'ready' ? readyTimer(workout, exercise) : null;
   return {
     ...named,
     phase: resting ? 'resting' : 'ready',
+    readyStartedAt: prep?.startedAt ?? null,
+    readySeconds: prep?.seconds ?? null,
     nextSet: finished ? 0 : next + 1,
     load: finished ? null : knownLoad(exercise, exercise.sets[next]),
     restEndsAt: workout.rest?.endsAt ?? null,

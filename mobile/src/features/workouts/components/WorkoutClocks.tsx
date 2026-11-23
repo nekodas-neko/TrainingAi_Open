@@ -1,11 +1,11 @@
 import { View } from 'react-native';
 import { Pressable } from '../../../shared/ui/Pressable';
 import { slopTo } from '../../../shared/ui/touchSlop';
-import { transitionSecForEquipment } from '@trainingai/shared/workout/duration-model';
 import { AppText, Icon, ProgressBar, Stack } from '../../../shared/ui';
 import { useClock, formatDuration } from '../../../shared/hooks/useClock';
 import { useWorkoutJournal } from '../logging/WorkoutJournalProvider';
 import { workoutFlow } from '../logging/flow';
+import { readyTimer } from '../logging/ready-timer';
 import { usePipSourceRect } from '../pip/usePipSourceRect';
 import { activeElapsedMs, type WorkoutExercise, type WorkoutRecord } from '../logging/workout';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
@@ -160,12 +160,12 @@ export function ReadyProgress({
     workout.timers.setup && exercise.readyStartedAt !== null && workout.pausedAt === null,
   );
   const now = workout.pausedAt ?? clock;
-  if (!workout.timers.setup || exercise.readyStartedAt === null) {
+  const timer = readyTimer(workout, exercise);
+  if (!timer) {
     return null;
   }
-  const elapsed = Math.max(0, (now - exercise.readyStartedAt) / 1000);
-  const total =
-    workout.timers.setupSeconds ?? transitionSecForEquipment(exercise.equipment);
+  const elapsed = Math.max(0, (now - timer.startedAt) / 1000);
+  const total = timer.seconds;
   return (
     <Stack gap="xs">
       <Stack direction="row" justify="space-between">

@@ -43,6 +43,43 @@ class PipCardTest {
     assertEquals(0, c.current)
   }
 
+  @Test fun `Ready with the preparation countdown shows that timer, and the workout's time beneath`() {
+    val prep = base.copy(readyStartedAt = t0 - 20_000, readySeconds = 90, workoutFrom = t0 - 574_000)
+    val c = card("ready", prep, t0)
+    assertEquals(t0 - 20_000, c.countsFrom)
+    assertEquals(90L, c.targetSec)
+    assertTrue(c.clampAtZero)
+    assertEquals("9:34 workout time", c.clockLabel)
+    assertEquals("Set 1 of 2", c.setLine)
+    assertEquals("first set", c.loadLabel)
+    // The line beneath moves with the workout's time, not the step's.
+    assertEquals("9:44 workout time", card("ready", prep, t0 + 10_000).clockLabel)
+  }
+
+  @Test fun `the preparation clock stops at 0 00 instead of counting past it`() {
+    assertEquals("1:10", PipPresenter.restClockText(20, 90, clampAtZero = true))
+    assertEquals("0:00", PipPresenter.restClockText(90, 90, clampAtZero = true))
+    assertEquals("0:00", PipPresenter.restClockText(400, 90, clampAtZero = true))
+    assertEquals("+0:10", PipPresenter.restClockText(100, 90))
+  }
+
+  @Test fun `Ready with no preparation countdown keeps the workout's clock and invents none`() {
+    val c = card("ready", base.copy(readyStartedAt = null, readySeconds = null), t0)
+    assertNull(c.targetSec)
+    assertEquals(false, c.clampAtZero)
+    assertEquals("workout time", c.clockLabel)
+    assertEquals(t0 - 600_000, c.countsFrom)
+  }
+
+  @Test fun `the heart beside the reading is the app's red in every zone`() {
+    val reading = PipHeartRate(bpm = 88, zoneName = "Recovery", zoneColor = "#3b82f6", at = t0)
+    assertEquals(PipPresenter.HEART_COLOR, card("ready", base.copy(hr = reading), t0).hr!!.heartColor)
+    assertEquals("#f87171", card("ready", base.copy(hr = reading, heartColor = "#f87171"), t0).hr!!.heartColor)
+    val hot = reading.copy(zoneName = "Peak", zoneColor = "#ef4444")
+    assertEquals("#f87171", card("rest", base.copy(phase = "resting", hr = hot, heartColor = "#f87171"), t0).hr!!.heartColor)
+    assertEquals("Recovery", card("ready", base.copy(hr = reading), t0).hr!!.zoneName)
+  }
+
   @Test fun `Lifting counts this set up, in green, with no load label, and pulses`() {
     val c = card("set", base.copy(phase = "working", setStartedAt = t0 - 20_000))
     assertEquals(PipCardState.LIFTING, c.state)

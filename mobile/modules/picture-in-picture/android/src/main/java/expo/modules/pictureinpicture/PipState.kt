@@ -91,10 +91,21 @@ data class PipStatus(
   val effortAnswer: Int? = null,
   /** The app's accent, `#rrggbb`, or null for the window's own green. */
   val accent: String? = null,
+  /** The heart-rate red, `#rrggbb`, or null for the window's own danger red. */
+  val heartColor: String? = null,
+  /** #4058: the load / warm-up step's countdown (start and length), as the app's preparation screen. */
+  val readyStartedAt: Long? = null,
+  val readySeconds: Long? = null,
 )
 
 /** The heart-rate line: `bpm` is null once the reading is too old to show. */
-data class PipHeartView(val bpm: Int?, val zoneName: String?, val zoneColor: String?)
+data class PipHeartView(
+  val bpm: Int?,
+  val zoneName: String?,
+  val zoneColor: String?,
+  /** `#rrggbb` of the heart drawn beside the reading: red in every zone, the zone is in the text. */
+  val heartColor: String = PipPresenter.HEART_COLOR,
+)
 
 /** One of the window's buttons. `icon` names a drawable; `action` is what JS is told. */
 data class PipButton(val action: String, val label: String, val icon: String)
@@ -142,6 +153,8 @@ sealed class PipFrame {
     val accent: String,
     /** The lifting segment pulses. */
     val pulse: Boolean,
+    /** The clock stops at 0:00 instead of counting up past its target (the preparation countdown). */
+    val clampAtZero: Boolean = false,
     val hr: PipHeartView?,
   ) : PipFrame()
 }
@@ -153,6 +166,8 @@ object PipPresenter {
   const val READY_COLOR = "#cfd8dc"
   const val LIFT_COLOR = "#56ee66"
   const val OVER_COLOR = "#ff6467"
+  /** The heart-rate red for an app that sends none; the app's own token arrives as `heartColor`. */
+  const val HEART_COLOR = OVER_COLOR
   /** The dark warning status token (#3441), as the in-app chips. */
   const val PAUSED_COLOR = "#efaf00"
   /** The app's green, for an app that sends no accent. */
@@ -192,22 +207,38 @@ object PipPresenter {
   private fun card(
     state: PipCardState, color: String, word: String, status: PipStatus, nowMs: Long,
     setLine: String, countsFrom: Long?, targetSec: Long?, clockLabel: String, bar: Float?,
-    loadLabel: String?, current: Int?, pulse: Boolean = false,
+    loadLabel: String?, current: Int?, pulse: Boolean = false, clampAtZero: Boolean = false,
   ) = PipFrame.Card(
     state = state, color = color, stateWord = word, setLine = setLine,
     countsFrom = countsFrom, targetSec = targetSec, clockLabel = clockLabel, bar = bar,
     name = status.exerciseName, where = where(status.exerciseIndex, status),
     load = status.load, loadLabel = loadLabel.takeIf { status.load != null },
     sets = status.sets, setsDone = status.setsDone, current = current,
-    accent = status.accent ?: DEFAULT_ACCENT, pulse = pulse, hr = heartView(status.hr, nowMs),
+    accent = status.accent ?: DEFAULT_ACCENT, pulse = pulse, clampAtZero = clampAtZero,
+    hr = heartView(status.hr, nowMs, status.heartColor),
   )
 
-  private fun ready(status: PipStatus, nowMs: Long) = card(
-    PipCardState.READY, READY_COLOR, "READY", status, nowMs,
-    setLine = "Set ${setOf(status.setsDone + 1, status.sets)}",
-    countsFrom = workoutClock(status), targetSec = null, clockLabel = "workout time", bar = null,
-    loadLabel = "first set", current = status.setsDone,
-  )
+  /**
+   * Getting ready for a set. With the app's preparation countdown (#4058) the big number is that
+   * timer, stopping at 0:00 as the screen does, and the workout's time is the small line; without
+   * one the screen shows no timer, so the window keeps the workout's clock and invents none.
+   */
+  private fun ready(status: PipStatus, nowMs: Long): PipFrame.Card {
+    val setLine = "Set ${setOf(status.setsDone + 1, status.sets)}"
+    val from = status.readyStartedAt
+    val length = status.readySeconds
+    if (from == null || length == null) {
+      return card(
+        PipCardState.READY, READY_COLOR, "READY", status, nowMs, setLine,
+        workoutClock(status), null, "workout time", null, "first set", status.setsDone,
+      )
+    }
+    return card(
+      PipCardState.READY, READY_COLOR, "READY", status, nowMs, setLine,
+      from, length, "${formatTime(seconds(workoutClock(status), nowMs))} workout time", null,
+      "first set", status.setsDone, clampAtZero = true,
+    )
+  }
 
   private fun lifting(status: PipStatus, nowMs: Long): PipFrame.Card {
     val timed = status.setStartedAt != null
@@ -332,10 +363,10 @@ object PipPresenter {
   }
 
   /** Null with no strap; a bpm of null once the reading is stale, which the window draws as "—". */
-  fun heartView(hr: PipHeartRate?, nowMs: Long): PipHeartView? {
+  fun heartView(hr: PipHeartRate?, nowMs: Long, heartColor: String? = null): PipHeartView? {
     if (hr == null) return null
     val fresh = nowMs - hr.at <= HR_STALE_MS
-    return PipHeartView(if (fresh) hr.bpm else null, hr.zoneName, hr.zoneColor)
+    return PipHeartView(if (fresh) hr.bpm else null, hr.zoneName, hr.zoneColor, heartColor ?: HEART_COLOR)
   }
 
   /** #3745: "how did it feel?", answered in the window for the first seconds of the last rest. */
@@ -432,8 +463,9 @@ object PipPresenter {
   }
 
   /** What the rest clock reads: the time left, then "+0:12" once past the target; up with none. */
-  fun restClockText(elapsedSec: Long, targetSec: Long?): String = when {
+  fun restClockText(elapsedSec: Long, targetSec: Long?, clampAtZero: Boolean = false): String = when {
     targetSec == null -> formatTime(elapsedSec)
+    elapsedSec >= targetSec && clampAtZero -> formatTime(0)
     elapsedSec >= targetSec -> "+" + formatTime(elapsedSec - targetSec)
     else -> formatTime(targetSec - elapsedSec)
   }
@@ -468,6 +500,9 @@ object PipPresenter {
       effortAnswer = ((map["effortAsk"] as? Map<*, *>)?.get("answer") as? Number)?.toInt()
         ?.takeIf { it in -1..1 },
       accent = color(map["accent"]),
+      heartColor = color(map["heartColor"]),
+      readyStartedAt = long("readyStartedAt"),
+      readySeconds = long("readySeconds"),
     )
   }
 

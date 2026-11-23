@@ -7,6 +7,7 @@ import type { WorkoutRecord } from '../logging/workout';
 import { workoutStatusFor } from '../status/workout-status';
 import { pipCommand, pipPhaseFor, type PipAction } from './pip';
 import { effortQuestionWindow } from '../logging/effort';
+import { pipHeartColor } from './pip-accent';
 
 export type PipHeartRate = NonNullable<WorkoutStatusPayload['hr']>;
 /** At most one heart-rate update a second reaches the window (#3266). */
@@ -43,6 +44,7 @@ export function createPipReporter(
       hr,
       effortAsk: asked && { until: asked.until, answer: asked.answer },
       accent,
+      heartColor: pipHeartColor,
     };
     const key = JSON.stringify([phase, withHr]);
     if (key === last) return;

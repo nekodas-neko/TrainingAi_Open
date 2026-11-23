@@ -181,3 +181,47 @@ test('changing the accent mid-workout redraws the window on the same reporter, n
   reporter.setAccent('#ff6467');
   assert.equal(sent.at(-1)![0], 'idle', 'nothing after close');
 });
+
+// #4058: while getting ready for a set, the window shows the preparation screen's own countdown.
+test('Ready carries the preparation countdown the screen shows, and nothing when it shows none (#4058)', async () => {
+  const { readyTimer } = await import('../src/features/workouts/logging/ready-timer.ts');
+  const { transitionSecForEquipment } = await import('@trainingai/shared/workout/duration-model');
+  const ready = workout();
+  const row = ready.exercises[1]!;
+  (ready as { timers: unknown }).timers = { setup: true, setupSeconds: null };
+  // The step has not begun: the screen shows no timer, so the payload has none.
+  row.readyStartedAt = null;
+  assert.equal(workoutStatusFor(ready)!.readyStartedAt, null);
+  row.readyStartedAt = T0 + 20_000;
+  const status = workoutStatusFor(ready)!;
+  assert.equal(status.phase, 'ready');
+  assert.equal(status.readyStartedAt, T0 + 20_000);
+  assert.equal(status.readySeconds, transitionSecForEquipment(row.equipment));
+  // Screen and window read one function.
+  assert.deepEqual(readyTimer(ready, row), {
+    startedAt: T0 + 20_000,
+    seconds: status.readySeconds,
+  });
+  // An explicit setup length wins, as on the screen.
+  (ready as { timers: unknown }).timers = { setup: true, setupSeconds: 45 };
+  assert.equal(workoutStatusFor(ready)!.readySeconds, 45);
+  // Setup timer off: no timer on the screen, none in the window.
+  (ready as { timers: unknown }).timers = { setup: false, setupSeconds: 45 };
+  const off = workoutStatusFor(ready)!;
+  assert.deepEqual([off.readyStartedAt, off.readySeconds], [null, null]);
+  // Once a set has been started the window is a rest or a set: no preparation countdown.
+  (ready as { timers: unknown }).timers = { setup: true, setupSeconds: 45 };
+  row.sets[0] = { ...row.sets[0]!, startedAt: T0 + 60_000, completedAt: T0 + 70_000 };
+  assert.equal(workoutStatusFor(ready)!.readyStartedAt, null);
+});
+
+test('the window\'s copy carries the heart-rate red from the theme tokens (#4058)', async () => {
+  const { scoreColors } = await import('../src/shared/theme/tokens.ts');
+  const { pipHeartColor } = await import('../src/features/workouts/pip/pip-accent.ts');
+  assert.equal(pipHeartColor, scoreColors.dark.heart);
+  assert.match(pipHeartColor, /^#[\da-f]{6}$/i);
+  const sent: unknown[] = [];
+  const reporter = createPipReporter({ setPhase: (_phase, status) => void sent.push(status) });
+  reporter.update(workout());
+  assert.equal((sent.at(-1) as { heartColor: string }).heartColor, pipHeartColor);
+});
