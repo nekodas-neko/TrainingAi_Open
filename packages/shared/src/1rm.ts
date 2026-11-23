@@ -290,6 +290,19 @@ export function displayOneRm(
   return { value: kg, unit: 'kg', text: `${kg} kg` }
 }
 
+/**
+ * The text a screen draws under `oneRmLabel`, or null when there is no estimate to show: a missing
+ * one, or one of 0 or less (a bodyweight lift, a deload row; #4071). Screens show what they show for
+ * null, a dash or no line, instead of "0 RM". A real estimate reads as `displayOneRm` does.
+ */
+export function oneRmText(
+  oneRm: number | null | undefined,
+  exerciseType?: string | null,
+  addedKg = 0,
+): string | null {
+  return isEstimatedOneRm(oneRm) ? displayOneRm(oneRm, exerciseType, addedKg).text : null
+}
+
 
 export function barShareOfOneRm(weightKg: number | null | undefined, oneRm: number | null | undefined): number | null {
   if (weightKg == null || oneRm == null) return null

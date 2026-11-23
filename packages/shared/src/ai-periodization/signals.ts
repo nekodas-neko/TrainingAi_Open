@@ -4,6 +4,7 @@ import { sessionSoreness } from './session-soreness'
 import { todayInTz, todayMidnightUtc, toAestDay, startOfWeekInTz, shiftDateStr, dateStrMidnightInTz } from '@trainingai/shared/date-utils'
 import { confidenceFactors, computeConfidence } from '@trainingai/shared/ai-periodization/confidence'
 import { perExerciseRpeDelta, rpeTrendFromSets } from '@trainingai/shared/ai-periodization/expected-rpe'
+import { effortRpeDelta, tappedEffort, type LatestEffortAnswer } from '@trainingai/shared/ai-periodization/autoregulation'
 import { computeVolumeAcwr, acwrBaselineDaysRemaining } from '@trainingai/shared/ai-periodization/acwr'
 import { latestIllnessFromDerived, type IllnessFlag } from '@trainingai/shared/health/illness-radar'
 import { beforeSourceSwitch } from '@trainingai/shared/health/source-rank'
@@ -60,8 +61,12 @@ export interface PrescriptionSignals {
     // RPE autoregulation inputs (null when insufficient recent data):
     // rpeDelta = avg (actual RPE − expected RPE) over this exercise's recent sets;
     // repCompletionRate = actual ÷ prescribed reps last session.
+    // #4061: a tapped answer on the lift's latest log stands in for the rated delta (`effortRpeDelta`).
     rpeDelta: number | null
     repCompletionRate: number | null
+    /** #4061: the lifter's tapped "How did it feel?" on the lift's latest log. Absent when untouched
+     *  or unanswered, so a session without a tap builds the same signals. */
+    effortAnswer?: -1 | 0 | 1
     /**
      * The exercise's own progression style, set by set — the numbers the program prescribes
      * before any model sees them (RV-202).
@@ -454,6 +459,7 @@ export async function aggregateSignals(
   // emergency-deload safety net) and a per-exercise delta (for RPE autoregulation).
   let rpeTrend: PrescriptionSignals['rpeTrend'] = null
   let perExRpeDelta = new Map<string, number>()
+  let latestEfforts = new Map<string, LatestEffortAnswer>()
   if (last5.length >= 1) {
     const last3Ids = last5.slice(0, 3).map(s => s.id)
     const setLogs = await repo.getSetLogsForSessions(last3Ids)
@@ -464,6 +470,11 @@ export async function aggregateSignals(
     // `rpeTrendFromSets` above deliberately keeps every set: it is the emergency-deload safety net,
     // and the same bias makes it fire slightly EARLY, which is the safe direction.
     perExRpeDelta = perExerciseRpeDelta(setLogs)
+    // #4061: the answer on each lift's latest log in the same sessions. A repository without the read,
+    // or a failed one, reads as no answer, so the plan falls back to the rated delta as before.
+    const read = await (async () => repo.getLatestExerciseEfforts?.(userId, last3Ids, exerciseNames))()
+      .catch(err => { console.error('[signals] effort answers read failed (ignored):', err); return undefined })
+    if (read instanceof Map) latestEfforts = read
   }
 
   // Hours since last session
@@ -638,11 +649,15 @@ export async function aggregateSignals(
     programSession.timeBudgetMinutes,
   )
 
-  const exercisesWithAutoreg = exercises.map(ex => ({
-    ...ex,
-    rpeDelta: perExRpeDelta.get(ex.name) ?? null,
-    repCompletionRate: perExCompletion.get(ex.name) ?? null,
-  }))
+  const exercisesWithAutoreg = exercises.map(ex => {
+    const effortAnswer = tappedEffort(latestEfforts.get(ex.name))
+    return {
+      ...ex,
+      rpeDelta: effortRpeDelta(perExRpeDelta.get(ex.name) ?? null, latestEfforts.get(ex.name)),
+      repCompletionRate: perExCompletion.get(ex.name) ?? null,
+      ...(effortAnswer !== undefined && { effortAnswer }),
+    }
+  })
 
   return {
     trainingGoal: program.trainingGoal,

@@ -9,20 +9,16 @@ export function ChoiceScale({
   value,
   onChange,
   disabled = false,
-  colorForValue,
-  large = false,
 }: {
   label: string;
   options: readonly { value: number; label: string; description: string }[];
   value: number | null;
   onChange: (value: number) => void;
   disabled?: boolean;
-  colorForValue?: (value: number) => string;
-  large?: boolean;
 }) {
   const { theme } = useTheme();
   return (
-    <Stack direction="row" gap={large ? 'sm' : 'xs'} accessibilityLabel={label}>
+    <Stack direction="row" gap="xs" accessibilityLabel={label}>
       {options.map((option) => (
         <Pressable
           key={option.value}
@@ -34,35 +30,26 @@ export function ChoiceScale({
           onPress={() => onChange(option.value)}
           style={{
             flex: 1,
-            minHeight: large ? theme.sizes.loggingControl : theme.sizes.touchTarget,
+            minHeight: theme.sizes.touchTarget,
             justifyContent: 'center',
             alignItems: 'center',
             // A label that wraps (#3745's "Harder than expected") stays centred, off the edges.
             paddingHorizontal: theme.spacing.xs,
             borderRadius: theme.radii.small,
-            backgroundColor: colorForValue
-              ? value === option.value
-                ? colorForValue(option.value)
-                : `${colorForValue(option.value)}${value !== null && option.value <= value ? '44' : '18'}`
-              : value === option.value
-                ? theme.colors.brand
-                : theme.colors.raised,
+            backgroundColor:
+              value === option.value ? theme.colors.brand : theme.colors.raised,
           }}
         >
           <AppText
             accessibilityRole="text"
-            variant={large ? 'heading' : colorForValue ? 'micro' : 'label'}
+            variant="label"
             style={{
               textAlign: 'center',
               color: disabled
                 ? theme.colors.disabled
-                : colorForValue
-                  ? value === option.value
-                    ? theme.colors.onSignal
-                    : colorForValue(option.value)
-                  : value === option.value
-                    ? theme.colors.onBrand
-                    : theme.colors.brandText,
+                : value === option.value
+                  ? theme.colors.onBrand
+                  : theme.colors.brandText,
             }}
           >
             {option.label}

@@ -5,6 +5,7 @@ import {
   calc1RM,
   displayOneRm,
   oneRmLabel,
+  oneRmText,
 } from '@trainingai/shared/1rm';
 import {
   AppButton,
@@ -173,7 +174,7 @@ export function GuidedWorkoutScreen({
     }
   }
   function goBack(source: 'header' | 'system') {
-    const action = workoutBack(flow.stage, ready, source);
+    const action = workoutBack(flow.stage, ready, source, last);
     if (action === 'next') {
       void next();
     } else if (action === 'session') {
@@ -192,10 +193,8 @@ export function GuidedWorkoutScreen({
     } else if (decision === 'finish') {
       saved = await controller.finish(workout.id);
     } else if (decision === 'skip') {
+      // Skipping the last exercise lands on the session hub, where Finish is a choice (#4070).
       saved = await controller.skipExercise(workout.id);
-      if (saved && last && !workout.soloExerciseId && count > 0) {
-        saved = await controller.finish(workout.id);
-      }
     } else if (flow.stage === 'review') {
       closeWorkout();
       saved = true;
@@ -288,9 +287,9 @@ export function GuidedWorkoutScreen({
         fillBottom={flow.stage === 'exercise' && !ready && !resting}
         onBack={() => goBack('header')}
         onSystemBack={() => goBack('system')}
-        backIcon={flow.stage === 'summary' ? 'forward' : 'back'}
+        backIcon={flow.stage === 'summary' && !last ? 'forward' : 'back'}
         backLabel={
-          flow.stage === 'summary' ? 'Continue to next exercise' : 'Back to session'
+          flow.stage === 'summary' && !last ? 'Continue to next exercise' : 'Back to session'
         }
         actions={
           <Stack direction="row" gap="xs">
@@ -360,9 +359,7 @@ export function GuidedWorkoutScreen({
                 )}
                 <AppText variant="caption" tone="brand">
                   {oneRmLabel(exercise.exerciseType)}:{' '}
-                  {exercise.estimated1rm === null
-                    ? 'Unavailable'
-                    : displayOneRm(exercise.estimated1rm, exercise.exerciseType).text}
+                  {oneRmText(exercise.estimated1rm, exercise.exerciseType) ?? 'Unavailable'}
                   {exercise.exerciseType === 'weighted' &&
                   set &&
                   barShareOfOneRm(Number(set.weight), exercise.estimated1rm) !== null

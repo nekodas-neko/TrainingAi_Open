@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { VOICE_LOG_EXAMPLE } from '@trainingai/shared/workout/voice-log';
 import { AppButton, AppText, Stack } from '../../../shared/ui';
-import { captureSet, type SpeechEngine } from '../voice/voice';
+import { captureSet, voiceExample, type SpeechEngine } from '../voice/voice';
 
 /**
  * Speaks a set into the wheels. It never logs: the user still taps Log Set. The caller passes an
@@ -11,11 +10,14 @@ export function VoiceLogButton({
   engine,
   onResult,
   disabled = false,
+  unloaded = false,
 }: {
   engine: SpeechEngine;
   /** False when the values could not be put on the wheels. */
   onResult: (result: { weight?: number; reps?: number }) => Promise<boolean>;
   disabled?: boolean;
+  /** A bodyweight set with no load: the example names reps alone. */
+  unloaded?: boolean;
 }) {
   const [listening, setListening] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -34,7 +36,7 @@ export function VoiceLogButton({
     }
     setError(null);
     setListening(true);
-    const outcome = await captureSet(engine);
+    const outcome = await captureSet(engine, unloaded);
     if (!mounted.current) return;
     setListening(false);
     if (outcome.kind === 'message') {
@@ -43,7 +45,7 @@ export function VoiceLogButton({
     }
     const applied = await onResult(outcome);
     if (mounted.current && !applied) setError('Could not apply that — try again');
-  }, [engine, listening, onResult]);
+  }, [engine, listening, onResult, unloaded]);
   return (
     <Stack align="center" gap="xs">
       <AppButton
@@ -60,7 +62,7 @@ export function VoiceLogButton({
         numberOfLines={1}
         style={{ textAlign: 'center' }}
       >
-        {error ?? (listening ? 'Say the weight and reps' : `Say "${VOICE_LOG_EXAMPLE}"`)}
+        {error ?? (listening ? 'Say the weight and reps' : `Say "${voiceExample(unloaded)}"`)}
       </AppText>
     </Stack>
   );

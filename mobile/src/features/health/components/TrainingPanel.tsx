@@ -3,7 +3,6 @@ import { useState, type ReactNode } from 'react';
 import { shiftDateStr, startOfWeekInTz, weekStartForDay } from '@trainingai/shared/date-utils';
 import { plural } from '@trainingai/shared/format/plural';
 import {
-  AppButton,
   AppText,
   Card,
   Icon,
@@ -13,14 +12,12 @@ import {
   ProgressBar,
   Sheet,
   Stack,
-  TouchSurface,
 } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { weeklySpec } from '../../workouts/data/models';
 import { WeeklyTrainingCard } from '../../progress/WeeklyTrainingCard';
 import { ResourceStatus } from '../../workouts/components/ResourceStatus';
-import { SessionGlyph } from '../../workouts/components/SessionGlyph';
 import { useHealthData } from '../data/HealthDataProvider';
 import {
   activityHistorySpec,
@@ -30,18 +27,17 @@ import {
   trendsSpec,
 } from '../data/models';
 import {
-  APPLY_PRIOR_DATA_LABEL,
   APPLY_PRIOR_DATA_PATH,
   activityRow,
   applyPriorDataBody,
   muscleVolumeCaption,
   movementRows,
-  periodizationRow,
   trendSeries,
   weekActivities,
 } from '../data/training-view';
 import { useReadableCueColor } from './RangeBar';
 import { ActivityDetails, type HealthActivity } from './ActivityDetails';
+import { PeriodizationRow } from './PeriodizationRow';
 import { MuscleVolumeFigure } from './MuscleVolumeFigure';
 import { TrainingCalendarCard } from './TrainingCalendarCard';
 import { activityIcon, activityTypesSpec } from '../../activities/data/models';
@@ -240,61 +236,18 @@ export function TrainingPanel({
         />
         <Stack gap="sm">
           {overview.data?.sessions.map((session) => {
-            const row = periodizationRow(session);
             return (
-              <Stack key={session.sessionId} direction="row" align="center" gap="sm">
-              <TouchSurface
-                style={{ flex: 1, minWidth: 0 }}
-                accessibilityRole="button"
-                accessibilityLabel={`${session.sessionName}, ${row.label}`}
-                onPress={openPrograms}
-              >
-                <Stack
-                  direction="row"
-                  align="center"
-                  gap="md"
-                  style={{
-                    borderRadius: theme.radii.control,
-                    backgroundColor: `${theme.colors.background}99`,
-                    paddingHorizontal: theme.spacing.md,
-                    paddingVertical: theme.spacing.sm,
-                  }}
-                >
-                  <SessionGlyph
-                    icon={session.icon}
-                    position={0}
-                    size={theme.sizes.iconCompact}
-                    color={theme.colors.muted}
-                  />
-                  <Stack gap="none" style={{ flex: 1, minWidth: 0 }}>
-                    <AppText variant="label" numberOfLines={1}>
-                      {session.sessionName}
-                    </AppText>
-                    <AppText variant="micro" style={{ color: phaseColors[row.phase] }}>
-                      {row.label}
-                    </AppText>
-                  </Stack>
-                  {row.recency ? (
-                    <AppText variant="micro" tone="muted">
-                      {row.recency}
-                    </AppText>
-                  ) : null}
-                </Stack>
-              </TouchSurface>
-              {row.needsBaseline && (
-                <AppButton
-                  title={APPLY_PRIOR_DATA_LABEL}
-                  variant="ghost"
-                  textVariant="micro"
-                  busy={applyingId === session.sessionId && priorData.busy}
-                  disabled={priorData.busy}
-                  accessibilityLabel={`Use prior data for ${session.sessionName}`}
-                  onPress={() => {
-                    void applyPriorData(session.sessionId);
-                  }}
-                />
-              )}
-              </Stack>
+              <PeriodizationRow
+                key={session.sessionId}
+                session={session}
+                phaseColors={phaseColors}
+                busy={applyingId === session.sessionId && priorData.busy}
+                disabled={priorData.busy}
+                onOpen={openPrograms}
+                onApplyPriorData={() => {
+                  void applyPriorData(session.sessionId);
+                }}
+              />
             );
           })}
         </Stack>

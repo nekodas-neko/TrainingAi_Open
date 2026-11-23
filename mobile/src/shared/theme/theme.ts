@@ -22,7 +22,6 @@ import {
   scoreColors,
   weatherColors,
   homeCardColors,
-  effortColors,
   progressColors,
   friendColors,
   rewardColors,
@@ -87,7 +86,6 @@ export type Theme = {
   deload: typeof deloadStrengthColors.dark;
   coachFab: { background: string; foreground: string };
   sessions: TonePalette[];
-  effort: Record<number, string>;
   sleepStages: typeof STAGE_COLOR;
   hrZoneColors: string[];
   progress: typeof progressColors.light;
@@ -114,7 +112,6 @@ export type ThemeOverrides = {
   tones?: Partial<Record<Tone, Partial<TonePalette>>>;
   anatomy?: Partial<Theme['anatomy']>;
   sessions?: TonePalette[];
-  effort?: Record<number, string>;
   sleepStages?: Partial<typeof STAGE_COLOR>;
   hrZoneColors?: string[];
   progress?: Partial<Omit<typeof progressColors.light, 'goals'>> & {
@@ -199,7 +196,6 @@ export function createTheme(
       mode === 'dark'
         ? { background: colors.text, foreground: colors.background }
         : { background: colors.brand, foreground: colors.onBrand },
-    effort: { ...effortColors, ...overrides.effort },
     sleepStages: { ...STAGE_COLOR, ...overrides.sleepStages },
     hrZoneColors:
       overrides.hrZoneColors ??

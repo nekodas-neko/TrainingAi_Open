@@ -1,0 +1,170 @@
+{
+  "untouched": {
+    "payload": {
+      "sessionName": "Upper body",
+      "sessionId": "10000000-0000-4000-8000-000000000002",
+      "workoutSessionId": "20000000-0000-4000-8000-000000000010",
+      "exerciseLogId": "20000000-0000-4000-8000-000000000011",
+      "setLogIds": [
+        "20000000-0000-4000-8000-000000000012",
+        "20000000-0000-4000-8000-000000000013"
+      ],
+      "exercise": "Bench press",
+      "weights": [
+        60,
+        60
+      ],
+      "sets": 2,
+      "reps": [
+        8,
+        6
+      ],
+      "localDate": "2026-11-20",
+      "setTimes": [
+        30,
+        30
+      ],
+      "restTimes": [
+        60,
+        0
+      ],
+      "setStartTimes": [
+        1795140000000,
+        1795140090000
+      ],
+      "setEndTimes": [
+        1795140030000,
+        1795140120000
+      ],
+      "prepTimeSec": 0,
+      "progressionStyle": [
+        {
+          "pct": 70,
+          "reps": 8,
+          "restSec": 90,
+          "useFor1rm": true
+        },
+        {
+          "pct": 75,
+          "reps": 6,
+          "restSec": 120,
+          "useFor1rm": true
+        }
+      ],
+      "styleName": "Strength",
+      "muscleGroups": [
+        "Chest"
+      ],
+      "workoutStartedAt": 1795140000000,
+      "warmupEndedAtMs": 1795140000000,
+      "rpeValues": [
+        6,
+        6
+      ],
+      "rpeSources": [
+        "expected",
+        "expected"
+      ],
+      "intensityMode": "full",
+      "wasOverride": false,
+      "exerciseDeloaded": false,
+      "editedAt": 1795140180000
+    },
+    "sets": [
+      {
+        "rpe": 6,
+        "rpeSource": "expected"
+      },
+      {
+        "rpe": 6,
+        "rpeSource": "expected"
+      }
+    ]
+  },
+  "defaultShown": {
+    "payload": {
+      "sessionName": "Upper body",
+      "sessionId": "10000000-0000-4000-8000-000000000002",
+      "workoutSessionId": "20000000-0000-4000-8000-000000000010",
+      "exerciseLogId": "20000000-0000-4000-8000-000000000011",
+      "setLogIds": [
+        "20000000-0000-4000-8000-000000000012",
+        "20000000-0000-4000-8000-000000000013"
+      ],
+      "exercise": "Bench press",
+      "weights": [
+        60,
+        60
+      ],
+      "sets": 2,
+      "reps": [
+        8,
+        6
+      ],
+      "localDate": "2026-11-20",
+      "setTimes": [
+        30,
+        30
+      ],
+      "restTimes": [
+        60,
+        0
+      ],
+      "setStartTimes": [
+        1795140000000,
+        1795140090000
+      ],
+      "setEndTimes": [
+        1795140030000,
+        1795140120000
+      ],
+      "prepTimeSec": 0,
+      "progressionStyle": [
+        {
+          "pct": 70,
+          "reps": 8,
+          "restSec": 90,
+          "useFor1rm": true
+        },
+        {
+          "pct": 75,
+          "reps": 6,
+          "restSec": 120,
+          "useFor1rm": true
+        }
+      ],
+      "styleName": "Strength",
+      "muscleGroups": [
+        "Chest"
+      ],
+      "workoutStartedAt": 1795140000000,
+      "warmupEndedAtMs": 1795140000000,
+      "rpeValues": [
+        6,
+        6
+      ],
+      "rpeSources": [
+        "expected",
+        "expected"
+      ],
+      "intensityMode": "full",
+      "wasOverride": false,
+      "exerciseDeloaded": false,
+      "effort": {
+        "vsPlan": 0,
+        "source": "default"
+      },
+      "editedAt": 1795140180000
+    },
+    "sets": [
+      {
+        "rpe": 6,
+        "rpeSource": "expected"
+      },
+      {
+        "rpe": 6,
+        "rpeSource": "expected"
+      }
+    ]
+  }
+}

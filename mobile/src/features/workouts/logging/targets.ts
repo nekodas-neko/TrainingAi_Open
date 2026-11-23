@@ -58,11 +58,19 @@ export function isAmrap(
   );
 }
 
+/** A bodyweight set with no load added or taken off: the card shows reps alone. */
+export function isUnloadedSet(
+  exercise: Pick<WorkoutExercise, 'exerciseType'>,
+  set: Pick<WorkoutSet, 'weight'>,
+) {
+  return exercise.exerciseType === 'bodyweight' && Number(set.weight) === 0;
+}
+
 export function formatSetLoad(
   exercise: Pick<WorkoutExercise, 'exerciseType'>,
   set: Pick<WorkoutSet, 'weight' | 'reps'>,
 ) {
-  if (exercise.exerciseType === 'bodyweight' && Number(set.weight) === 0) {
+  if (isUnloadedSet(exercise, set)) {
     return `${set.reps} reps`;
   }
   const prefix =
@@ -70,6 +78,8 @@ export function formatSetLoad(
   return `${prefix}${loadLabel(set.weight)} × ${set.reps} reps`;
 }
 
+// #4061: this only fires after a rated set. Preview's set card no longer has an RPE row, so for new
+// sets it does not appear; whether it should come back is #4068.
 export function loadSuggestion(
   workout: WorkoutRecord,
   exercise: WorkoutExercise,

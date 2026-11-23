@@ -23,13 +23,16 @@ export type VoiceOutcome =
   | { kind: 'set'; weight?: number; reps?: number }
   | { kind: 'message'; message: string };
 
+/** The phrase the hint and the failure message offer: no weight for an unloaded lift (#4071). */
+export const voiceExample = (unloaded: boolean) => (unloaded ? '6 reps' : VOICE_LOG_EXAMPLE);
+
 const message = (text: string): VoiceOutcome => ({ kind: 'message', message: text });
 
 /**
  * One tap: ask for the microphone, listen, parse. It only reports what was heard. The caller puts
  * it on the wheels and the user logs the set as usual, so a misheard phrase never saves anything.
  */
-export async function captureSet(engine: SpeechEngine): Promise<VoiceOutcome> {
+export async function captureSet(engine: SpeechEngine, unloaded = false): Promise<VoiceOutcome> {
   try {
     if (!engine.available()) return message('Speech recognition unavailable on this device');
     if (!(await engine.requestPermission())) return message('Microphone permission denied');
@@ -37,7 +40,7 @@ export async function captureSet(engine: SpeechEngine): Promise<VoiceOutcome> {
     if (!transcript) return message('Did not catch that');
     const { weight, reps } = parseVoice(transcript);
     if (weight === undefined && reps === undefined) {
-      return message(`Didn't catch that — try "${VOICE_LOG_EXAMPLE}"`);
+      return message(`Didn't catch that — try "${voiceExample(unloaded)}"`);
     }
     // 0-500 in the spoken unit, the same bounds the wheels and the log schema enforce. The current
     // app also rounds through mroundStep, whose 5-250 kg bar limits would cap a heavy lb figure

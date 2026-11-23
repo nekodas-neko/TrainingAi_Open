@@ -12,9 +12,8 @@ import {
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import type { WorkoutExercise, WorkoutRecord, WorkoutSet } from '../logging/workout';
 import { useWorkoutJournal } from '../logging/WorkoutJournalProvider';
-import { isAmrap, weightStep } from '../logging/targets';
+import { isAmrap, isUnloadedSet, weightStep } from '../logging/targets';
 import { displayLoad, loadLabel, storedLoad } from '../logging/preferences';
-import { EffortPicker } from './EffortPicker';
 import { VoiceLogButton } from './VoiceLogButton';
 import { applyHeardSet } from '../voice/voice';
 import { useVoiceEngine } from '../voice/useVoiceEngine';
@@ -58,16 +57,13 @@ export function SetEntry({
     minimumRow * 3 +
     theme.spacing.sm +
     (bodyweight ? assistanceHeight : theme.sizes.touchTarget + theme.spacing.xs * 2) +
-    theme.sizes.loggingControl +
-    theme.typography.caption.lineHeight! * textScale +
-    theme.spacing.sm +
     (voiceEngine
       ? theme.spacing.md +
         theme.sizes.touchTarget +
         theme.spacing.xs +
         theme.typography.caption.lineHeight! * textScale
       : 0) +
-    theme.spacing.md * 2;
+    theme.spacing.md;
   const columnStyle =
     columnWidth === undefined
       ? { flex: 1, flexBasis: 0, minWidth: 0 }
@@ -180,15 +176,13 @@ export function SetEntry({
         </View>
       )}
       {voiceEngine && (
-        <VoiceLogButton engine={voiceEngine} onResult={applyVoice} disabled={journal.busy} />
+        <VoiceLogButton
+          engine={voiceEngine}
+          onResult={applyVoice}
+          disabled={journal.busy}
+          unloaded={isUnloadedSet(exercise, set)}
+        />
       )}
-      <EffortPicker
-        set={set}
-        disabled={journal.busy}
-        onChange={(rpe) => {
-          void journal.controller?.rateSet(workout.id, exercise.id, set.id, rpe);
-        }}
-      />
     </Stack>
   );
 }

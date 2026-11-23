@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { calc1RM, calcAmrap1RM, calculate1RM, runningEstimate1RM, oneRmTrendStatus, BW_REF, repMaxFromOneRm, repMaxFromAmrapOneRm, rescaleBodyweightReps, resolveBodyweightStyle, estimateOneRm, repFactor, REP_CEILING, bestSetOneRm, mround, displayOneRm, displayOneRmDelta, displayOneRmSeries, oneRmLabel, oneRmUnit, describePersonalRecord, pickHeadlinePersonalRecord } from '../1rm'
+import { calc1RM, calcAmrap1RM, calculate1RM, runningEstimate1RM, oneRmTrendStatus, BW_REF, repMaxFromOneRm, repMaxFromAmrapOneRm, rescaleBodyweightReps, resolveBodyweightStyle, estimateOneRm, repFactor, REP_CEILING, bestSetOneRm, mround, displayOneRm, oneRmText, displayOneRmDelta, displayOneRmSeries, oneRmLabel, oneRmUnit, describePersonalRecord, pickHeadlinePersonalRecord } from '../1rm'
 
 describe('calcAmrap1RM', () => {
   it('matches calc1RM for ≤5 reps (scale factor 1.0)', () => {
@@ -668,5 +668,24 @@ describe('beatsPersonalRecord', () => {
     expect(beatsPersonalRecord(120, null, null)).toBe(true)
     expect(beatsPersonalRecord(0, null, null)).toBe(false)
     expect(beatsPersonalRecord(null, 100, 100)).toBe(false)
+  })
+})
+
+
+describe('oneRmText (#4071)', () => {
+  it('is null for no estimate: null, undefined, 0 and negative', () => {
+    for (const bad of [null, undefined, 0, -5, NaN]) {
+      expect(oneRmText(bad, 'bodyweight')).toBeNull()
+      expect(oneRmText(bad, 'weighted')).toBeNull()
+    }
+  })
+  it('reads a real estimate as displayOneRm does', () => {
+    expect(oneRmText(92.5, 'weighted')).toBe(displayOneRm(92.5, 'weighted').text)
+    expect(oneRmText(92.5, 'weighted')).toBe('92.5 kg')
+    expect(oneRmText(114.5, 'bodyweight')).toBe('5 RM')
+    expect(oneRmText(114.5, 'bodyweight', 10)).toBe(displayOneRm(114.5, 'bodyweight', 10).text)
+  })
+  it('leaves displayOneRm itself alone, so a series and a stored 0 still read as numbers', () => {
+    expect(displayOneRm(0, 'bodyweight').value).toBe(0)
   })
 })

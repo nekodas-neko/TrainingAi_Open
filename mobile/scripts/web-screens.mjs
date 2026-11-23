@@ -53,6 +53,8 @@
  *   { "scroll": 600 }            scroll the screen's content down by px (negative is up)
  *   { "wait": 1000 }             wait ms
  *   { "capture": "data-sync" }   save <name>.png and add it to the index
+ *   { "measure": "name", "texts": ["Upper"] }   save measure-<name>.json: the box of every
+ *                                focusable surface (and its parent) and of each exact text
  *
  * Needs the local Postgres from docs/local-dev-database.md (`pnpm db:local`). Playwright and
  * Chromium are preinstalled in cloud sessions; nothing is installed. Never point it at production:
@@ -572,6 +574,42 @@ async function scrollBy(page, px) {
   }, px);
 }
 
+/**
+ * Boxes for layout checks (#4067): every focusable surface on the open screen (a Pressable, with
+ * its parent, which is TouchSurface's wrapper) and the box of each exact text in `texts`. All in
+ * CSS px, rounded to 0.1. Use a tall `--height` so the whole screen is laid out in view.
+ */
+function measureBoxes(page, texts) {
+  return page.evaluate((wanted) => {
+    const rect = (el) => {
+      if (!el) return null;
+      const b = el.getBoundingClientRect();
+      const r = (n) => Math.round(n * 10) / 10;
+      return { x: r(b.x), y: r(b.y), w: r(b.width), h: r(b.height) };
+    };
+    const visible = (el) => !el.closest('[aria-hidden="true"]') && el.offsetParent !== null;
+    const text = (el) => (el.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 60);
+    const out = [];
+    for (const el of document.querySelectorAll('[tabindex="0"]')) {
+      if (!visible(el)) continue;
+      out.push({
+        kind: 'surface',
+        label: el.getAttribute('aria-label') ?? text(el),
+        pressable: rect(el),
+        wrapper: rect(el.parentElement),
+        parent: rect(el.parentElement?.parentElement),
+      });
+    }
+    for (const want of wanted) {
+      const hits = [...document.querySelectorAll('div, span')].filter(
+        (el) => visible(el) && el.children.length === 0 && text(el) === want,
+      );
+      out.push({ kind: 'text', label: want, matches: hits.length, box: rect(hits[0]) });
+    }
+    return out;
+  }, texts);
+}
+
 async function main() {
   const options = parseArgs(process.argv.slice(2));
   const proxyOrigin = `http://localhost:${options.port}`;
@@ -709,6 +747,11 @@ async function main() {
           await page.waitForTimeout(400);
         } else if (typeof step.wait === 'number') {
           await page.waitForTimeout(step.wait);
+        } else if (step.measure) {
+          const name = String(step.measure).replace(/[^A-Za-z0-9_-]/g, '-');
+          const rows = await measureBoxes(page, step.texts ?? []);
+          fs.writeFileSync(path.join(options.out, `measure-${name}.json`), `${JSON.stringify(rows, null, 2)}\n`);
+          console.log(`[web-screens] measured ${rows.length} box(es) → measure-${name}.json`);
         } else if (step.capture) {
           await capture(String(step.capture).replace(/[^A-Za-z0-9_-]/g, '-'), { clickScript: true });
         } else {

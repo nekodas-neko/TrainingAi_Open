@@ -14,8 +14,10 @@ export function workoutBack(
   stage: WorkoutStage,
   ready: boolean,
   source: 'header' | 'system',
+  last = false,
 ): WorkoutBack {
-  if (stage === 'summary') return source === 'header' ? 'next' : 'session';
+  // On the last exercise "Continue" would finish the workout, so it goes to the hub too (#4070).
+  if (stage === 'summary') return source === 'header' && !last ? 'next' : 'session';
   if (stage === 'warmup' || (stage === 'exercise' && ready)) return 'session';
   return 'leave';
 }
