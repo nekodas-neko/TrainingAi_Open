@@ -99,3 +99,19 @@ export function dayHistory(
     );
   return overlayHistory([...server, ...local], [...operations]);
 }
+
+/**
+ * The session-exercise id whose logged unit applies to a history row: the id the phone's own
+ * journal gave the exercise (`relogOf ?? id`, the key `preferences.units` is written under), found
+ * through the row's log id. Null for a row the phone has no copy of (another phone, an old
+ * session): its unit is unknown, so it stays kilograms.
+ */
+export function unitKeyForLog(workouts: readonly WorkoutRecord[], exerciseLogId: string) {
+  for (const workout of workouts) {
+    const exercise = workout.exercises.find((x) => x.logId === exerciseLogId);
+    if (exercise) {
+      return exercise.relogOf ?? exercise.id;
+    }
+  }
+  return null;
+}

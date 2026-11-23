@@ -113,3 +113,13 @@ test('what is uploaded does not change with the unit: exact kilograms, no unit f
   assert.ok(Math.abs(body.weights[0] - 10.2058) < 1e-4);
   assert.doesNotMatch(JSON.stringify(inLb), /"lb"|weightUnit|unit/);
 });
+
+test('a pound label rounds a tie away from zero, for an assistance (negative) load as for a positive one', () => {
+  // Exact half-tenths: these kilogram values convert to precisely 0.25 lb and 0.35 lb, no float noise.
+  assert.equal(loadLabel(0.1133980925, 'lb'), '0.3 lb', 'positive tie 0.25 rounds up');
+  assert.equal(loadLabel(-0.1133980925, 'lb'), '-0.3 lb', 'negative tie 0.25 rounds away from zero');
+  assert.equal(loadLabel(0.1587573295, 'lb'), '0.4 lb');
+  assert.equal(loadLabel(-0.1587573295, 'lb'), '-0.4 lb');
+  assert.equal(loadLabel(-0.0113398, 'lb'), '0 lb', 'no negative zero');
+  assert.equal(loadLabel('0', 'lb'), '0 lb');
+});

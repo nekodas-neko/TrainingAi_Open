@@ -48,3 +48,15 @@ export const useWorkoutResource = (spec: { path: string }) => ({ data: state.res
 export const useWeightUnits = () => state.units;
 export const ResourceCard = ({ children }: Props) =>
   (children as unknown as (data: unknown) => ReactNode)(state.next);
+
+// #4072 follow-up: the history sheet and the day log.
+export const ExerciseHrTrendCard = () => null;
+export const AppButton = ({ title }: Props) => h('button', null, title as string);
+export const ConfirmationCard = box;
+export const Notice = box;
+export const NumericStepper = () => null;
+export const StatusIndicator = () => null;
+export const useHistoryQueue = () => ({ operations: [], ready: true, syncing: false, error: null, queue: null });
+export const useWorkoutAction = () => ({ error: null, busy: false, run: async () => {} });
+export const journal: { workouts: unknown[] } = { workouts: [] };
+export const useWorkoutJournal = () => ({ data: { workouts: journal.workouts, preferences: { units: state.units } } });

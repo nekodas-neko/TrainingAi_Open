@@ -4,10 +4,24 @@ import { useWorkoutResource } from '../data/WorkoutDataProvider';
 import { exerciseHistorySpec } from '../data/models';
 import { ResourceStatus } from './ResourceStatus';
 import { formatSetLoad } from '../logging/targets';
+import { weightUnitOf } from '../logging/preferences';
+import { useWeightUnits } from '../logging/WorkoutJournalProvider';
 import { oneRmTrendEntries } from '../data/exercise-history';
 import { ExerciseHrTrendCard } from './ExerciseHrTrendCard';
 
-export function ExerciseHistory({ name }: { name: string }) {
+/**
+ * `sessionExerciseId` ties the sheet to the lift it was opened from, so its set loads read in the
+ * unit that lift is logged in (#4072). Without one (Strength, the library) the unit is unknown
+ * and loads stay kilograms.
+ */
+export function ExerciseHistory({
+  name,
+  sessionExerciseId,
+}: {
+  name: string;
+  sessionExerciseId?: string | null;
+}) {
+  const weightUnit = weightUnitOf(useWeightUnits(), sessionExerciseId);
   const state = useWorkoutResource(exerciseHistorySpec(name));
   const type = state.data?.exerciseType ?? 'weighted';
   const dated = oneRmTrendEntries(state.data?.entries ?? []);
@@ -56,7 +70,7 @@ export function ExerciseHistory({ name }: { name: string }) {
                       {entry.weightKg[index] === undefined
                         ? `${reps} reps · load unavailable`
                         : formatSetLoad(
-                            { exerciseType: type },
+                            { exerciseType: type, weightUnit },
                             { weight: String(entry.weightKg[index]), reps: String(reps) },
                           )}
                     </AppText>

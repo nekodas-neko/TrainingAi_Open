@@ -14,13 +14,13 @@ import {
   Stack,
   StatusIndicator,
 } from '../../../shared/ui';
-import { loadLabel } from '../logging/preferences';
+import { loadLabel, weightUnitOf } from '../logging/preferences';
 import { ResourceStatus } from '../components/ResourceStatus';
 import { useWorkoutResource } from '../data/WorkoutDataProvider';
 import { daySpec, type DayExercise } from '../data/models';
 import { useHistoryQueue } from '../data/HistoryQueueProvider';
-import { dayHistory } from '../data/workout-view';
-import { useWorkoutJournal } from '../logging/WorkoutJournalProvider';
+import { dayHistory, unitKeyForLog } from '../data/workout-view';
+import { useWeightUnits, useWorkoutJournal } from '../logging/WorkoutJournalProvider';
 import { useWorkoutAction } from '../data/useWorkoutAction';
 import { formatSetLoad } from '../logging/targets';
 import { exerciseVolume } from '../logging/summary';
@@ -38,7 +38,7 @@ export function HistoryDay({
   readOnly?: boolean;
   sessionEnergy?: { id: string; kcal: number; source: 'hr' | 'met' }[];
 }) {
-  const [history, setHistory] = useState<string | null>(null);
+  const [history, setHistory] = useState<{ name: string; unitKey: string | null } | null>(null);
   const state = useWorkoutResource(daySpec(date));
   const queue = useHistoryQueue();
   const journal = useWorkoutJournal();
@@ -59,6 +59,10 @@ export function HistoryDay({
     queue.operations,
     Date.now(),
   );
+  const units = useWeightUnits();
+  // The unit a row is logged in, where this phone knows it; kilograms otherwise.
+  const unitOf = (entry: DayExercise) =>
+    weightUnitOf(units, unitKeyForLog(journal.data.workouts, entry.exerciseLogId));
   const sessionIds = [...new Set(entries.map((entry) => entry.workoutSessionId))];
   function awaitingUpload(id: string) {
     return journal.data.workouts.some(
@@ -210,7 +214,7 @@ export function HistoryDay({
                   <Pressable
                     accessibilityRole="button"
                     accessibilityLabel={entry.name + ' history'}
-                    onPress={() => setHistory(entry.name)}
+                    onPress={() => setHistory({ name: entry.name, unitKey: unitKeyForLog(journal.data.workouts, entry.exerciseLogId) })}
                     // The name fills the row's height, which the 48 dp edit and delete buttons
                     // beside it set, so the text stays where it was (#3759).
                     style={{ flex: 1, alignSelf: 'stretch', justifyContent: 'center' }}
@@ -223,11 +227,11 @@ export function HistoryDay({
                   <AppText variant="micro">
                     {entry.exerciseType === 'bodyweight'
                       ? entry.weightKg
-                        ? `BW +${loadLabel(entry.weightKg)}`
+                        ? `BW +${loadLabel(entry.weightKg, unitOf(entry))}`
                         : 'BW'
                       : entry.weightKg == null
                         ? '—'
-                        : loadLabel(entry.weightKg)}
+                        : loadLabel(entry.weightKg, unitOf(entry))}
                   </AppText>
                   {!readOnly && <>
                   <IconButton
@@ -266,6 +270,7 @@ export function HistoryDay({
                             {
                               exerciseType:
                                 entry.exerciseType === 'bodyweight' ? 'bodyweight' : 'weighted',
+                              weightUnit: unitOf(entry),
                             },
                             { weight: String(entry.setWeights[index]), reps: String(rep) },
                           )}
@@ -334,10 +339,10 @@ export function HistoryDay({
       )}
       <Sheet
         visible={history !== null}
-        title={history ?? 'Exercise history'}
+        title={history?.name ?? 'Exercise history'}
         onClose={() => setHistory(null)}
       >
-        {history && <ExerciseHistory name={history} />}
+        {history && <ExerciseHistory name={history.name} sessionExerciseId={history.unitKey} />}
       </Sheet>
       <Sheet
         visible={edit !== null}
