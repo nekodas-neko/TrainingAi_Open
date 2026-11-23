@@ -598,7 +598,7 @@ export function GuidedWorkoutScreen({
             }}
           />
         ) : shownPanel === 'history' ? (
-          <ExerciseHistory name={exercise.name} />
+          <ExerciseHistory name={exercise.name} sessionExerciseId={exercise.relogOf ?? exercise.id} />
         ) : shownPanel === 'muscles' ? (
           <>
             <AppText variant="heading">

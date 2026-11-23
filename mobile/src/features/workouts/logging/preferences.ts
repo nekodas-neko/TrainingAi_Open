@@ -39,7 +39,11 @@ export function loadLabel(kg: string | number, unit: 'kg' | 'lb' = 'kg') {
   if (String(kg).trim() === '' || !Number.isFinite(Number(kg))) {
     return '';
   }
-  return `${Math.round(kgToLbs(Number(kg)) * 10) / 10} lb`;
+  // Round the magnitude and restore the sign, so an assistance (negative) tie rounds away from
+  // zero like a positive one instead of toward it.
+  const lb = kgToLbs(Number(kg));
+  const tenths = Math.sign(lb) * (Math.round(Math.abs(lb) * 10) / 10);
+  return `${tenths === 0 ? 0 : tenths} lb`;
 }
 
 /** The unit a lift is logged in: the one its set card's toggle last chose, kilograms until then. */
