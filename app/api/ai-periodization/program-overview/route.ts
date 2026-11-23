@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { DEFAULT_TZ, todayInTz, toAestDateStr, daysBetweenDateStrs } from '@trainingai/shared/date-utils'
-import { servePrescriptionState } from '@trainingai/shared/ai-periodization/prescription-expiry'
+import { servePrescriptionState, holdPrescriptionUnderWay } from '@trainingai/shared/ai-periodization/prescription-expiry'
+import { sessionUnderWayCheck } from '@trainingai/shared/ai-periodization/session-under-way'
 import { programDeloadCheckOf, syncProgramPhase } from '@trainingai/shared/ai-periodization/program-phase'
 
 export async function GET() {
@@ -26,11 +27,21 @@ export async function GET() {
     program.sessions.map(ps => repo.getRecentSessionsOfType(userId, ps.id, 3)),
   )
 
+  // #3900 third review (1): a plan held because its workout is under way is listed as the plan.
+  // One read, and only when some plan here would otherwise be hidden.
+  const now = new Date()
+  const wouldHide = program.phaseMode === 'ai_dynamic'
+    && states.some(st => servePrescriptionState(st, now, programDeload).prescriptionAgedOut === true)
+  const underWayFor = wouldHide ? await sessionUnderWayCheck(repo, userId, now) : () => false
+
   const sessions = program.sessions.map((ps, i) => {
     const stored = states.find(s => s.programSessionId === ps.id) ?? null
     // #3716: an aged-out prescription is not the session's plan, here as on every other read. Nor is
     // one whose deload has ended (#3876).
-    const state = stored && servePrescriptionState(stored, new Date(), programDeload)
+    const servedState = stored && servePrescriptionState(stored, now, programDeload)
+    const state = stored && servedState && servedState.prescriptionAgedOut === true && underWayFor(ps.id)
+      ? holdPrescriptionUnderWay(stored, now)
+      : servedState
     const lastCompleted = recentBySession[i].find(s => s.completedAt != null)
     const lastTrainedDaysAgo = lastCompleted?.completedAt != null
       ? daysBetweenDateStrs(toAestDateStr(lastCompleted.completedAt, tz), today)

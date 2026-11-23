@@ -1014,3 +1014,58 @@ describe('second review (2): a poll never fires generation, and a move is planne
     expect(attempts).toBe(3)
   })
 })
+
+describe('third review (1) and (3): the held plan and the re-evaluation, without a database', () => {
+  const plan = { phase: 'accumulation', phaseAction: 'stay', reasoning: 'Held.', confidence: 0.9, deload: false, estimatedSessionDurationMin: 40, weeklyVolumeContribution: {},
+    exercises: [
+      { sessionExerciseId: 'a', name: 'Lift a', sets: 5, reps: 5, pct: 78, restSec: 180 },
+      { sessionExerciseId: 'b', name: 'Lift b', sets: 3, reps: 12, pct: 60, restSec: 90 },
+    ] } as AiPrescription
+  const ex = (id: string, muscle: string) => ({ sessionExerciseId: id, name: id, muscleAssignments: [{ muscle, role: 'main' as const }] }) as never
+  const signalsOf = (over: Record<string, unknown> = {}) => ({
+    soreMusclesInSession: [], hoursSinceLastSession: null, activeInjuredMusclesInSession: [], trainingGoal: 'strength',
+    illnessFlag: null, selfReportedSick: false, exercises: [ex('a', 'quads'), ex('b', 'biceps')], ...over,
+  }) as never
+  const state = (over: Record<string, unknown> = {}) => ({
+    phase: 'accumulation' as PeriodizationPhase, prescriptionStatus: 'auto_applied' as PrescriptionStatus,
+    prescriptionExpiresAt: new Date(NOW.getTime() - 5 * 60_000), sessionsInPhase: 2, ...over,
+  }) as never
+
+  it('an expired plan is re-planned when nothing is under way, held when a workout is', () => {
+    expect(reevaluatePrescriptionForToday(plan, signalsOf(), state(), NOW).needsRegenerate).toBe(true)
+    const held = reevaluatePrescriptionForToday(plan, signalsOf(), state({ underWay: true }), NOW)
+    expect(held).toEqual({ prescription: plan, changed: false, needsRegenerate: false })
+  })
+
+  it('under way, a sore muscle lightens that lift only (as the per-exercise path does anywhere)', () => {
+    const r = reevaluatePrescriptionForToday(plan, signalsOf({ soreMusclesInSession: ['quads'] }), state({ underWay: true }), NOW)
+    expect(r.needsRegenerate).toBe(false)
+    expect(r.changed).toBe(true)
+    expect(r.prescription.exercises.map(e => e.deloaded === true)).toEqual([true, false])
+    expect(r.prescription.exercises[1].pct).toBe(60)
+  })
+
+  it('under way, a sick report (an emergency elsewhere) lightens every row instead of asking for a plan generation would refuse', () => {
+    const idle = reevaluatePrescriptionForToday(plan, signalsOf({ selfReportedSick: true }), state({ prescriptionExpiresAt: new Date(NOW.getTime() + DAY) }), NOW)
+    expect(idle.needsRegenerate).toBe(true)
+    const r = reevaluatePrescriptionForToday(plan, signalsOf({ selfReportedSick: true }), state({ underWay: true, prescriptionExpiresAt: new Date(NOW.getTime() + DAY) }), NOW)
+    expect(r.needsRegenerate).toBe(false)
+    expect(r.prescription.exercises.every(e => e.deloaded === true && e.pct < 60)).toBe(true)
+  })
+
+  it('under way, soreness on most of the session lightens every row (the whole-session outcome)', () => {
+    const r = reevaluatePrescriptionForToday(plan, signalsOf({ soreMusclesInSession: ['quads', 'biceps'] }), state({ underWay: true }), NOW)
+    expect(r.needsRegenerate).toBe(false)
+    expect(r.prescription.exercises.every(e => e.deloaded === true)).toBe(true)
+  })
+
+  it('holdPrescriptionUnderWay: a past expiry goes out as none; a future one is kept', async () => {
+    const { holdPrescriptionUnderWay, prescriptionAgedOutOnScreen } = await import('../prescription-expiry')
+    const past = { prescriptionExpiresAt: new Date(NOW.getTime() - 1000), prescriptionStatus: 'auto_applied' as const, prescription: plan }
+    expect(prescriptionAgedOutOnScreen(past as never, NOW)).toBe(true)
+    expect(holdPrescriptionUnderWay(past, NOW).prescriptionExpiresAt).toBeNull()
+    expect(prescriptionAgedOutOnScreen(holdPrescriptionUnderWay(past, NOW) as never, NOW)).toBe(false)
+    const future = { ...past, prescriptionExpiresAt: new Date(NOW.getTime() + 1000) }
+    expect(holdPrescriptionUnderWay(future, NOW)).toBe(future)
+  })
+})

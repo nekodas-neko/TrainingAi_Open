@@ -305,7 +305,11 @@ describe.skipIf(!canRun)('the AI plan applies by itself (#3900)', () => {
     expect(res.ok && res.prescriptionStatus).toBe('auto_applied')
     expect(regen.calls).toBe(0)
     expect(model.calls).toBe(0)
-    expect((await rowsOf()).find(r => r.program_session_id === push)!.prescription).toEqual(deload)
+    // The plan is the same; the serve path's re-evaluation, restored while under way (third review 3),
+    // stamps the day's inputs fingerprint on it exactly as on main.
+    const { reevaluatedInputsKey, ...stored } = (await rowsOf()).find(r => r.program_session_id === push)!.prescription as AiPrescription & { reevaluatedInputsKey?: string }
+    expect(stored).toEqual(deload)
+    expect(reevaluatedInputsKey).toBeDefined()
   })
 
   it('R2: one set logged 19 hours ago and never finished, yesterday\'s deload expired 8 hours ago: the serve path calls it aged out and generation re-plans it', async () => {
@@ -349,6 +353,196 @@ describe.skipIf(!canRun)('the AI plan applies by itself (#3900)', () => {
     const legsRow = rows.find(r => r.program_session_id === legs)!
     expect(legsRow.prescription_status).toBe('auto_applied')
     expect(legsRow.prescription).toEqual(legsPlan)
+  })
+
+  // ── Third review ──────────────────────────────────────────────────────────────────────────────
+  const HOUR = 3_600_000
+  /** An unfinished Push workout whose one exercise log reads `loggedSql` on the phone's clock; the
+   *  server stamps `updated_at` now. `setEndMs` adds one set carrying that end time. */
+  const workoutWith = async (loggedSql: string, setEndMs?: number) => {
+    const ws = (await pool.query(
+      `INSERT INTO workout_sessions (user_id, session_id, session_name, started_at) VALUES ($1,$2,'Push 3900', now() - interval '20 hours') RETURNING id`, [USER, push])).rows[0].id
+    const el = (await pool.query(
+      `INSERT INTO exercise_logs (workout_session_id, exercise_name, exercise_id, logged_at) VALUES ($1,$2,$3, ${loggedSql}) RETURNING id`, [ws, LIFT, libIds[0]])).rows[0].id
+    if (setEndMs != null) {
+      await pool.query(`INSERT INTO set_logs (exercise_log_id, set_number, weight_kg, reps, set_end_ms) VALUES ($1,1,60,5,$2)`, [el, String(setEndMs)])
+    }
+    return { ws: ws as string, el: el as string }
+  }
+  const underWayAt = async (now: Date) =>
+    repo.listUnfinishedLoggedSessions!(USER, new Date(now.getTime() - SESSION_UNDER_WAY_LAST_SET_WINDOW_MS))
+
+  it('third review (2): an absurd set_end_ms does not throw, and does not pin the session either way', async () => {
+    const now = new Date()
+    // 9e18 made `to_timestamp` throw, and "a failed read counts as under way" then pinned it for good.
+    const { ws } = await workoutWith(`now() - interval '19 hours'`, 9_000_000_000_000_000_000)
+    expect(await underWayAt(now)).toEqual([])
+    // Ignored, not distrusted: a believable last-set time on the log still keeps it under way.
+    await pool.query(`UPDATE exercise_logs SET logged_at = now() - interval '10 minutes' WHERE workout_session_id = $1`, [ws])
+    expect(await underWayAt(now)).toEqual([push])
+  })
+
+  it('third review (2): a set_end_ms in seconds reads as 1970: ignored, the log\'s time stands', async () => {
+    const now = new Date()
+    const { ws } = await workoutWith(`now() - interval '19 hours'`, Math.floor(Date.now() / 1000))
+    expect(await underWayAt(now)).toEqual([])
+    await pool.query(`UPDATE exercise_logs SET logged_at = now() - interval '1 hour' WHERE workout_session_id = $1`, [ws])
+    expect(await underWayAt(now)).toEqual([push])
+  })
+
+  it('third review (2): a phone 6 hours ahead, session abandoned: released 5 hours after the server last received a set, not 11', async () => {
+    const received = new Date()
+    await workoutWith(`now() + interval '6 hours'`, received.getTime() + 6 * HOUR)
+    // 4 h 59 min after the server received it: under way. 5 h 01 min: released. (Read as the phone says,
+    // it would hold until 11 hours after it was received.)
+    expect(await underWayAt(new Date(received.getTime() + 5 * HOUR - 60_000))).toEqual([push])
+    expect(await underWayAt(new Date(received.getTime() + 5 * HOUR + 60_000))).toEqual([])
+    expect(await underWayAt(new Date(received.getTime() + 8 * HOUR))).toEqual([])
+  })
+
+  it('third review (2): a phone only a little ahead (inside 10 minutes) is believed as it says', async () => {
+    const received = new Date()
+    await workoutWith(`now() + interval '5 minutes'`)
+    // Read as the phone says, its last set is 5 minutes after it was received: released 5 h 05 min on.
+    expect(await underWayAt(new Date(received.getTime() + 5 * HOUR + 2 * 60_000))).toEqual([push])
+    expect(await underWayAt(new Date(received.getTime() + 5 * HOUR + 6 * 60_000))).toEqual([])
+  })
+
+  it('third review (2): a workout from yesterday synced late is NOT under way (the receive time is not used for a believable phone time)', async () => {
+    await workoutWith(`now() - interval '20 hours'`, Date.now() - 20 * HOUR)
+    expect(await underWayAt(new Date())).toEqual([])
+  })
+
+  it('third review (2), stated limit: a phone 6 hours BEHIND reads as not under way, the same as a late sync: no server-stamped time tells them apart', async () => {
+    await workoutWith(`now() - interval '6 hours'`, Date.now() - 6 * HOUR)
+    expect(await underWayAt(new Date())).toEqual([])
+  })
+
+  // Third review (1): the session-state readers take "under way" too.
+  const sessionState = async () => {
+    authUser.current = { id: USER, timezone: TZ }
+    const { GET } = await import('@/app/api/ai-periodization/session/[sessionId]/route')
+    const res = await GET(new Request(`http://localhost/api/ai-periodization/session/${push}`) as never, { params: Promise.resolve({ sessionId: push }) } as never)
+    return (await res.json()) as { state: { prescription: { phaseAction: string } | null; prescriptionAgedOut?: boolean; prescriptionExpiresAt: string | null } }
+  }
+  const overview = async () => {
+    authUser.current = { id: USER, timezone: TZ }
+    const { GET } = await import('@/app/api/ai-periodization/program-overview/route')
+    const body = (await (await GET()).json()) as { sessions: Array<{ sessionId: string; state: { prescription: unknown | null; prescriptionAgedOut?: boolean; prescriptionExpiresAt: string | null } }> }
+    return body.sessions.find(x => x.sessionId === push)!.state
+  }
+
+  it('third review (1): a plan that expired mid-workout stays the plan on the card, the overview, the screen\'s own check and /respond', async () => {
+    await storeDeload("now() - interval '5 minutes'")
+    await underWay(push, 'Push 3900', "now() - interval '40 minutes'")
+    const { hidePrescriptionAgedOutOnScreen } = await import('@trainingai/shared/ai-periodization/prescription-expiry')
+    const card = await sessionState()
+    expect(card.state.prescription?.phaseAction).toBe('deload_recommended')
+    expect(card.state.prescriptionAgedOut).toBeUndefined()
+    // The screens (web and native) also read the expiry off the wire: the card must survive that too.
+    expect(hidePrescriptionAgedOutOnScreen(card.state).prescription).not.toBeNull()
+    const listed = await overview()
+    expect(listed.prescription).not.toBeNull()
+    expect(hidePrescriptionAgedOutOnScreen(listed as Parameters<typeof hidePrescriptionAgedOutOnScreen>[0]).prescription).not.toBeNull()
+    // And the bar and the card agree.
+    expect((await serve()).aiPrescriptionPending).toBe(false)
+    // /respond does not refuse it as aged out.
+    const { POST } = await import('@/app/api/ai-periodization/session/[sessionId]/respond/route')
+    const res = await POST(new Request('http://localhost/x', { method: 'POST', body: JSON.stringify({ action: 'dismiss' }), headers: { 'content-type': 'application/json' } }) as never, { params: Promise.resolve({ sessionId: push }) } as never)
+    expect(res.status).not.toBe(409)
+    expect(model.calls).toBe(0)
+  })
+
+  it('third review (1): the same expired plan with nothing under way is still hidden and flagged (the control)', async () => {
+    await storeDeload("now() - interval '5 minutes'")
+    const card = await sessionState()
+    expect(card.state.prescription).toBeNull()
+    expect(card.state.prescriptionAgedOut).toBe(true)
+    expect((await overview()).prescriptionAgedOut).toBe(true)
+  })
+
+  it('third review (1): the Coach reads a plan under way as driving the bar', async () => {
+    await storeDeload("now() - interval '5 minutes'")
+    const { readExerciseContext } = await import('@/lib/coach/context')
+    const { getDb } = await import('@/lib/data/postgres/client')
+    const read = async () => (await readExerciseContext(getDb() as never, repo as never, USER, pushLift, TZ))?.storedPlan?.drivesLoad
+    expect(await read()).toBe(false)
+    await underWay(push, 'Push 3900', "now() - interval '40 minutes'")
+    expect(await read()).toBe(true)
+  })
+
+  // Third review (3): what the person enters mid-workout is their own instruction.
+  const checkIn = (bodyState: string[], sore: string[]) => pool.query(
+    `INSERT INTO mood_logs (user_id, log_date, energy_level, sleep_quality, body_state, sore_muscles, suggested_sore_muscles) VALUES ($1,$2,'ok','ok',$3,$4,ARRAY[]::text[])`,
+    [USER, todayInTz(TZ), sore.length > 0 ? [...bodyState, 'sore_muscles'] : bodyState, sore])
+  const fullPlan = () => ({ phase: 'accumulation', phaseAction: 'stay', reasoning: 'Held.', confidence: 0.9, deload: false, estimatedSessionDurationMin: 40, weeklyVolumeContribution: {},
+    exercises: [
+      { sessionExerciseId: pushLift, name: LIFT, sets: 5, reps: 5, pct: 78, restSec: 180 },
+      { sessionExerciseId: pushAcc, name: ACC, sets: 3, reps: 12, pct: 60, restSec: 90 },
+    ] })
+  // The route writes the lightened plan back without waiting for it.
+  const cached = async (until?: (p: AiPrescription) => boolean) => {
+    for (let i = 0; i < 40; i++) {
+      const p = (await rowsOf()).find(r => r.program_session_id === push)!.prescription
+      if (!until || (p && until(p))) return p
+      await new Promise(r => setTimeout(r, 50))
+    }
+    return (await rowsOf()).find(r => r.program_session_id === push)!.prescription
+  }
+
+  it('third review (3): under way with no new signal, a read changes nothing and fires nothing', async () => {
+    await storePlan(push, fullPlan(), 'auto_applied', "now() - interval '5 minutes'")
+    await underWay(push, 'Push 3900', "now() - interval '40 minutes'")
+    for (const poll of [false, true]) {
+      const served = await serve(poll)
+      expect(served.aiPrescriptionPending).toBe(false)
+      expect(bar(served)?.every(p => p === 78)).toBe(true)
+    }
+    expect(regen.calls).toBe(0)
+    expect(model.calls).toBe(0)
+    expect((await cached())!.exercises.map(e => e.pct)).toEqual([78, 60])
+  })
+
+  it('third review (3): under way, a sore muscle logged after Start lightens that lift on the next read, as on main', async () => {
+    await storePlan(push, fullPlan(), 'auto_applied')
+    await underWay(push, 'Push 3900', "now() - interval '40 minutes'")
+    await checkIn([], ['Quads'])
+    const served = await serve()
+    expect(served.aiPrescriptionPending).toBe(false)
+    expect(bar(served)?.every(p => p < 78)).toBe(true)
+    expect(regen.calls).toBe(0)
+    expect(model.calls).toBe(0)
+    const row = (await cached(p => p.exercises[0].deloaded === true))!.exercises
+    expect(row[0].deloaded).toBe(true)
+    expect(row[1].pct).toBe(60)
+  })
+
+  it('third review (3): under way, a sick check-in after Start lightens every remaining row; nothing is re-planned', async () => {
+    await storePlan(push, fullPlan(), 'auto_applied')
+    await underWay(push, 'Push 3900', "now() - interval '40 minutes'")
+    await checkIn(['sick'], [])
+    const served = await serve()
+    expect(served.aiPrescriptionPending).toBe(false)
+    expect(bar(served)?.every(p => p < 78)).toBe(true)
+    expect((await cached(p => p.exercises.every(e => e.deloaded === true)))!.exercises.every(e => e.deloaded === true)).toBe(true)
+    expect(regen.calls).toBe(0)
+    expect(model.calls).toBe(0)
+  })
+
+  it('third review (3): the same sick check-in with nothing under way asks for a new plan, as on main', async () => {
+    await storePlan(push, fullPlan(), 'auto_applied')
+    await checkIn(['sick'], [])
+    await serve()
+    expect(regen.calls).toBe(1)
+  })
+
+  it('third review (3): under way, an injury entered after Start changes nothing on its own, as on main', async () => {
+    await storePlan(push, fullPlan(), 'auto_applied')
+    await underWay(push, 'Push 3900', "now() - interval '40 minutes'")
+    await pool.query(`INSERT INTO injuries (user_id, muscle_name, severity, started_date) VALUES ($1,'Quads','mild',$2)`, [USER, todayInTz(TZ)])
+    const served = await serve()
+    expect(bar(served)?.every(p => p === 78)).toBe(true)
+    expect(regen.calls).toBe(0)
   })
 
   it('on the other program kinds a move voids that plan as before', async () => {

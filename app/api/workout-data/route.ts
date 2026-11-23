@@ -426,7 +426,9 @@ async function handleWorkoutData(req: NextRequest) {
   // #3900 second review (1): while a workout of this type is under way (`isSessionUnderWay`, the one
   // definition generation uses), the plan it started with keeps driving the bar. It is not pending
   // after its expiry or deload count passes, it does not fall back to the base numbers, and nothing
-  // regenerates it or re-evaluates it against signals that came in mid-session.
+  // regenerates it. A signal the person enters mid-workout (a sore, injury or sick check-in) still
+  // lightens the remaining rows exactly as on main (third review, 3, the Orchestrator's call): only
+  // time passing is held back, and a re-plan generation would refuse is done as a lightening instead.
   const underWay = isAiDynamic && aiPeriodizationState != null && slotHoldsPlan(aiPeriodizationState)
     ? await isSessionUnderWay(repo, userId, programSession.id)
     : false
@@ -434,7 +436,7 @@ async function handleWorkoutData(req: NextRequest) {
   const aiDrivesLoad = aiPrescription != null && aiPeriodizationState != null && !aiPrescriptionPending
     && prescriptionDrivesLoad(aiPrescription.phaseAction, aiPeriodizationState.prescriptionStatus)
 
-  if (aiDrivesLoad && aiPrescription && aiPeriodizationState && !underWay) {
+  if (aiDrivesLoad && aiPrescription && aiPeriodizationState) {
     // Consumption-day re-evaluation (AI-2/AI-3) — re-derive per-exercise soreness/injury
     // deloads against TODAY's signals without re-running the LLM.
     //
@@ -513,6 +515,7 @@ async function handleWorkoutData(req: NextRequest) {
         prescriptionExpiresAt: aiPeriodizationState.prescriptionExpiresAt,
         sessionsInPhase: aiPeriodizationState.sessionsInPhase,
         programDeload,
+        underWay,
       }
       let reevalResult = reevaluatePrescriptionForToday(aiPrescription, reevalSignals, reevalState)
 

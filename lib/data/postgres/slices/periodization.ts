@@ -118,22 +118,47 @@ async function lockProgramRows(tx: Tx, userId: string, programId: string): Promi
 }
 
 /**
- * #3900 second review (1): the session types with a workout under way: not finished, not deleted, and
- * with a logged set whose time is at or after `lastSetSince` (`sessionUnderWayCutoff`). The time of a
- * workout's last set is the latest of its exercise logs' `logged_at` and its sets' `set_end_ms`, which
- * are the phone's clock; `updated_at` is not used, because a late sync stamps it with the push's time.
- * The start of the workout and the local date do not decide it: a workout across midnight is under
- * way, and one abandoned half-done is not once its last set is old.
+ * #3900 second review (1), third review (2): the session types with a workout under way: not
+ * finished, not deleted, and with a logged set whose time is at or after `lastSetSince`
+ * (`sessionUnderWayCutoff`).
+ *
+ * A set's time is the PHONE's clock: the latest of its exercise log's `logged_at` and its sets'
+ * `set_end_ms` (the phone's clock too; `started_at`, `completed_at` and `client_edited_at` are the
+ * phone's as well). Two guards, because nothing about a phone's clock is certain:
+ *  - A `set_end_ms` is used only when it reads as a millisecond epoch (`BETWEEN 1e12 AND 4e12`); a
+ *    value in seconds, or an absurd one that `to_timestamp` would throw on, is ignored and the log's
+ *    `logged_at` stands.
+ *  - A phone time more than 10 minutes later than the server's time when it received the log row
+ *    (`updated_at`) is not believed: the phone's clock runs ahead. It is not clamped to now, which would
+ *    hold the session under way for as long as the row exists, and it is compared with the receive time
+ *    rather than the clock now, so the verdict does not flip back once real time catches up with the
+ *    phone's. The log row's `updated_at` is its time instead.
+ *
+ * `updated_at` is not used for a phone time that is believable, because a late sync stamps it with the
+ * push's time and would make yesterday's workout look as if it were being trained now. A phone that
+ * runs BEHIND is not corrected: no server-stamped time tells its just-logged set from a workout synced
+ * late (both rows are received now, both phone times read old), so such a session reads as not under
+ * way once the phone's last-set time is older than the window. The start of the workout and the local
+ * date do not decide it: a workout across midnight is under way, and one abandoned half-done is not
+ * once its last set is old.
  */
 export async function listUnfinishedLoggedSessions(db: Db | Tx, userId: string, lastSetSince: Date): Promise<string[]> {
   const rows = await db.execute(sql`
     SELECT DISTINCT last_sets.program_session_id
     FROM (
       SELECT ws.session_id AS program_session_id,
-             GREATEST(max(el.logged_at), to_timestamp(max(sl.set_end_ms) / 1000.0)) AS last_set_at
+             max(CASE WHEN logs.phone_at <= logs.server_at + interval '10 minutes' THEN logs.phone_at ELSE logs.server_at END) AS last_set_at
       FROM workout_sessions ws
-      JOIN exercise_logs el ON el.workout_session_id = ws.id AND el.deleted_at IS NULL
-      LEFT JOIN set_logs sl ON sl.exercise_log_id = el.id AND sl.deleted_at IS NULL
+      JOIN (
+        SELECT el.workout_session_id,
+               GREATEST(el.logged_at,
+                        to_timestamp(max(CASE WHEN sl.set_end_ms BETWEEN 1000000000000 AND 4000000000000 THEN sl.set_end_ms END) / 1000.0)) AS phone_at,
+               el.updated_at AS server_at
+        FROM exercise_logs el
+        LEFT JOIN set_logs sl ON sl.exercise_log_id = el.id AND sl.deleted_at IS NULL
+        WHERE el.deleted_at IS NULL
+        GROUP BY el.id
+      ) logs ON logs.workout_session_id = ws.id
       WHERE ws.user_id = ${userId}
         AND ws.session_id IS NOT NULL
         AND ws.deleted_at IS NULL

@@ -120,6 +120,18 @@ export function servePrescriptionState<T extends Pick<SessionPeriodization, 'pre
   return { ...state, prescription: null, prescriptionAgedOut: true } as ServedPrescriptionState<T>
 }
 
+/**
+ * #3900 third review (1): a stored plan served while a workout of its type is under way. Its plan
+ * keeps driving the bar (`/api/workout-data`), so the session-state reads must not call it aged out
+ * either: they return it, and an expiry already past goes out as `null` ("no expiry"), because the
+ * screens (web and native) also read the expiry off the wire and would hide the card by it. The
+ * stored row is untouched; a future expiry is left as it is so a cached copy still ages out.
+ */
+export function holdPrescriptionUnderWay<T extends Pick<SessionPeriodization, 'prescriptionExpiresAt'>>(state: T, now = new Date()): T {
+  if (state.prescriptionExpiresAt == null || state.prescriptionExpiresAt > now) return state
+  return { ...state, prescriptionExpiresAt: null }
+}
+
 /** The client's side of `servePrescriptionState`, for a state read off the wire or a cache. */
 export interface WirePrescriptionState {
   prescriptionStatus?: string | null

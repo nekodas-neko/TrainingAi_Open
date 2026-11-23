@@ -8,6 +8,8 @@ import type { Db } from './domains/types'
 import type { CoachContext } from '@trainingai/shared/coach/context'
 import { prescriptionDrivesLoad } from '@trainingai/shared/ai-periodization/apply-prescription'
 import { isAiPrescriptionPending } from '@trainingai/shared/ai-periodization/prescription-pending'
+import { isSessionUnderWay } from '@trainingai/shared/ai-periodization/session-under-way'
+import { listUnfinishedLoggedSessions } from '@/lib/data/postgres/slices/periodization'
 import { normalizeStoredPrescription } from '@trainingai/shared/ai-periodization/reconcile-prescription'
 import { prescribedBar } from '@trainingai/shared/workout/load-rounding'
 import { resolveWorkingBasisWithSource } from '@trainingai/shared/1rm'
@@ -204,8 +206,10 @@ export async function readExerciseContext(
     const row = plan.exercises.find(e => e.sessionExerciseId === target.id)
     if (row) {
       const isBaselinePhase = periodization.phase === 'baseline'
+      // #3900 third review (1): a plan whose workout is under way keeps driving the bar.
+      const underWay = await isSessionUnderWay({ listUnfinishedLoggedSessions: (u, since) => listUnfinishedLoggedSessions(db, u, since) }, userId, target.sessionId, now)
       const drivesLoad = prescriptionDrivesLoad(plan.phaseAction, periodization.prescriptionStatus)
-        && !isAiPrescriptionPending(periodization, { isAiDynamic: true, isBaselinePhase }, now)
+        && !isAiPrescriptionPending(periodization, { isAiDynamic: true, isBaselinePhase, underWay }, now)
       const [lastReal, estimates, prs, [library]] = await Promise.all([
         repo.getLastRealOneRmBatch(userId, [name]),
         repo.getExerciseEstimates(userId).catch(() => []),
