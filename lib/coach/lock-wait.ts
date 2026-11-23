@@ -28,3 +28,43 @@ export async function withBoundedLockWait<T>(db: Db, take: () => Promise<T>): Pr
   await db.execute(sql`SELECT set_config('lock_timeout', ${prev ?? '0'}, true)`)
   return out
 }
+
+/**
+ * #4082: the one lock every writer of a person's lift preferences and stored plans takes FIRST.
+ *
+ * Before it, each writer took its own locks in its own order: a lift's advisory lock, then its preference
+ * row, then the stored plan rows. One stored plan holds several lifts, so a weekly check-in (lift A, then
+ * lift B, in one transaction) and a Coach apply on lift B met in a cycle: the check-in held plan row P and
+ * wanted B, the apply held B and wanted P. Postgres ended it with 40P01 after a second, and one side
+ * answered 500. With this lock taken before anything else, two such writers cannot hold one thing each
+ * and want the other's: the second waits here, holding nothing, until the first commits.
+ *
+ * Per user, so it queues only one person's own lift changes behind each other (a tap, an undo, a check-in
+ * save: each a short transaction); another user's writers never see it. Transaction-scoped, so it is
+ * released at commit or rollback with no cleanup, and re-taking it inside the same transaction (the
+ * check-in takes it for the whole save, and each lift apply nested in it takes it again) is free.
+ * Bounded like the others: past `lockWait` the caller gets `busy`, not a statement timeout.
+ */
+export async function lockLiftWrites(db: Db, userId: string): Promise<void> {
+  await withBoundedLockWait(db, async () => {
+    await db.execute(sql`SELECT pg_advisory_xact_lock(hashtext('lift_writes:user'), hashtext(${userId}))`)
+  })
+}
+
+/**
+ * #4082: run `run` in a transaction that holds the per-user, per-domain lock first, for a Coach apply
+ * whose "read the current value, then write" must not interleave with another apply of the same thing
+ * (nutrition targets, user goals, program phase, early deload). The second apply waits here, then reads
+ * what the first wrote and is refused as stale instead of recording the same "before" twice. Nested in a
+ * caller's transaction this is a savepoint and the lock lasts to the outer commit. Bounded: a wait past
+ * `lockWait` throws 55P03 before anything is written, which `applyCoachPatch` answers as `busy`.
+ */
+export async function withDomainLock<T>(db: Db, userId: string, domain: string, run: (tx: Db) => Promise<T>): Promise<T> {
+  return db.transaction(async tx => {
+    const t = tx as unknown as Db
+    await withBoundedLockWait(t, async () => {
+      await t.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`coach_apply:${domain}`}), hashtext(${userId}))`)
+    })
+    return run(t)
+  })
+}

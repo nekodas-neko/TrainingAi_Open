@@ -33,7 +33,7 @@ import { buildWorkoutExercises } from '@trainingai/shared/workout/session-data'
 import { buildAutomaticPhaseStatus, isEarlyDeloadWeek } from '@trainingai/shared/phase-engine'
 import { getScheduledSessionsPerWeek } from '@trainingai/shared/schedule-utils'
 import { loadTarget, type TargetRow } from './session-exercise'
-import { withBoundedLockWait } from '../lock-wait'
+import { lockLiftWrites, withBoundedLockWait } from '../lock-wait'
 import type { Consequence, Db, DomainHandler, Drift, PreviewResult } from './types'
 import {
   DURATION_LABEL, LIFT_PREFERENCE_DURATION, REP_RANGE_DEFAULT, REP_RANGE_REQUESTS, liftPreferenceValueLabel,
@@ -753,6 +753,9 @@ export function liftPreferenceHandler(
 
     async apply(db, userId, patch, accepted, prepared) {
       if (!patch.targetId) return { ok: false, reason: 'not_found' }
+      // #4082: before any read or write, so every writer of a person's lifts and stored plans meets the
+      // same lock first (see `lockLiftWrites`). The reads below then see what the last writer committed.
+      await lockLiftWrites(db, userId)
       const target = await loadTarget(db, userId, patch.targetId)
       if (!target) return { ok: false, reason: 'not_found' }
       const changes = liftChanges(accepted)
@@ -834,6 +837,9 @@ export function liftPreferenceHandler(
     async undo(db, userId, targetId, beforeState) {
       const state = beforeState as unknown as LiftPreferenceBefore
       if (!state?.after || state.preferenceId !== targetId) return { ok: false, reason: 'invalid', detail: 'This change can no longer be undone' }
+      // #4082: the same first lock as apply. Undo used to take the preference row and then the plan rows
+      // with no advisory lock, which a check-in applying a sibling lift could meet in a cycle.
+      await lockLiftWrites(db, userId)
       const row = await rowById(db, userId, targetId, true)
       if (!row) return { ok: false, reason: 'not_found' }
       if (!same(columnsOf(row), state.after)) {

@@ -2,7 +2,8 @@ import { and, eq, gte, inArray, isNull, lt } from 'drizzle-orm'
 import * as s from '@/lib/data/postgres/schema'
 import { aestMidnight } from '@trainingai/shared/date-utils'
 import { countSessionsSinceStart } from '@/lib/data/postgres/slices/programs'
-import type { Consequence, DomainHandler, Db, PreviewResult } from './types'
+import type { Consequence, DomainHandler, Db, HandlerApplyResult, PreviewResult } from './types'
+import { withDomainLock } from '../lock-wait'
 
 /**
  * Starting (or cancelling) a deload week ahead of schedule.
@@ -135,54 +136,59 @@ export function earlyDeloadHandler(today: string, timezone: string): DomainHandl
     },
 
     async apply(db, userId, patch, accepted) {
-      const state = await loadState(db, userId, today, timezone)
-      if (!state) return { ok: false, reason: 'not_found' }
+      // #4082: read, stale check and write under one lock per user and domain (see `withDomainLock`): a double
+      // tap used to pass the `from` check twice and write twice with the same "before".
+      return withDomainLock<HandlerApplyResult>(db, userId, 'early_deload', async t => {
+        const state = await loadState(t, userId, today, timezone)
+        if (!state) return { ok: false, reason: 'not_found' }
 
-      const change = accepted.find(c => c.field === 'deloadNow')
-      if (!change) return { ok: false, reason: 'invalid', detail: 'Nothing to change' }
-      if (Boolean(change.from) !== state.deloadNow) {
+        const change = accepted.find(c => c.field === 'deloadNow')
+        if (!change) return { ok: false, reason: 'invalid', detail: 'Nothing to change' }
+        if (Boolean(change.from) !== state.deloadNow) {
+          return {
+            ok: false,
+            reason: 'stale',
+            drift: [{
+              changeId: change.id,
+              field: 'deloadNow',
+              expected: String(change.from),
+              actual: String(state.deloadNow),
+            }],
+          }
+        }
+        if (change.to === state.deloadNow) {
+          return { ok: false, reason: 'invalid', detail: 'That is already the case' }
+        }
+
+        const starting = change.to === true
+        await t.transaction(async tx => {
+          await tx.update(s.programs)
+            .set({ earlyDeloadWeekStart: starting ? today : null })
+            .where(and(eq(s.programs.id, state.programId), eq(s.programs.userId, userId)))
+          if (state.todaySessionIds.length > 0) {
+            await tx.update(s.workoutSessions)
+              .set({ isEarlyDeload: starting })
+              .where(and(
+                eq(s.workoutSessions.userId, userId),
+                inArray(s.workoutSessions.id, state.todaySessionIds),
+              ))
+          }
+        })
+
         return {
-          ok: false,
-          reason: 'stale',
-          drift: [{
-            changeId: change.id,
-            field: 'deloadNow',
-            expected: String(change.from),
-            actual: String(state.deloadNow),
-          }],
+          ok: true,
+          summary: starting
+            ? `Started a deload week on ${state.programName}`
+            : `Cancelled the deload week on ${state.programName}`,
+          beforeState: {
+            earlyDeloadWeekStart: state.earlyDeloadWeekStart,
+            sessionIds: state.todaySessionIds,
+            wasFlagged: !starting,
+          },
+          targetId: state.programId,
         }
-      }
-      if (change.to === state.deloadNow) {
-        return { ok: false, reason: 'invalid', detail: 'That is already the case' }
-      }
-
-      const starting = change.to === true
-      await db.transaction(async tx => {
-        await tx.update(s.programs)
-          .set({ earlyDeloadWeekStart: starting ? today : null })
-          .where(and(eq(s.programs.id, state.programId), eq(s.programs.userId, userId)))
-        if (state.todaySessionIds.length > 0) {
-          await tx.update(s.workoutSessions)
-            .set({ isEarlyDeload: starting })
-            .where(and(
-              eq(s.workoutSessions.userId, userId),
-              inArray(s.workoutSessions.id, state.todaySessionIds),
-            ))
-        }
+    
       })
-
-      return {
-        ok: true,
-        summary: starting
-          ? `Started a deload week on ${state.programName}`
-          : `Cancelled the deload week on ${state.programName}`,
-        beforeState: {
-          earlyDeloadWeekStart: state.earlyDeloadWeekStart,
-          sessionIds: state.todaySessionIds,
-          wasFlagged: !starting,
-        },
-        targetId: state.programId,
-      }
     },
 
     async undo(db, userId, targetId, before) {

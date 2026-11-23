@@ -216,6 +216,12 @@ export async function undoCoachChange(db: Db, userId: string, changeId: string):
     } catch (err) {
       if (err instanceof Refused) return err.outcome
       if (err instanceof StaleLiftPreference) return { ok: false, reason: 'stale', drift: err.drift }
+      // #4082: gave up waiting for the lift-write lock, or was the victim of a deadlock. The undo is one
+      // transaction, so nothing of it was written; the same request can be sent again.
+      if (isLockWaitTimeout(err)) {
+        reportServerError(err, { userId, url: '/api/coach/apply/undo' })
+        return { ok: false, reason: 'busy' }
+      }
       throw err
     }
   }

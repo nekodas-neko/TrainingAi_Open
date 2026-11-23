@@ -7,9 +7,9 @@ import { progressionStyleIdsOwned } from '@/lib/data/postgres/slices/programs'
 import { voidSessionPrescription } from '@/lib/data/postgres/slices/periodization'
 import { normalizeMuscle } from '@trainingai/shared/muscles'
 import { FIELD_LABEL, type PatchChange } from '../patch'
-import type { Consequence, DomainHandler, Db, PreviewResult } from './types'
+import type { Consequence, DomainHandler, Db, HandlerApplyResult, PreviewResult } from './types'
 import { driftAgainst } from './types'
-import { withBoundedLockWait } from '../lock-wait'
+import { withBoundedLockWait, withDomainLock } from '../lock-wait'
 
 export interface TargetRow {
   id: string
@@ -329,84 +329,91 @@ export const sessionExerciseHandler: DomainHandler = {
 
   async apply(db, userId, patch, accepted) {
     if (!patch.targetId) return { ok: false, reason: 'invalid', detail: 'No exercise selected' }
-    const row = await loadTarget(db, userId, patch.targetId)
-    if (!row) return { ok: false, reason: 'not_found' }
+    const targetId = patch.targetId
+    // #4082: read, stale check and write under one lock per user and target, so a double tap (two swaps of
+    // one slot) is refused as stale instead of both writing and both recording the same "before". The swap's
+    // library insert nests as a savepoint and keeps its own bounded wait.
+    return withDomainLock<HandlerApplyResult>(db, userId, `session_exercise:${targetId}`, async t => {
+      const row = await loadTarget(t, userId, targetId)
+      if (!row) return { ok: false, reason: 'not_found' }
 
-    // `removed` carries plain booleans so the tool schema stays Gemini-compatible (see patch.ts),
-    // which means "remove this" has to be checked here rather than by the type.
-    const badRemoval = accepted.find(c => c.field === 'removed' && c.to !== true)
-    if (badRemoval) return { ok: false, reason: 'invalid', detail: 'A removal must set `to` to true' }
+      // `removed` carries plain booleans so the tool schema stays Gemini-compatible (see patch.ts),
+      // which means "remove this" has to be checked here rather than by the type.
+      const badRemoval = accepted.find(c => c.field === 'removed' && c.to !== true)
+      if (badRemoval) return { ok: false, reason: 'invalid', detail: 'A removal must set `to` to true' }
 
-    const drift = driftAgainst(accepted, row as unknown as Record<string, unknown>, c => c.field === 'removed')
-    if (drift.length > 0) return { ok: false, reason: 'stale', drift }
+      const drift = driftAgainst(accepted, row as unknown as Record<string, unknown>, c => c.field === 'removed')
+      if (drift.length > 0) return { ok: false, reason: 'stale', drift }
 
-    // `styleId` is written verbatim onto the exercise row, so it must name one of the caller's own
-    // progression styles — the same check the program save route makes (RV-32). Checked before the
-    // swap below, which can create a library row: a refused change leaves nothing behind.
-    const styleChange = accepted.find(c => c.field === 'styleId')
-    if (styleChange && row.phaseMode === 'ai_dynamic') {
-      return { ok: false, reason: 'invalid', detail: STYLE_UNUSED_UNDER_AI }
-    }
-    if (styleChange && !(await progressionStyleIdsOwned(db, userId, [styleChange.to as string | null]))) {
-      return { ok: false, reason: 'invalid', detail: 'That progression style is not one of yours' }
-    }
+      // `styleId` is written verbatim onto the exercise row, so it must name one of the caller's own
+      // progression styles — the same check the program save route makes (RV-32). Checked before the
+      // swap below, which can create a library row: a refused change leaves nothing behind.
+      const styleChange = accepted.find(c => c.field === 'styleId')
+      if (styleChange && row.phaseMode === 'ai_dynamic') {
+        return { ok: false, reason: 'invalid', detail: STYLE_UNUSED_UNDER_AI }
+      }
+      if (styleChange && !(await progressionStyleIdsOwned(t, userId, [styleChange.to as string | null]))) {
+        return { ok: false, reason: 'invalid', detail: 'That progression style is not one of yours' }
+      }
 
-    // Resolve a swap before writing anything, so a bad name fails the whole apply rather than
-    // leaving a half-applied patch behind.
-    const swap = accepted.find(c => c.field === 'exerciseName')
-    let replacement: { id: string; muscles: { muscle: string }[] } | null = null
-    // No role is written: the slot keeps its own (#2215 — see `preview`).
-    if (swap) {
-      const [entry] = await db
-        .select({
-          id: s.exerciseLibrary.id,
-          muscles: s.exerciseLibrary.muscles,
-          equipment: s.exerciseLibrary.equipment,
-          mergedInto: s.exerciseLibrary.mergedInto,
-        })
-        .from(s.exerciseLibrary)
-        .where(eq(s.exerciseLibrary.name, swap.to as string))
-        .limit(1)
-      if (!entry) {
-        const created = await createMissingExercise(db, userId, swap.to as string, accepted)
-        if ('error' in created) return { ok: false, reason: 'invalid', detail: created.error }
-        replacement = created
+      // Resolve a swap before writing anything, so a bad name fails the whole apply rather than
+      // leaving a half-applied patch behind.
+      const swap = accepted.find(c => c.field === 'exerciseName')
+      let replacement: { id: string; muscles: { muscle: string }[] } | null = null
+      // No role is written: the slot keeps its own (#2215 — see `preview`).
+      if (swap) {
+        const [entry] = await t
+          .select({
+            id: s.exerciseLibrary.id,
+            muscles: s.exerciseLibrary.muscles,
+            equipment: s.exerciseLibrary.equipment,
+            mergedInto: s.exerciseLibrary.mergedInto,
+          })
+          .from(s.exerciseLibrary)
+          .where(eq(s.exerciseLibrary.name, swap.to as string))
+          .limit(1)
+        if (!entry) {
+          const created = await createMissingExercise(t, userId, swap.to as string, accepted)
+          if ('error' in created) return { ok: false, reason: 'invalid', detail: created.error }
+          replacement = created
+        } else {
+          // A merged-away catalogue row is kept only so historical FKs stay valid (migration 165) — it
+          // must never become a new selection.
+          if (entry.mergedInto) return { ok: false, reason: 'invalid', detail: `"${swap.to}" has been merged into another exercise` }
+          replacement = { id: entry.id, muscles: (entry.muscles as { muscle: string }[] | null) ?? [] }
+        }
+      }
+
+      const beforeState = captureBefore(accepted, row)
+
+      if (accepted.some(c => c.field === 'removed')) {
+        // LB-66: tombstone, and bump the parent program so the pull delta re-sends the subtree —
+        // see `bumpProgramOfSession`. `undo` lifts the tombstone off this same row.
+        await t.update(s.sessionExercises).set({ deletedAt: new Date() })
+          .where(eq(s.sessionExercises.id, row.id))
+        await t.update(s.programs).set({ updatedAt: new Date() })
+          .where(eq(s.programs.id, row.programId))
       } else {
-        // A merged-away catalogue row is kept only so historical FKs stay valid (migration 165) — it
-        // must never become a new selection.
-        if (entry.mergedInto) return { ok: false, reason: 'invalid', detail: `"${swap.to}" has been merged into another exercise` }
-        replacement = { id: entry.id, muscles: (entry.muscles as { muscle: string }[] | null) ?? [] }
+        const set: Record<string, unknown> = { updatedAt: new Date() }
+        for (const c of accepted) {
+          if (c.field === 'exerciseName' && replacement) {
+            set.exerciseName = c.to
+            set.exerciseId = replacement.id
+            set.muscleGroups = replacement.muscles.map(m => m.muscle)
+          } else if (c.field === 'styleId') set.styleId = c.to
+          else if (c.field === 'position') set.position = c.to
+        }
+        await t.update(s.sessionExercises).set(set).where(eq(s.sessionExercises.id, row.id))
       }
-    }
 
-    const beforeState = captureBefore(accepted, row)
+      // #3895: the stored AI plan was made for the session as it was, and keeps driving the bar until
+      // it expires. Void it, as the program editor's save does (`clearProgramPrescriptions`), so the
+      // next open regenerates against the changed session. Phase and counts are untouched.
+      await voidSessionPrescription(t, userId, row.sessionId)
 
-    if (accepted.some(c => c.field === 'removed')) {
-      // LB-66: tombstone, and bump the parent program so the pull delta re-sends the subtree —
-      // see `bumpProgramOfSession`. `undo` lifts the tombstone off this same row.
-      await db.update(s.sessionExercises).set({ deletedAt: new Date() })
-        .where(eq(s.sessionExercises.id, row.id))
-      await db.update(s.programs).set({ updatedAt: new Date() })
-        .where(eq(s.programs.id, row.programId))
-    } else {
-      const set: Record<string, unknown> = { updatedAt: new Date() }
-      for (const c of accepted) {
-        if (c.field === 'exerciseName' && replacement) {
-          set.exerciseName = c.to
-          set.exerciseId = replacement.id
-          set.muscleGroups = replacement.muscles.map(m => m.muscle)
-        } else if (c.field === 'styleId') set.styleId = c.to
-        else if (c.field === 'position') set.position = c.to
-      }
-      await db.update(s.sessionExercises).set(set).where(eq(s.sessionExercises.id, row.id))
-    }
-
-    // #3895: the stored AI plan was made for the session as it was, and keeps driving the bar until
-    // it expires. Void it, as the program editor's save does (`clearProgramPrescriptions`), so the
-    // next open regenerates against the changed session. Phase and counts are untouched.
-    await voidSessionPrescription(db, userId, row.sessionId)
-
-    return { ok: true, summary: summarize(accepted, row), beforeState, targetId: row.id }
+      return { ok: true, summary: summarize(accepted, row), beforeState, targetId: row.id }
+  
+    })
   },
 
   async undo(db, userId, targetId, before) {
