@@ -50,3 +50,14 @@ export function splitTouchSurfaceStyle(style: unknown): { outer: Style; inner: S
   }
   return { outer, inner };
 }
+
+/** A caller's style for a TouchSurface: a style value, or a function of the press state. */
+export type TouchSurfaceStyle = unknown | ((state: { pressed: boolean }) => unknown);
+
+/**
+ * The split for one press state. A function style is resolved first, so a placement key it
+ * returns reaches the wrapper too; the wrapper only knows `pressed` (its own press tracking).
+ */
+export function resolveTouchSurfaceStyle(style: TouchSurfaceStyle, pressed: boolean) {
+  return splitTouchSurfaceStyle(typeof style === 'function' ? style({ pressed }) : style);
+}
