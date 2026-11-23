@@ -122,7 +122,7 @@ export const coachPaths = [
   '/api/goal-recommendations',
 ];
 export const COACH_BUSY_TEXT =
-  'Coach is busy saving another change. Nothing was changed. Tap Apply again in a moment.';
+  'Coach is busy saving another change. Nothing was changed. Try again in a moment.';
 export function coachError(error: unknown, action = 'get a reply') {
   if ((error as { code?: string })?.code === 'pending_local_changes')
     return 'Finish uploading your saved changes before applying this suggestion.';

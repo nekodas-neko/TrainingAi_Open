@@ -35,7 +35,8 @@ test('a busy 409 says another change was saving, nothing changed, and to tap App
   const text = coachError(error, 'apply this change');
   assert.equal(text, COACH_BUSY_TEXT);
   assert.match(text, /saving another change/);
-  assert.match(text, /Tap Apply again/);
+  assert.match(text, /Try again in a moment/);
+  assert.doesNotMatch(text, /Apply/);
   assert.doesNotMatch(text, /out of date/i);
 });
 test('an older server answers 409 with no busy flag and reads as stale', async (t) => {

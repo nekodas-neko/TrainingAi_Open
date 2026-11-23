@@ -194,7 +194,7 @@ export function ActiveMealPlan({
             {energy.data?.target?.recommendedKcal == null
               ? 'Current target advice is unavailable; review whether the meals still suit you.'
               : Math.abs(energy.data.target.recommendedKcal - plan.targetCalories) > 100
-                ? `Rebuilding would use ${Math.round(energy.data.target.recommendedKcal)} kcal/day, ${energy.data.target.recommendedKcal > plan.targetCalories ? 'up' : 'down'} from ${plan.targetCalories}.`
+                ? `Rebuilding would use ${formatCount(energy.data.target.recommendedKcal)} kcal/day, ${energy.data.target.recommendedKcal > plan.targetCalories ? 'up' : 'down'} from ${formatCount(plan.targetCalories)}.`
                 : 'The target has not moved much. Rebuild if the meals no longer suit you.'}
           </AppText>
           <Stack direction="row">
@@ -303,7 +303,7 @@ export function ActiveMealPlan({
                         (planned {formatCount(m.targetCalories)})
                       </>
                     ) : (
-                      `${m.targetCalories} kcal target`
+                      `${formatCount(m.targetCalories)} kcal target`
                     )}
                   </AppText>
                   {adjusted && (
