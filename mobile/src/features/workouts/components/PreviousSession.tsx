@@ -8,7 +8,7 @@ import {
   Sheet,
   Stack,
 } from '../../../shared/ui';
-import { displayOneRm, oneRmLabel } from '@trainingai/shared/1rm';
+import { oneRmLabel, oneRmText } from '@trainingai/shared/1rm';
 import type { WorkoutExercise, WorkoutRecord } from '../logging/workout';
 import { useWorkoutJournal } from '../logging/WorkoutJournalProvider';
 import { previousValueChanges } from '../logging/reuse';
@@ -41,6 +41,7 @@ export function PreviousSession({
   );
   const source = sources?.length === 1 ? sources[0] : null;
   const changes = previousValueChanges(exercise);
+  const rm = oneRmText(exercise.estimated1rm, exercise.exerciseType);
   return (
     <Card>
       <AppText variant="micro" tone="muted">
@@ -78,13 +79,13 @@ export function PreviousSession({
             </AppText>
           )}
         </Stack>
-        {exercise.estimated1rm !== null && (
+        {rm !== null && (
           <Stack align="center" gap="xs">
             <AppText variant="micro" tone="muted">
               {oneRmLabel(exercise.exerciseType)}
             </AppText>
             <AppText variant="heading" tone="brand">
-              {displayOneRm(exercise.estimated1rm, exercise.exerciseType).text}
+              {rm}
             </AppText>
           </Stack>
         )}

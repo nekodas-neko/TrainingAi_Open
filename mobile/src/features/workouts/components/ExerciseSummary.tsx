@@ -1,4 +1,4 @@
-import { bodyweightRepMax, displayOneRm, oneRmLabel } from '@trainingai/shared/1rm';
+import { bodyweightRepMax, displayOneRm, isEstimatedOneRm, oneRmLabel } from '@trainingai/shared/1rm';
 import { View } from 'react-native';
 import { Pressable } from '../../../shared/ui/Pressable';
 import { AppText, Card, Icon, Stack } from '../../../shared/ui';
@@ -36,7 +36,9 @@ export function ExerciseSummary({
           storedReps: exercise.prevRepMaxReps,
           oneRm: exercise.estimated1rm,
         })
-      : exercise.estimated1rm;
+      : isEstimatedOneRm(exercise.estimated1rm)
+        ? exercise.estimated1rm
+        : null;
   const current =
     exercise.exerciseType === 'bodyweight' ? result.repMax : result.estimate;
   // As the current app: no change against a baseline test's estimate, or during one (#3671).
