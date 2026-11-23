@@ -15,6 +15,8 @@ import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from 'vites
 // The error report goes to the error_events table; here it is counted (a stuck lock must be reported, once).
 const reportServerError = vi.hoisted(() => vi.fn())
 vi.mock('@/lib/observability', () => ({ reportServerError }))
+// The route's own rate limit is not under test (it is shared across runs of this file in a minute).
+vi.mock('@/lib/rate-limit', () => ({ rateLimit: () => true }))
 // The route is driven as the signed-in user.
 vi.mock('@/auth', () => ({ auth: async () => ({ user: { id: '00000000-0000-4000-8000-0000040760a1', timezone: 'Australia/Brisbane' } }) }))
 
