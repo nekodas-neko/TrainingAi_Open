@@ -150,13 +150,16 @@ const SHADOW_READERS: Record<string, Carrier> = {
  */
 const LIVE_READERS: Record<string, Carrier> = {
   'packages/shared/src/ai-periodization/autoregulation.ts': {
-    why: 'the mapping: tapped +1 / -1 onto the rated-RPE delta, everything else no signal (#4061)',
+    why: 'the mapping: tapped +1 / -1 onto the rated-RPE delta, everything else no signal (#4061); and the plan note for a tap the rule changed nothing for (#4079)',
     lines: [
       "import type { EffortSource, EffortVsPlan } from '@trainingai/shared/workout/effort-vs-plan'",
       "/** The answer on a lift's latest log, as stored (`exercise_logs.effort_vs_plan` / `effort_source`). */",
       'export interface LatestEffortAnswer { vsPlan: number | null; source: string | null }',
       'export function tappedEffort(latest: LatestEffortAnswer | null | undefined): EffortVsPlan | undefined {',
       'return latest.vsPlan === -1 || latest.vsPlan === 0 || latest.vsPlan === 1 ? latest.vsPlan : undefined',
+      'effortAnswer?: -1 | 1',
+      "const said = sig.effortAnswer === 1 ? 'harder' : sig.effortAnswer === -1 ? 'easier' : null",
+      'if (sig.effortAnswer === 1) {',
     ],
   },
   'packages/shared/src/ai-periodization/signals.ts': {
@@ -180,9 +183,10 @@ const LIVE_READERS: Record<string, Carrier> = {
     ],
   },
   'packages/shared/src/ai-periodization/generate-prescription.ts': {
-    why: 'marks the delta as the tap\'s, for the cut note\'s wording only (#4061)',
+    why: 'marks the delta as the tap\'s and which way it went, for a note\'s wording only (#4061, #4079)',
     lines: [
       '...(e.effortAnswer !== undefined && { effortFromAnswer: true as const }),',
+      '...((e.effortAnswer === 1 || e.effortAnswer === -1) && { effortAnswer: e.effortAnswer }),',
     ],
   },
 }

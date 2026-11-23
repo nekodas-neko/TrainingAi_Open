@@ -40,6 +40,7 @@ const PCT = 70
 const REPS = 10
 const HIGH_RPE = 9 // a rep short: 9 − 6.82 = +2.18, at or above the Harder delta
 const LOW_RPE = 6 // reps met: 6 − 7.82 = −1.82, inside (−2, Easier delta]
+const HARDER_ALL_REPS = "You said it felt harder. Your logged reps were on target, so your answer doesn't change the plan."
 const local = (day: string, hour: number) => new Date(dateStrMidnightInTz(day, TZ).getTime() + hour * 3_600_000)
 
 interface Latest {
@@ -161,8 +162,9 @@ describe.skipIf(!canRun)('the tapped effort answer in the next plan (#4061)', ()
     const dflt = await plan({ ...untouched, reps: REPS - 1, effort: { vsPlan: 0, source: 'default' } })
     expect(dflt).toEqual(none)
     expect(none).toMatchObject({ pct: PCT, reps: REPS, note: null })
+    // #4079: the figures stay the model's; the note now says the tap was read.
     const harderAlone = await plan({ ...untouched, reps: REPS, effort: { vsPlan: 1, source: 'tapped' } })
-    expect(harderAlone).toMatchObject({ pct: PCT, reps: REPS, note: null })
+    expect(harderAlone).toMatchObject({ pct: PCT, reps: REPS, sets: none.sets, note: HARDER_ALL_REPS })
   })
 
   it('a log with both a rated RPE and a tapped answer: the answer wins', async () => {
@@ -175,8 +177,35 @@ describe.skipIf(!canRun)('the tapped effort answer in the next plan (#4061)', ()
     const ratedLow = await plan({ reps: REPS, rated: LOW_RPE, effort: null })
     expect(ratedLow.reps).toBeGreaterThan(REPS)
     const lowButHarder = await plan({ reps: REPS, rated: LOW_RPE, effort: { vsPlan: 1, source: 'tapped' } })
-    expect(lowButHarder).toMatchObject({ pct: PCT, reps: REPS, note: null })
+    expect(lowButHarder).toMatchObject({ pct: PCT, reps: REPS, note: HARDER_ALL_REPS })
     expect(model.calls).toBe(4)
+  })
+
+  // #4079: a tapped answer the rule read and changed nothing for is said in the lift's note.
+  it('tapped Harder with every rep done: the plan is the model\'s, and the note says the tap was read', async () => {
+    const none = await plan({ ...untouched, reps: REPS })
+    const harder = await plan({ ...untouched, reps: REPS, effort: { vsPlan: 1, source: 'tapped' } })
+    // Sets, reps, load: the plan the model gave, as with no answer. Only the note differs.
+    expect({ ...harder, note: null, prompt: null }).toEqual({ ...none, note: null, prompt: null })
+    expect(harder.pct).toBe(PCT)
+    expect(harder.reps).toBe(REPS)
+    expect(harder.note).toBe(HARDER_ALL_REPS)
+    expect(none.note).toBeNull()
+  })
+
+  it('tapped Easier with a missed rep: the answer changes nothing and the note says why', async () => {
+    const none = await plan({ ...untouched, reps: REPS - 1 })
+    const easier = await plan({ ...untouched, reps: REPS - 1, effort: { vsPlan: -1, source: 'tapped' } })
+    expect({ ...easier, note: null, prompt: null }).toEqual({ ...none, note: null, prompt: null })
+    expect(easier.note).toBe("You said it felt easier, but your logged reps fell short of your target, so your answer doesn't change the plan.")
+  })
+
+  it('As expected adds no note; a tap that changed the plan keeps the rule\'s own note', async () => {
+    expect((await plan({ ...untouched, reps: REPS, effort: { vsPlan: 0, source: 'tapped' } })).note).toBeNull()
+    expect((await plan({ ...untouched, reps: REPS, effort: { vsPlan: 0, source: 'default' } })).note).toBeNull()
+    const cut = await plan({ ...untouched, reps: REPS - 1, effort: { vsPlan: 1, source: 'tapped' } })
+    expect(cut.note).toMatch(/^−\d+(\.\d)?% load — it felt harder than expected and you fell short of the prescribed reps$/)
+    expect(cut.note).not.toMatch(/You said/)
   })
 
   it('the read is owner-scoped: another user\'s session ids give nothing', async () => {
