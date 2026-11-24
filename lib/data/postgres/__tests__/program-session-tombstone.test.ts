@@ -123,19 +123,18 @@ describe.skipIf(!canRun)('a removed program session is tombstoned, not deleted (
       { id: sid(1), name: 'Alpha' }, { id: sid(2), name: 'Bravo' },
     ]))
     await pool.query(
-      `INSERT INTO workout_sessions (user_id, session_id, program_session_id, session_name, started_at, completed_at)
-       VALUES ($1, $2, $2, 'Bravo', now(), now())`,
+      `INSERT INTO workout_sessions (user_id, session_id, session_name, started_at, completed_at)
+       VALUES ($1, $2, 'Bravo', now(), now())`,
       [TEST_USER_ID, sid(2)],
     )
     await prog.saveProgram(db, TEST_USER_ID, payload([{ id: sid(1), name: 'Alpha' }], saved.id))
 
-    // Both FKs are ON DELETE SET NULL, so the hard delete used to blank both columns and the
-    // workout lost the session it belonged to.
+    // The FK is ON DELETE SET NULL, so the hard delete used to blank the link and the workout lost
+    // the session it belonged to.
     const { rows } = await pool.query(
-      `SELECT session_id, program_session_id FROM workout_sessions WHERE user_id = $1`, [TEST_USER_ID],
+      `SELECT session_id FROM workout_sessions WHERE user_id = $1`, [TEST_USER_ID],
     )
     expect(rows[0].session_id).toBe(sid(2))
-    expect(rows[0].program_session_id).toBe(sid(2))
   })
 
   it('keeps the removed session periodization row, and stops listing it for the program', async () => {
@@ -230,16 +229,15 @@ describe.skipIf(!canRun)('a removed program session is tombstoned, not deleted (
       { id: sid(1), name: 'Alpha' }, { id: sid(2), name: 'Bravo' },
     ]))
     await pool.query(
-      `INSERT INTO workout_sessions (user_id, session_id, program_session_id, session_name, started_at, completed_at)
-       VALUES ($1, $2, $2, 'Alpha', now(), now())`,
+      `INSERT INTO workout_sessions (user_id, session_id, session_name, started_at, completed_at)
+       VALUES ($1, $2, 'Alpha', now(), now())`,
       [TEST_USER_ID, sid(1)],
     )
     await prog.saveProgram(db, TEST_USER_ID, payload([{ id: sid(2), name: 'Bravo' }], saved.id))
 
     const { rows } = await pool.query(
-      `SELECT session_id, program_session_id FROM workout_sessions WHERE user_id = $1`, [TEST_USER_ID],
+      `SELECT session_id FROM workout_sessions WHERE user_id = $1`, [TEST_USER_ID],
     )
-    expect(rows[0].program_session_id).toBe(sid(1))
     expect(rows[0].session_id).toBe(sid(1))
   })
 
