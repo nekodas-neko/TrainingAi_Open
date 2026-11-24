@@ -24,7 +24,12 @@ export function withDeadline<T>(work: Promise<T>, ms: number, message: string): 
   ]).finally(() => clearTimeout(timer));
 }
 
-export type SyncWaiting = { label: string; reason: string };
+/**
+ * `refused`: changes the server turned down. They do not upload on their own; the person decides
+ * with Retry or Discard, so the notice words them apart from rows that are only waiting.
+ */
+export type SyncWaiting = { label: string; reason: string; refused?: number; what?: string };
+export type SyncReason = string | { refused: number; what?: string };
 
 const reasonOf = (cause: unknown) =>
   (cause instanceof Error ? cause.message : String(cause || 'it failed'))
@@ -32,7 +37,7 @@ const reasonOf = (cause: unknown) =>
     .toLowerCase();
 
 /** What a store's own state says is still not uploaded; `null` when nothing is. Read live. */
-export type SyncCheck = () => string | null | undefined;
+export type SyncCheck = () => SyncReason | null | undefined;
 type StepOptions = {
   /** Read once the step is given up on or ends: what its own state says is left. */
   check?: SyncCheck;
@@ -50,6 +55,8 @@ export class SyncBoard {
   private readonly failed = new Map<string, string>();
   private readonly pending = new Set<{ label: string; still: StepOptions['still'] }>();
   private readonly checks = new Map<string, SyncCheck[]>();
+  /** Counts read after a store's own checks: they name a store that has no reason of its own. */
+  private readonly counts = new Map<string, SyncCheck[]>();
   private readonly alsoNotes: (() => string | null | undefined)[] = [];
   private readonly listeners = new Set<() => void>();
   private readonly watched: ((notify: () => void) => () => void)[] = [];
@@ -96,6 +103,10 @@ export class SyncBoard {
   check(label: string, read: SyncCheck) {
     this.checks.set(label, [...(this.checks.get(label) ?? []), read]);
   }
+  /** A store's pending count, as a last check: it only names the store when nothing else did. */
+  count(label: string, read: SyncCheck) {
+    this.counts.set(label, [...(this.counts.get(label) ?? []), read]);
+  }
   /** Something running outside the steps that the result should name while it goes (#3906). */
   also(note: () => string | null | undefined) {
     this.alsoNotes.push(note);
@@ -111,20 +122,27 @@ export class SyncBoard {
       .join(' ');
   }
   waiting(): SyncWaiting[] {
-    const rows = new Map<string, string>(this.failed);
+    const rows = new Map<string, SyncWaiting | string>(this.failed);
     for (const { label, still } of this.pending)
       if (!rows.has(label)) rows.set(label, still?.() || NO_ANSWER);
-    for (const [label, reads] of this.checks) {
+    const labels = new Set([...this.checks.keys(), ...this.counts.keys()]);
+    for (const label of labels) {
       if (rows.has(label)) continue;
-      for (const read of reads) {
+      for (const read of [...(this.checks.get(label) ?? []), ...(this.counts.get(label) ?? [])]) {
         const reason = read();
-        if (reason) {
-          rows.set(label, reasonOf(reason));
-          break;
-        }
+        if (!reason) continue;
+        rows.set(
+          label,
+          typeof reason === 'string'
+            ? reasonOf(reason)
+            : { label, reason: 'refused', refused: reason.refused, what: reason.what },
+        );
+        break;
       }
     }
-    return [...rows].map(([label, reason]) => ({ label, reason }));
+    return [...rows].map(([label, row]) =>
+      typeof row === 'string' ? { label, reason: row } : row,
+    );
   }
   /** Calls `fn` when a step settles or a watched store changes; returns how to stop. */
   follow(fn: () => void) {
@@ -139,8 +157,21 @@ export class SyncBoard {
 
 /** Plain words for what did not finish, and what that means for the person's data. */
 export function waitingText(waiting: SyncWaiting[]) {
-  const list = waiting.map((row) => `${row.label} (${row.reason})`).join(', ');
-  return `Not everything uploaded. Still waiting: ${list}. It is saved on this phone and uploads on its own.`;
+  const queued = waiting.filter((row) => !row.refused);
+  const refused = waiting.filter((row) => row.refused);
+  const parts = ['Not everything uploaded.'];
+  if (queued.length) {
+    const list = queued.map((row) => `${row.label} (${row.reason})`).join(', ');
+    parts.push(`Still waiting: ${list}. It is saved on this phone and uploads on its own.`);
+  }
+  // A refused change never uploads by itself: say so, and point to the card that decides.
+  for (const row of refused) {
+    const count = row.refused ?? 0;
+    parts.push(
+      `${count} ${row.what ?? row.label} ${count === 1 ? 'change was' : 'changes were'} refused by the server. Use Retry or Discard below.`,
+    );
+  }
+  return parts.join(' ');
 }
 const endedText =
   'Sync stopped waiting. Your changes are saved on this phone and upload on their own.';
@@ -167,7 +198,7 @@ export function syncNowRunner(
   let current: Promise<void> | null = null;
   let stopFollowing: (() => void) | null = null;
   let generation = 0;
-  return (start: (board: SyncBoard) => Promise<string>): Promise<void> => {
+  const run = (start: (board: SyncBoard) => Promise<string>): Promise<void> => {
     if (current) return current;
     stopFollowing?.();
     stopFollowing = null;
@@ -191,7 +222,8 @@ export function syncNowRunner(
         view.setMessage(null);
         view.setError((failure ?? 'Could not sync. Your saved records are kept.') + tail);
       }
-      if (over && !waiting.length && finished) {
+      // Unfollow only when nothing is waiting, the run has its result and no source is still going.
+      if (over && !waiting.length && finished && !extra) {
         stopFollowing?.();
         stopFollowing = null;
       }
@@ -225,11 +257,23 @@ export function syncNowRunner(
         view.setBusy(false);
         current = null;
         const waiting = board.waiting();
-        if (mine === generation && (waiting.length || !finished)) {
+        if (mine === generation && (waiting.length || !finished || board.alsoText())) {
           stopFollowing = board.follow(show);
         }
       });
     current = run;
     return run;
   };
+  /**
+   * The account changed: stop following, forget the run, and let nothing the old run emits reach
+   * the view. The old work is not cancelled (its own stores keep it saved); a new tap starts a run
+   * of its own instead of joining it (#3906 second check).
+   */
+  run.dispose = () => {
+    generation++;
+    stopFollowing?.();
+    stopFollowing = null;
+    current = null;
+  };
+  return run;
 }

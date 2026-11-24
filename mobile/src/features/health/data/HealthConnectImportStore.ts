@@ -132,6 +132,8 @@ export const emptyHealthConnectImport = {
   /** #3906: the switch is on but no read permission is granted. Not an error, and not a change
    *  waiting to upload; nothing can be read until a permission is granted. */
   needsPermission: false,
+  /** #3906: the system permission sheet is open and the store is waiting for the person's answer. */
+  sheetOpen: false,
 };
 const newFilter = (sources: FirstHandSources | null) =>
   new FirstHandFilter<HealthConnectRecord>(
@@ -273,10 +275,7 @@ export class HealthConnectImportStore {
         ...this.disk,
         requested: [...new Set([...this.disk.requested, ...healthConnectTypes])],
       });
-      types =
-        (await this.native(this.reader.request([...healthConnectTypes]), NATIVE_SHEET_MS).catch(
-          () => null,
-        )) ?? [];
+      types = (await this.sheet(this.reader.request([...healthConnectTypes]))) ?? [];
     }
     if (!this.canceled) this.publish({ needsPermission: !types.length });
     return types;
@@ -287,7 +286,33 @@ export class HealthConnectImportStore {
     // The run's own end cuts every wait short at once, so the run unwinds and clears busy.
     return this.runEnd ? Promise.race([bounded, this.runEnd]) : bounded;
   }
+  /**
+   * The system permission sheet waits on a person (up to 120 s), so the run's own clock stops while
+   * it is open and starts again, in full, when it returns (#3906 second check). A denial, a closed
+   * sheet or no answer is `null`.
+   */
+  private async sheet<T>(work: Promise<T>): Promise<T | null> {
+    this.stopRunClock();
+    if (!this.canceled) this.publish({ sheetOpen: true });
+    try {
+      return await withDeadline(work, NATIVE_SHEET_MS, 'Health Connect did not answer.');
+    } catch {
+      return null;
+    } finally {
+      if (!this.canceled) this.publish({ sheetOpen: false });
+      if (this.rejectEnd) this.startRunClock();
+    }
+  }
   private runEnd: Promise<never> | null = null;
+  private rejectEnd: ((error: Error) => void) | null = null;
+  private runClock: ReturnType<typeof setTimeout> | undefined;
+  private startRunClock() {
+    clearTimeout(this.runClock);
+    this.runClock = setTimeout(() => this.rejectEnd?.(new Error(RUN_STILL_READING)), RUN_LIMIT_MS);
+  }
+  private stopRunClock() {
+    clearTimeout(this.runClock);
+  }
   private guard() {
     if (!this.state.ready || this.canceled)
       throw new Error('Saved Health Connect data is unavailable. Reopen the app to retry.');
@@ -590,11 +615,11 @@ export class HealthConnectImportStore {
     if (this.canceled || (!manual && this.now() - this.lastAttempt < 300000))
       return Promise.resolve();
     this.lastAttempt = this.now();
-    let endTimer: ReturnType<typeof setTimeout> | undefined;
     this.runEnd = new Promise<never>((_, reject) => {
-      endTimer = setTimeout(() => reject(new Error(RUN_STILL_READING)), RUN_LIMIT_MS);
+      this.rejectEnd = reject;
     });
     this.runEnd.catch(() => {});
+    this.startRunClock();
     this.running = (async () => {
       await this.initialize();
       if (!this.state.ready || !this.disk.enabled || this.canceled) return;
@@ -609,16 +634,21 @@ export class HealthConnectImportStore {
         );
         if (unasked.length && this.reader.request && options.ask !== false) {
           await this.write({ ...this.disk, requested: [...this.disk.requested, ...unasked] });
-          const granted = await this.native(this.reader.request(unasked), NATIVE_SHEET_MS).catch(
-            () => null,
-          );
+          const granted = await this.sheet(this.reader.request(unasked));
           if (this.canceled) return;
           if (granted?.length) types = granted;
         }
         // #3906: nothing granted is a state to show, not a failure that fails Sync now.
         this.publish({ needsPermission: !types.length });
         if (!types.length) return;
-        const firstHand = await this.firstHandSources().catch(() => null);
+        // Bounded like every native call, so the run's end can cut it. A run end is not an
+        // "unknown", it ends the run; any other failure reads as no first-hand data, as before.
+        const firstHand = await this.native(this.firstHandSources(), NATIVE_READ_MS).catch(
+          (cause) => {
+            if (cause instanceof Error && cause.message === RUN_STILL_READING) throw cause;
+            return null;
+          },
+        );
         if (this.canceled) return;
         // A new filter each run, so its counts are that sync's: a rescan reads records again and
         // must not count them twice.
@@ -769,7 +799,8 @@ export class HealthConnectImportStore {
         if (!this.canceled) this.publish({ busy: false });
       }
     })().finally(() => {
-      clearTimeout(endTimer);
+      this.stopRunClock();
+      this.rejectEnd = null;
       this.runEnd = null;
       this.running = null;
     });

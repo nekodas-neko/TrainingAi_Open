@@ -5,6 +5,7 @@ import {
   SYNC_NOW_END_MS,
   SYNC_STEP_LIMIT_MS,
   SyncBoard,
+  waitingText,
 } from '../src/core/sync/deadline.ts';
 import {
   createSyncNowShared,
@@ -117,8 +118,12 @@ test('a refused Training change and a refused workout say refused, and point to 
   };
   const { board } = await outcome(deps(log, { training, journal }));
   const rows = board.waiting();
-  assert.match(rows.find((row) => row.label === 'Training')?.reason ?? '', /refused by the server.*retry or discard/);
-  assert.match(rows.find((row) => row.label === 'Workouts')?.reason ?? '', /refused by the server.*retry or discard/);
+  assert.deepEqual(rows.find((row) => row.label === 'Training'), { label: 'Training', reason: 'refused', refused: 1, what: undefined });
+  assert.equal(rows.find((row) => row.label === 'Workouts')?.refused, 1);
+  const text = waitingText(rows);
+  assert.match(text, /1 Training change was refused by the server\. Use Retry or Discard below\./);
+  assert.match(text, /1 workout change was refused by the server\. Use Retry or Discard below\./);
+  assert.doesNotMatch(text, /Still waiting|uploads on its own/, 'a refused change does not upload on its own');
 });
 
 test('the workout journal reports its own sync error, offline, and an unfinished workout is not "waiting"', () => {

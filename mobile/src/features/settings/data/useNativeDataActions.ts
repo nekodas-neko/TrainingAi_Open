@@ -14,7 +14,7 @@ import { useHistoryQueue } from '../../workouts/data/HistoryQueueProvider';
 import { useHistoryDownload } from './HistoryDownloadProvider';
 import { useStrapSession } from '../../devices/strap/StrapProvider';
 import { useScaleSession } from '../../devices/scale/ScaleProvider';
-import { deviceUploadsWaiting, useQueued } from './device-uploads';
+import { pendingChanges, useQueued } from './device-uploads';
 import { deviceHealthName } from '../../../integrations/device-health/platform';
 import { runSyncNow } from './sync-now-steps';
 import { syncNowShared } from './sync-now-state';
@@ -41,17 +41,17 @@ export function useNativeDataActions() {
     scale = useScaleSession();
   const strapSamples = useQueued(strap),
     scaleReadings = useQueued(scale);
-  const pending =
-    health.operations.length +
-    home.operations.length +
-    nutrition.operations.length +
-    nutrition.http.length +
-    training.operations.length +
-    journal.data.workouts.reduce((sum, row) => sum + row.pending.length, 0) +
-    imported.pending +
-    activities.pending +
-    history.operations.length +
-    deviceUploadsWaiting({ strapSamples, scaleReadings });
+  const pending = pendingChanges({
+    health,
+    home,
+    nutrition,
+    training,
+    journal,
+    imported,
+    activities,
+    history,
+    devices: { strapSamples, scaleReadings },
+  });
   async function sync(restore = false) {
     if (!resources) {
       return;

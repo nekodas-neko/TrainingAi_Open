@@ -21,7 +21,7 @@ const start = Date.parse('2026-11-20T05:00:00Z');
 function fixture(
   options: {
     sheetNeverAnswers?: boolean;
-    hang?: 'hasHistory' | 'changes' | 'history' | 'post';
+    hang?: 'hasHistory' | 'changes' | 'history' | 'post' | 'firstHand';
   } = {},
 ) {
   const saved = new Map<string, string>();
@@ -39,6 +39,8 @@ function fixture(
   let grantOnRequest: HealthConnectType[] = [];
   let clock = start;
   let endless = false;
+  let slowSheet: ((types: HealthConnectType[]) => void) | null = null;
+  let sheetOnHold = false;
   const reader: HealthConnectReader = {
     permissions: async () => {
       calls.permissions++;
@@ -47,6 +49,13 @@ function fixture(
     request: async () => {
       calls.requests++;
       if (options.sheetNeverAnswers) return new Promise<HealthConnectType[]>(() => {});
+      if (sheetOnHold)
+        return new Promise<HealthConnectType[]>((resolve) => {
+          slowSheet = (types) => {
+            granted = types;
+            resolve(types);
+          };
+        });
       granted = grantOnRequest;
       return granted;
     },
@@ -96,9 +105,15 @@ function fixture(
         ? new Promise<never>(() => {})
         : { measurements: 0, nights: 0, days: 0, heartRate: 0, hrv: null, completedAt: new Date(clock).toISOString() },
   };
-  const store = new HealthConnectImportStore(storage, connection, reader, () => {}, () => clock);
+  const firstHand = options.hang === 'firstHand' ? () => new Promise<never>(() => {}) : undefined;
+  const store = new HealthConnectImportStore(storage, connection, reader, () => {}, () => clock, firstHand);
   return {
     store,
+    /** The next permission sheet waits for `answerSheet`, as a person taking their time would. */
+    holdSheet: () => {
+      sheetOnHold = true;
+    },
+    answerSheet: (types: HealthConnectType[]) => slowSheet?.(types),
     calls,
     /** A fresh store over the same disk with `requested` emptied: no type has ever been asked for. */
     unasked: async () => {
@@ -389,4 +404,46 @@ test('#3906 review: the whole run has an end even when every call is slow in tur
   assert.match(f.store.getSnapshot().error ?? '', /Health Connect|did not answer/);
   void RUN_LIMIT_MS;
   void RUN_STILL_READING;
+});
+
+test('#3906 second check: the first-hand source read is bounded, so a silent one cannot hold busy', async (t) => {
+  const f = fixture({ hang: 'firstHand' });
+  f.grant(['Steps']);
+  await f.store.setEnabled(true);
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  f.advance(10 * 60_000);
+  const running = f.store.run(true, { ask: false });
+  for (let i = 0; i < 20; i++) await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(f.store.getSnapshot().busy, true, 'busy while it waits');
+  t.mock.timers.tick(20_000);
+  for (let i = 0; i < 40; i++) await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(f.store.getSnapshot().busy, false, 'cut at 20 s, not held until a call that never comes');
+  await running;
+  // A later run is not blocked behind a stuck one.
+  await f.store.setEnabled(true);
+});
+
+test('#3906 second check: the run does not time out while the system permission sheet is open', async (t) => {
+  const f = fixture();
+  await f.store.setEnabled(true);
+  const next = await f.unasked();
+  f.holdSheet();
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const flush = async () => {
+    for (let i = 0; i < 40; i++) await new Promise((resolve) => setImmediate(resolve));
+  };
+  f.advance(10 * 60_000);
+  const running = next.run(true);
+  await flush();
+  assert.equal(next.getSnapshot().sheetOpen, true, 'the store says it waits on the answer');
+  t.mock.timers.tick(RUN_LIMIT_MS + 10_000);
+  await flush();
+  assert.equal(next.getSnapshot().busy, true, 'past the run end, still waiting on the person');
+  assert.equal(next.getSnapshot().error, null);
+  f.answerSheet(['Steps']);
+  await flush();
+  await running;
+  assert.equal(next.getSnapshot().sheetOpen, false);
+  assert.equal(next.getSnapshot().busy, false);
+  assert.doesNotMatch(next.getSnapshot().error ?? '', /still reading/);
 });
