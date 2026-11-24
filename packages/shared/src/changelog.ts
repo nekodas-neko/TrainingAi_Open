@@ -6,6 +6,21 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.533.0",
+    date: "2026-11-24",
+    changes: [
+      "On an AI-planned program, a workout now starts in one tap. Every plan is applied as soon as it is made: there is no Accept, and no phase to choose. A phase moves on by itself at the end of its window, a plan the AI is unsure of still applies inside the usual limits, and a deload it prescribes becomes the day's plan. A rest or swap suggestion is a note and never changes your weights. This changes how plans are applied on the AI plan only; other programs are untouched.",
+      "TrainingAi Preview: the workout screen on an AI-planned program is one card. Today's plan, the phase as a label, each lift with what moved since your last full session and why, one Start workout, and Deload today instead underneath. A prescribed deload reads Start deload with Train full instead. Accept, Dismiss, Advance phase and the Full / Deload switch are gone from this screen; changing the phase by hand moved to the program editor. This needs the new Preview build.",
+      "Both apps: Train full instead on a deload the AI wrote now brings back your program's numbers. Before, the session was logged as full but trained at the deload's weights. Full on any deload now also respects a lift you called Heavy in the weekly check-in and a lift's own rep range and rest, so it can no longer put the bar above that week's limit. This changes plans only when you choose Full on a deload day.",
+      "Both apps: a deload offered for one day now ends at your local midnight. While a workout is under way its plan is not swapped by time passing; a sore or sick check-in entered mid-workout still lightens the rest of it. TrainingAi Preview only uploads a workout when it is finished, so for Preview this protection starts once it logs sets as it goes.",
+      "Both apps: saving a weekly check-in and changing a lift through the Coach at the same moment can no longer block each other, and a double tap on Apply or on nutrition targets applies once. When the server is busy saving another change it says so, nothing is changed, and you can try again. Opening a workout no longer waits behind a save.",
+      "TrainingAi Preview: choosing an activity from Log Activity on the Cardio Hub no longer leaves the sheet stuck over the next screen, which had killed the app. With an activity already open, every start button says An activity is in progress with Resume and Discard, and an activity left behind by a crash can be discarded. This needs the new Preview build and has not been confirmed on the phone yet.",
+      "Both apps: a plan's note says when your How did it feel? answer was read and did not change the plan, and why.",
+      "TrainingAi Preview: a lift logged in pounds shows its sets in pounds, the Strength screen no longer prints 0 RM, calories and other large numbers get separators, the nutrition card's earned chip reads correctly, a busy Coach says so, and the AI Periodization rows no longer draw as tall blank blocks. These need the new Preview build.",
+      "Behind the scenes: a release now stops before changing production when its tag could not be created afterwards, the release Android builds get the memory and download retry the test builds have, six more AI answer formats are checked against what the provider accepts, and a test run that leaves rows behind in the exercise catalogue fails.",
+    ],
+  },
+  {
     version: "1.532.0",
     date: "2026-11-23",
     changes: [

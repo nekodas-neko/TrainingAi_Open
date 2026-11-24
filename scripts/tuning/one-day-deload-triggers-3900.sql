@@ -13,7 +13,7 @@ rf AS (
   SELECT r, ((1 + r / 30.0) + 36.0 / (37 - LEAST(r, 20))) / 2 AS f FROM generate_series(1, 30) AS r
 ),
 ws AS (
-  SELECT w.id, w.program_session_id, w.started_at, w.completed_at, (w.started_at AT TIME ZONE win.tz)::date AS d
+  SELECT w.id, w.session_id AS program_session_id, w.started_at, w.completed_at, (w.started_at AT TIME ZONE win.tz)::date AS d
   FROM claude_ro.workout_sessions w CROSS JOIN win
   WHERE w.deleted_at IS NULL
 ),
