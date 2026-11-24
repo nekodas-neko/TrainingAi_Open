@@ -153,6 +153,15 @@ export function reconcilePrescriptionExercises(
     return false
   })
 
+  // #4124: a row is the lifter's own exercise, found by id; the name on it is theirs, never the model's
+  // echo (the prompt prints a blank name as "Unnamed exercise", and a model that says it back must not
+  // leave that text, or a name of its own, on a lift).
+  const nameById = new Map(signalExercises.map(e => [e.sessionExerciseId, e.name]))
+  for (let i = 0; i < kept.length; i++) {
+    const own = nameById.get(kept[i].sessionExerciseId)
+    if (own !== undefined && own !== kept[i].name) kept[i] = { ...kept[i], name: own }
+  }
+
   const keptIds = new Set(kept.map(ex => ex.sessionExerciseId))
   const backfilledIds: string[] = []
   const zone = intensityZone(trainingGoal, phase)

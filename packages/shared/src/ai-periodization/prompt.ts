@@ -253,12 +253,31 @@ function phaseLine(signals: PrescriptionSignals): string {
   return `${signals.phase} for the whole program (training week ${p.trainingWeeksDone + 1}; ${p.trainingWeeksDone} training weeks done${cap}; ${own})`
 }
 
-/** A user-named exercise as one prompt line's worth of text: line breaks and runs of whitespace become
- *  single spaces, so a name cannot imitate a prompt line of its own (#4061). Ordinary names are unchanged.
- *  A name of nothing but whitespace would print as an empty name, so it reads as `UNNAMED_PROMPT_LINE_NAME`. */
+/** A user-named exercise as one prompt line's worth of text (#4061, #4124).
+ *  Blank or not is decided on a COPY with every invisible character removed: format characters
+ *  (`\p{Cf}`: zero-width, direction marks, invisible math operators, tag characters), the fillers that
+ *  render as nothing (U+2800 braille blank, U+034F, U+061C, U+115F, U+1160, U+3164, U+FFA0), variation
+ *  selectors, and whitespace. Nothing visible left: the name reads `UNNAMED_PROMPT_LINE_NAME`.
+ *  Otherwise the ORIGINAL name is printed with only what is unsafe on one prompt line changed: line
+ *  breaks, tabs and runs of whitespace become one space; zero-width space U+200B, U+FEFF and the
+ *  direction overrides (U+202A-U+202E, U+2066-U+2069) are removed. Joiners (U+200C, U+200D) and variation
+ *  selectors inside visible text stay, so Persian names and emoji sequences are not altered. (A stray
+ *  U+200B inside a name is removed: "Bench<U+200B>Press" prints "BenchPress".) A name longer than
+ *  `PROMPT_LINE_NAME_MAX_CHARS` code points is cut there with an ellipsis; the exercise API accepts
+ *  120 and the longest name in the `exercise_library` seed is 34, so no real name is touched.
+ *  The text is only ever printed: a plan row's name comes from the session's own exercise. */
 export const UNNAMED_PROMPT_LINE_NAME = 'Unnamed exercise'
+export const PROMPT_LINE_NAME_MAX_CHARS = 120
+const INVISIBLE_FOR_BLANK_TEST = /[\p{Cf}\p{Cc}\s\u2800\u034F\u061C\u115F\u1160\u3164\uFFA0\u180E\uFE00-\uFE0F\u{E0100}-\u{E01EF}]/gu
+const UNSAFE_ON_A_LINE_REMOVED = /[\u200B\uFEFF\u202A-\u202E\u2066-\u2069]/g
+const LINE_WHITESPACE = /[\s\u0085]+/g
 export function promptLineName(name: string): string {
-  return name.replace(/\s+/g, ' ').trim() || UNNAMED_PROMPT_LINE_NAME
+  if (name.replace(INVISIBLE_FOR_BLANK_TEST, '') === '') return UNNAMED_PROMPT_LINE_NAME
+  const line = name.replace(UNSAFE_ON_A_LINE_REMOVED, '').replace(LINE_WHITESPACE, ' ').trim()
+  const chars = Array.from(line)
+  return chars.length > PROMPT_LINE_NAME_MAX_CHARS
+    ? `${chars.slice(0, PROMPT_LINE_NAME_MAX_CHARS - 1).join('').trimEnd()}\u2026`
+    : line
 }
 
 export function buildUserPrompt(
@@ -388,7 +407,7 @@ export function buildUserPrompt(
 
   if (perExerciseDeloadedNames && perExerciseDeloadedNames.length > 0) {
     recoveryLines.push(
-      `  Per-exercise deloads already applied to: ${perExerciseDeloadedNames.join(', ')} — ` +
+      `  Per-exercise deloads already applied to: ${perExerciseDeloadedNames.map(promptLineName).join(', ')} — ` +
       `this soreness is handled; prescribe the session normally and do NOT recommend a rest day or session swap for this soreness alone.`,
     )
   }

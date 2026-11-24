@@ -188,11 +188,23 @@ export const MODEL_DELOAD_NOTE = 'Deload \u2014 prescribed by your plan'
  * preference chose them (a rep range, a rest) or the check-in's hold lowered the bar. A row with no
  * program numbers (no base style) stays deloaded under `Full` with what it had. `fullSession` is costed
  * over the restored rows through `prescriptionFigures`, as everywhere.
+ *
+ * #4124: the notes. `effortNotes` are what the autoregulation pass said back about a lift's "how did it
+ * feel" answer, by `sessionExerciseId`: `all` of them, and the `unacted` ones, which say the answer changed
+ * nothing. The pass ran on the MODEL's rows, so a sentence in it is about those numbers. A lightened row
+ * shows `deloadNote`: a specific reason the row already has (soreness) keeps its place, then the
+ * `unacted` sentence, then `MODEL_DELOAD_NOTE`, so a row never shows two. A rule's own note for a change
+ * it made ("-8% load") is not carried: the zone clamp and the other stages after the rule can undo that
+ * change, so it is not known to be true of the numbers the row ends with. The full row (what `Full` shows
+ * once the row is not lightened) shows `autoregNote`, and none of `all` is about the program's own numbers
+ * that `Full` restores (in the planned deload week it also says "deload week"), so they are taken off
+ * `autoregNote`. Any other note on it (the neutral "Trained recently") stays. No number is read or changed.
  */
 export function recordFullSessionOnModelDeload(
   plan: AiPrescription,
   signals: PrescriptionSignals,
   fullPhase: PeriodizationPhase,
+  effortNotes: { all: Record<string, string>; unacted: Record<string, string> } = { all: {}, unacted: {} },
 ): AiPrescription {
   const asWritten = buildProgramAsWrittenPrescription(signals, plan.reasoning)
   const fullById = programFullNumbersById(asWritten)
@@ -229,10 +241,14 @@ export function recordFullSessionOnModelDeload(
   const exercises: AiPrescriptionExercise[] = plan.exercises.map(row => {
     const full = fullById.get(row.sessionExerciseId)
     const preDeload = full ? bounded(row.sessionExerciseId, full) : row.preDeload
+    const effort = effortNotes.all[row.sessionExerciseId]
+    const { autoregNote: ownAutoregNote, ...rowWithoutAutoregNote } = row
+    const autoregNote = effort ? withoutNote(ownAutoregNote, effort) : ownAutoregNote
     return {
-      ...row,
+      ...rowWithoutAutoregNote,
+      ...(autoregNote && { autoregNote }),
       deloaded: true,
-      deloadNote: row.deloadNote ?? MODEL_DELOAD_NOTE,
+      deloadNote: row.deloadNote ?? effortNotes.unacted[row.sessionExerciseId] ?? MODEL_DELOAD_NOTE,
       modelDeload: true as const,
       ...(preDeload && { preDeload }),
     }
@@ -1199,7 +1215,7 @@ async function runPrescriptionGeneration(
   // The gate is the plan being a deload the model wrote (`deload`: the phase and the action, #3877), not
   // the action's name, so a `stay` answered in the planned deload week is restorable too.
   const aiPrescription = aiPlan && !engineDeload && builtPrescription.deload && state.phase !== 'baseline'
-    ? recordFullSessionOnModelDeload(builtPrescription, signals, state.phase)
+    ? recordFullSessionOnModelDeload(builtPrescription, signals, state.phase, { all: autoreg.notes, unacted: autoreg.unactedNotes })
     : builtPrescription
 
   // Phase guards: force a transition recommendation at the phase's cap so ambiguous signals can't
@@ -1353,6 +1369,13 @@ function withProgramMove(
 function joinNotes(...notes: Array<string | undefined>): string | undefined {
   const kept = notes.filter((n): n is string => !!n)
   return kept.length > 0 ? kept.join(' · ') : undefined
+}
+
+/** #4124: `joined` (notes joined by `joinNotes`) without the one note `note`; undefined when nothing else is left. */
+function withoutNote(joined: string | undefined, note: string): string | undefined {
+  if (joined == null) return undefined
+  const kept = joined.split(' \u00b7 ').filter(n => n !== note)
+  return kept.length > 0 ? kept.join(' \u00b7 ') : undefined
 }
 
 /** #4079: puts the notes the autoregulation pass wrote (by `sessionExerciseId`) on the engine's

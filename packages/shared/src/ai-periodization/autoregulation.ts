@@ -218,9 +218,12 @@ export function applyAutoregulation(
   signals: AutoregExerciseSignal[],
   trainingGoal: string,
   phase: string,
-): { exercises: AutoregExercise[]; earnedSetIds: Set<string>; notes: Record<string, string> } {
+): { exercises: AutoregExercise[]; earnedSetIds: Set<string>; notes: Record<string, string>; unactedNotes: Record<string, string> } {
   const earnedSetIds = new Set<string>()
   const notes: Record<string, string> = {}
+  // #4124: the subset of `notes` that say the answer changed nothing (`unactedEffortNote`), as against a
+  // rule's own note for a change it made. Only the first is true of a plan built apart from these rows.
+  const unactedNotes: Record<string, string> = {}
 
   const out = exercises.map((ex) => {
     const sig = signals.find((s) => s.sessionExerciseId === ex.sessionExerciseId)
@@ -231,7 +234,7 @@ export function applyAutoregulation(
     if (!adj.note) {
       // #4079: nothing changed; a tapped answer the rule did not act on is said back in the note.
       const unacted = unactedEffortNote(sig, { phase, currentReps: ex.reps, band })
-      if (unacted) notes[ex.sessionExerciseId] = unacted
+      if (unacted) { notes[ex.sessionExerciseId] = unacted; unactedNotes[ex.sessionExerciseId] = unacted }
       return { ...ex }
     }
 
@@ -250,7 +253,7 @@ export function applyAutoregulation(
     return { ...ex, pct, reps, sets }
   })
 
-  return { exercises: out, earnedSetIds, notes }
+  return { exercises: out, earnedSetIds, notes, unactedNotes }
 }
 
 // Combined-deviation clamp: whatever the model chose plus whatever autoregulation cut,

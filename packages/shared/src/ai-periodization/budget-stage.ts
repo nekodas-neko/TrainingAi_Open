@@ -21,7 +21,7 @@ import { durationDirection, fitBudgetMin, fitBudgetWholeMin, type DurationPreset
 import type { PrescriptionSignals } from '@trainingai/shared/ai-periodization/signals'
 import { UNCLASSIFIED_EXERCISE_ROLE } from '@trainingai/shared/workout/exercise-role'
 import { prescriptionFigures } from '@trainingai/shared/ai-periodization/prescription-figures'
-import { phaseSetsMax } from '@trainingai/shared/ai-periodization/prompt'
+import { phaseSetsMax, promptLineName } from '@trainingai/shared/ai-periodization/prompt'
 import { capitalize } from '@trainingai/shared/format/capitalize'
 import type { PrescriptionFigures } from '@trainingai/shared/types/ai-periodization'
 
@@ -296,11 +296,11 @@ export function applyBudgetStage(
   const notes: string[] = []
   const shortened = activeExercises.filter(ex => (restSec.get(ex.sessionExerciseId) ?? ex.restSec) < ex.restSec)
   if (shortened.length > 0) {
-    notes.push(`Rest on ${shortened.map(ex => ex.name).join(', ')} is cut by a quarter for the shorter session (never under ${SHORT_SESSION_REST_FLOOR_SEC} s); the main lift keeps its full rest.`)
+    notes.push(`Rest on ${shortened.map(ex => promptLineName(ex.name)).join(', ')} is cut by a quarter for the shorter session (never under ${SHORT_SESSION_REST_FLOOR_SEC} s); the main lift keeps its full rest.`)
   }
   if (droppedIds.size > 0) {
     const names = exercises
-      .filter(ex => droppedIds.has(ex.sessionExerciseId)).map(ex => ex.name).join(', ')
+      .filter(ex => droppedIds.has(ex.sessionExerciseId)).map(ex => promptLineName(ex.name)).join(', ')
     notes.push(`To keep today's plan to ${budgetPhrase}, ${names} ${droppedIds.size === 1 ? 'was' : 'were'} dropped for today — accessories go first, then whatever trains the muscles furthest ahead of their weekly target — so the remaining work keeps more of its sets rather than every exercise being cut to a token two.`)
   }
   // The estimate is a whole minute rounded to nearest, so it is compared with the fit's figure
