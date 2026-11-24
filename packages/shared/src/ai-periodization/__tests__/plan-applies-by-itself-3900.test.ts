@@ -1083,3 +1083,70 @@ describe('third review (1) and (3): the held plan and the re-evaluation, without
     expect(holdPrescriptionUnderWay(future, NOW)).toBe(future)
   })
 })
+
+// #4079: the move into the planned deload week is built by the engine apart from the model's rows, so a
+// lift's "You said it felt …, this is a deload week" sentence (written in the autoregulation pass, which
+// runs in the deload phase) has to be carried onto the engine's row. Nothing but that note may differ.
+describe('a tapped answer in the engine\'s planned deload week is said on the row and moves nothing (#4079)', () => {
+  type Tap = 'none' | 'as-expected' | 'harder' | 'easier'
+  const TAPS: Tap[] = ['none', 'as-expected', 'harder', 'easier']
+  const answerOf = (t: Tap): -1 | 0 | 1 | undefined => (t === 'none' ? undefined : t === 'as-expected' ? 0 : t === 'harder' ? 1 : -1)
+  // What `aggregateSignals` gives the rule for a tap: the delta of the tap, nothing for As expected.
+  const deltaOf = (t: Tap) => (t === 'harder' ? 1.5 : t === 'easier' ? -1.5 : null)
+  const SAID = { harder: 'You said it felt harder. This is a deload week, so your answer doesn\'t change the plan.', easier: 'You said it felt easier. This is a deload week, so your answer doesn\'t change the plan.' }
+
+  async function plan(tap: Tap, over: Partial<Ex>) {
+    const sig = (id: string, role: string, muscle: string, extra: Partial<Ex> = {}) =>
+      exercise(id, role, muscle, { ...over, rpeDelta: deltaOf(tap), effortAnswer: answerOf(tap), ...extra } as Partial<Ex>)
+    mocks.signals = signals({
+      phase: 'realisation',
+      exercises: [sig('p', 'primary', 'quadriceps'), sig('s', 'secondary', 'back'), sig('a', 'accessory', 'biceps')],
+    })
+    mocks.answer = answer('realisation', 'stay', 90, 2)
+    const h = program({ kind: 'ai_dynamic', now: NOW, phase: 'realisation', weeksDone: CAP.realisation })
+    const r = ok(await h.run())
+    expect(r.prescription.phase).toBe('deload')
+    expect(r.prescription.exercises.every(e => e.deloaded)).toBe(true)
+    return r.prescription
+  }
+  const withoutNotes = (p: AiPrescription) => JSON.stringify({
+    ...p, generatedAt: undefined,
+    exercises: p.exercises.map(({ deloadNote: _d, autoregNote: _a, ...rest }) => rest),
+  })
+
+  it('a grid of taps × reps × 1RM trend × a lift with a rep-range override: only the note differs, only on a Harder or Easier tap', async () => {
+    const counts = { cells: 0, numbersDiffered: 0, gainedNote: 0, silent: 0 }
+    for (const completion of [1, 0.9, null] as const) for (const rm1Trend of ['flat', 'down'] as const)
+      for (const override of [false, true]) {
+        const extra: Partial<Ex> = {
+          repCompletionRate: completion, rm1Trend,
+          ...(override && { liftPreference: { preference: { repRange: { min: 4, max: 6 }, restSec: null, oneShot: null }, basisKg: 100 } } as Partial<Ex>),
+        }
+        const base = await plan('none', extra)
+        for (const tap of TAPS) {
+          const p = await plan(tap, extra)
+          counts.cells++
+          if (withoutNotes(p) !== withoutNotes(base)) counts.numbersDiffered++
+          expect(withoutNotes(p), `${tap} ${completion} ${rm1Trend} override=${override}`).toBe(withoutNotes(base))
+          for (const row of p.exercises) {
+            if (tap === 'harder' || tap === 'easier') {
+              expect(row.deloadNote, `${tap} ${row.sessionExerciseId}`).toBe(SAID[tap])
+              counts.gainedNote++
+            } else {
+              // No tap, or As expected: no sentence on the row, and nothing else changed about its notes.
+              expect(row.deloadNote, `${tap} ${row.sessionExerciseId}`).toBeUndefined()
+              counts.silent++
+            }
+            expect(row.autoregNote).toBeUndefined()
+          }
+        }
+      }
+    console.info(`[4079] forced deload: ${counts.cells} cells, ${counts.numbersDiffered} differed outside the note; ${counts.gainedNote} lifts gained the sentence, ${counts.silent} stayed silent`)
+    expect(counts).toEqual({ cells: 48, numbersDiffered: 0, gainedNote: 72, silent: 72 })
+  })
+
+  it('the sentence names neither RPE nor autoregulation', async () => {
+    const p = await plan('harder', {})
+    for (const row of p.exercises) expect(row.deloadNote).not.toMatch(/rpe|autoreg/i)
+  })
+})
