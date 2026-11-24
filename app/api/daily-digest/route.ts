@@ -6,8 +6,7 @@ import { formatInTimeZone } from 'date-fns-tz'
 import { DEFAULT_TZ, todayInTz, todayMidnightUtc, startOfWeekInTz, shiftDateStr } from '@trainingai/shared/date-utils'
 import { rateLimit } from '@/lib/rate-limit'
 import { projectWeeklyWeightChangeKg, stepsPaceToWeeklyGoal } from '@trainingai/shared/health/daily-digest-context'
-import { buildAutomaticPhaseStatus } from '@trainingai/shared/phase-engine'
-import { getScheduledSessionsPerWeek } from '@trainingai/shared/schedule-utils'
+import { resolveSessionPhase } from '@trainingai/shared/workout/read-session'
 import { MIN_LOGGED_DAYS, DEFAULT_WINDOW_DAYS } from '@trainingai/shared/nutrition/adaptive-tdee'
 import { computeEnergyBalance } from '@/lib/health/energy-balance-service'
 import { dayStepCount, dayStepCountsByDate } from '@trainingai/shared/health/activity-steps'
@@ -133,13 +132,12 @@ export async function POST(_req: Request) {
     const trainedName = sessionsToday[0].sessionName
     const programSession = program.sessions.find(s => s.name === trainedName)
     if (programSession) {
-      const phases = await repo.listProgramPhases(userId, program.id)
-      if (phases.length > 0) {
-        const sessionCounts = await repo.countAllSessionsSinceStart(userId, program.id)
-        const count = sessionCounts.get(programSession.id) ?? 0
-        const totalPerWeek = getScheduledSessionsPerWeek(program)
-        const sessionPerWeek = totalPerWeek / Math.max(1, program.sessions.length)
-        const status = buildAutomaticPhaseStatus(phases, count, program, todayIso, sessionPerWeek)
+      const { phases, sessionCounts } = await repo.getProgramPhaseState(userId, program.id)
+      const status = resolveSessionPhase({
+        program, todayStr: todayIso, allPhases: phases,
+        thisSessionCount: sessionCounts.get(programSession.id) ?? 0, periodization: null,
+      }).phaseStatus
+      if (status) {
         facts.phase = { name: status.phase.name, cycleInPhase: status.cycleInPhase, totalPhaseCycles: status.totalPhaseCycles }
       }
     }

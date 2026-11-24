@@ -14,13 +14,13 @@ const listFoodLogs = empty()
 const listBodyMetrics = empty()
 const listExerciseLibrary = empty()
 const listFoodLogsSummary = empty()
-const listProgramPhases = empty()
 const getActiveProgram = vi.fn(async (_u: string) => null as unknown)
 const getNutritionTargets = vi.fn(async (_u: string) => null as unknown)
 const getDayCheckin = vi.fn(async (..._a: unknown[]) => null as unknown)
 const getUserGoals = vi.fn(async (_u: string) => ({}) as Record<string, unknown>)
 const getWorkoutSessionsFrom = empty()
-const countAllSessionsSinceStart = vi.fn(async (..._a: unknown[]) => new Map())
+// The digest reads a program's phases and session counts in one call (#4114).
+const getProgramPhaseState = vi.fn(async (..._a: unknown[]) => ({ phases: [] as unknown[], sessionCounts: new Map<string, number>() }))
 const generateText = vi.fn(async (_o: unknown) => ({ text: 'must not be used' }))
 const aiModel = vi.fn(() => ({}))
 
@@ -30,7 +30,7 @@ vi.mock('@/auth', () => ({ auth: async () => ({ user: { id: userId, timezone: 'A
 const repo = () => ({
   getDaySessionSummaries, listRecentPersonalRecords, getActiveProgram, listFoodLogs,
   getNutritionTargets, getDayCheckin, getUserGoals, listBodyMetrics, listExerciseLibrary,
-  listFoodLogsSummary, listProgramPhases, getWorkoutSessionsFrom, countAllSessionsSinceStart,
+  listFoodLogsSummary, getWorkoutSessionsFrom, getProgramPhaseState,
 })
 vi.mock('@/lib/data', () => ({ getRepository: async () => repo(), getRepositoryAsync: async () => repo() }))
 vi.mock('ai', () => ({ generateText: (o: unknown) => generateText(o) }))
@@ -48,16 +48,16 @@ const post = () =>
 
 beforeEach(() => {
   for (const m of [getDaySessionSummaries, listRecentPersonalRecords, listFoodLogs, listBodyMetrics,
-                   listExerciseLibrary, listFoodLogsSummary, listProgramPhases, getActiveProgram,
+                   listExerciseLibrary, listFoodLogsSummary, getActiveProgram,
                    getNutritionTargets, getDayCheckin, getUserGoals, getWorkoutSessionsFrom,
-                   countAllSessionsSinceStart, generateText, aiModel]) m.mockClear()
+                   getProgramPhaseState, generateText, aiModel]) m.mockClear()
   for (const m of [getDaySessionSummaries, listRecentPersonalRecords, listFoodLogs, listBodyMetrics,
-                   listExerciseLibrary, listFoodLogsSummary, listProgramPhases,
+                   listExerciseLibrary, listFoodLogsSummary,
                    getWorkoutSessionsFrom]) m.mockResolvedValue([])
   getActiveProgram.mockResolvedValue(null)
   getNutritionTargets.mockResolvedValue(null)
   getUserGoals.mockResolvedValue({})
-  countAllSessionsSinceStart.mockResolvedValue(new Map())
+  getProgramPhaseState.mockResolvedValue({ phases: [], sessionCounts: new Map() })
   // The morning check-in is what gets the route past its "nothing happened today" early return.
   getDayCheckin.mockResolvedValue({ physicalTiredness: 2, soreMuscles: ['quads'] })
   userId = `u-${++seq}` // the route rate-limits 3/min per user
