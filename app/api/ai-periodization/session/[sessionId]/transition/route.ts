@@ -9,6 +9,7 @@ import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 import { isOneDayDeload } from '@trainingai/shared/ai-periodization/one-day-deload'
 import { serveStoredPrescription, syncProgramPhase } from '@trainingai/shared/ai-periodization/program-phase'
 import { DEFAULT_TZ } from '@trainingai/shared/date-utils'
+import { isBusyError } from '@trainingai/shared/errors'
 
 // One phase transition.
 const MAX_BODY_BYTES = 16 * 1024
@@ -121,9 +122,16 @@ export async function POST(
   // first finds the program moved and changes nothing, so it cannot void the plans regenerated since.
   // That move leaves this slot 'consumed' itself, so the status write is only the per-type path's.
   if (programPhase?.aligned) {
-    await repo.advanceProgramPhase(userId, sessionId, body.newPhase as PeriodizationPhase, {
-      phase: state.phase, phaseStartedAt: state.phaseStartedAt,
-    })
+    try {
+      await repo.advanceProgramPhase(userId, sessionId, body.newPhase as PeriodizationPhase, {
+        phase: state.phase, phaseStartedAt: state.phaseStartedAt,
+      })
+    } catch (err) {
+      // #4082 review: gave up waiting for the person's other write (a check-in, a Coach apply), or was
+      // ended as a deadlock victim: nothing was written, reported once where it happened. Send it again.
+      if (isBusyError(err)) return NextResponse.json({ error: err.message, busy: true }, { status: 409 })
+      throw err
+    }
   } else {
     await repo.advancePhase(userId, sessionId, body.newPhase as PeriodizationPhase)
     await repo.updatePrescriptionStatus(userId, sessionId, POST_TRANSITION_STATUS)

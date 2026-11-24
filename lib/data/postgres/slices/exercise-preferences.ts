@@ -60,6 +60,11 @@ export async function listExercisePreferences(
   // An expired one-shot (`ONE_SHOT_TTL_DAYS`, database clock) is cleared the moment a read sees it, by a
   // conditional write that only touches rows still past the limit. If the clear fails the read below
   // still treats it as expired, so a failure never lets an old one-shot apply.
+  // #4082 review: `SKIP LOCKED`. This one statement updates several preference rows, and with no lift lock
+  // it could wait for a row a weekly check-in holds while the check-in waited for another of them. A
+  // clear is best-effort (a read treats an expired one-shot as expired whether or not it was cleared), so
+  // a row someone else holds is left for the next read rather than waited for: a statement that never
+  // waits cannot be one side of a cycle.
   // The cleared rows' old times come back (a CTE reads them before the update nulls them), so the caller
   // can take the spent step out of the stored plans that still carry it (#4007).
   const expired = await db.execute(sql`
@@ -70,7 +75,7 @@ export async function listExercisePreferences(
          AND deleted_at IS NULL
          AND one_shot_set_at IS NOT NULL
          AND one_shot_set_at < now() - make_interval(days => ${ONE_SHOT_TTL_DAYS})
-         FOR UPDATE
+         FOR UPDATE SKIP LOCKED
     )
     UPDATE exercise_preferences p
        SET next_load_step = NULL, sets_delta = NULL, one_shot_set_at = NULL, updated_at = now()

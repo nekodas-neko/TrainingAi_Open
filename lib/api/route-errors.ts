@@ -68,12 +68,27 @@ export function isStatementTimeout(err: unknown): boolean {
 /**
  * #4080: a Coach apply that gave up waiting for a lock. 55P03 is `lock_timeout` (the bounded wait in
  * `lib/coach/lock-wait.ts`), 57014 the pool's `statement_timeout` for a wait that ran past it anyway.
- * Same cause-chain walk as `isStatementTimeout`.
+ * #4082: and 40P01, Postgres ending a lock cycle by cancelling this side: its transaction is rolled back
+ * whole, the same "nothing was written, send it again" as the others. Same cause-chain walk as
+ * `isStatementTimeout`.
  */
 export function isLockWaitTimeout(err: unknown): boolean {
   for (let e: unknown = err, depth = 0; e && typeof e === 'object' && depth < 5; e = (e as { cause?: unknown }).cause, depth++) {
     const code = (e as { code?: unknown }).code
-    if (code === '55P03' || code === '57014') return true
+    if (code === '55P03' || code === '57014' || code === '40P01') return true
+  }
+  return false
+}
+
+/**
+ * #4082: Postgres chose this side as the victim of a deadlock (40P01). The statement and the transaction
+ * around it are rolled back. Whether anything EARLIER committed is up to who wrapped it: only a caller that
+ * holds one transaction around the whole write (a Coach lift apply, a weekly check-in save) can say "nothing
+ * was written".
+ */
+export function isDeadlock(err: unknown): boolean {
+  for (let e: unknown = err, depth = 0; e && typeof e === 'object' && depth < 5; e = (e as { cause?: unknown }).cause, depth++) {
+    if ((e as { code?: unknown }).code === '40P01') return true
   }
   return false
 }

@@ -1,8 +1,9 @@
 import { eq } from 'drizzle-orm'
 import * as s from '@/lib/data/postgres/schema'
 import { FIELD_LABEL, FIELD_UNIT, type PatchChange } from '../patch'
-import type { Consequence, DomainHandler, Db, PreviewResult } from './types'
+import type { Consequence, DomainHandler, Db, HandlerApplyResult, PreviewResult } from './types'
 import { driftAgainst } from './types'
+import { withDomainLock } from '../lock-wait'
 import { OWN_TARGET_GOAL_TYPE, ownTargetFromGoals } from '@trainingai/shared/nutrition/calorie-budget'
 import { ownCalorieTargetReason } from '@trainingai/shared/validation/plausibility'
 import { wholeCalorieTarget } from '@trainingai/shared/validation/goal-bounds'
@@ -96,33 +97,38 @@ function makeHandler(
     },
 
     async apply(db, userId, patch, accepted) {
-      const current = await read(db, userId)
-      const drift = driftAgainst(accepted, current)
-      if (drift.length > 0) return { ok: false, reason: 'stale', drift }
+      // #4082: the read, the stale check and the write under one lock per user and domain. Without it a double
+      // tap had both applies read the same current value, both pass the check, both write and both record
+      // the same "before"; now the second waits, reads what the first wrote, and is refused as stale.
+      return withDomainLock<HandlerApplyResult>(db, userId, kind, async t => {
+        const current = await read(t, userId)
+        const drift = driftAgainst(accepted, current)
+        if (drift.length > 0) return { ok: false, reason: 'stale', drift }
 
-      for (const c of accepted) {
-        if (c.field === 'calorieGoal' && c.to != null) {
-          const reason = ownCalorieTargetReason(Number(c.to))
-          if (reason) return { ok: false, reason: 'invalid', detail: reason }
+        for (const c of accepted) {
+          if (c.field === 'calorieGoal' && c.to != null) {
+            const reason = ownCalorieTargetReason(Number(c.to))
+            if (reason) return { ok: false, reason: 'invalid', detail: reason }
+          }
         }
-      }
 
-      const beforeState: Record<string, unknown> = {}
-      for (const c of accepted) beforeState[c.field] = current[c.field] ?? null
-      // Undo must put the flag back too, or restoring a number would turn a retired typed goal into
-      // an override. Captured from the row, which `current` only carries for exactly this.
-      if (accepted.some(c => c.field === 'calorieGoal')) beforeState.calorieGoalType = current.calorieGoalType ?? null
+        const beforeState: Record<string, unknown> = {}
+        for (const c of accepted) beforeState[c.field] = current[c.field] ?? null
+        // Undo must put the flag back too, or restoring a number would turn a retired typed goal into
+        // an override. Captured from the row, which `current` only carries for exactly this.
+        if (accepted.some(c => c.field === 'calorieGoal')) beforeState.calorieGoalType = current.calorieGoalType ?? null
 
-      await write(db, userId, accepted, kind)
+        await write(t, userId, accepted, kind)
 
-      return {
-        ok: true,
-        summary: accepted.map(describe).join(', '),
-        beforeState,
-        // No row id: these are singletons. The undo path re-resolves by user, so a placeholder
-        // would be a lie rather than a convenience.
-        targetId: userId,
-      }
+        return {
+          ok: true,
+          summary: accepted.map(describe).join(', '),
+          beforeState,
+          // No row id: these are singletons. The undo path re-resolves by user, so a placeholder
+          // would be a lie rather than a convenience.
+          targetId: userId,
+        }
+      })
     },
 
     async undo(db, userId, _targetId, before) {
