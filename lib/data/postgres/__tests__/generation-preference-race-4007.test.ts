@@ -671,7 +671,6 @@ describe.skipIf(!canRun)('a lift change made while a plan is generated survives 
     const times: number[] = []
     const realQuery = pg.Client.prototype.query
     let n = 0
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ;(pg.Client.prototype as any).query = function (this: pg.Client, ...args: unknown[]) { n++; return (realQuery as any).apply(this, args) } // eslint-disable-line @typescript-eslint/no-explicit-any
     try {
       for (let k = 0; k < 20; k++) {
