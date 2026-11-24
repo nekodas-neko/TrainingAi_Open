@@ -20,9 +20,10 @@
 -- The DEVICE has no such column (neither the web local store nor the native SQLite), so nothing to
 -- change there.
 --
--- Guarded on the owner-only measurement: claude_ro sees the owner's rows, so a count of rows in any
--- account that still hold a value is logged before the drop. The drop proceeds regardless (the owner
--- chose it, and a snapshot comes first); the notice makes any surprise visible in the deploy log.
+-- ⚠ GUARDED, because the measurement only sees the owner's rows (claude_ro is owner-scoped; 160 of
+-- 160 NULL on 2026-11-24). The owner approved dropping an EMPTY column. It is dropped only if no row
+-- in any account holds a value; otherwise it stays, a notice in the deploy log says how many rows do,
+-- and nothing is lost. Same shape as 293 and 294.
 --
 -- Locking: ALTER TABLE ... DROP COLUMN takes ACCESS EXCLUSIVE on workout_sessions, plus a brief lock
 -- on program_sessions to remove the FK. It rewrites nothing (the column is marked dropped in the
@@ -30,8 +31,8 @@
 -- give up, and ensureSchema retry on the next boot, rather than queue every workout write behind a
 -- long reader. Both settings are SET LOCAL, scoped to this migration's transaction.
 --
--- Replay-safe (CI truncates schema_migrations and re-runs everything): DROP VIEW IF EXISTS,
--- DROP COLUMN IF EXISTS, and the count only runs while the column exists.
+-- Replay-safe (CI truncates schema_migrations and re-runs everything): a column already gone is
+-- skipped, and the view is dropped only when the column is about to be.
 --
 -- REVERSE (nothing needs back-filling: the column was NULL on every row):
 --   ALTER TABLE workout_sessions ADD COLUMN IF NOT EXISTS program_session_id uuid;
@@ -47,17 +48,17 @@ DO $$
 DECLARE
   n bigint;
 BEGIN
-  IF EXISTS (
+  IF NOT EXISTS (
     SELECT 1 FROM information_schema.columns
     WHERE table_schema = 'public' AND table_name = 'workout_sessions' AND column_name = 'program_session_id'
   ) THEN
-    EXECUTE 'SELECT count(*) FROM workout_sessions WHERE program_session_id IS NOT NULL' INTO n;
-    IF n > 0 THEN
-      RAISE NOTICE '#2412: dropping workout_sessions.program_session_id with % non-null row(s)', n;
-    END IF;
+    RETURN;
   END IF;
+  EXECUTE 'SELECT count(*) FROM workout_sessions WHERE program_session_id IS NOT NULL' INTO n;
+  IF n > 0 THEN
+    RAISE NOTICE '#2412: workout_sessions.program_session_id still holds a value on % row(s); not dropped', n;
+    RETURN;
+  END IF;
+  DROP VIEW IF EXISTS claude_ro.workout_sessions;
+  ALTER TABLE workout_sessions DROP COLUMN program_session_id;
 END $$;
-
-DROP VIEW IF EXISTS claude_ro.workout_sessions;
-
-ALTER TABLE workout_sessions DROP COLUMN IF EXISTS program_session_id;
