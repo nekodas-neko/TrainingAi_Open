@@ -4,12 +4,12 @@
  * midday unless the test is about a midnight edge.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import type { AiPrescription, PendingTransition, SessionPeriodization } from '@trainingai/shared/types/ai-periodization'
+import type { AiPrescription, PendingTransition, PeriodizationPhase, SessionPeriodization } from '@trainingai/shared/types/ai-periodization'
 import type { PrescriptionSignals } from '../signals'
 import { shiftDateStr, toAestDay } from '@trainingai/shared/date-utils'
 import type { WorkoutRepository } from '@/lib/data/repository'
 import {
-  trainingWeekOf, programPhaseView, applyProgramPhaseCap, programMoveTarget, collectVotes,
+  trainingWeekOf, programPhaseView, workoutCountsInPhase, applyProgramPhaseCap, programMoveTarget, collectVotes,
   planSwitchOver, syncProgramPhase, isProgramAligned, programMoveMark, switchOverPendingTransition, PROGRAM_PHASE_CAP_WEEKS,
   type PhaseRow, type ProgramCompletion, type PhaseVote, type PhaseAnswer, type ProgramPhaseRepo,
 } from '../program-phase'
@@ -686,37 +686,43 @@ describe('generation follows the program', () => {
   })
 })
 
-// #4097: a workout belongs to the phase it STARTED in. The aligned program's window count reads the start.
-describe('a workout that started before the phase began belongs to the phase before (#4097)', () => {
-  const started = (id: string, startLocal: string, doneLocal: string): ProgramCompletion =>
-    ({ programSessionId: id, startedAt: at(startLocal), completedAt: at(doneLocal) })
+// #4119 / #3799: a workout counts toward a phase when it was COMPLETED at or after the phase began and, when the
+// app said which phase's plan it trained, that phase is this one. When it started does not matter.
+describe('which phase a workout counts toward (#3799, #4119)', () => {
+  const done = (id: string, doneLocal: string, planPhase?: PeriodizationPhase | null): ProgramCompletion =>
+    ({ programSessionId: id, completedAt: at(doneLocal), ...(planPhase === undefined ? {} : { planPhase }) })
   const moveAt = at('2026-11-12T12:00:00') // a Thursday: the deload begins
   const rows = [row('a', 'deload', moveAt), row('b', 'deload', moveAt)]
 
-  it('started on Wednesday, finished on Thursday after the move: not a deload session, and not a deload week', () => {
-    // Everything else is real deload sessions, in the weeks of 16 Nov and 23 Nov (the current week, not yet done).
+  it('the web case (#3799): no plan phase, finished after the move: counted, the week of the move too', () => {
     const sessions = [
-      started('a', '2026-11-12T11:00:00', '2026-11-12T13:00:00'),
-      started('a', '2026-11-17T11:00:00', '2026-11-17T12:00:00'),
-      started('b', '2026-11-24T11:00:00', '2026-11-24T12:00:00'),
+      done('a', '2026-11-12T13:00:00'),
+      done('a', '2026-11-17T12:00:00'),
+      done('b', '2026-11-24T12:00:00'),
     ]
-    const view = programPhaseView(rows, sessions, TZ, at('2026-11-26T12:00:00'))
-    // The week of 9 Nov holds only the straddling session, which was the phase before's: no stub week.
-    expect(view.trainingWeeksDone).toBe(1)
-    // The same workout counted by its finish (an earlier reading) would have made the week of the move count:
-    const byFinish = programPhaseView(rows, sessions.map(c => ({ ...c, startedAt: undefined })), TZ, at('2026-11-26T12:00:00'))
-    expect(byFinish.trainingWeeksDone).toBe(2)
+    expect(programPhaseView(rows, sessions, TZ, at('2026-11-26T12:00:00')).trainingWeeksDone).toBe(2)
   })
 
-  it('this week: a straddling workout does not mark its type trained in the new phase', () => {
-    const view = programPhaseView(rows, [started('a', '2026-11-12T11:00:00', '2026-11-12T13:00:00')], TZ, at('2026-11-12T14:00:00'))
+  it('a plan phase of another phase never counts, finished after the move or not', () => {
+    const view = programPhaseView(rows, [done('a', '2026-11-12T13:00:00', 'accumulation')], TZ, at('2026-11-12T14:00:00'))
     expect(view.trainedThisWeek.has('a')).toBe(false)
-    const real = programPhaseView(rows, [started('a', '2026-11-12T12:30:00', '2026-11-12T13:30:00')], TZ, at('2026-11-12T14:00:00'))
-    expect(real.trainedThisWeek.has('a')).toBe(true)
+    const same = programPhaseView(rows, [done('a', '2026-11-12T13:00:00', 'deload')], TZ, at('2026-11-12T14:00:00'))
+    expect(same.trainedThisWeek.has('a')).toBe(true)
+    const unsaid = programPhaseView(rows, [done('a', '2026-11-12T13:00:00', null)], TZ, at('2026-11-12T14:00:00'))
+    expect(unsaid.trainedThisWeek.has('a')).toBe(true)
   })
 
-  it('a completion that names no start reads as its finish, as before', () => {
-    const view = programPhaseView(rows, [{ programSessionId: 'a', completedAt: at('2026-11-12T13:00:00') }], TZ, at('2026-11-12T14:00:00'))
-    expect(view.trainedThisWeek.has('a')).toBe(true)
+  it('a week holding only the old plan\'s workout is no stub week of the new phase', () => {
+    const sessions = [
+      done('a', '2026-11-12T13:00:00', 'accumulation'),
+      done('a', '2026-11-17T11:00:00', 'deload'),
+    ]
+    expect(programPhaseView(rows, sessions, TZ, at('2026-11-26T12:00:00')).trainingWeeksDone).toBe(1)
+  })
+
+  it('workoutCountsInPhase: completion before the phase began never counts; the start is not read', () => {
+    const c = { programSessionId: 'a', completedAt: at('2026-11-12T11:59:00'), startedAt: at('2026-11-12T12:30:00'), planPhase: 'deload' } as ProgramCompletion
+    expect(workoutCountsInPhase(c, 'deload', moveAt)).toBe(false)
+    expect(workoutCountsInPhase({ ...c, completedAt: at('2026-11-12T12:00:00') }, 'deload', moveAt)).toBe(true)
   })
 })

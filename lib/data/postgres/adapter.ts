@@ -1308,10 +1308,17 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
    * such session for this user" and is an error; here the guard makes it mean "someone else got
    * there first", which is the normal idempotent path.
    */
-  async completeWorkoutSession(workoutSessionId: string, userId: string, completedAt: Date, pausedSec?: number): Promise<boolean> {
+  async completeWorkoutSession(workoutSessionId: string, userId: string, completedAt: Date, pausedSec?: number, planPhase?: PeriodizationPhase): Promise<boolean> {
     const rows = await this.db.update(s.workoutSessions)
       // #3266: only a build that can pause sends it; an older one leaves the column NULL (never paused).
-      .set(pausedSec === undefined ? { completedAt } : { completedAt, pausedSec })
+      // #4119: `plan_phase` is stamped in this same statement, before any counter runs, so every counter reads
+      // the row as stored. The guard above makes it a one-time write (a repeated finish matches no row), and
+      // COALESCE means a value already stored is never replaced and an absent one leaves NULL.
+      .set({
+        completedAt,
+        ...(pausedSec === undefined ? {} : { pausedSec }),
+        ...(planPhase === undefined ? {} : { planPhase: sql`COALESCE(${s.workoutSessions.planPhase}, ${planPhase})` }),
+      })
       .where(and(
         eq(s.workoutSessions.id, workoutSessionId),
         eq(s.workoutSessions.userId, userId),
@@ -8724,7 +8731,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async updatePrescriptionExercisesCache(userId: string, programSessionId: string, prescription: AiPrescription) { return period.updatePrescriptionExercisesCache(this.db, userId, programSessionId, prescription) }
   async replacePrescriptionIfUnchanged(userId: string, programSessionId: string, before: AiPrescription, after: AiPrescription) { return period.replacePrescriptionIfUnchanged(this.db, userId, programSessionId, before, after) }
   async storePendingTransition(userId: string, programSessionId: string, transition: PendingTransition | null) { return period.storePendingTransition(this.db, userId, programSessionId, transition) }
-  async incrementSessionsInPhase(userId: string, programSessionId: string, completedAt?: Date, trained?: { startedAt?: Date; trainedPhase?: PeriodizationPhase }) { return period.incrementSessionsInPhase(this.db, userId, programSessionId, completedAt, trained) }
+  async incrementSessionsInPhase(userId: string, programSessionId: string, workoutSessionId: string) { return period.incrementSessionsInPhase(this.db, userId, programSessionId, workoutSessionId) }
   async setLastSessionRanPrescription(userId: string, programSessionId: string, ranPrescription: boolean, startedAt?: Date) { return period.setLastSessionRanPrescription(this.db, userId, programSessionId, ranPrescription, startedAt) }
   async listSessionPeriodizationForProgram(userId: string, programId: string) { return period.listSessionPeriodizationForProgram(this.db, userId, programId) }
   async reconcileSessionsInPhase(userId: string, programId: string) { return period.reconcileSessionsInPhase(this.db, userId, programId) }

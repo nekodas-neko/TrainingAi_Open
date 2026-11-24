@@ -18,6 +18,7 @@ import { DELOAD_FLOOR } from '@trainingai/shared/ai-periodization/phase-guards'
 import { repCompletionFromSetLogs } from '@trainingai/shared/ai-periodization/rep-completion'
 import type { WorkoutRepository } from '@/lib/data/repository'
 import type { AiPrescription } from '@trainingai/shared/types/ai-periodization'
+import { classifyDay } from '@/app/api/weekly-stats/classify-day'
 
 const model = vi.hoisted(() => ({ answer: null as Record<string, unknown> | null, calls: 0, hold: null as null | Promise<void> }))
 vi.mock('ai', async orig => ({
@@ -274,12 +275,12 @@ describe.skipIf(!canRun)('a finished Preview workout is recorded against the pla
       expect(regen.calls).toBe(1)
     })
 
-    it('B, another type moves the phase and voids the plan: not counted in the new phase (it started before the move); the voided plan leaves "ran a plan" false (the gap)', async () => {
+    it('B, another type moves the phase and voids the plan: an older payload counts as on main (it was completed after the move); the voided plan leaves "ran a plan" false (the gap)', async () => {
       const { old } = await both(() => phaseMovedByAnotherType(false), FULL, [5, 5, 4])
       expect(old.mid.prescription).toBeNull()
       expect(old.mid.prescription_status).toBe('consumed')
       expect(old.after.phase).toBe('intensification')
-      expect(old.after.sessionsInPhase).toBe(0) // started before the move, so it belongs to the phase before (#4097; #3799 counted it by its finish)
+      expect(old.after.sessionsInPhase).toBe(1) // no planPhase: the app did not say, so main's rule (#3799, completed after the move)
       expect(old.after.repRate).toBeCloseTo(14 / 15, 6)
       expect(old.after.ranPrescription).toBe(false) // the stored plan is gone, so the finish reads "no plan was run"
       expect(old.modelCallsAtFinish).toBe(0) // nothing was made mid-workout: nothing wasted
@@ -289,7 +290,7 @@ describe.skipIf(!canRun)('a finished Preview workout is recorded against the pla
       const { old } = await both(() => phaseMovedByAnotherType(true), FULL, [5, 5, 4])
       expect(old.mid.prescription!.phase).toBe('intensification')
       expect(old.after.status).toBe('consumed')
-      expect(old.after.sessionsInPhase).toBe(0) // started before the move: the phase before's, not the new phase's
+      expect(old.after.sessionsInPhase).toBe(1) // an older payload: as on main
       expect(old.after.plannedReps).toEqual([5, 5, 5])
       expect(old.after.ranPrescription).toBe(true)
       expect(old.modelCallsAtFinish).toBe(1) // that plan was never trained: 1 wasted
@@ -503,27 +504,34 @@ describe.skipIf(!canRun)('a finished Preview workout is recorded against the pla
       expect((await pushRow()).sessions_in_phase).toBe(3)
     })
 
-    it('the aligned program\'s window: a workout that started before the move belongs to the phase before', async () => {
+    it('the aligned program\'s window uses the same rule: a plan of the phase before never counts; an older payload counts as on main', async () => {
       const t1 = T1()
       await storePlan(planOf('full', 70, 3, 5), 'auto_applied', t1, "now() + interval '3 days'")
       const started = Date.now() - 1000
       await sleep(15)
       await repo.advanceProgramPhase(USER, legs, 'deload')
-      const ws = await upload(FULL, [5, 5, 4], t1, 0, { planPhase: 'accumulation', startedAtMs: started })
       const view = async () => {
         const rows = await repo.listSessionPeriodizationForProgram(USER, program)
         const done = await repo.listProgramCompletions(USER, program, new Date(Date.now() - 30 * 86_400_000))
         return { done, view: programPhaseView(rows, done, TZ) }
       }
+      const ws = await upload(FULL, [5, 5, 4], t1, 0, { planPhase: 'accumulation', startedAtMs: started })
       const a = await view()
-      const spanning = a.done.find(c => c.programSessionId === push && c.startedAt!.getTime() === started)!
-      expect(spanning).toBeTruthy() // the completion carries its start
+      expect(a.done.find(c => c.programSessionId === push && c.planPhase === 'accumulation')).toBeTruthy() // the completion carries the stored plan phase
       expect(a.view.aligned).toBe(true)
       expect(a.view.trainedThisWeek.has(push)).toBe(false) // main: true, a deload session this week
-      // One that started after the move counts.
-      await upload(DELOAD, [6, 6], null, 0, { startedAtMs: await startNow(), explicitNone: true })
+      // Another workout started after the move, on the deload's own plan, counts.
+      await upload(DELOAD, [6, 6], null, 0, { startedAtMs: await startNow(), explicitNone: true, planPhase: 'deload' })
       expect((await view()).view.trainedThisWeek.has(push)).toBe(true)
       void ws
+      // An older payload (no planPhase) that started before the move and finished after counts: main's rule.
+      await seed()
+      await storePlan(planOf('full', 70, 3, 5), 'auto_applied', t1, "now() + interval '3 days'")
+      const started2 = Date.now() - 1000
+      await sleep(15)
+      await repo.advanceProgramPhase(USER, legs, 'deload')
+      await upload(FULL, [5, 5, 4], null, 0, { startedAtMs: started2 })
+      expect((await view()).view.trainedThisWeek.has(push)).toBe(true)
     })
   })
 
@@ -554,7 +562,7 @@ describe.skipIf(!canRun)('a finished Preview workout is recorded against the pla
         const wsId = randomUUID()
         const day = todayInTz(TZ)
         const res = await repo.pushMutations(USER, [
-          { id: randomUUID(), domain: 'workout_log', date: day, payload: {
+          { id: randomUUID(), domain: 'workout_log' as const, date: day, payload: {
             sessionName: 'Push 4097', sessionId: push, workoutSessionId: wsId, exerciseLogId: randomUUID(), setLogIds: [randomUUID()],
             exercise: LIFT, weights: [70], reps: [5], sets: 1, localDate: day, workoutStartedAt: Date.now() - 600_000, setEndTimes: [Date.now() - 60_000],
             muscleGroups: ['quads'], intensityMode: 'full' } },
@@ -563,6 +571,233 @@ describe.skipIf(!canRun)('a finished Preview workout is recorded against the pla
         expect(res.errors).toEqual([])
         expect((await pool.query(`SELECT completed_at FROM workout_sessions WHERE id = $1`, [wsId])).rows[0].completed_at).not.toBeNull()
       }
+    })
+  })
+
+  // ---- #4119: the finish stores the plan phase and every counter reads it, so none undoes another ----
+  describe('#4119: one rule for every counter, on the plan phase stored at the finish', () => {
+    const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
+    const storedPlanPhase = async (wsId: string) =>
+      (await pool.query(`SELECT plan_phase FROM workout_sessions WHERE id = $1`, [wsId])).rows[0].plan_phase as string | null
+    /** finish -> read -> read -> delete -> read, with the stored counter at each step. The count after the
+     *  finish, after each read, and after the delete (the decrement) must agree with what a read says. */
+    const sequence = async (wsId: string) => {
+      const { deleteWorkoutSession } = await import('@/lib/workout/delete-session')
+      const read = async () => { await repo.reconcileSessionsInPhase(USER, program); return (await pushRow()).sessions_in_phase }
+      const finish = (await pushRow()).sessions_in_phase
+      const read1 = await read()
+      const read2 = await read()
+      await deleteWorkoutSession(USER, wsId)
+      const afterDelete = (await pushRow()).sessions_in_phase
+      const read3 = await read()
+      return { finish, read1, read2, afterDelete, read3 }
+    }
+    const move = async (to: 'deload' | 'intensification') => { await sleep(15); await repo.advanceProgramPhase(USER, legs, to) }
+    const planned = async () => { const t1 = T1(); await storePlan(planOf('full', 70, 3, 5), 'auto_applied', t1, "now() + interval '3 days'"); return t1 }
+
+    it('(a) trained and finished inside the phase: 2 -> 3 at every step, 2 after the delete', async () => {
+      const t1 = await planned()
+      const ws = await upload(FULL, [5, 5, 4], t1, 0, { planPhase: 'accumulation' })
+      expect(await storedPlanPhase(ws)).toBe('accumulation')
+      expect(await sequence(ws)).toEqual({ finish: 3, read1: 3, read2: 3, afterDelete: 2, read3: 2 })
+    })
+
+    it('(b) started before a move into a deload, finished after it, new payload: never counted in the deload, and two real deload sessions exit it', async () => {
+      const t1 = await planned()
+      const started = Date.now() - 1000
+      await move('deload')
+      const ws = await upload(FULL, [5, 5, 4], t1, 0, { planPhase: 'accumulation', startedAtMs: started })
+      expect(await sequence(ws)).toEqual({ finish: 0, read1: 0, read2: 0, afterDelete: 0, read3: 0 })
+      // the same workout again (the sequence deleted it): finished, then two real deload sessions
+      const again = await upload(FULL, [5, 5, 4], t1, 0, { planPhase: 'accumulation', startedAtMs: started })
+      expect((await pushRow()).sessions_in_phase).toBe(0)
+      for (let i = 1; i <= DELOAD_FLOOR; i++) {
+        await upload(DELOAD, [6, 6], null, 0, { explicitNone: true, planPhase: 'deload' })
+        expect((await pushRow()).sessions_in_phase).toBe(i)
+      }
+      await repo.reconcileSessionsInPhase(USER, program)
+      expect((await pushRow()).sessions_in_phase).toBe(DELOAD_FLOOR)
+      void again
+    })
+
+    it('(c) the same with an OLD payload (no planPhase): counted, exactly as on main', async () => {
+      const t1 = await planned()
+      const started = Date.now() - 1000
+      await move('deload')
+      const ws = await upload(FULL, [5, 5, 4], t1, 0, { startedAtMs: started })
+      expect(await storedPlanPhase(ws)).toBeNull()
+      expect(await sequence(ws)).toEqual({ finish: 1, read1: 1, read2: 1, afterDelete: 0, read3: 0 })
+    })
+
+    it('(d) #4119: started AFTER the move on a plan of the old phase: never counted, at any step', async () => {
+      const t1 = await planned()
+      await move('deload')
+      const started = Date.now() - 1
+      await sleep(15)
+      const ws = await upload(FULL, [5, 5, 4], t1, 0, { planPhase: 'accumulation', startedAtMs: started })
+      expect(await sequence(ws)).toEqual({ finish: 0, read1: 0, read2: 0, afterDelete: 0, read3: 0 })
+    })
+
+    it('(e) #3799, the web case: no planPhase, started before the move, finished after: counted', async () => {
+      const started = Date.now() - 1000
+      await move('intensification')
+      const ws = await upload(FULL, [5, 5, 4], null, 0, { startedAtMs: started, omitMode: true })
+      expect(await sequence(ws)).toEqual({ finish: 1, read1: 1, read2: 1, afterDelete: 0, read3: 0 })
+    })
+
+    it('(f) a finish uploaded 2 days late across a move: completed before the move, so never counted, with or without a plan phase', async () => {
+      await pool.query(
+        `UPDATE session_periodization SET phase = 'intensification', phase_started_at = now() - interval '1 day', sessions_in_phase = 0 WHERE user_id = $1`, [USER])
+      for (const planPhase of ['accumulation', undefined]) {
+        const ws = await upload(FULL, [5, 5, 4], null, 2 * 24 * HOUR, { ...(planPhase ? { planPhase } : {}), explicitNone: true })
+        expect(await sequence(ws)).toEqual({ finish: 0, read1: 0, read2: 0, afterDelete: 0, read3: 0 })
+      }
+      // and one finished after the move, uploaded a few hours late, on the new phase's plan, counts
+      const ws = await upload(FULL, [5, 5, 4], null, 3 * HOUR, { planPhase: 'intensification', explicitNone: true })
+      expect(await sequence(ws)).toEqual({ finish: 1, read1: 1, read2: 1, afterDelete: 0, read3: 0 })
+    })
+
+    it('(g) a phone clock 2 minutes behind: started_at earlier than the phase start, planPhase the phase: counted', async () => {
+      await move('intensification')
+      const phaseStart = (await pushRow()) && (await pool.query(`SELECT phase_started_at FROM session_periodization WHERE user_id = $1 AND program_session_id = $2`, [USER, push])).rows[0].phase_started_at as Date
+      const ws = await upload(FULL, [5, 5, 4], null, 0, { planPhase: 'intensification', startedAtMs: phaseStart.getTime() - 120_000, explicitNone: true })
+      const started = (await pool.query(`SELECT started_at FROM workout_sessions WHERE id = $1`, [ws])).rows[0].started_at as Date
+      expect(started.getTime()).toBeLessThan(phaseStart.getTime())
+      expect(await sequence(ws)).toEqual({ finish: 1, read1: 1, read2: 1, afterDelete: 0, read3: 0 })
+    })
+
+    it('stores the plan phase only from a valid upload, once, and a repeat or an edit never changes it', async () => {
+      const t1 = await planned()
+      const id = randomUUID()
+      await upload(FULL, [5, 5, 4], t1, 0, { planPhase: 'accumulation', workoutSessionId: id })
+      expect(await storedPlanPhase(id)).toBe('accumulation')
+      // a repeated finish with the same value, a different one, and none: nothing changes
+      for (const planPhase of ['accumulation', 'deload', undefined]) {
+        await upload(FULL, [5, 5, 4], t1, 0, { ...(planPhase ? { planPhase } : {}), workoutSessionId: id })
+        expect(await storedPlanPhase(id)).toBe('accumulation')
+      }
+      expect((await pushRow()).sessions_in_phase).toBe(3) // and it counted once
+      // absent and invalid leave NULL
+      const none = await upload(FULL, [5, 5, 4], null, 0, { explicitNone: true })
+      expect(await storedPlanPhase(none)).toBeNull()
+      const bad = await upload(FULL, [5, 5, 4], null, 0, { planPhase: 'warp', explicitNone: true })
+      expect(await storedPlanPhase(bad)).toBeNull()
+    })
+
+    it('only the caller\'s own workout row is written (a finish for another user\'s id changes nothing)', async () => {
+      const other = '00000000-0000-4000-8000-000000004198'
+      await pool.query(`DELETE FROM users WHERE id = $1`, [other])
+      await pool.query(`INSERT INTO users (id, email, password_hash, timezone) VALUES ($1,'finish-4119-other@example.com','x',$2)`, [other, TZ])
+      try {
+        const theirs = (await pool.query(`INSERT INTO workout_sessions (user_id, session_name, started_at) VALUES ($1,'Theirs', now() - interval '1 hour') RETURNING id`, [other])).rows[0].id
+        expect(await repo.completeWorkoutSession(theirs, USER, new Date(), undefined, 'deload')).toBe(false)
+        const row = (await pool.query(`SELECT completed_at, plan_phase FROM workout_sessions WHERE id = $1`, [theirs])).rows[0]
+        expect(row).toEqual({ completed_at: null, plan_phase: null })
+      } finally {
+        await pool.query(`DELETE FROM users WHERE id = $1`, [other])
+      }
+    })
+
+    it('the finish is not delayed while another connection holds the lift lock for 6 s', async () => {
+      const t1 = await planned()
+      const holder = await pool.connect()
+      try {
+        await holder.query('BEGIN')
+        await holder.query(`SELECT pg_advisory_xact_lock(hashtext('lift_writes:user'), hashtext($1))`, [USER])
+        const day = todayInTz(TZ)
+        const wsId = randomUUID()
+        const began = Date.now()
+        const res = await repo.pushMutations(USER, [
+          { id: randomUUID(), domain: 'workout_log' as const, date: day, payload: {
+            sessionName: 'Push 4097', sessionId: push, workoutSessionId: wsId, exerciseLogId: randomUUID(), setLogIds: [randomUUID()],
+            exercise: LIFT, weights: [70], reps: [5], sets: 1, localDate: day, workoutStartedAt: Date.now() - 600_000, setEndTimes: [Date.now() - 60_000],
+            muscleGroups: ['quads'], intensityMode: 'full' } },
+          { id: randomUUID(), domain: 'complete_workout', date: day, payload: { workoutSessionId: wsId, completedAtMs: Date.now(), planGeneratedAt: t1.toISOString(), planPhase: 'accumulation' } },
+        ])
+        const elapsed = Date.now() - began
+        process.stderr.write(`[#4119] workout_log + complete_workout with the lift lock held elsewhere: ${elapsed} ms\n`)
+        expect(res.errors).toEqual([])
+        expect(elapsed).toBeLessThan(3000)
+        await sleep(300)
+        expect(await storedPlanPhase(wsId)).toBe('accumulation')
+        expect((await pushRow()).sessions_in_phase).toBe(3)
+      } finally {
+        await holder.query('ROLLBACK').catch(() => {})
+        holder.release()
+      }
+    })
+  })
+
+  // ---- "Recorded differently from before": a day trained as a deload is a deload day ----
+  describe('#4116 review: what a day trained as a deload is recorded as', () => {
+    const wsRow = async (id: string) => (await pool.query(`SELECT phase_type, intensity_mode FROM workout_sessions WHERE id = $1`, [id])).rows[0] as { phase_type: string | null; intensity_mode: string | null }
+    const e1rms = async (id: string) => (await pool.query(`SELECT exercise_name, estimated_1rm, exercise_deloaded FROM exercise_logs WHERE workout_session_id = $1 ORDER BY exercise_name`, [id])).rows
+    const personal = async () => (await repo.getPersonalRecord(USER, LIFT))?.estimated1rm ?? null
+    const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
+    const stored = async (id: string) => {
+      const sessions = await repo.getWorkoutSessionsFrom(USER, new Date(Date.now() - 2 * 86_400_000))
+      return sessions.find(s => s.id === id)!
+    }
+
+    it('a one-day deload in a normal phase is recorded phase_type deload: no 1RM, no record, a deload day in weekly stats; a normal session still counts', async () => {
+      expect((await pushRow()).phase).toBe('accumulation')
+      const deloadWs = await upload(DELOAD, [6, 6], null, 0, { explicitNone: true })
+      expect(await wsRow(deloadWs)).toEqual({ phase_type: 'deload', intensity_mode: 'deload' }) // main: phase_type NULL
+      expect((await e1rms(deloadWs))[0].estimated_1rm).toBe(0)
+      expect(await personal()).toBeNull()
+      const day = classifyDay([await stored(deloadWs)])
+      expect(day.isDeload).toBe(true) // main: false
+      expect(day.volume).toBe(0)      // held out of the headline total
+      expect(day.deloadVolume).toBeGreaterThan(0)
+      // A normal session the same week still counts.
+      const fullWs = await upload(FULL, [5, 5, 4], null, 0, { explicitNone: true })
+      expect(await wsRow(fullWs)).toEqual({ phase_type: null, intensity_mode: 'full' })
+      const normal = classifyDay([await stored(fullWs)])
+      expect(normal).toMatchObject({ isDeload: false, isTesting: false })
+      expect(normal.volume).toBeGreaterThan(0)
+      const both = classifyDay([await stored(deloadWs), await stored(fullWs)])
+      expect(both.volume).toBe(normal.volume)
+      expect(both.isDeload).toBe(false)
+    })
+
+    it('the NEXT normal session of the lift takes its comparison and 1RM from the last non-deload session, not the deload', async () => {
+      const full = await upload(FULL, [5, 5, 4], null, 0, { explicitNone: true })
+      expect((await e1rms(full))[0].estimated_1rm).toBe(99)
+      await sleep(30)
+      const deload = await upload(DELOAD, [6, 6], null, 0, { explicitNone: true })
+      expect((await e1rms(deload))[0].estimated_1rm).toBe(0)
+      // what the next plan compares against: the full session's 99, not the deload's 0
+      expect((await repo.listRecent1rm(USER)).get(LIFT)?.latest).toBe(99)
+      expect(await personal()).toBe(99)
+      // A rebuilt record reads `phase_type`: it ignores the deload day (`main`: this day had no phase type, so
+      // a stray estimate on it, which production has stored before, would have become the record).
+      await pool.query(`UPDATE exercise_logs SET estimated_1rm = 150 WHERE workout_session_id = $1`, [deload])
+      await repo.reconcilePersonalRecord(USER, LIFT)
+      expect(await personal()).toBe(100) // the best non-deload log (the seeded history), not 150
+    })
+
+    it('some lifts lightened per exercise, the upload says intensityMode full: recorded full; the lightened lift handled as on main', async () => {
+      const t1 = T1()
+      await storePlan(planOf('full', 70, 3, 5), 'auto_applied', t1, "now() + interval '3 days'")
+      const day = todayInTz(TZ)
+      const wsId = randomUUID()
+      const mk = (exercise: string, deloaded: boolean) => ({
+        id: randomUUID(), domain: 'workout_log' as const, date: day, payload: {
+          sessionName: 'Push 4097', sessionId: push, workoutSessionId: wsId, exerciseLogId: randomUUID(), setLogIds: [randomUUID(), randomUUID()],
+          exercise, weights: [deloaded ? 50 : 70, deloaded ? 50 : 70], reps: [5, 5], sets: 2, localDate: day, workoutStartedAt: Date.now() - 1_800_000,
+          setEndTimes: [Date.now() - 300_000, Date.now() - 200_000], muscleGroups: ['quads'], exerciseDeloaded: deloaded, intensityMode: 'full', wasOverride: false } })
+      const res = await repo.pushMutations(USER, [
+        mk(LIFT, false), mk(ACC, true),
+        { id: randomUUID(), domain: 'complete_workout', date: day, payload: { workoutSessionId: wsId, completedAtMs: Date.now() } },
+      ])
+      expect(res.errors).toEqual([])
+      expect(await wsRow(wsId)).toEqual({ phase_type: null, intensity_mode: 'full' }) // not a deload day
+      const rows = await e1rms(wsId)
+      const lightened = rows.find(r => r.exercise_name === ACC)!
+      const normal = rows.find(r => r.exercise_name === LIFT)!
+      expect(lightened).toMatchObject({ exercise_deloaded: true, estimated_1rm: 0 }) // as on main: no estimate, no record
+      expect(normal.estimated_1rm).toBeGreaterThan(0)
+      expect(classifyDay([await stored(wsId)])).toMatchObject({ isDeload: false })
     })
   })
 })

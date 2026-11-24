@@ -261,27 +261,27 @@ export async function deleteExerciseLogWithRepo(
       if (Number(remaining[0]?.count ?? 0) === 0) {
         // Capture the session's program-session + start time before deleting so we can
         // keep the AI-periodization phase counter honest.
-        const { rows: wsRows } = await client.query<{ session_id: string | null; started_at: Date; completed_at: Date | null }>(
-          'SELECT session_id, started_at, completed_at FROM workout_sessions WHERE id = $1',
+        const { rows: wsRows } = await client.query<{ session_id: string | null; plan_phase: string | null; completed_at: Date | null }>(
+          'SELECT session_id, plan_phase, completed_at FROM workout_sessions WHERE id = $1',
           [workoutSessionId],
         )
         const programSessionId = wsRows[0]?.session_id ?? null
         const completedAt = wsRows[0]?.completed_at ?? null
-        const startedAt = wsRows[0]?.started_at ?? null
+        const planPhase = wsRows[0]?.plan_phase ?? null
 
         await client.query('UPDATE workout_sessions SET deleted_at = $2, updated_at = $2 WHERE id = $1', [workoutSessionId, now])
         sessionDeleted = true
 
         // Completing a session increments sessions_in_phase, so deleting one must decrement
         // it — but only when the deleted session falls inside the current phase window
-        // (started_at >= phase_started_at, #4097; completed_at before that, #3799) AND was actually completed (canonical definition,
+        // (the one rule in the canonical definition above `reconcileSessionsInPhase`) AND was actually completed (canonical definition,
         // AI-5) — an abandoned session that never completed was never counted. A session from
         // a prior phase was already excluded from the current count, so decrementing for it
         // would under-count. Floor at 0.
         if (programSessionId && completedAt) {
           await client.query(
             DECREMENT_SESSIONS_IN_PHASE_SQL,
-            [userId, programSessionId, startedAt],
+            [userId, programSessionId, completedAt, planPhase],
           )
         }
       }
