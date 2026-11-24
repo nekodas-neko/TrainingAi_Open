@@ -1,4 +1,4 @@
-import { eq, and, inArray, asc, desc, sql, isNull, gte, lte } from 'drizzle-orm'
+import { eq, and, inArray, asc, desc, sql, isNull, gte } from 'drizzle-orm'
 import { NotFoundError, BusyError } from '@trainingai/shared/errors'
 import { lockLiftWrites, lockWait, readLockWait, tryLiftWrites } from '../../../coach/lock-wait'
 import { isLockWaitTimeout } from '@/lib/api/route-errors'
@@ -585,11 +585,13 @@ export async function advanceProgramPhase(
 /**
  * Completed sessions of a program since `since`: completed, not deleted, with logged sets (the same
  * test `reconcileSessionsInPhase` uses). Training weeks are counted from these (#3766). Sessions of a
- * tombstoned session type still count: the training happened.
+ * tombstoned session type still count: the training happened. Each carries the plan phase the app said it
+ * trained (`plan_phase`, NULL when it did not say), which `programPhaseView` reads by the one rule in the
+ * canonical definition above `reconcileSessionsInPhase` (#4119).
  */
 export async function listProgramCompletions(db: Db, userId: string, programId: string, since: Date): Promise<ProgramCompletion[]> {
   const rows = await db.execute(sql`
-    SELECT ws.session_id AS program_session_id, ws.completed_at
+    SELECT ws.session_id AS program_session_id, ws.completed_at, ws.plan_phase
     FROM workout_sessions ws
     JOIN program_sessions ps ON ps.id = ws.session_id
     WHERE ws.user_id = ${userId}
@@ -600,9 +602,10 @@ export async function listProgramCompletions(db: Db, userId: string, programId: 
       AND EXISTS (SELECT 1 FROM exercise_logs el WHERE el.workout_session_id = ws.id AND el.deleted_at IS NULL)
     ORDER BY ws.completed_at
   `)
-  return (rows.rows as Array<{ program_session_id: string; completed_at: Date | string }>).map(r => ({
+  return (rows.rows as Array<{ program_session_id: string; completed_at: Date | string; plan_phase: string | null }>).map(r => ({
     programSessionId: r.program_session_id,
     completedAt: new Date(r.completed_at),
+    planPhase: (r.plan_phase ?? null) as PeriodizationPhase | null,
   }))
 }
 
@@ -889,44 +892,71 @@ export async function storePendingTransition(db: Db, userId: string, programSess
     ))
 }
 
-// `completedAt` is the session's own completion time. A session counts toward the phase it was
-// COMPLETED in (the canonical definition above `reconcileSessionsInPhase`), so a completion stamped before the phase moved (an offline
-// finish synced after a later phase change) is not counted in the new phase.
-export async function incrementSessionsInPhase(db: Db, userId: string, programSessionId: string, completedAt?: Date): Promise<void> {
-  await db
-    .update(s.sessionPeriodization)
-    .set({
-      sessionsInPhase: sql`${s.sessionPeriodization.sessionsInPhase} + 1`,
-      updatedAt: new Date(),
-    })
-    .where(and(
-      eq(s.sessionPeriodization.userId, userId),
-      eq(s.sessionPeriodization.programSessionId, programSessionId),
-      ...(completedAt ? [lte(s.sessionPeriodization.phaseStartedAt, completedAt)] : []),
-    ))
+/**
+ * THE rule for "a workout of session type S counts toward S's current phase P (which began at T)", as SQL
+ * text over four expressions. The other conditions (live, completed, at least one live logged set) are the
+ * caller's own; see the canonical definition above `reconcileSessionsInPhase`. Used by the finish's increment,
+ * the reconcile, and the delete decrement, so none can undo another. (`programPhaseView` applies the same
+ * rule in TypeScript over `listProgramCompletions`: `workoutCountsInPhase` in `program-phase.ts`.)
+ */
+export function sessionCountsInPhaseSql(x: { completedAt: string; planPhase: string; phaseStartedAt: string; phase: string }): string {
+  return `${x.completedAt} >= ${x.phaseStartedAt} AND (${x.planPhase} IS NULL OR ${x.planPhase} = ${x.phase})`
+}
+
+/**
+ * The increment at a finish. It reads the workout as STORED (`completed_at`, `plan_phase`, stamped by
+ * `completeWorkoutSession` before this runs) and applies the one rule, so what it counts is what every later
+ * read counts. Scoped to the caller's own workout row (`ws.user_id`): another user's id changes nothing.
+ */
+export async function incrementSessionsInPhase(db: Db, userId: string, programSessionId: string, workoutSessionId: string): Promise<void> {
+  await db.execute(sql`
+    UPDATE session_periodization sp
+    SET sessions_in_phase = sp.sessions_in_phase + 1, updated_at = now()
+    FROM workout_sessions ws
+    WHERE ws.id = ${workoutSessionId} AND ws.user_id = ${userId}
+      AND sp.user_id = ${userId} AND sp.program_session_id = ${programSessionId}
+      AND ws.completed_at IS NOT NULL
+      AND ${sql.raw(sessionCountsInPhaseSql({ completedAt: 'ws.completed_at', planPhase: 'ws.plan_phase', phaseStartedAt: 'sp.phase_started_at', phase: 'sp.phase' }))}
+  `)
 }
 
 /**
  * The decrement for a deleted workout, shared by both delete flows (`lib/workout/delete-session.ts`
- * and the workout-entry delete in `lib/workout/exercise-log-edits.ts`). `$3` is the deleted
- * session's `completed_at`; the callers run it only for a completed session. Floor at 0.
+ * and the workout-entry delete in `lib/workout/exercise-log-edits.ts`). `$3` is the deleted session's
+ * `completed_at` and `$4` its `plan_phase` (NULL when none was said); the callers run it only for a completed
+ * session. Floor at 0.
  */
 export const DECREMENT_SESSIONS_IN_PHASE_SQL =
   `UPDATE session_periodization
    SET sessions_in_phase = GREATEST(sessions_in_phase - 1, 0), updated_at = now()
-   WHERE user_id = $1 AND program_session_id = $2 AND $3 >= phase_started_at`
+   WHERE user_id = $1 AND program_session_id = $2
+     AND ${sessionCountsInPhaseSql({ completedAt: '$3::timestamptz', planPhase: '$4::text', phaseStartedAt: 'phase_started_at', phase: 'phase' })}`
 
 // Recompute every session's `sessions_in_phase` for a program from the actual
 // (non-empty) workout_sessions logged since each session's phase started. The stored
 // counter is only ever incremented (on complete-workout) and decremented (on the app's
 // delete flow), so directly-inserted or directly-deleted test rows can leave it stale.
 // Deriving from real sessions makes the count self-healing. Only writes rows that drift.
-// Canonical definition of "a session in the current phase": non-deleted, with
-// logged sets, and COMPLETED at or after phase_started_at. Applied here, in the increment above
-// (complete-workout.ts passes the completion time) and in `DECREMENT_SESSIONS_IN_PHASE_SQL` (both
-// delete flows) — one definition, checked in three places (AI-5). It read `started_at` until #3799:
-// a session started before the phase moved and finished after it ran in the new phase and was not
-// counted, so a deload block ran three sessions instead of two.
+// Canonical definition of "a session in the current phase". A workout of session type S counts toward S's
+// current phase P (which began at T) iff it is live (not deleted), completed, has at least one live logged
+// set, `completed_at >= T`, AND (`plan_phase IS NULL` OR `plan_phase = P`). Written once, as
+// `sessionCountsInPhaseSql`, and used by this reconcile, the finish's increment and the delete decrement
+// (`DECREMENT_SESSIONS_IN_PHASE_SQL`, both delete flows); `programPhaseView` applies the same rule in
+// TypeScript (`workoutCountsInPhase`). The reasons:
+//  - Completion, not start (#3799, signed by the owner): the phase once moved mid warm-up on the web app
+//    and the deload ran three sessions instead of two, because the session started before the move was not
+//    counted. A start-time rule was tried in #4116 and dropped: a phone whose clock runs behind the server
+//    judges a workout started seconds after a phase move as started before it, and it brought back #3799's
+//    own case.
+//  - The plan phase (#4097, #4119): a Preview workout fixes its plan at Start, so a workout trained on a
+//    plan of another phase must not count in this one, whenever it started or finished. The app says which
+//    phase's plan it trained when it finishes, and the finish stores it in `workout_sessions.plan_phase`.
+//    NULL means the app did not say (the web app, an older build, every row before the column): exactly the
+//    completion rule alone. Nothing here reads `started_at`.
+// `wasProgramSessionTrainedSince` (baseline healing only) is NOT this rule: it goes by
+// `exercise_logs.logged_at`, a third clock, on purpose. Leave it.
+// The automatic program's cycle counts (`countAllSessionsSinceStart`, `getProgramPhaseState`) are a different
+// count and are not this rule.
 export async function reconcileSessionsInPhase(db: Db, userId: string, programId: string): Promise<void> {
   // #4082 review: a multi-row update, so it takes the lift-write lock too, but only if it is free right
   // now: it runs on most reads and is self-healing, so it skips rather than queue behind a check-in (and
@@ -964,9 +994,9 @@ export async function reconcileSessionsInPhase(db: Db, userId: string, programId
       LEFT JOIN workout_sessions ws
         ON ws.session_id = sp2.program_session_id
        AND ws.user_id = sp2.user_id
-       AND ws.completed_at >= sp2.phase_started_at
        AND ws.deleted_at IS NULL
        AND ws.completed_at IS NOT NULL
+       AND ${sql.raw(sessionCountsInPhaseSql({ completedAt: 'ws.completed_at', planPhase: 'ws.plan_phase', phaseStartedAt: 'sp2.phase_started_at', phase: 'sp2.phase' }))}
        AND EXISTS (SELECT 1 FROM exercise_logs el WHERE el.workout_session_id = ws.id AND el.deleted_at IS NULL)
       WHERE sp2.user_id = ${userId} AND ps.program_id = ${programId} AND ps.deleted_at IS NULL
       GROUP BY sp2.id
@@ -975,13 +1005,21 @@ export async function reconcileSessionsInPhase(db: Db, userId: string, programId
   `) } catch (err) { if (!isLockWaitTimeout(err)) throw err }
 }
 
-export async function setLastSessionRanPrescription(db: Db, userId: string, programSessionId: string, ranPrescription: boolean): Promise<void> {
+// The flag describes the LATEST workout of the type. With `startedAt` (#4097), a workout uploaded late (an
+// offline finish synced after a newer one of the same type) must not overwrite the newer one's answer, so it
+// writes only while no other completed, live workout of this session type started after it.
+export async function setLastSessionRanPrescription(db: Db, userId: string, programSessionId: string, ranPrescription: boolean, startedAt?: Date): Promise<void> {
   await db
     .update(s.sessionPeriodization)
     .set({ lastSessionRanPrescription: ranPrescription, updatedAt: new Date() })
     .where(and(
       eq(s.sessionPeriodization.userId, userId),
       eq(s.sessionPeriodization.programSessionId, programSessionId),
+      ...(startedAt ? [sql`NOT EXISTS (
+        SELECT 1 FROM workout_sessions newer
+        WHERE newer.user_id = ${userId} AND newer.session_id = ${programSessionId}
+          AND newer.deleted_at IS NULL AND newer.completed_at IS NOT NULL
+          AND newer.started_at > ${startedAt.toISOString()}::timestamptz)`] : []),
     ))
 }
 

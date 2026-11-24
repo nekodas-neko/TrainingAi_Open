@@ -133,7 +133,11 @@ export async function completeWorkoutWithRepo(
   // and is cut to the span rather than refused, as `completedAtMs` above is (#3266).
   const spanSec = Math.max(0, Math.floor((completedAt.getTime() - existing.startedAt.getTime()) / 1000))
   const paused: [number] | [] = pausedSec === undefined ? [] : [Math.min(pausedSec, spanSec)]
-  const stamped = await repo.completeWorkoutSession(workoutSessionId, userId, completedAt, ...paused)
+  // #4119: the plan phase the app says it trained goes into the same statement that stamps the completion (the
+  // schema already read an unknown value as absent), so every counter below and after reads it as stored.
+  const stamped = payload.planPhase
+    ? await repo.completeWorkoutSession(workoutSessionId, userId, completedAt, paused[0], payload.planPhase)
+    : await repo.completeWorkoutSession(workoutSessionId, userId, completedAt, ...paused)
   const alreadyCompleted = !stamped
 
   const programSessionId = await repo.getWorkoutSessionProgramSessionId(userId, workoutSessionId)
@@ -143,14 +147,34 @@ export async function completeWorkoutWithRepo(
     // session actually ran under a prescription — an advisory signal, must never fail
     // completion.
     const periodizationState = await repo.getSessionPeriodization(userId, programSessionId).catch(() => null)
-    const ranPrescription =
+    // #4097: a Preview workout is uploaded only at its finish, so the stored plan may no longer be the one it
+    // was trained on: voided by another type's phase move (no plan, status 'consumed'), or replaced by a plan
+    // made after Start. The phone says which plan it trained (`planGeneratedAt`) and the phase it was made for
+    // (`planPhase`); what follows from the identity:
+    //  - `last_session_ran_prescription` (the rep-completion read of the next plan, signals.ts): true when a
+    //    plan was trained whatever is stored now; false when the phone says it trained none (explicit null:
+    //    the program as written, even if a plan was stored mid-workout); read from the stored status only
+    //    when the phone says nothing (an older build).
+    //  - the phase the workout belongs to, for the count: `planPhase` as the phone sent it, stored on the
+    //    workout at the finish above (`workout_sessions.plan_phase`; NULL when it did not say). It is not
+    //    derived from the stored plan: that guessed, and the counters read only what is stored.
+    //  - the stored plan, whichever one it is, is still spent: a session of this type has just been trained,
+    //    and a plan made before it finished was made without it. The next open makes a new one.
+    // Everything else a finish records (the sets' planned reps, weights and %, the 1RM) comes from the
+    // numbers the phone sent per set, never from the stored plan.
+    const sentIdentity = payload.planGeneratedAt
+    const trainedPlanAt = typeof sentIdentity === 'string' ? new Date(sentIdentity) : null
+    const trainedAServedPlan = trainedPlanAt != null && !Number.isNaN(trainedPlanAt.getTime()) &&
+      trainedPlanAt.getTime() <= completedAt.getTime() + COMPLETED_AT_FUTURE_TOLERANCE_MS
+    const legacyRanPrescription =
       periodizationState?.prescriptionStatus === 'accepted' ||
       periodizationState?.prescriptionStatus === 'auto_applied' ||
       (periodizationState?.prescriptionStatus === 'pending' && periodizationState?.prescription != null)
-    repo.setLastSessionRanPrescription(userId, programSessionId, ranPrescription).catch(() => {})
+    const ranPrescription = sentIdentity === null ? false : trainedAServedPlan || legacyRanPrescription
+    repo.setLastSessionRanPrescription(userId, programSessionId, ranPrescription, existing.startedAt).catch(() => {})
 
     await repo.updatePrescriptionStatus(userId, programSessionId, 'consumed')
-    repo.incrementSessionsInPhase(userId, programSessionId, completedAt).catch(e =>
+    repo.incrementSessionsInPhase(userId, programSessionId, workoutSessionId).catch(e =>
       console.error('incrementSessionsInPhase failed (advisory, workout completion unaffected):', e)
     )
 

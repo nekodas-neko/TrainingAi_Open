@@ -80,7 +80,7 @@ describe.skipIf(!canRun)('completeWorkoutSession elects one winner (Q-473)', () 
     )
     const programSessionId = ps.rows[0].id
     await pool.query(
-      `INSERT INTO session_periodization (user_id, program_session_id, sessions_in_phase) VALUES ($1, $2, 0)`,
+      `INSERT INTO session_periodization (user_id, program_session_id, sessions_in_phase, phase_started_at) VALUES ($1, $2, 0, now() - interval '1 day')`,
       [TEST_USER_ID, programSessionId],
     )
     // Q-474: the live link is workout_sessions.session_id. Populating program_session_id instead

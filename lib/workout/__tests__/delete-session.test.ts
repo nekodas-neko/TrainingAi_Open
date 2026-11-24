@@ -10,7 +10,7 @@ function makeClient(rows: Record<string, unknown[]>) {
       // Route canned result sets by a substring of the SQL.
       if (text.includes('SELECT 1 FROM workout_sessions')) return { rows: rows.ownership ?? [] }
       if (text.includes('SELECT DISTINCT el.exercise_name')) return { rows: rows.names ?? [] }
-      if (text.includes('SELECT session_id, started_at')) return { rows: rows.session ?? [] }
+      if (text.includes('SELECT session_id, plan_phase')) return { rows: rows.session ?? [] }
       return { rows: [] }
     }),
     release: vi.fn(),
@@ -33,7 +33,7 @@ describe('deleteWorkoutSession', () => {
     const { client, queries } = makeClient({
       ownership: [{ ok: 1 }],
       names: [{ exercise_name: 'Squat' }, { exercise_name: 'Bench Press' }],
-      session: [{ session_id: 'ps-1', started_at: new Date('2026-07-01T08:00:00Z'), completed_at: new Date('2026-07-01T09:00:00Z') }],
+      session: [{ session_id: 'ps-1', plan_phase: 'accumulation', completed_at: new Date('2026-07-01T09:00:00Z') }],
     })
     connectMock.mockResolvedValue(client)
 
@@ -61,8 +61,10 @@ describe('deleteWorkoutSession', () => {
     expect(counter.text).toContain('sessions_in_phase - 1')
     expect(counter.text).toContain('>= phase_started_at')
     expect(counter.params[0]).toBe('user-1')
-    // #3799: the window is tested on the session's completion, not its start.
+    // The one rule (#3799, #4119): the window is tested on the session's completion, and its stored plan phase must be the phase's.
     expect(counter.params[2]).toEqual(new Date('2026-07-01T09:00:00Z'))
+    expect(counter.params[3]).toBe('accumulation')
+    expect(counter.text).toContain('$4::text IS NULL OR $4::text = phase')
 
     expect(queries.some(q => q.text.includes('BEGIN'))).toBe(true)
     expect(queries.some(q => q.text.includes('COMMIT'))).toBe(true)
@@ -73,7 +75,7 @@ describe('deleteWorkoutSession', () => {
     const { client, queries } = makeClient({
       ownership: [{ ok: 1 }],
       names: [{ exercise_name: 'Squat' }],
-      session: [{ session_id: 'ps-1', started_at: new Date('2026-07-01T08:00:00Z'), completed_at: null }],
+      session: [{ session_id: 'ps-1', plan_phase: null, completed_at: null }],
     })
     connectMock.mockResolvedValue(client)
 

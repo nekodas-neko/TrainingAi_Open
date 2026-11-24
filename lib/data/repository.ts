@@ -767,7 +767,7 @@ export interface WorkoutRepository {
   /** Q-473 — true when this call stamped `completed_at`, false when it was already stamped (a
    *  concurrent request or an outbox replay won). Callers derive idempotence from this, never from
    *  a read taken before the write. */
-  completeWorkoutSession(workoutSessionId: string, userId: string, completedAt: Date, pausedSec?: number): Promise<boolean>
+  completeWorkoutSession(workoutSessionId: string, userId: string, completedAt: Date, pausedSec?: number, planPhase?: PeriodizationPhase): Promise<boolean>
   /** Q-460 — true when a row was updated. Zero rows means no such session for this user, which is
    *  an error here (unlike `setWorkoutSessionWarmupEnd`, where zero rows means "already set"). */
   setSessionRpe(userId: string, workoutSessionId: string, rpe: number): Promise<boolean>
@@ -1492,9 +1492,9 @@ export interface WorkoutRepository {
    *  Optional: a repository without it serves stored plans as they are (no check-in hold). */
   replacePrescriptionIfUnchanged?(userId: string, programSessionId: string, before: AiPrescription, after: AiPrescription): Promise<boolean>
   storePendingTransition(userId: string, programSessionId: string, transition: PendingTransition | null): Promise<void>
-  /** #3799: `completedAt` set, the row is counted only when the phase began at or before it. */
-  incrementSessionsInPhase(userId: string, programSessionId: string, completedAt?: Date): Promise<void>
-  setLastSessionRanPrescription(userId: string, programSessionId: string, ranPrescription: boolean): Promise<void>
+  /** The finish's increment: reads the workout as stored and counts it by the one rule (see `reconcileSessionsInPhase`). */
+  incrementSessionsInPhase(userId: string, programSessionId: string, workoutSessionId: string): Promise<void>
+  setLastSessionRanPrescription(userId: string, programSessionId: string, ranPrescription: boolean, startedAt?: Date): Promise<void>
 
   // `program_volume_targets` has no user_id column, so these take the userId and scope through
   // `programs` themselves rather than trusting the caller to have checked (Q-174).

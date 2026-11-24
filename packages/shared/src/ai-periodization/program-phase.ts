@@ -55,6 +55,19 @@ export type PhaseRow = Pick<
 export interface ProgramCompletion {
   programSessionId: string
   completedAt: Date
+  /** The phase of the plan the app said it trained (`workout_sessions.plan_phase`, #4119). Absent or null: the
+   *  app did not say, so only the completion time decides. */
+  planPhase?: PeriodizationPhase | null
+}
+
+/**
+ * The one rule for which phase a workout counts toward, over what a completion carries (the SQL form is
+ * `sessionCountsInPhaseSql` in `slices/periodization.ts`, see the canonical definition above
+ * `reconcileSessionsInPhase`): completed at or after the phase began, and, when the app said which phase's
+ * plan it trained, that phase is this one. It never looks at when the workout started.
+ */
+export function workoutCountsInPhase(c: ProgramCompletion, phase: PeriodizationPhase, phaseStartedAt: Date): boolean {
+  return c.completedAt.getTime() >= phaseStartedAt.getTime() && (c.planPhase == null || c.planPhase === phase)
 }
 
 /** One session type's model answer, as it votes. */
@@ -142,7 +155,7 @@ export function programPhaseView(
   const lastTrainedThisWeek = new Map<string, Date>()
   for (const c of completions) {
     const week = trainingWeekOf(c.completedAt, tz)
-    if (c.completedAt.getTime() < phaseStartedAt.getTime()) {
+    if (!workoutCountsInPhase(c, phase, phaseStartedAt)) {
       if (week === startWeek) startWeekBegunBefore = true
       continue
     }
@@ -409,7 +422,7 @@ export function planSwitchOver(
   let lastFinish: Date | null = null
   for (const r of counting) {
     const done = completions
-      .filter(c => c.programSessionId === r.programSessionId && c.completedAt.getTime() >= r.phaseStartedAt.getTime())
+      .filter(c => c.programSessionId === r.programSessionId && workoutCountsInPhase(c, r.phase, r.phaseStartedAt))
       .map(c => c.completedAt)
       .sort((a, b) => a.getTime() - b.getTime())
     const finish = done[DELOAD_FLOOR - 1]
