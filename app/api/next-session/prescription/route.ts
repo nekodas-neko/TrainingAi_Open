@@ -10,9 +10,7 @@ import { adoptPendingAiPlan } from "@trainingai/shared/ai-periodization/pending-
 import { prescribedBar } from "@trainingai/shared/workout/load-rounding";
 import { loadLiftPreferences } from "@trainingai/shared/ai-periodization/lift-preference-read";
 import { rateLimit } from "@/lib/rate-limit";
-import { reportServerError } from "@/lib/observability";
-import { readSessionFromStoredState, resolveStoredPlan, type ReadSessionInputs } from "@trainingai/shared/workout/read-session";
-import { reevaluateStoredPlanForToday } from "@trainingai/shared/ai-periodization/reevaluate-for-today";
+import { readSessionFromStoredState } from "@trainingai/shared/workout/read-session";
 import { NO_PHASE_STATE } from "@/lib/data/repository";
 import type { ExerciseType } from "@trainingai/shared/types/program";
 
@@ -114,13 +112,12 @@ export async function GET() {
     : null;
 
   // #4019: the card takes every lift's sets, reps and bar from the same function the session screen's
-  // batch read runs (`readSessionFromStoredState` -> `buildWorkoutExercises`), not from a copy of it, and
-  // re-evaluates a plan that drives the load against today's soreness, injuries and illness with the same
-  // function the screen's single-session read runs (`reevaluateStoredPlanForToday`). That step is a READ
-  // here: nothing is stored and no regeneration or model call starts (a stale plan shows as stored, as
-  // the screen shows it until the new one lands). It differs from the screen in one way: no `?aiDeload`
-  // toggle (the person has not opened the session).
-  const readInputs: ReadSessionInputs = {
+  // batch read runs (`readSessionFromStoredState` -> `buildWorkoutExercises`), not from a copy of it. It
+  // differs from the screen's own single-session read in two ways, both because it previews a FUTURE
+  // session: no re-check against today's soreness, injuries and check-in (today's signals are not that
+  // session's), and no `?aiDeload` toggle (the person has not opened it).
+  // The re-check as a read was built and reviewed at a54dca72 and taken out on purpose (#4019 item 2).
+  const read = readSessionFromStoredState({
     program, programSession, todayStr, allPhases: phaseState.phases,
     thisSessionCount: phaseState.sessionCounts.get(programSession.id) ?? 0,
     periodization, programDeload,
@@ -128,19 +125,6 @@ export async function GET() {
       ? await isSessionUnderWay(repo, userId, programSession.id) : false,
     loggedTodayInThisSession: new Set<string>(),
     shared: { lastLogs, lastRealOneRm, prMap, estimateMap, styleById, styleByName, styles, libByName, liftPreferences },
-  };
-  const stored = resolveStoredPlan(readInputs);
-  const reeval = stored.aiDrivesLoad && stored.aiPrescription && periodization
-    ? await reevaluateStoredPlanForToday({
-        repo, userId, tz, todayStr, program, programSession,
-        state: periodization, prescription: stored.aiPrescription, programDeload, underWay: readInputs.underWay ?? false,
-        liftPreferences, libByName, lastRealOneRm, estimateMap, prMap,
-        onError: err => reportServerError(err, { userId, url: '/api/next-session/prescription#recost' }),
-      })
-    : null;
-  const read = readSessionFromStoredState({
-    ...readInputs,
-    todaysPlan: reeval?.kind === 'reevaluated' ? reeval.prescription : null,
   });
 
   // 'pending': an ai_dynamic program with no plan in hand (none stored, consumed, aged out, or a

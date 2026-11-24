@@ -37,12 +37,6 @@ export interface ReadSessionInputs {
   /** A workout of this type is under way (`sessionUnderWayCheck`): its plan keeps driving the bar. */
   underWay?: boolean
   loggedTodayInThisSession: Set<string>
-  /**
-   * The stored plan after today's re-evaluation (`reevaluateStoredPlanForToday`), for a reader that
-   * runs that step before it builds. Used in place of the stored plan, and only when the plan drives
-   * the load. Absent, the stored plan is read as it is.
-   */
-  todaysPlan?: AiPrescription | null
   shared: SharedSessionBuildCtx
 }
 
@@ -148,8 +142,15 @@ export function resolveSessionPhase(i: SessionPhaseInputs): SessionPhase {
   return { currentPhase, phaseStatus, isBaselinePhase }
 }
 
-/** The session's stored AI plan and whether it drives the load: the part of a read that decides what, if anything, to re-evaluate. */
-export function resolveStoredPlan(i: ReadSessionInputs) {
+/**
+ * One program session's exercises as the session screen builds them, from stored state alone: no
+ * re-evaluation against today's signals, no regeneration, no write, no `?aiDeload` toggle. The ONE
+ * resolution of phase, baseline, deload, the AI plan and its pending state that feeds
+ * `buildWorkoutExercises`, so a reader that cannot run the screen's live steps gets the same numbers
+ * the screen starts from. Called by `/api/workout-data?tab=all` (every session) and by
+ * `/api/next-session/prescription` (the Next workout card).
+ */
+export function readSessionFromStoredState(i: ReadSessionInputs): ReadSessionResult {
   const { program, programSession, allPhases, periodization, programDeload } = i
   const isAiDynamic = program.phaseMode === 'ai_dynamic'
 
@@ -168,24 +169,6 @@ export function resolveStoredPlan(i: ReadSessionInputs) {
   // An aged-out prescription is pending regeneration, not the plan (#3700).
   const aiDrivesLoad = aiPrescription != null && periodization != null && !aiPrescriptionPending
     && prescriptionDrivesLoad(aiPrescription.phaseAction, periodization.prescriptionStatus)
-
-  return { currentPhase, phaseStatus, isBaselinePhase, aiPrescription, aiPrescriptionPending, aiDrivesLoad }
-}
-
-/**
- * One program session's exercises as the session screen builds them, from stored state alone: no
- * re-evaluation against today's signals, no regeneration, no write, no `?aiDeload` toggle. The ONE
- * resolution of phase, baseline, deload, the AI plan and its pending state that feeds
- * `buildWorkoutExercises`, so a reader that cannot run the screen's live steps gets the same numbers
- * the screen starts from. Called by `/api/workout-data?tab=all` (every session) and by
- * `/api/next-session/prescription` (the Next workout card).
- */
-export function readSessionFromStoredState(i: ReadSessionInputs): ReadSessionResult {
-  const { program, programSession, allPhases } = i
-  const isAiDynamic = program.phaseMode === 'ai_dynamic'
-  const stored = resolveStoredPlan(i)
-  const { currentPhase, phaseStatus, isBaselinePhase, aiPrescriptionPending, aiDrivesLoad } = stored
-  const aiPrescription = aiDrivesLoad && i.todaysPlan ? i.todaysPlan : stored.aiPrescription
 
   const aiPhaseLabel = aiPrescription ? capitalize(aiPrescription.phase) : ''
   const droppedThisCycle = new Set(aiDrivesLoad ? (aiPrescription!.droppedExerciseIds ?? []) : [])

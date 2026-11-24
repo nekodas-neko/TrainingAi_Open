@@ -349,8 +349,9 @@ async function handleWorkoutData(req: NextRequest) {
     && prescriptionDrivesLoad(aiPrescription.phaseAction, aiPeriodizationState.prescriptionStatus)
 
   if (aiDrivesLoad && aiPrescription && aiPeriodizationState) {
-    // Consumption-day re-evaluation (AI-2/AI-3): the Next workout card runs the same function (#4019).
-    // This read then stores what it returns and fires the regeneration a stale plan needs.
+    // Consumption-day re-evaluation (AI-2/AI-3): `reevaluateStoredPlanForToday` returns what to do and stores
+    // nothing. This read then stores what it returns and fires the regeneration a stale plan needs. The Next
+    // workout card deliberately does not run it: it previews a future session (#4019 item 2).
     const reeval = await reevaluateStoredPlanForToday({
       repo, userId, tz, todayStr, program, programSession,
       state: aiPeriodizationState, prescription: aiPrescription, programDeload, underWay,

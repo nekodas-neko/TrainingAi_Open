@@ -240,6 +240,13 @@ describe.skipIf(!canRun)('Coach lift_preference domain (#3896 step 5)', () => {
         await setPlan(deloadPlan(true))
         expect(await textOf([{ id: 'r', field: 'restSec', from: null, to: 200 }])).toMatch(/If you train full today, it uses the new rest\.$/)
       })
+      it('a rep-range and a rest change together say Full uses the new range and rest', async () => {
+        await setPlan(deloadPlan(true))
+        const text = await textOf([more, { id: 'r', field: 'restSec', from: null, to: 200 }])
+        expect(text).toMatch(/This applies from the session after it\. If you train full today, it uses the new range and rest\.$/)
+        // The other two cases keep their one-word clause (the two tests above), not this one.
+        expect(text).not.toMatch(/the new (range|rest)\.$/)
+      })
       it('a deload with no record of the full numbers offers no Full: no clause', async () => {
         await setPlan(deloadPlan(false))
         expect(await textOf([more])).not.toContain(FULL_CLAUSE)

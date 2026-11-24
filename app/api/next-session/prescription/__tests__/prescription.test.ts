@@ -40,9 +40,6 @@ vi.mock('@/lib/data', () => ({
     listPersonalRecords,
     getExerciseEstimates,
     // A stored row always has a phase (the screen's reader labels it); these cases only vary the plan.
-    // The card re-evaluates a plan that drives the load against today's signals, as the screen does (#4019).
-    getMoodLog: async () => null, getDayCheckin: async () => null, listInjuries: async () => [],
-    getRecentSessionsOfType: async () => [], getExerciseMuscleAssignments: async () => ({}), getOuraDailyDerived: async () => [],
     getSessionPeriodization: async (...a: []) => {
       const st = await getSessionPeriodization(...a)
       return st ? { phase: 'accumulation', sessionsInPhase: 0, baselineComplete: true, ...st } : st

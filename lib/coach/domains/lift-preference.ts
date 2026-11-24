@@ -466,7 +466,9 @@ function measure(ctx: Context, before: PrefColumns, after: PrefColumns, accepted
       // numbers offers it, and only a rep-range or rest change reaches them.
       const fullTakesIt = excluded !== 'baseline' && storedRow.deloaded === true && !!storedRow.preDeload
         && accepted.some(c => c.field === 'repRange' || c.field === 'restSec')
-      const fullClause = accepted.some(c => c.field === 'repRange') ? ' If you train full today, it uses the new range.' : ' If you train full today, it uses the new rest.'
+      const changedRange = accepted.some(c => c.field === 'repRange')
+      const changedRest = accepted.some(c => c.field === 'restSec')
+      const fullClause = ` If you train full today, it uses the new ${changedRange && changedRest ? 'range and rest' : changedRange ? 'range' : 'rest'}.`
       consequences.push({
         kind: 'info',
         text: `Your next ${ctx.target.sessionName} is ${excluded === 'baseline' ? 'a baseline test' : 'a deload'}, so it stays at ${line(was)}. This applies from the session after it.${fullTakesIt ? fullClause : ''}`,

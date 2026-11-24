@@ -1,9 +1,10 @@
-// #4019 item 2, at the database driver: the Next workout card re-evaluates a stored AI plan against today's
-// soreness, and that is a READ. On a real Postgres, with a plan that today's check-in lightens and that has not
-// yet been re-checked for today, the card is read with every statement the process sends logged
-// (`pg.Client.prototype.query`): there is no INSERT, UPDATE or DELETE, no regeneration starts, no model is
-// called (a model mock throws), and the stored plan row is byte-identical afterwards. The session screen, read
-// next, shows the same lifts and does store the re-check. Made-up names and numbers only.
+// #4019 item 2, at the database driver: the Next workout card reads a stored AI plan and nothing else. On a real
+// Postgres, with a plan that today's check-in would lighten and that has not yet been re-checked for today, the
+// card is read with every statement the process sends logged (`pg.Client.prototype.query`): there is no INSERT,
+// UPDATE or DELETE (so no `error_events` row either: there is no figure re-cost on a card read to fail), no
+// regeneration starts, no model is called (a model mock throws), the stored plan row is byte-identical afterwards,
+// and the card shows the STORED numbers. The session screen, read next, lightens the lift and stores the
+// re-check; the card read after that shows what is stored. Made-up names and numbers only.
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest'
 import { NextRequest } from 'next/server'
 import { prescribedBar } from '@trainingai/shared/workout/load-rounding'
@@ -23,7 +24,7 @@ const USER = '00000000-0000-4000-8000-0000401900a1'
 const LIFT = 'Card Reads Only Press 4019'
 const OTHER = 'Card Reads Only Row 4019'
 
-describe.skipIf(!canRun)('the card re-evaluates today\'s soreness without writing (#4019)', () => {
+describe.skipIf(!canRun)('the card shows the stored plan and writes nothing (#4019)', () => {
   let pool: import('pg').Pool
   let pg: typeof import('pg')
   const ids = {} as { session: string; lift: string; other: string }
@@ -95,20 +96,26 @@ describe.skipIf(!canRun)('the card re-evaluates today\'s soreness without writin
     expect(model.calls).toBe(0)
     expect(await planRow()).toEqual(before) // the stored plan is exactly as it was
 
-    // The sore chest lightened the pressing lift on the card, and the other lift is as the plan wrote it.
+    // The sore chest does not lighten the pressing lift on the card: it shows the stored plan, as does the other lift.
     const stored = (before.prescription as { exercises: Array<{ pct: number }> }).exercises
     const press = cardBody.exercises.find(e => e.name === LIFT)!
-    expect(press.sets[0].weightKg).not.toBe(prescribedBar(100, stored[0].pct, ['Barbell']))
+    expect(press.sets[0].weightKg).toBe(prescribedBar(100, stored[0].pct, ['Barbell']))
     expect(cardBody.exercises.find(e => e.name === OTHER)!.sets[0].weightKg).toBe(prescribedBar(100, 70, ['Barbell']))
+    // Nothing was reported as an error by the card read.
+    expect((await pool.query(`SELECT count(*)::int AS n FROM error_events WHERE user_id = $1`, [USER])).rows[0].n).toBe(0)
 
-    // The screen, read next, shows the same lifts, and is the one that stores the re-check.
+    // The screen, read next, lightens the pressing lift and is the one that stores the re-check.
     const screenBody = await screen()
-    for (const ex of screenBody.exercises) {
-      const onCard = cardBody.exercises.find(c => c.name === ex.name)!
-      expect(onCard.sets).toEqual(ex.progressionStyle.map(s => ({ weightKg: prescribedBar(ex.estimated1rm, s.pct, ex.equipment), reps: s.reps, restSec: s.restSec })))
-    }
+    const screenPress = screenBody.exercises.find(e => e.name === LIFT)!
+    expect(prescribedBar(screenPress.estimated1rm, screenPress.progressionStyle[0].pct, screenPress.equipment)).toBeLessThan(press.sets[0].weightKg!)
     await new Promise(r => setTimeout(r, 300))
     expect((await planRow()).prescription).not.toEqual(before.prescription)
+
+    // The card read after the screen's store shows what is stored: the lightened press, as the screen showed it.
+    const after = await card()
+    const afterPress = after.exercises.find(e => e.name === LIFT)!
+    expect(afterPress.sets).toEqual(screenPress.progressionStyle.map(st => ({ weightKg: prescribedBar(screenPress.estimated1rm, st.pct, screenPress.equipment), reps: st.reps, restSec: st.restSec })))
+    expect(afterPress.sets[0].weightKg).toBeLessThan(press.sets[0].weightKg!)
     expect(model.calls).toBe(0)
   })
 })

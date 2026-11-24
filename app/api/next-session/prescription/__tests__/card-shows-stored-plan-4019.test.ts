@@ -1,12 +1,11 @@
-// #4019 item 2: the done screen's Next workout card re-evaluates a plan that drives the load against today's
-// soreness, injuries and illness, with the SAME function the session screen's single-session read runs
-// (`reevaluateStoredPlanForToday`), so the two no longer differ after that step moves a load. On the card it is a
-// READ: nothing is stored, no regeneration starts, no model is called (a model mock throws if it is touched).
-// This runs the REAL `/api/workout-data` single-session handler and the REAL card route on the same stored data
-// and compares them lift by lift, over: program kind (ai_dynamic with a plan driving · manual · automatic) × the
-// plan's phase × a signal grid (none · one sore muscle · sore plus an injury · every muscle sore, which asks for a
-// whole-session deload · 3 sore muscles a day after a session, the one-day emergency trigger) × the plan already
-// re-checked for today's inputs, or not. Made-up names and numbers.
+// #4019 item 2, decided: the done screen's Next workout card shows the STORED plan and does not re-check it
+// against today's soreness, injuries, check-in or illness. The card previews a session that is usually a day or
+// more away, and today's signals are not that session's. (A card that re-checked as a read was built and reviewed
+// at a54dca72 and taken out on purpose.) The session screen keeps its re-check (`reevaluateStoredPlanForToday`).
+// This runs the REAL card route and the REAL `/api/workout-data` single-session handler on the same stored data,
+// over: program kind (ai_dynamic normal plan · model deload · rules deload · baseline · automatic · manual) × today's
+// signals (none · one sore muscle · sore plus an injury · every muscle sore · sick · three sore a day after a
+// session, the emergency trigger) × the plan already re-checked for today's inputs, or not. Made-up names and numbers.
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 import { prescribedBar } from '@trainingai/shared/workout/load-rounding'
@@ -24,13 +23,13 @@ const LIFTS = [
 const set = (pct: number, reps: number, restSec = 120) => ({ pct, reps, restSec, useFor1rm: true })
 const STYLES = [{ id: 'style-main', name: 'Main', sets: [set(80, 8), set(80, 8), set(77.5, 8)] }]
 
-type Scenario = 'none' | 'one sore muscle' | 'sore + injury' | 'every muscle sore' | 'three sore, a day after a session'
-const SCENARIOS: Scenario[] = ['none', 'one sore muscle', 'sore + injury', 'every muscle sore', 'three sore, a day after a session']
+type Scenario = 'none' | 'one sore muscle' | 'sore + injury' | 'every muscle sore' | 'sick' | 'three sore, a day after a session'
+const SCENARIOS: Scenario[] = ['none', 'one sore muscle', 'sore + injury', 'every muscle sore', 'sick', 'three sore, a day after a session']
 
 const state = { program: null as Row | null, periodization: null as Row | null, scenario: 'none' as Scenario, keyCurrent: false }
-const calls = { regenerate: 0, generate: 0, model: 0, writes: 0, errors: [] as string[] }
+const calls = { regenerate: 0, generate: 0, model: 0, writes: 0, screenStores: 0, errors: [] as string[] }
 
-const moodFor = (s: Scenario) => s === 'none' ? null : {
+const moodFor = (s: Scenario) => s === 'none' ? null : s === 'sick' ? { bodyState: ['sick'], suggestedSoreMuscles: null, soreMuscles: [] as string[] } : {
   bodyState: ['sore_muscles'], suggestedSoreMuscles: null,
   soreMuscles: s === 'one sore muscle' || s === 'sore + injury' ? ['Chest'] : ['Chest', 'Shoulders', 'Triceps'],
 }
@@ -55,7 +54,8 @@ const repo = {
   getExerciseEquipment: vi.fn(async (names: string[]) => Object.fromEntries(names.map(n => [n, ['barbell']]))),
   getExerciseTypes: vi.fn(async (names: string[]) => Object.fromEntries(names.map(n => [n, 'weighted']))),
   replacePrescriptionIfUnchanged: vi.fn(async () => true),
-  updatePrescriptionExercisesCache: vi.fn(async () => { calls.writes++ }),
+  // The screen stores its re-check here; the card has no business calling it (counted separately for the card).
+  updatePrescriptionExercisesCache: vi.fn(async (_u: string, _s: string, p: unknown) => { calls.writes++; calls.screenStores++; if (state.periodization) state.periodization.prescription = p }),
   updatePrescriptionStatus: vi.fn(async () => { calls.writes++ }),
   listSessionPeriodizationForProgram: vi.fn(async () => []),
   listProgramCompletions: vi.fn(async () => []),
@@ -91,16 +91,18 @@ const session = {
     id: l.id, sessionId: 'sess-1', exerciseName: l.name, styleId: 'style-main', position: i, exerciseRole: l.role, muscleGroups: [l.muscle],
   })),
 }
-const plan = (deload: boolean) => ({
-  phase: deload ? 'deload' : 'accumulation', phaseAction: 'stay', deload, reasoning: '', confidence: 1, source: 'model',
+const plan = (deload: boolean, source: 'model' | 'rules' = 'model') => ({
+  phase: deload ? 'deload' : 'accumulation', phaseAction: 'stay', deload, reasoning: '', confidence: 1, source,
   estimatedSessionDurationMin: 45, weeklyVolumeContribution: {},
   exercises: LIFTS.map(l => ({ sessionExerciseId: l.id, name: l.name, sets: 3, reps: 5, pct: deload ? 55 : 82.5, restSec: 150 })),
 })
 
-type Kind = 'ai driving' | 'manual' | 'automatic'
-function setUp(kind: Kind, planDeload: boolean, scenario: Scenario, keyCurrent: boolean) {
+type Kind = 'ai normal' | 'ai model deload' | 'ai rules deload' | 'ai baseline' | 'manual' | 'automatic'
+const KINDS: Kind[] = ['ai normal', 'ai model deload', 'ai rules deload', 'ai baseline', 'manual', 'automatic']
+const isAi = (k: Kind) => k.startsWith('ai')
+function setUp(kind: Kind, scenario: Scenario, keyCurrent: boolean) {
   state.scenario = scenario
-  const program: Row = { id: 'prog-1', userId: 'user-1', phaseMode: kind === 'ai driving' ? 'ai_dynamic' : kind, trainingGoal: 'strength', sessions: [session], autoApplyPrescriptions: true }
+  const program: Row = { id: 'prog-1', userId: 'user-1', phaseMode: isAi(kind) ? 'ai_dynamic' : kind, trainingGoal: 'strength', sessions: [session], autoApplyPrescriptions: true }
   state.program = program
   repo.getNextSession.mockResolvedValue({ isRestDay: false, session, reason: '', program })
   if (kind === 'automatic') {
@@ -111,14 +113,16 @@ function setUp(kind: Kind, planDeload: boolean, scenario: Scenario, keyCurrent: 
     })
   } else repo.getProgramPhaseState.mockResolvedValue({ phases: [], sessionCounts: new Map() })
   state.periodization = null
-  if (kind === 'ai driving') {
-    const p = plan(planDeload) as Row
-    if (keyCurrent) p.reevaluatedInputsKey = reevaluationKey(today, moodFor(scenario) as never, null, injuriesFor(scenario) as never)
+  if (isAi(kind)) {
+    const baseline = kind === 'ai baseline'
+    const deload = kind === 'ai model deload' || kind === 'ai rules deload'
+    const p = baseline ? null : plan(deload, kind === 'ai rules deload' ? 'rules' : 'model') as Row
+    if (p && keyCurrent) p.reevaluatedInputsKey = reevaluationKey(today, moodFor(scenario) as never, null, injuriesFor(scenario) as never)
     state.periodization = {
-      id: 'per-1', userId: 'user-1', programSessionId: 'sess-1', phase: planDeload ? 'deload' : 'accumulation',
-      phaseStartedAt: new Date('2026-11-10T00:00:00Z'), sessionsInPhase: 0, baselineComplete: true, baseline1rm: {}, prescription: p,
-      prescriptionGeneratedAt: new Date('2026-11-21T00:00:00Z'), prescriptionExpiresAt: new Date(Date.now() + 3 * 86_400_000),
-      prescriptionStatus: 'accepted', lastSessionRanPrescription: null, pendingTransition: null, preEmergencyDeloadPhase: null, updatedAt: new Date(),
+      id: 'per-1', userId: 'user-1', programSessionId: 'sess-1', phase: baseline ? 'baseline' : deload ? 'deload' : 'accumulation',
+      phaseStartedAt: new Date('2026-11-10T00:00:00Z'), sessionsInPhase: 0, baselineComplete: !baseline, baseline1rm: {}, prescription: p,
+      prescriptionGeneratedAt: p ? new Date('2026-11-21T00:00:00Z') : null, prescriptionExpiresAt: p ? new Date(Date.now() + 3 * 86_400_000) : null,
+      prescriptionStatus: p ? 'accepted' : null, lastSessionRanPrescription: null, pendingTransition: null, preEmergencyDeloadPhase: null, updatedAt: new Date(),
     }
   }
 }
@@ -131,48 +135,68 @@ async function onScreen(): Promise<Lift[]> {
   return body.exercises.map(ex => ({ name: ex.name, sessionExerciseId: ex.sessionExerciseId,
     sets: (ex.progressionStyle ?? []).map(s => ({ weightKg: ex.exerciseType === 'bodyweight' || !ex.estimated1rm ? null : prescribedBar(ex.estimated1rm, s.pct, ex.equipment), reps: s.reps, restSec: s.restSec })) }))
 }
-const onCard = async () => ((await (await card()).json()) as { exercises: Array<Lift & { exerciseType: string }> }).exercises
-  .map(({ name, sessionExerciseId, sets }) => ({ name, sessionExerciseId, sets }))
+const cardBody = async (): Promise<{ exercises: Array<Lift & { exerciseType: string }> }> => (await card()).json()
+const onCard = async (): Promise<Lift[]> => (await cardBody()).exercises.map(({ name, sessionExerciseId, sets }) => ({ name, sessionExerciseId, sets }))
 
-const tally = { cases: 0, liftCases: 0, mismatches: 0, moved: 0, screenRegenerated: 0 }
+const tally = { cells: 0, differsFromNoSignal: 0, screenLightened: 0 }
+const storedBar = (pct: number) => prescribedBar(100, pct, ['barbell'])
 
-describe('the Next workout card re-evaluates against today like the session screen (#4019)', () => {
-  beforeEach(() => { vi.clearAllMocks(); calls.regenerate = calls.generate = calls.model = calls.writes = 0; calls.errors = [] })
+describe('the Next workout card shows the stored plan, not today\'s soreness (#4019)', () => {
+  beforeEach(() => { vi.clearAllMocks(); calls.regenerate = calls.generate = calls.model = calls.writes = calls.screenStores = 0; calls.errors = [] })
 
-  const cells: Array<[Kind, boolean]> = [['ai driving', false], ['ai driving', true], ['manual', false], ['automatic', false]]
-  for (const [kind, planDeload] of cells) for (const scenario of SCENARIOS) for (const keyCurrent of kind === 'ai driving' ? [false, true] : [false]) {
-    it(`${kind}${kind === 'ai driving' ? (planDeload ? ' (a deload plan)' : '') : ''} · ${scenario} · plan ${keyCurrent ? 'already re-checked' : 'not re-checked today'}`, async () => {
-      setUp(kind, planDeload, scenario, keyCurrent)
-      // The card first: it must not have changed what the screen then reads.
-      const cardLifts = await onCard()
+  for (const kind of KINDS) for (const scenario of SCENARIOS) for (const keyCurrent of isAi(kind) ? [false, true] : [false]) {
+    it(`${kind} · ${scenario} · plan ${keyCurrent ? 'already re-checked' : 'not re-checked today'}: the card is what it is with no signal at all`, async () => {
+      // The same stored data with no signal today: what the card must show.
+      setUp(kind, 'none', false)
+      const noSignal = await cardBody()
+      setUp(kind, scenario, keyCurrent)
+      const withSignal = await cardBody()
+      tally.cells++
+      if (JSON.stringify(withSignal) !== JSON.stringify(noSignal)) tally.differsFromNoSignal++
+      expect(withSignal).toEqual(noSignal)
       expect(calls.writes, 'the card stores nothing').toBe(0)
       expect(calls.regenerate + calls.generate + calls.model, 'the card starts no regeneration and calls no model').toBe(0)
-      const screenLifts = await onScreen()
-      tally.cases++; tally.liftCases += screenLifts.length
-      if (JSON.stringify(cardLifts) !== JSON.stringify(screenLifts)) tally.mismatches++
-      expect(cardLifts).toEqual(screenLifts)
-      if (calls.regenerate > 0) tally.screenRegenerated++
-      // Did today's signals move a load on the screen? (Compared with the plan as stored: 5 reps at 82.5 % or 55 %.)
-      const storedBar = (pct: number) => prescribedBar(100, pct, ['barbell'])
-      if (kind === 'ai driving' && screenLifts.some(l => l.sets[0]?.weightKg !== storedBar(planDeload ? 55 : 82.5))) tally.moved++
-      expect(calls.model).toBe(0)
-      expect(calls.errors, 'no error was reported by either route').toEqual([])
+      expect(calls.errors, 'the card reports no error (there is no figure re-cost on a card read)').toEqual([])
     })
   }
 
-  it('the grid was not vacuous: signals moved loads and asked for regenerations on the screen, and the card matched every time', () => {
-    expect(tally.cases).toBe(SCENARIOS.length * (2 * 2 + 2))
-    expect(tally.mismatches).toBe(0)
-    expect(tally.moved).toBeGreaterThan(0)
-    expect(tally.screenRegenerated).toBeGreaterThan(0)
-    console.info(`[#4019 item 2] cases: ${tally.cases} (${tally.liftCases} lift comparisons), mismatches: ${tally.mismatches}; a signal moved a load in ${tally.moved} cases, the screen asked for a regeneration in ${tally.screenRegenerated}`)
+  it('an AI plan\'s card carries the stored numbers: 5 reps at 82.5 %, even with every muscle sore', async () => {
+    setUp('ai normal', 'every muscle sore', false)
+    for (const lift of await onCard()) expect(lift.sets[0], lift.name).toEqual({ weightKg: storedBar(82.5), reps: 5, restSec: 150 })
   })
 
-  it('with the soreness check run on the card, a sore chest lightens the card\'s bench exactly as the screen does', async () => {
-    setUp('ai driving', false, 'one sore muscle', false)
-    const [bench] = await onCard()
-    const stored = prescribedBar(100, 82.5, ['barbell'])
-    expect(bench.sets[0].weightKg).not.toBe(stored)
-    expect(bench.sets).toEqual((await onScreen())[0].sets)
+  it('a sore chest: the card shows the stored bench, the screen\'s read lightens it, and once the screen has stored the re-check the card shows what is stored', async () => {
+    setUp('ai normal', 'one sore muscle', false)
+    const before = await onCard()
+    expect(before[0].sets[0].weightKg).toBe(storedBar(82.5))
+
+    const screenLifts = await onScreen()
+    expect(calls.screenStores, 'the screen stored its re-check').toBe(1)
+    tally.screenLightened += screenLifts[0].sets[0].weightKg !== storedBar(82.5) ? 1 : 0
+    expect(screenLifts[0].sets[0].weightKg).toBeLessThan(storedBar(82.5)!)
+
+    // The row now holds the screen's re-check; the card reads that row as it would read any stored plan.
+    const stored = (state.periodization!.prescription as { exercises: Array<{ pct: number; reps: number; restSec: number }> }).exercises[0]
+    const after = await onCard()
+    expect(after[0].sets[0].weightKg).toBe(prescribedBar(100, stored.pct, ['barbell']))
+    expect(after[0].sets).toEqual(screenLifts[0].sets)
+    expect(after[0].sets[0].weightKg).not.toBe(before[0].sets[0].weightKg)
+  })
+
+  it('on the screen, the same signals do change the lifts (so the grid above is not vacuous)', async () => {
+    let moved = 0
+    for (const scenario of SCENARIOS.filter(s => s !== 'none')) {
+      setUp('ai normal', scenario, false)
+      const cardLifts = await onCard()
+      const screenLifts = await onScreen()
+      if (JSON.stringify(cardLifts) !== JSON.stringify(screenLifts)) moved++
+    }
+    expect(moved).toBeGreaterThan(0)
+  })
+
+  it('the grid ran in full and no cell differed from "no signal"', () => {
+    expect(tally.cells).toBe(SCENARIOS.length * (4 * 2 + 2))
+    expect(tally.differsFromNoSignal).toBe(0)
+    console.info(`[#4019 item 2] cells: ${tally.cells}, differing from no-signal: ${tally.differsFromNoSignal}`)
   })
 })
