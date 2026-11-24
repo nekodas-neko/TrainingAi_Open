@@ -604,6 +604,12 @@ export interface StrapStatusRow extends StrapStatusWrite {
   recordedAt: Date
 }
 
+/** What `getProgramPhaseState` returns: a program's phases and its sessions' completed counts. */
+export type ProgramPhaseState = { phases: ProgramPhase[]; sessionCounts: Map<string, number> }
+
+/** `getProgramPhaseState`'s answer for a program that is not automatic: nothing to read, so no statement is run. Never mutated. */
+export const NO_PHASE_STATE: ProgramPhaseState = { phases: [], sessionCounts: new Map<string, number>() }
+
 export interface WorkoutRepository {
   applyHealthConnectBatch(userId:string,batch:import('@trainingai/shared/validation/health-connect-import').HealthConnectBatch,timezone?:string):Promise<{accepted:number;deleted:number}>;
   rebuildHealthConnect(userId:string,timezone:string):Promise<{measurements:number;nights:number;days:number;heartRate:number;completedAt:string;hrv:{method:'RMSSD';value:number;at:string;source:string}|null}>;
@@ -740,7 +746,7 @@ export interface WorkoutRepository {
   // ── Block Periodization ────────────────────────────────────────────────────
   listProgramPhases(userId: string, programId: string): Promise<ProgramPhase[]>
   // A program's phases and its sessions' completed counts in ONE query (#4050); the counts are empty when there are no phases.
-  getProgramPhaseState(userId: string, programId: string): Promise<{ phases: ProgramPhase[]; sessionCounts: Map<string, number> }>
+  getProgramPhaseState(userId: string, programId: string): Promise<ProgramPhaseState>
   listPhaseSets(userId: string): Promise<PhaseSetWithPhases[]>
   createPhaseSet(userId: string, name: string, phases: Omit<ProgramPhase, 'id' | 'phaseSetId'>[]): Promise<PhaseSetWithPhases>
   updatePhaseSet(phaseSetId: string, userId: string, name: string, phases: Omit<ProgramPhase, 'id' | 'phaseSetId'>[]): Promise<PhaseSetWithPhases>

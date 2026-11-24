@@ -11,9 +11,9 @@ import { prescribedBar } from "@trainingai/shared/workout/load-rounding";
 import { loadLiftPreferences } from "@trainingai/shared/ai-periodization/lift-preference-read";
 import { rateLimit } from "@/lib/rate-limit";
 import { readSessionFromStoredState } from "@trainingai/shared/workout/read-session";
-import type { ExerciseType, ProgramPhase } from "@trainingai/shared/types/program";
+import { NO_PHASE_STATE } from "@/lib/data/repository";
+import type { ExerciseType } from "@trainingai/shared/types/program";
 
-const NO_PHASE_STATE = { phases: [] as ProgramPhase[], sessionCounts: new Map<string, number>() };
 
 export interface NextSessionSetPreview {
   weightKg: number | null;

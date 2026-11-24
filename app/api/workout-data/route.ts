@@ -3,10 +3,8 @@ import { sessionSoreness } from "@trainingai/shared/ai-periodization/session-sor
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { getRepository } from "@/lib/data";
-import type { ProgramPhase } from "@trainingai/shared/types/program";
+import { NO_PHASE_STATE } from "@/lib/data/repository";
 import { todayInTz, shiftDateStr, startOfWeekInTz, DEFAULT_TZ } from "@trainingai/shared/date-utils";
-import { buildAutomaticPhaseStatus } from "@trainingai/shared/phase-engine";
-import { getScheduledSessionsPerWeek } from "@trainingai/shared/schedule-utils";
 import { prescriptionDrivesLoad } from "@trainingai/shared/ai-periodization/apply-prescription";
 import { reevaluatePrescriptionForToday, reevaluationKey, type ReevaluationSignals } from "@trainingai/shared/ai-periodization/reevaluate";
 import { rowNumbersMoved } from "@trainingai/shared/ai-periodization/prescription-figures";
@@ -42,7 +40,6 @@ import { resolveWorkingBasis } from "@trainingai/shared/1rm";
 export type { WorkoutExercise, PhaseStatus, PerSessionPhaseStatus };
 
 // What a program that is not `automatic` has for phases and counts (none are read).
-const NO_PHASE_STATE = { phases: [] as ProgramPhase[], sessionCounts: new Map<string, number>() };
 
 export async function GET(req: NextRequest) {
   try {
@@ -123,17 +120,13 @@ async function handleWorkoutData(req: NextRequest) {
       if (phases.length > 0) {
         const tz = session?.user?.timezone ?? DEFAULT_TZ
         const today = todayInTz(tz)
-        const totalPerWeek = getScheduledSessionsPerWeek(program)
-        const numSessions = Math.max(1, program.sessions.length)
-        const sessionPerWeek = totalPerWeek / numSessions
-
-        perSessionPhaseStatus = program.sessions.map(sess => {
-          const count = sessionCounts.get(sess.id) ?? 0
-          return {
-            sessionId: sess.id,
-            sessionName: sess.name,
-            phaseStatus: buildAutomaticPhaseStatus(phases, count, program, today, sessionPerWeek),
-          }
+        // Each session's status comes from the one resolver the screen, the card and the Coach call (#4114).
+        perSessionPhaseStatus = program.sessions.flatMap(sess => {
+          const status = resolveSessionPhase({
+            program, todayStr: today, allPhases: phases,
+            thisSessionCount: sessionCounts.get(sess.id) ?? 0, periodization: null,
+          }).phaseStatus
+          return status ? [{ sessionId: sess.id, sessionName: sess.name, phaseStatus: status }] : []
         })
 
         // Leader = session furthest through the program (most completedCycles)
