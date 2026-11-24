@@ -67,6 +67,15 @@ function syntheticPhaseStatus(name: 'Baseline' | 'Deload', phaseType: 'baseline'
   }
 }
 
+/**
+ * BF-148 — a stored periodization still reading `baseline && !baselineComplete` means what it says: the
+ * lifter is in the calibration session. The ONE test of it: the screen, the card, the Coach and the
+ * server's own record of a logged lift (`logExerciseFromPayload`) all ask it here.
+ */
+export function isStoredBaseline(periodization: Pick<SessionPeriodization, 'phase' | 'baselineComplete'> | null | undefined): boolean {
+  return periodization?.phase === 'baseline' && !periodization.baselineComplete
+}
+
 /** What phase resolution is told. The same inputs for every reader of a session. */
 export interface SessionPhaseInputs {
   program: Program
@@ -107,10 +116,7 @@ export function resolveSessionPhase(i: SessionPhaseInputs): SessionPhase {
     currentPhase = phaseStatus.phase
   }
 
-  // BF-148 — a row still reading `baseline && !baselineComplete` means what it says.
-  const isAiDynamicBaseline = isAiDynamic
-    && periodization?.phase === 'baseline'
-    && !periodization?.baselineComplete
+  const isAiDynamicBaseline = isAiDynamic && isStoredBaseline(periodization)
 
   const isBaselinePhase = currentPhase?.phaseType === 'baseline' || isAiDynamicBaseline
 

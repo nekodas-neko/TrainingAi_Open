@@ -6,7 +6,7 @@
 import { isDeloadedForEstimate } from '../1rm';
 import { oneRmImplausible } from '@trainingai/shared/validation/plausibility'
 import { aestMidnight, todayInTz, normalizeDateParam, shiftDateStr } from '@trainingai/shared/date-utils';
-import { getCurrentPhase, isDeloadActive } from '@trainingai/shared/phase-engine';
+import { resolveSessionPhase, isStoredBaseline } from '@trainingai/shared/workout/read-session';
 import { estimateOneRm, BW_REF, withPrescribedBars } from '@trainingai/shared/1rm';
 import { computeSetAggregates, computeIntensityPct } from '@trainingai/shared/workout/set-aggregates';
 import { bodyweightSetLoadKg } from '@trainingai/shared/workout/bodyweight-load';
@@ -103,10 +103,16 @@ export async function logExerciseWithRepo(
       const resolvedSessionId = sessionId
         ?? activeProg.sessions.find(x => x.name.toLowerCase() === sessionName.toLowerCase())?.id;
       const thisSessionCount = resolvedSessionId ? (sessionCounts.get(resolvedSessionId) ?? 0) : 0;
-      const { phase } = getCurrentPhase(phaseList, 1, thisSessionCount);
-      currentPhaseId = phase.id;
-      currentPhaseType = phase.phaseType;
-      sessionIsEarlyDeload = isDeloadActive(phase, activeProg, todayStr);
+      // The one phase resolution the screen, the card and the Coach share (#4114): the phase, its type
+      // and whether a deload (the phase's own or a confirmed early week) is active.
+      const { phaseStatus } = resolveSessionPhase({
+        program: activeProg, todayStr, allPhases: phaseList, thisSessionCount, periodization: null,
+      });
+      if (phaseStatus) {
+        currentPhaseId = phaseStatus.phase.id;
+        currentPhaseType = phaseStatus.phase.phaseType;
+        sessionIsEarlyDeload = phaseStatus.isDeloadActive;
+      }
     }
   } else if (activeProgram?.phaseMode === 'ai_dynamic' && sessionId) {
     // getActiveProgramWithPhases only resolves for 'automatic' programs, so it's always null
@@ -132,7 +138,7 @@ export async function logExerciseWithRepo(
       || (intensityMode !== 'full' && periodizationState?.phase === 'deload' && !overriddenToFull);
     if (trainedAsDeload) {
       currentPhaseType = 'deload';
-    } else if (periodizationState?.phase === 'baseline' && !periodizationState.baselineComplete) {
+    } else if (isStoredBaseline(periodizationState)) {
       // TN-75: the same test `workout-data` uses for `isAiDynamicBaseline`, so the server agrees
       // with the screen that this is a calibration session. It is stored as the session's
       // `phase_type`, which is the marker adherence reads need to exclude calibration sets (they
