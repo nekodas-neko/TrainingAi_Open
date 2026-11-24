@@ -439,15 +439,17 @@ export function buildWorkoutExercises(
         if (!aiStyleApplied) defaultSets = onStyle.style.length
         if (onStyle.applied) liftPreference = onStyle.applied
       }
-      // #3890: a deloaded lift's full numbers, which the screen puts back when the person reverts the
-      // deload, carry the week's hold too: a revert never brings a held lift back above its last bar.
-      if (deloaded && preDeloadStyle && pref?.checkinHold && !isBaselinePhase) {
-        const heldFull = liftPreferenceOnStyle(preDeloadStyle, pref, {
-          aiStyleApplied: true, reduced: false, noPreferencePhase: false, aiPlanDeload: !!aiPrescription?.deload,
+      // #3890 / #4087: a deloaded lift's full numbers, which the screen puts back when the person reverts
+      // the deload, carry the lift's preference (rep range, rest) and the week's hold as they are NOW,
+      // whatever the plan recorded and whatever its deload flag or phase: a revert never brings a held
+      // lift back above its last bar, nor outside the reps or rest it was asked to train in. The one-shot
+      // is not applied (a deload never carried it). Idempotent on numbers that already carry them.
+      if (deloaded && preDeloadStyle && pref && !isBaselinePhase) {
+        const restated = applyLiftPreferenceToStyle(preDeloadStyle, { ...pref, oneShot: null }, {
           role: ex.exerciseRole ?? UNCLASSIFIED_EXERCISE_ROLE, bodyweight: bwType === 'bodyweight',
           basisKg: workingBasis.kg, equipment: libEntry?.equipment,
         })
-        if (heldFull) preDeloadStyle = heldFull.style
+        if (restated) preDeloadStyle = restated.style
       }
 
       return {

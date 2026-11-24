@@ -203,6 +203,12 @@ export function recordFullSessionOnModelDeload(
   const setsCap = phaseSetsMax(signals.trainingGoal, fullPhase) ?? Infinity
 
   const bounded = (id: string, full: NonNullable<AiPrescriptionExercise['preDeload']>) => {
+    // In the planned deload week what Full restores is what the whole-session builder restores for the
+    // same program: the program's own numbers, one rule for both builders. They are not clamped into the
+    // deload zone, which would put a 3×6 @ 75 back as 3×6 @ 55. The lift's rep range, rest and the
+    // check-in hold are not in them in that phase (`buildProgramAsWrittenPrescription` applies none of
+    // them there); `buildWorkoutExercises` puts them on what Full restores when it is served.
+    if (fullPhase === 'deload') return full
     const role = roleById.get(id) ?? UNCLASSIFIED_EXERCISE_ROLE
     const sets = Math.max(1, Math.min(full.sets, setsCap))
     // An accessory is held to the goal's own band by the rules that make it, not to the phase's zone
@@ -227,6 +233,7 @@ export function recordFullSessionOnModelDeload(
       ...row,
       deloaded: true,
       deloadNote: row.deloadNote ?? MODEL_DELOAD_NOTE,
+      modelDeload: true as const,
       ...(preDeload && { preDeload }),
     }
   })
@@ -1185,7 +1192,9 @@ async function runPrescriptionGeneration(
 
   // #4087: a deload the model wrote itself applies by itself on the AI plan, so `Full` has to have the
   // program's numbers to put back, as it has on the engine's deloads. Rows stay the model's.
-  const aiPrescription = aiPlan && !engineDeload && builtPrescription.phaseAction === 'deload_recommended' && state.phase !== 'baseline'
+  // The gate is the plan being a deload the model wrote (`deload`: the phase and the action, #3877), not
+  // the action's name, so a `stay` answered in the planned deload week is restorable too.
+  const aiPrescription = aiPlan && !engineDeload && builtPrescription.deload && state.phase !== 'baseline'
     ? recordFullSessionOnModelDeload(builtPrescription, signals, state.phase)
     : builtPrescription
 
