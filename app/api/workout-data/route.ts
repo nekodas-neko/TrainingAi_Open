@@ -221,6 +221,7 @@ async function handleWorkoutData(req: NextRequest) {
       dataDate: string
       aiPrescriptionPending: boolean
       prescriptionSource?: AiPrescription['source']
+      prescriptionGeneratedAt?: string
     }> = {}
 
     for (const programSession of program.sessions) {
@@ -252,6 +253,9 @@ async function handleWorkoutData(req: NextRequest) {
         dataDate: todayStr,
         aiPrescriptionPending: read.aiPrescriptionPending,
         prescriptionSource: read.aiDrivesLoad ? read.aiPrescription!.source : undefined,
+        // #4097: which plan drives the bar. The phone copies the plan at Start and echoes this with the
+        // finish, so the server can tell the plan a workout trained from one made after it started.
+        prescriptionGeneratedAt: read.aiDrivesLoad ? aiPeriodizationState?.prescriptionGeneratedAt?.toISOString() : undefined,
       }
     }
 
@@ -605,6 +609,8 @@ async function handleWorkoutData(req: NextRequest) {
   // program's own (`'rules'`, the model could not be reached) rather than a coached plan. Only
   // while the prescription drives load — one that does not is not what `exercises` shows.
   const prescriptionSource = aiDrivesLoad ? aiPrescription!.source : undefined
+  // #4097: the plan's identity, only while it drives the bar (absent otherwise, so other program kinds are unchanged).
+  const prescriptionGeneratedAt = aiDrivesLoad ? aiPeriodizationState?.prescriptionGeneratedAt?.toISOString() : undefined
 
-  return NextResponse.json({ exercises, program, session: programSession, phaseStatus: sessionPhaseStatus, dataDate: todayStr, aiPrescriptionPending, prescriptionSource }, { headers: cacheHeaders });
+  return NextResponse.json({ exercises, program, session: programSession, phaseStatus: sessionPhaseStatus, dataDate: todayStr, aiPrescriptionPending, prescriptionSource, prescriptionGeneratedAt }, { headers: cacheHeaders });
 }

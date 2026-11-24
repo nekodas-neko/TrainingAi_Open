@@ -275,3 +275,21 @@ describe('resolveCompletedAt', () => {
     expect(resolveCompletedAt(undefined, startedAt, now)).toEqual(now)
   })
 })
+
+// #4097: the finish names the plan the workout was trained on.
+describe('CompleteWorkoutPayloadSchema planGeneratedAt (#4097)', () => {
+  const base = { workoutSessionId: '00000000-0000-4000-8000-000000000001', completedAtMs: 1_795_000_000_000 }
+  it('accepts the identity, and an older build that sends none', async () => {
+    const { CompleteWorkoutPayloadSchema } = await import('../complete-payload')
+    expect(CompleteWorkoutPayloadSchema.parse({ ...base, planGeneratedAt: '2026-10-20T05:00:00.123Z' }).planGeneratedAt).toBe('2026-10-20T05:00:00.123Z')
+    expect('planGeneratedAt' in CompleteWorkoutPayloadSchema.parse(base)).toBe(false)
+  })
+  it('drops anything that is not a timestamp rather than refusing the completion', async () => {
+    const { CompleteWorkoutPayloadSchema } = await import('../complete-payload')
+    for (const bad of ['yesterday', 17, '2026-10-20T05:00:00Z'.repeat(4)]) {
+      const parsed = CompleteWorkoutPayloadSchema.safeParse({ ...base, planGeneratedAt: bad })
+      expect(parsed.success).toBe(true)
+      expect(parsed.success && parsed.data.planGeneratedAt).toBeUndefined()
+    }
+  })
+})

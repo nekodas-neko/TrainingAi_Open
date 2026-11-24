@@ -101,6 +101,9 @@ const workoutSchema = z.object({
   phaseDetail: z.string().nullable().default(null),
   isBaseline: z.boolean(),
   fromSavedPlan: z.boolean(),
+  // #4097: the AI plan this workout was trained on (its `prescription_generated_at`), copied at Start and
+  // sent with the finish. A workout saved before this build reads as having none.
+  planGeneratedAt: z.string().datetime().max(40).nullable().default(null),
   startedAt: timestamp,
   warmupEndedAt: timestamp.nullable().default(null),
   warmupGoalSeconds: z.number().int().positive().default(600),
@@ -433,6 +436,7 @@ export function createWorkout(
     phaseDetail: session.phaseDetail ?? session.phase,
     isBaseline: session.isBaseline,
     fromSavedPlan,
+    planGeneratedAt: session.planGeneratedAt ?? null,
     startedAt: now,
     warmupEndedAt: null,
     warmupGoalSeconds:
@@ -530,6 +534,8 @@ export function mutationFor(
       payload: CompleteWorkoutPayloadSchema.parse({
         workoutSessionId: workout.id,
         completedAtMs: workout.completedAt,
+        // #4097: which plan the workout was trained on, since the server may have replaced it meanwhile.
+        ...(workout.planGeneratedAt ? { planGeneratedAt: workout.planGeneratedAt } : {}),
         // Only a workout that was paused says so: the rest stay as they were before pause existed.
         ...(workout.pausedMs > 0 ? { pausedSec: Math.round(workout.pausedMs / 1000) } : {}),
       }),

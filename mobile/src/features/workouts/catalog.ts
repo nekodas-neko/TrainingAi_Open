@@ -63,6 +63,12 @@ export type SessionPreview = {
   exercises: ExercisePreview[];
   phase: string | null;
   prescriptionPending: boolean;
+  /**
+   * #4097: `prescription_generated_at` of the AI plan that drives this session's numbers, as the server served
+   * it. Copied into the workout at Start and sent with the finish, so the server knows which plan was trained.
+   * Null when no AI plan drives it (and from a server that does not send it).
+   */
+  planGeneratedAt?: string | null;
   isBaseline: boolean;
   icon?: string | null;
   phaseDetail?: string | null;
@@ -441,6 +447,7 @@ export function buildCatalog(
         exercises,
         phase,
         prescriptionPending: data.aiPrescriptionPending,
+        planGeneratedAt: oneShotTime(data.prescriptionGeneratedAt),
         isBaseline: data.phaseStatus != null && object(data.phaseStatus).isBaseline === true,
         icon: optionalText(session.icon),
         phaseDetail,
@@ -559,6 +566,7 @@ export function readSavedCatalog(
         ) {
           throw new Error('Invalid saved prescription status.');
         }
+        session.planGeneratedAt = oneShotTime(session.planGeneratedAt);
         const exercises = array(session.exercises);
         unique(
           exercises.map((value) => {

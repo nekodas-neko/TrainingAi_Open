@@ -143,7 +143,19 @@ export async function completeWorkoutWithRepo(
     // session actually ran under a prescription — an advisory signal, must never fail
     // completion.
     const periodizationState = await repo.getSessionPeriodization(userId, programSessionId).catch(() => null)
+    // #4097: a Preview workout is uploaded only at its finish, so the stored plan may no longer be the one it
+    // was trained on: voided by another type's phase move (no plan, status 'consumed'), or replaced by a plan
+    // made after Start. The phone says which plan it trained (`planGeneratedAt`), and a workout that trained one
+    // ran a prescription whatever is stored now. The rep-completion read of this session (signals.ts) is gated
+    // on it. Everything else a finish records (the sets' planned reps, weights and %, the 1RM, the deload
+    // flag) comes from the numbers the phone sent per set, never from the stored plan, so it is unaffected.
+    // The stored plan, whichever one it is, is still spent below: a session of this type has just been trained
+    // and the next plan must be made with it.
+    const trainedPlanAt = payload.planGeneratedAt ? new Date(payload.planGeneratedAt) : null
+    const trainedAServedPlan = trainedPlanAt != null && !Number.isNaN(trainedPlanAt.getTime()) &&
+      trainedPlanAt.getTime() <= completedAt.getTime() + COMPLETED_AT_FUTURE_TOLERANCE_MS
     const ranPrescription =
+      trainedAServedPlan ||
       periodizationState?.prescriptionStatus === 'accepted' ||
       periodizationState?.prescriptionStatus === 'auto_applied' ||
       (periodizationState?.prescriptionStatus === 'pending' && periodizationState?.prescription != null)
