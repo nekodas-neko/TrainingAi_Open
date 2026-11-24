@@ -96,15 +96,17 @@ function makeRepo(kind: Kind, rows: Map<string, LiftPreferenceRow>, phase: strin
   }
   if (withGuard) {
     // What the adapter does in its transaction: read the rows again, stamp them, compare, store.
-    extra.storePrescriptionIfPreferencesUnchanged = async (
-      _u: string, _s: string, p: AiPrescription, _e: Date, _st: string, _g: unknown, guard: { names: string[]; weekStart: string; stamp: string },
+    extra.storePrescriptionForCurrentPreferences = async (
+      _u: string, _s: string, p: AiPrescription, _e: Date, _st: string, _g: unknown,
+      guard: { names: string[]; weekStart: string; stamp: string; finalize: (p: AiPrescription) => AiPrescription },
     ) => {
       guardCalls.n++
       const { prefs, held } = preferencesFromRows(read(guard.names, guard.weekStart), guard.weekStart)
       for (const name of held) withCheckinHold(prefs, name, guard.weekStart, null)
-      if (liftPreferencesStamp(prefs, guard.names) !== guard.stamp) return 'preferences_moved'
-      stored.push(p)
-      return 'stored'
+      // Nothing moved in this differential, so the restate is never reached.
+      if (liftPreferencesStamp(prefs, guard.names) !== guard.stamp) throw new Error('preferences moved in a case that has no change')
+      stored.push(guard.finalize(p))
+      return { stored: true, prescription: p }
     }
   }
   void week

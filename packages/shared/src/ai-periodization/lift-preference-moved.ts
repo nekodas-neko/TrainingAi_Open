@@ -5,8 +5,8 @@
  * plan built from what it read. A change made meanwhile (the Coach, the rep-range editor, a check-in save
  * or undo) restates the STORED plan at once, and the generator's store then replaced it with a plan built
  * from the old preferences. The store now re-reads the preferences inside the per-user lift-write lock
- * (`storePrescriptionIfPreferencesUnchanged`, `lib/data/postgres/slices/periodization.ts`) and, when they are
- * not the ones the plan was built from, the plan is restated here before it is stored again. No lock is
+ * (`storePrescriptionForCurrentPreferences`, `lib/data/postgres/slices/periodization.ts`) and, when they are
+ * not the ones the plan was built from, the plan is restated here and stored in the same transaction. No lock is
  * held across the model call, and no model call is repeated.
  *
  * The restate is the one the stored plan would have had had the change landed just after the store:

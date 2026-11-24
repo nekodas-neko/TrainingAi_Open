@@ -10,6 +10,7 @@ import { normalizeMuscle } from '@trainingai/shared/muscles'
 import { holdsOneDayDeload } from '@trainingai/shared/ai-periodization/one-day-deload'
 import { preferencesFromRows, withCheckinHold } from '@trainingai/shared/ai-periodization/lift-preference-read'
 import { liftPreferencesStamp } from '@trainingai/shared/ai-periodization/lift-preference-moved'
+import type { LiftPreference } from '@trainingai/shared/ai-periodization/lift-preference'
 import { readExercisePreferenceRows } from './exercise-preferences'
 import { slotHoldsPlan } from '@trainingai/shared/ai-periodization/plan-status'
 import { sessionUnderWayCutoff } from '@trainingai/shared/ai-periodization/session-under-way'
@@ -121,7 +122,13 @@ export async function ensureSessionPeriodization(db: Db, userId: string, program
 
 /** #4098: `read: true` is a caller on a READ path: it skips its repair when the lock is not free (`BusyError`)
  *  instead of waiting the write's 4 s. A write leaves it off. */
-export type LockMode = { read?: boolean }
+export type LockMode = {
+  read?: boolean
+  /** #4007: write the "gave up on a lock" row only when this person has none in the last N ms. A generation's
+   *  store sets it (30 s, the route's limit): the generation may already have written that row for its
+   *  earlier wait, and one busy request is one row. Other writers leave it off and write one row each. */
+  reportOncePerMs?: number
+}
 
 /**
  * #4098 review: a write that a READ path reaches (a repair or a cached value: adopting a pending plan, voiding
@@ -187,10 +194,18 @@ export async function withProgramWriteLock<T>(db: Db, userId: string, run: (tx: 
       // through `@/lib/data`, which would make this slice import its own composition root (as `oura.ts`'s
       // `recordPruneFailure`). Only the code and a fixed text, never the failed statement's parameters.
       const code = [err, (err as { cause?: unknown })?.cause].map(e => (e as { code?: unknown } | null)?.code).find(c => typeof c === 'string')
-      trackPendingWrite(db.insert(s.errorEvents).values({
-        userId, source: 'server', message: `program write gave up on a lock (${code ?? 'lock wait'}); nothing was written`,
-        stack: null, url: 'periodization/program-write', userAgent: null,
-      }).catch(e => console.error('[periodization] could not record the busy write:', e)))
+      const message = `program write gave up on a lock (${code ?? 'lock wait'}); nothing was written`
+      const once = mode.reportOncePerMs
+      trackPendingWrite((once == null
+        ? db.insert(s.errorEvents).values({ userId, source: 'server', message, stack: null, url: 'periodization/program-write', userAgent: null })
+        : db.execute(sql`
+            INSERT INTO error_events (user_id, source, message, url)
+            SELECT ${userId}::uuid, 'server', ${message}::text, 'periodization/program-write'
+            WHERE NOT EXISTS (
+              SELECT 1 FROM error_events
+              WHERE user_id = ${userId} AND message = ${message} AND url = 'periodization/program-write'
+                AND created_at > now() - make_interval(secs => ${once / 1000}))`)
+      ).catch(e => console.error('[periodization] could not record the busy write:', e)))
       throw new BusyError()
     }
     throw err
@@ -762,37 +777,50 @@ function storePrescriptionRow(
 }
 
 /**
- * #4007: a generation's store that refuses a plan whose lift preferences have moved since it read them.
+ * #4007: a generation's store that keeps the lift preferences in force at the moment it commits.
  *
  * Generation reads the session's lift preferences at its start, then calls the model for seconds, then
  * stores. A lift change landing in between (the Coach, the rep-range editor, a check-in save or undo)
  * restates the stored plan at once, and a plain store then replaced that with a plan built from the old
- * preferences. Holding the lift lock across the model call would queue the person's own taps behind a
- * generation, so the lock is taken only here, AFTER the model: in one short transaction (`withProgramWriteLock`:
- * the per-user lift lock first, then `lock_timeout` 4 s for the row wait, nothing slower than two selects
- * and one UPDATE inside), the lifts' preferences are read again, and compared with the stamp the plan was
- * built from (`liftPreferencesStamp`). Equal: the plan is stored, by the same statement as `storePrescription`.
- * Not equal: nothing is written and the caller restates its plan for the current preferences
- * (`restateForMovedPreferences`) and stores again. A wait past the bound is a `BusyError` (nothing written),
- * which the caller answers by storing the plan as before: the paid plan is never lost (docs/lift-write-lock-order.md).
+ * preferences. Holding the lift lock across the MODEL call would queue the person's own taps behind a
+ * generation, so the lock is taken only here, after it, in one transaction (`withProgramWriteLock`: the
+ * per-user lift lock first, then `lock_timeout` 4 s for the row wait):
+ *   1. the lifts' preferences are read again (a plain select) and compared with the stamp the plan was built from;
+ *   2. when they moved, `restate` (the caller's, no model call: plain selects for the bases, then a pure
+ *      function) gives the plan IT MADE for the preferences now in force;
+ *   3. the plan is stored by the same statement as `storePrescription`.
+ * No writer can move a preference while the lock is held, so there is no loop: what is stored always matches
+ * what is in force when it commits, however many changes were made meanwhile.
  *
- * A writer that holds the lift lock commits its preference row and its restated plan together, so this
- * transaction sees either both or neither; the same lock is what keeps a writer from changing a preference
- * between the read here and the store.
+ * A re-read that fails throws (nothing is written; the caller stores the plan as generated). A `restate` that
+ * fails stores the plan as generated, under the same lock, and logs once. A wait past the bound is a
+ * `BusyError` (nothing written); its error row is skipped when the request already wrote one.
  */
-export async function storePrescriptionIfPreferencesUnchanged(
+export async function storePrescriptionForCurrentPreferences(
   db: Db, userId: string, programSessionId: string, prescription: AiPrescription, expiresAt: Date,
   status: PrescriptionStatus, generatedFor: GeneratedFor | undefined,
-  guard: { names: string[]; weekStart: string; stamp: string },
-): Promise<'stored' | 'not_stored' | 'preferences_moved'> {
+  guard: {
+    names: string[]; weekStart: string; stamp: string
+    /** What is stored for a plan (the generation's derived extras added); the answer is the plan without them. */
+    finalize: (plan: AiPrescription) => AiPrescription
+    restate: (current: { prefs: Map<string, LiftPreference>; held: string[] }) => Promise<AiPrescription>
+  },
+): Promise<{ stored: boolean; prescription: AiPrescription }> {
   return withProgramWriteLock(db, userId, async tx => {
     const rows = await readExercisePreferenceRows(tx as unknown as Db, userId, guard.names, undefined, guard.weekStart)
     const { prefs, held } = preferencesFromRows(rows, guard.weekStart)
     for (const name of held) withCheckinHold(prefs, name, guard.weekStart, null)
-    if (liftPreferencesStamp(prefs, guard.names) !== guard.stamp) return 'preferences_moved' as const
-    return (await storePrescriptionRow(tx as unknown as Db, userId, programSessionId, prescription, expiresAt, status, generatedFor)).length > 0
-      ? 'stored' as const : 'not_stored' as const
-  })
+    let plan = prescription
+    if (liftPreferencesStamp(prefs, guard.names) !== guard.stamp) {
+      try {
+        plan = await guard.restate({ prefs, held })
+      } catch (err) {
+        console.error('[prescribe] restating the plan for lift preferences that moved failed; storing it as generated:', err)
+      }
+    }
+    const done = (await storePrescriptionRow(tx as unknown as Db, userId, programSessionId, guard.finalize(plan), expiresAt, status, generatedFor)).length > 0
+    return { stored: done, prescription: plan }
+  }, { reportOncePerMs: 30_000 })
 }
 
 // Void the cached AI prescription for every session in a program, WITHOUT resetting

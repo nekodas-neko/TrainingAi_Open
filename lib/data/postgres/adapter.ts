@@ -8706,7 +8706,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   }
 
   async storePrescription(userId: string, programSessionId: string, prescription: AiPrescription, expiresAt: Date, status?: PrescriptionStatus, generatedFor?: import('@trainingai/shared/types/ai-periodization').PrescriptionGeneratedFor, mode?: { read?: boolean }) { return period.storePrescription(this.db, userId, programSessionId, prescription, expiresAt, status, generatedFor, mode) }
-  async storePrescriptionIfPreferencesUnchanged(userId: string, programSessionId: string, prescription: AiPrescription, expiresAt: Date, status: PrescriptionStatus, generatedFor: import('@trainingai/shared/types/ai-periodization').PrescriptionGeneratedFor | undefined, guard: { names: string[]; weekStart: string; stamp: string }) { return period.storePrescriptionIfPreferencesUnchanged(this.db, userId, programSessionId, prescription, expiresAt, status, generatedFor, guard) }
+  async storePrescriptionForCurrentPreferences(userId: string, programSessionId: string, prescription: AiPrescription, expiresAt: Date, status: PrescriptionStatus, generatedFor: import('@trainingai/shared/types/ai-periodization').PrescriptionGeneratedFor | undefined, guard: Parameters<typeof period.storePrescriptionForCurrentPreferences>[7]) { return period.storePrescriptionForCurrentPreferences(this.db, userId, programSessionId, prescription, expiresAt, status, generatedFor, guard) }
   async getSessionStructureStamp(userId: string, programSessionId: string) { return period.getSessionStructureStamp(this.db, userId, programSessionId) }
   // One repeatable-read snapshot: both reads see the database as of the first (#3927).
   async getActiveProgramWithStructureStamp(userId: string, programSessionId: string) {
