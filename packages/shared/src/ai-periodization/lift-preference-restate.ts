@@ -24,8 +24,9 @@
 import {
   applyLiftPreferenceToPlanRow, applyPlanSetsDelta, roleLoadCapPct, type PlanPreferenceCtx,
 } from './lift-preference-plan'
-import { pctOnePlateStep, type LiftPreference } from './lift-preference'
-import type { AppliedLiftPreference } from '../types/ai-periodization'
+import { pctOnePlateStep, preferenceAppliesIn, type LiftPreference } from './lift-preference'
+import { rewriteHeldRow, sameHoldRecord } from './checkin-plan-hold'
+import type { AiPrescription, AppliedLiftPreference, PeriodizationPhase } from '../types/ai-periodization'
 
 export interface RestatableRow {
   sets: number
@@ -87,6 +88,58 @@ export function restatePlanRow<R extends RestatableRow>(row: R, pref: LiftPrefer
 function sameRow(a: RestatableRow, b: RestatableRow): boolean {
   return a.sets === b.sets && a.reps === b.reps && a.pct === b.pct && a.restSec === b.restSec
     && JSON.stringify(a.liftPreference ?? null) === JSON.stringify(b.liftPreference ?? null)
+}
+
+/** A plan a preference never applies in: a deload, or the baseline test (design §3a). */
+export function planExcluded(plan: { phase: PeriodizationPhase; prescription: AiPrescription }): 'deload' | 'baseline' | null {
+  const deload = plan.prescription.deload === true || plan.prescription.phase === 'deload'
+  const baseline = plan.phase === 'baseline'
+  if (preferenceAppliesIn({ deload, baseline })) return null
+  return baseline ? 'baseline' : 'deload'
+}
+
+/** What `restatePlan` needs of one lift: its slots in the plan's session, and the facts its rows are costed from. */
+export interface RestateInputs {
+  slots: readonly { programSessionId: string; sessionExerciseId: string; role: string }[]
+  trainingGoal: string
+  bodyweight: boolean
+  basisKg: number | null
+  equipment: string[] | null
+}
+
+/**
+ * The plan as generation would store it with `pref`, or the same object when nothing changes. The one
+ * function that restates a whole stored plan for ONE lift's changed preference: the Coach's preview and
+ * apply call it (`lib/coach/domains/lift-preference.ts`), and so does a generation that finds a lift's
+ * preference moved while the model was answering (`restateForMovedPreferences`, #4007).
+ */
+export function restatePlan(ctx: RestateInputs, plan: { programSessionId: string; phase: PeriodizationPhase; prescription: AiPrescription }, pref: LiftPreference | null): AiPrescription {
+  if (planExcluded(plan)) return plan.prescription
+  const slotIds = new Map(ctx.slots.filter(x => x.programSessionId === plan.programSessionId).map(x => [x.sessionExerciseId, x.role]))
+  let changed = false
+  // #3890: a row the weekly check-in's hold lowered is restated from its own load, with the hold's
+  // ceiling put back over it (`rewriteHeldRow`), so the plan is still held and still knows its own load.
+  const hold = plan.prescription.checkinHold
+  const heldRows: NonNullable<AiPrescription['checkinHold']>['rows'] = { ...hold?.rows }
+  const exercises = plan.prescription.exercises.map(ex => {
+    const role = slotIds.get(ex.sessionExerciseId)
+    if (!role) return ex
+    const { row: out, held } = rewriteHeldRow(ex, hold, row => restatePlanRow(row, pref, {
+      trainingGoal: ctx.trainingGoal, phase: plan.prescription.phase, role,
+      bodyweight: ctx.bodyweight, basisKg: ctx.basisKg, equipment: ctx.equipment,
+      budgetHeldRest: plan.prescription.refitBaseline?.restSec?.[ex.sessionExerciseId] != null,
+    }))
+    if (hold?.rows[ex.sessionExerciseId]) {
+      if (held) heldRows[ex.sessionExerciseId] = held
+      else delete heldRows[ex.sessionExerciseId]
+    }
+    if (out !== ex) changed = true
+    return out
+  })
+  if (hold && !sameHoldRecord({ ...hold, rows: heldRows }, hold)) changed = true
+  if (!changed) return plan.prescription
+  const { checkinHold: _hold, ...rest } = plan.prescription
+  return { ...rest, exercises, ...(hold && Object.keys(heldRows).length > 0 && { checkinHold: { ...hold, rows: heldRows } }) }
 }
 
 /**

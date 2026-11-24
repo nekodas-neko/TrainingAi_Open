@@ -86,6 +86,19 @@ export async function listExercisePreferences(
   for (const r of (expired?.rows ?? []) as { exercise_name: string; set_ms: number }[]) {
     cleared?.push({ exerciseName: r.exercise_name, setAtMs: Number(r.set_ms) })
   }
+  return readExercisePreferenceRows(db, userId, exerciseNames, stale, checkinWeekStart)
+}
+
+/**
+ * The select half of `listExercisePreferences`: the user's live preferences for these lifts, with no
+ * clear and no write. The generation's store re-reads through it inside its transaction (#4007), so the
+ * rows it compares are the rows the start of the generation read, by the one query.
+ */
+export async function readExercisePreferenceRows(
+  db: Db, userId: string, exerciseNames: string[], stale?: ClearedOneShot[], checkinWeekStart?: string,
+): Promise<Map<string, LiftPreferenceRow>> {
+  const out = new Map<string, LiftPreferenceRow>()
+  if (exerciseNames.length === 0) return out
   const held = checkinWeekStart ? checkinHeldCondition(userId, checkinWeekStart, sql`lifts.lift`, sql`lifts.lib_id`) : null
   const res = await db.execute(sql`
     WITH lifts AS (

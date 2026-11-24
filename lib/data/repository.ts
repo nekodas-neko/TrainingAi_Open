@@ -1474,6 +1474,17 @@ export interface WorkoutRepository {
    *  `generatedFor`, stored only while the slot is still in that phase and start (#3766), and while
    *  the session's structure stamp still matches when one is given (#3895); false if not. */
   storePrescription(userId: string, programSessionId: string, prescription: AiPrescription, expiresAt: Date, status?: PrescriptionStatus, generatedFor?: import('@trainingai/shared/types/ai-periodization').PrescriptionGeneratedFor, mode?: { read?: boolean }): Promise<boolean>
+  /** #4007: `storePrescription` that stores the plan for the lift preferences in force when it commits. Under the per-user
+   *  lift-write lock, in one transaction, the lifts' preferences and check-in holds are read again and compared with
+   *  `guard.stamp` (`liftPreferencesStamp`); when they moved, `guard.restate` (no model call) gives the plan restated for them,
+   *  and that plan is stored before the lock is released. Answers whether the row was stored and the plan it holds. A failed
+   *  re-read or a wait past the lock's bound throws (`BusyError`) with nothing written. Optional: a repository without it stores as before. */
+  storePrescriptionForCurrentPreferences?(userId: string, programSessionId: string, prescription: AiPrescription, expiresAt: Date, status: PrescriptionStatus, generatedFor: import('@trainingai/shared/types/ai-periodization').PrescriptionGeneratedFor | undefined, guard: {
+    names: string[]; weekStart: string; stamp: string
+    /** What is stored for a plan (the generation's derived extras added); the answer is the plan without them. */
+    finalize: (plan: AiPrescription) => AiPrescription
+    restate: (current: { prefs: Map<string, import('@trainingai/shared/ai-periodization/lift-preference').LiftPreference>; held: string[] }) => AiPrescription
+  }): Promise<{ stored: boolean; prescription: AiPrescription }>
   /** #3895: a stamp of what the session's plan is made from (budget and live exercises), read at a
    *  generation's start and re-checked by `storePrescription`. Null when the session is not the user's. */
   getSessionStructureStamp(userId: string, programSessionId: string): Promise<string | null>
