@@ -11,7 +11,7 @@ import { randomUUID } from 'crypto'
 import { rejectMealImage, mealImageRejectionMessage, FOOD_ITEM_IMAGE_MAX_BYTES } from '@trainingai/shared/nutrition/meal-image'
 import { normalizeEmail } from '@trainingai/shared/validation/email'
 import { QUANTITY_MULTIPLIER_MIN, QUANTITY_MULTIPLIER_MAX, quantityMultiplierInRange } from '@trainingai/shared/nutrition/quantity-bounds'
-import { NotFoundError, UserFacingError } from '@trainingai/shared/errors'
+import { NotFoundError, UserFacingError, isBusyError } from '@trainingai/shared/errors'
 import { eq, and, or, inArray, notInArray, gt, gte, lt, lte, asc, desc, sql, ne, isNotNull, isNull, getTableColumns } from 'drizzle-orm'
 import { getDb, getPool } from './client'
 import { repointStoredExerciseNames, lockCollidingLiftWrites } from './exercise-name-tables'
@@ -8704,7 +8704,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     })
   }
 
-  async storePrescription(userId: string, programSessionId: string, prescription: AiPrescription, expiresAt: Date, status?: PrescriptionStatus, generatedFor?: import('@trainingai/shared/types/ai-periodization').PrescriptionGeneratedFor) { return period.storePrescription(this.db, userId, programSessionId, prescription, expiresAt, status, generatedFor) }
+  async storePrescription(userId: string, programSessionId: string, prescription: AiPrescription, expiresAt: Date, status?: PrescriptionStatus, generatedFor?: import('@trainingai/shared/types/ai-periodization').PrescriptionGeneratedFor, mode?: { read?: boolean }) { return period.storePrescription(this.db, userId, programSessionId, prescription, expiresAt, status, generatedFor, mode) }
   async getSessionStructureStamp(userId: string, programSessionId: string) { return period.getSessionStructureStamp(this.db, userId, programSessionId) }
   // One repeatable-read snapshot: both reads see the database as of the first (#3927).
   async getActiveProgramWithStructureStamp(userId: string, programSessionId: string) {
@@ -8717,7 +8717,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   }
   async clearProgramPrescriptions(userId: string, programId: string) { return period.clearProgramPrescriptions(this.db, userId, programId) }
   async updatePrescriptionStatus(userId: string, programSessionId: string, status: PrescriptionStatus) { return period.updatePrescriptionStatus(this.db, userId, programSessionId, status) }
-  async voidSessionPrescription(userId: string, programSessionId: string) { return period.voidSessionPrescription(this.db, userId, programSessionId) }
+  async voidSessionPrescription(userId: string, programSessionId: string, mode?: { read?: boolean }) { return period.voidSessionPrescription(this.db, userId, programSessionId, mode) }
   async listUnfinishedLoggedSessions(userId: string, lastSetSince: Date) { return period.listUnfinishedLoggedSessions(this.db, userId, lastSetSince) }
   async adoptPendingPrescription(userId: string, programSessionId: string, generatedAt: Date, status: PrescriptionStatus, expiresAt: Date) { return period.adoptPendingPrescription(this.db, userId, programSessionId, generatedAt, status, expiresAt) }
   async updatePrescriptionExercisesCache(userId: string, programSessionId: string, prescription: AiPrescription) { return period.updatePrescriptionExercisesCache(this.db, userId, programSessionId, prescription) }
@@ -8752,9 +8752,11 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         const key = `${c.exerciseName}\u0000${Math.round(c.setAtMs)}`
         return seen.has(key) ? false : (seen.add(key), true)
       }).slice(0, MAX_RESTATES_PER_READ)
-      for (const c of work) await this.restateSpentOneShot(userId, c.exerciseName, new Date(c.setAtMs))
+      // #4098 review: a read's restate waits for a plan row at most `readLockWait`; the first miss ends the loop
+      // (a held row means the rest would wait too) and the next read restates what is left.
+      for (const c of work) await this.restateSpentOneShot(userId, c.exerciseName, new Date(c.setAtMs), { read: true })
     } catch (err) {
-      console.error('[lift-preference] restating stored plans with a spent one-shot failed:', err)
+      if (!isBusyError(err)) console.error('[lift-preference] restating stored plans with a spent one-shot failed:', err)
     }
     return out
   }
@@ -8763,11 +8765,12 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
    *  that spent the step must not fail on it. It runs on no transaction of its own, so no path holds one
    *  pooled connection while another is awaited: each read and each guarded plan update is a short
    *  statement on the pool, and a plan changed since it was read is left alone by its own guard. */
-  private async restateSpentOneShot(userId: string, exerciseName: string, spentAt: Date) {
+  private async restateSpentOneShot(userId: string, exerciseName: string, spentAt: Date, mode: { read?: boolean } = {}) {
     try {
       const { restateSpentOneShot } = await import('@/lib/coach/domains/lift-preference')
-      await restateSpentOneShot(this.db, this, userId, exerciseName, spentAt)
+      await restateSpentOneShot(this.db, this, userId, exerciseName, spentAt, mode)
     } catch (err) {
+      if (mode.read && isBusyError(err)) throw err
       console.error('[lift-preference] restating stored plans after a spent one-shot failed:', err)
     }
   }

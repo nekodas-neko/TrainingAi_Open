@@ -1464,7 +1464,7 @@ export interface WorkoutRepository {
   /** `status` is written atomically with the prescription — see the slice for why (Q-54). With
    *  `generatedFor`, stored only while the slot is still in that phase and start (#3766), and while
    *  the session's structure stamp still matches when one is given (#3895); false if not. */
-  storePrescription(userId: string, programSessionId: string, prescription: AiPrescription, expiresAt: Date, status?: PrescriptionStatus, generatedFor?: import('@trainingai/shared/types/ai-periodization').PrescriptionGeneratedFor): Promise<boolean>
+  storePrescription(userId: string, programSessionId: string, prescription: AiPrescription, expiresAt: Date, status?: PrescriptionStatus, generatedFor?: import('@trainingai/shared/types/ai-periodization').PrescriptionGeneratedFor, mode?: { read?: boolean }): Promise<boolean>
   /** #3895: a stamp of what the session's plan is made from (budget and live exercises), read at a
    *  generation's start and re-checked by `storePrescription`. Null when the session is not the user's. */
   getSessionStructureStamp(userId: string, programSessionId: string): Promise<string | null>
@@ -1483,7 +1483,7 @@ export interface WorkoutRepository {
    *  is still that plan (`pending`, generated at `generatedAt`). True when it wrote. */
   adoptPendingPrescription?(userId: string, programSessionId: string, generatedAt: Date, status: PrescriptionStatus, expiresAt: Date): Promise<boolean>
   /** #3766: void one session's stored plan so the next open regenerates it. */
-  voidSessionPrescription(userId: string, programSessionId: string): Promise<void>
+  voidSessionPrescription(userId: string, programSessionId: string, mode?: { read?: boolean }): Promise<void>
   updatePrescriptionExercisesCache(userId: string, programSessionId: string, prescription: AiPrescription): Promise<void>
   /** #3890: replace the stored plan only while it is still exactly `before`. True when it wrote.
    *  Optional: a repository without it serves stored plans as they are (no check-in hold). */

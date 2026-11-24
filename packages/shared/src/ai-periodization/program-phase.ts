@@ -525,7 +525,8 @@ export interface ProgramPhaseRepo {
   /** Under the program's row lock, puts every phased row on `decide(lockedRows)` (nothing when
    *  null); only rows that differed lose their plans. */
   realignProgramPhase(userId: string, programId: string, decide: DecideTarget, mode?: { read?: boolean }): Promise<void>
-  voidSessionPrescription(userId: string, programSessionId: string): Promise<void>
+  /** `mode.read` (#4098): from a read path, the row wait is bounded and a miss skips the void. */
+  voidSessionPrescription(userId: string, programSessionId: string, mode?: { read?: boolean }): Promise<void>
 }
 
 /** While a program waits for its switch-over, an unanswered per-type move offer from before the
@@ -570,7 +571,7 @@ export async function syncProgramPhase(
   }
   if (plan.kind === 'waiting') {
     if (plan.stamp) await whenFree(() => repo.setProgramPendingTransition(userId, programId, waitingStampFor(completions, tz, now), mode))
-    for (const r of phasedRows(rows).filter(staleTypeMoveOffer)) await repo.voidSessionPrescription(userId, r.programSessionId)
+    for (const r of phasedRows(rows).filter(staleTypeMoveOffer)) await repo.voidSessionPrescription(userId, r.programSessionId, mode)
   }
   if (plan.kind === 'realign' || plan.kind === 'switch') {
     if (plan.kind === 'realign') await whenFree(() => repo.realignProgramPhase(userId, programId, realignTargetFor(completions, tz, now), mode))

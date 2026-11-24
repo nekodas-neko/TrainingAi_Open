@@ -171,6 +171,9 @@ export async function refitPrescriptionToBudget(
     state.prescriptionExpiresAt ?? new Date(Date.now() + 7 * 86_400_000),
     state.prescriptionStatus,
     { phase: state.phase, phaseStartedAt: state.phaseStartedAt, structure },
+    // #4098 review: the weekly check-in's fit is made by a READ (`fitStoredPlanToCheckinBudget`): its store waits
+    // for a row at most `readLockWait` and a miss serves the plan as stored (`session_changed`).
+    checkin ? { read: true } : undefined,
   )
   if (!stamped) return { ok: false, reason: 'session_changed' }
 
