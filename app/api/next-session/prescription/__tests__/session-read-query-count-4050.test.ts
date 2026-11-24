@@ -32,7 +32,8 @@ type Kind = keyof typeof U
 const CEILING: Record<'screen' | 'card' | 'coach', Record<Kind, number>> = {
   // main before #4050: screen 14 / 19 / 21, card 15 / 20 / 36, coach 15 / 20 / 11 (manual / automatic / AI-planned).
   screen: { manual: 14, automatic: 15, ai: 21 },
-  card: { manual: 15, automatic: 16, ai: 36 },
+  // #4019 item 2: the card re-evaluates a driving plan against today's soreness and injuries as the screen does: +4 statements (3 more when the inputs changed).
+  card: { manual: 15, automatic: 16, ai: 40 },
   coach: { manual: 15, automatic: 16, ai: 11 },
 }
 

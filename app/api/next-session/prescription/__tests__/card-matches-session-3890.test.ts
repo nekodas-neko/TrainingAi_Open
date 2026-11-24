@@ -38,6 +38,9 @@ const repo = {
   getLastRealOneRmBatch: vi.fn(async (_u: string, names: string[]) => new Map(names.map(n => [n, { estimated1rm: 100, target80: 80 }]))),
   listPersonalRecords: vi.fn(async () => new Map()),
   getExerciseEstimates: vi.fn(async () => []),
+  // The card re-evaluates a plan that drives the load against today's signals, as the screen does (#4019).
+  getMoodLog: async () => null, getDayCheckin: async () => null, listInjuries: async () => [],
+  getRecentSessionsOfType: async () => [], getExerciseMuscleAssignments: async () => ({}), getOuraDailyDerived: async () => [],
   getSessionPeriodization: vi.fn(async () => data.periodization),
   listExercisePreferences: vi.fn(async (_u: string, names: string[], o?: { checkinWeekStart?: string }) =>
     new Map([...data.prefs].filter(([n]) => names.includes(n)).map(([n, r]) =>
