@@ -83,12 +83,21 @@ export function Sheet({
   const dismissed = useRef(onDismiss);
   dismissed.current = onDismiss;
   const alive = useRef(true);
+  const notifyOnFinish = useRef(false);
   const animation = useRef<Animated.CompositeAnimation | null>(null);
   useEffect(() => {
     alive.current = true;
     return () => {
       alive.current = false;
       animation.current?.stop();
+      // A screen kept alive but hidden (`RetainedView`) runs this cleanup too, and no effect runs
+      // again until it is shown. Left presented, the Modal stays up over whatever screen opened
+      // next, with `closing` set so neither Back nor the scrim can dismiss it. Dropped here, it
+      // goes with its screen; shown again, the visibility effect presents it afresh if still open.
+      setPresented(false);
+      setModalShown(false);
+      if (closing.current && notifyOnFinish.current) closeAction.current();
+      notifyOnFinish.current = false;
     };
   }, []);
   useEffect(() => {
@@ -112,10 +121,12 @@ export function Sheet({
   function dismiss(notify = true) {
     if (closing.current) return;
     closing.current = true;
+    notifyOnFinish.current = notify;
     Keyboard.dismiss();
     animation.current?.stop();
     const finish = () => {
       if (!alive.current) return;
+      notifyOnFinish.current = false;
       setPresented(false);
       setModalShown(false);
       if (notify) closeAction.current();
