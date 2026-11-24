@@ -71,6 +71,24 @@ describe.skipIf(!canRun)('getProgramPhaseState equals the two reads it replaces 
     expect(one.sessionCounts.size).toBe(2)
   })
 
+  it('counts the same rows when the stored anchor carries microseconds', async () => {
+    // The older read sends the anchor through a JS Date (milliseconds), so a workout that started
+    // inside the anchor's own millisecond is after it there. The single statement must agree.
+    const before = (await pool.query(`SELECT cycle_anchor_at::text AS at FROM programs WHERE id = $1`, [program])).rows[0].at as string
+    await pool.query(`UPDATE programs SET cycle_anchor_at = '2026-11-01 02:00:00.000900+00' WHERE id = $1`, [program])
+    const { rows: [w] } = await pool.query(
+      `INSERT INTO workout_sessions (user_id, session_id, session_name, started_at) VALUES ($1,$2,'Pull','2026-11-01 02:00:00.000500+00') RETURNING id`, [A, pull])
+    try {
+      const one = await slice.getProgramPhaseState(db, A, program)
+      const two = await both(A, program)
+      expect(one.sessionCounts).toEqual(two.sessionCounts)
+      expect(two.sessionCounts.get(pull)).toBe(2)
+    } finally {
+      await pool.query(`DELETE FROM workout_sessions WHERE id = $1`, [w.id])
+      await pool.query(`UPDATE programs SET cycle_anchor_at = $2::timestamptz WHERE id = $1`, [program, before])
+    }
+  })
+
   it('a program with no phase set has no phases (and nothing to count)', async () => {
     const one = await slice.getProgramPhaseState(db, A, plain)
     expect(one.phases).toEqual([])

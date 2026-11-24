@@ -852,6 +852,9 @@ function foldSessionCounts(progSessions: { id: string; name: string }[], rows: S
  * A program with no phases (no phase set, or an empty one) returns an empty count map: a count only
  * places a session inside a phase, so with no phase there is nothing for it to place. It is a plain
  * read: no lock, no `FOR UPDATE`, no write (docs/lift-write-lock-order.md).
+ *
+ * The anchor is compared at millisecond precision: `countAllSessionsSinceStart` passes it through a
+ * JS Date, which drops the microseconds, and the two reads must count the same rows.
  */
 export async function getProgramPhaseState(
   db: Db, userId: string, programId: string,
@@ -879,7 +882,7 @@ export async function getProgramPhaseState(
            SELECT w.session_id AS sid, lower(w.session_name) AS sname, count(*)::int AS cnt
            FROM workout_sessions w, prog
            WHERE w.user_id = ${userId} AND w.is_early_deload = false AND w.deleted_at IS NULL
-             AND w.started_at > coalesce(prog.cycle_anchor_at, prog.started_at::timestamptz, '-infinity'::timestamptz)
+             AND w.started_at > coalesce(date_trunc('milliseconds', prog.cycle_anchor_at), prog.started_at::timestamptz, '-infinity'::timestamptz)
              AND EXISTS (SELECT 1 FROM ph)
            GROUP BY w.session_id, lower(w.session_name)
          ) g) AS groups
