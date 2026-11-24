@@ -12,6 +12,7 @@ import { formatTrendRatio } from '@trainingai/shared/health/trend-ratio-shown'
 import { READINESS_MODEL_VERSION } from '@trainingai/shared/health/readiness-composite'
 import { goalRange } from './goal-ranges'
 import { EFFORT_VS_PLAN_LABELS } from '@trainingai/shared/workout/effort-vs-plan'
+import { hasVisibleCharacter } from '@trainingai/shared/validation/visible-name'
 import { userTextBlock, USER_TEXT_NOTE } from '../ai/untrusted-text'
 // The units, superlative and no-diagnosis rules: `reasoning` is shown to the lifter (#3803).
 import { PROSE_FIELD_GUARDS } from '@/lib/ai/prompt-guards'
@@ -268,11 +269,10 @@ function phaseLine(signals: PrescriptionSignals): string {
  *  The text is only ever printed: a plan row's name comes from the session's own exercise. */
 export const UNNAMED_PROMPT_LINE_NAME = 'Unnamed exercise'
 export const PROMPT_LINE_NAME_MAX_CHARS = 120
-const INVISIBLE_FOR_BLANK_TEST = /[\p{Cf}\p{Cc}\s\u2800\u034F\u061C\u115F\u1160\u3164\uFFA0\u180E\uFE00-\uFE0F\u{E0100}-\u{E01EF}]/gu
 const UNSAFE_ON_A_LINE_REMOVED = /[\u200B\uFEFF\u202A-\u202E\u2066-\u2069]/g
 const LINE_WHITESPACE = /[\s\u0085]+/g
 export function promptLineName(name: string): string {
-  if (name.replace(INVISIBLE_FOR_BLANK_TEST, '') === '') return UNNAMED_PROMPT_LINE_NAME
+  if (!hasVisibleCharacter(name)) return UNNAMED_PROMPT_LINE_NAME
   const line = name.replace(UNSAFE_ON_A_LINE_REMOVED, '').replace(LINE_WHITESPACE, ' ').trim()
   const chars = Array.from(line)
   return chars.length > PROMPT_LINE_NAME_MAX_CHARS

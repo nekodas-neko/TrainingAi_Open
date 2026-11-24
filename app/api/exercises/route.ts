@@ -8,6 +8,7 @@ import { reportServerError } from '@/lib/observability'
 import { refusalResponse, isRefusal, isLockWaitTimeout, renameBusyResponse } from '@/lib/api/route-errors'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 import { promptSafeLine } from '@trainingai/shared/ai/untrusted-text'
+import { hasVisibleCharacter, BLANK_EXERCISE_NAME_MESSAGE } from '@trainingai/shared/validation/visible-name'
 
 // An exercise with muscles, equipment and instructions.
 const MAX_BODY_BYTES = 32 * 1024
@@ -15,9 +16,11 @@ const MAX_BODY_BYTES = 32 * 1024
 const CreateBody = z.object({
   // LA-73: a name is a menu item the model quotes back, so it is sanitised at the write rather
   // than fenced at the prompt. `.min(1)` runs before the transform, so a name of only control
-  // characters would pass it and arrive empty — hence the refine after.
+  // characters would pass it and arrive empty — hence the refine after. #4129: and a name of only
+  // invisible characters (U+200B, U+3164, U+2800 ...) is not empty after the transform, so the
+  // refine asks the shared visible-character test, which covers both.
   name:         z.string().min(1).max(120).transform(promptSafeLine)
-                  .refine(n => n.length > 0, { message: 'Name cannot be blank.' }),
+                  .refine(hasVisibleCharacter, { message: BLANK_EXERCISE_NAME_MESSAGE }),
   muscles:      z.array(z.object({ muscle: z.string(), role: z.enum(['main', 'secondary']) }).strict()).default([]),
   equipment:    z.array(z.string()).default([]),
   instructions: z.string().max(2000).optional(),
@@ -57,12 +60,13 @@ export async function POST(req: NextRequest) {
   }
   const body = CreateBody.safeParse(read.body)
   if (!body.success) {
-    // BF-129: the equipment rule is the one validation failure a user can actually act on, and the
+    // BF-129: the equipment rule is a validation failure a user can actually act on, and the
     // sheet renders `error` straight into its toast — so say what to do rather than "Invalid body".
-    // Only this issue's own message is surfaced; every other shape stays generic.
-    const equipmentIssue = body.error.issues.find(i => i.path[0] === 'equipment')
+    // #4129: the same for the name. Only these two issues' own messages are surfaced; every other
+    // shape stays generic.
+    const actionable = body.error.issues.find(i => i.path[0] === 'equipment' || i.path[0] === 'name')
     return NextResponse.json(
-      { error: equipmentIssue?.message ?? 'Invalid body' },
+      { error: actionable?.message ?? 'Invalid body' },
       { status: 400 },
     )
   }
