@@ -4,6 +4,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { todayInTz } from '@trainingai/shared/date-utils'
 import { liftLine } from '@/lib/coach/about'
+import { buildWidgetTools } from '@/lib/coach/tools'
 
 const TZ = 'Australia/Brisbane'
 const today = todayInTz(TZ)
@@ -47,4 +48,23 @@ describe('the Coach About line and a stored early-deload week (#4114)', () => {
     // No phase rows here, so only the week itself can make it a deload: the behaviour kept for non-manual programs.
     expect(await line('automatic', today)).toBe('Bench Press · next session is a deload or a test')
   })
+})
+
+describe('the Coach tool that reports a running deload (#4114)', () => {
+  const run = async (phaseMode: string, week?: string) => {
+    const repo = {
+      ...repoFor(phaseMode, week),
+      getUserGoals: vi.fn(async () => ({})),
+      getNutritionTargets: vi.fn(async () => null),
+      listInjuries: vi.fn(async () => []),
+    }
+    const tools = buildWidgetTools(repo as never, 'user-1') as unknown as Record<string, { execute: () => Promise<{ deloadRunning: boolean }> }>
+    return (await tools.getGoalsAndInjuries.execute()).deloadRunning
+  }
+  it('is false for a leftover week on a manual program', async () => expect(await run('manual', today)).toBe(false))
+  it('is true for a week on an automatic and an ai_dynamic program', async () => {
+    expect(await run('automatic', today)).toBe(true)
+    expect(await run('ai_dynamic', today)).toBe(true)
+  })
+  it('is false when no week is stored', async () => expect(await run('automatic')).toBe(false))
 })

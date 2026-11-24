@@ -1,5 +1,4 @@
 import { z } from 'zod'
-import { visibleExerciseName } from './visible-name'
 
 // LA-74 — the program half of the pair whose style half shipped 2026-09-07
 // (`validation/progression-style.ts`). `POST /api/workout-templates` spread `body.program` straight
@@ -69,9 +68,7 @@ const MAX_TOTAL_WEEKS = 52 * 20
 const SessionExerciseWriteSchema = z.object({
   id: anyId,
   sessionId: anyId,
-  // #4129: a lift needs something a person can see. Only a name with no visible character is refused;
-  // a stored name that has one is untouched, and the activate path posts those back verbatim.
-  exerciseName: visibleExerciseName(z.string().min(1)),
+  exerciseName: z.string().min(1),
   styleId: z.string().nullish(),
   muscleGroups: z.array(z.string()).optional(),
   position: z.number().int().min(0).max(MAX_POSITION).optional(),

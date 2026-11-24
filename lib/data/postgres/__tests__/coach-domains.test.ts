@@ -560,6 +560,45 @@ describe.skipIf(!canRun)('AI Coach — early_deload', () => {
       expect(result.ok).toBe(true)
       expect((await weekAndFlags()).start).toBeNull()
     })
+
+    it('undoing a cancel after the switch to manual restores nothing, and says so', async () => {
+      await pool.query(`UPDATE programs SET phase_mode = 'automatic', early_deload_week_start = $1 WHERE id = $2`, [TODAY, PROGRAM4])
+      const cancelled = await applyCoachPatch(db, OWNER4, deloadPatch(true, false), ['d1'], TODAY)
+      if (!cancelled.ok) throw new Error('cancel failed')
+      await pool.query(`UPDATE programs SET phase_mode = 'manual' WHERE id = $1`, [PROGRAM4])
+      const undone = await undoCoachChange(db, OWNER4, cancelled.changeId)
+      expect(undone.ok).toBe(true)
+      expect(undone.ok && undone.summary).toMatch(/run by hand/)
+      expect(await weekAndFlags()).toEqual({ start: null, flagged: 0 })
+    })
+
+    it('on an automatic program the same undo puts the week back, as before', async () => {
+      await pool.query(`UPDATE programs SET phase_mode = 'automatic', early_deload_week_start = $1 WHERE id = $2`, [TODAY, PROGRAM4])
+      const cancelled = await applyCoachPatch(db, OWNER4, deloadPatch(true, false), ['d1'], TODAY)
+      if (!cancelled.ok) throw new Error('cancel failed')
+      const undone = await undoCoachChange(db, OWNER4, cancelled.changeId)
+      expect(undone.ok).toBe(true)
+      expect(undone.ok && undone.summary).not.toMatch(/run by hand/)
+      expect((await weekAndFlags()).start).toBe(TODAY)
+    })
+
+    it('undoing an earlier apply after the switch to manual still clears the week and the flags', async () => {
+      await pool.query(`UPDATE programs SET phase_mode = 'automatic' WHERE id = $1`, [PROGRAM4])
+      const applied = await applyCoachPatch(db, OWNER4, deloadPatch(false, true), ['d1'], TODAY)
+      if (!applied.ok) throw new Error('apply failed')
+      await pool.query(`UPDATE programs SET phase_mode = 'manual' WHERE id = $1`, [PROGRAM4])
+      expect((await undoCoachChange(db, OWNER4, applied.changeId)).ok).toBe(true)
+      expect(await weekAndFlags()).toEqual({ start: null, flagged: 0 })
+    })
+
+    it('a double apply is refused both times and leaves no history', async () => {
+      const first = await applyCoachPatch(db, OWNER4, deloadPatch(false, true), ['d1'], TODAY)
+      const second = await applyCoachPatch(db, OWNER4, deloadPatch(false, true), ['d1'], TODAY)
+      expect([first.ok, second.ok]).toEqual([false, false])
+      expect(await weekAndFlags()).toEqual({ start: null, flagged: 0 })
+      const { rows } = await pool.query(`SELECT count(*)::int AS n FROM coach_changes WHERE user_id = $1`, [OWNER4])
+      expect(rows[0].n).toBe(0)
+    })
   })
 
   it('an ai_dynamic program starts a week exactly as an automatic one does', async () => {

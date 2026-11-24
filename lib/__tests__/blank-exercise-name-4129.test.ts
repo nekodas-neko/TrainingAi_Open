@@ -42,6 +42,12 @@ describe('POST /api/exercises (#4129)', () => {
     expect((await res.json()).error).toBe('Give the exercise a name')
     expect(createExercise).not.toHaveBeenCalled()
   })
+  it('refuses an empty name with the same plain message, not "Invalid body"', async () => {
+    const res = await createRoute(json('/api/exercises', 'POST', { name: '', equipment: ['Cable'] }))
+    expect(res.status).toBe(400)
+    expect((await res.json()).error).toBe('Give the exercise a name')
+    expect(createExercise).not.toHaveBeenCalled()
+  })
   it.each(BLANK)('refuses a rename to %j too', async n => {
     const res = await createRoute(json('/api/exercises', 'POST', { name: n, mergeWithId: MERGE_ID }))
     expect(res.status).toBe(400)

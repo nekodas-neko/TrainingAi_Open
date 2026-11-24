@@ -19,7 +19,7 @@ const CreateBody = z.object({
   // characters would pass it and arrive empty — hence the refine after. #4129: and a name of only
   // invisible characters (U+200B, U+3164, U+2800 ...) is not empty after the transform, so the
   // refine asks the shared visible-character test, which covers both.
-  name:         z.string().min(1).max(120).transform(promptSafeLine)
+  name:         z.string().min(1, BLANK_EXERCISE_NAME_MESSAGE).max(120).transform(promptSafeLine)
                   .refine(hasVisibleCharacter, { message: BLANK_EXERCISE_NAME_MESSAGE }),
   muscles:      z.array(z.object({ muscle: z.string(), role: z.enum(['main', 'secondary']) }).strict()).default([]),
   equipment:    z.array(z.string()).default([]),
@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
     // sheet renders `error` straight into its toast — so say what to do rather than "Invalid body".
     // #4129: the same for the name. Only these two issues' own messages are surfaced; every other
     // shape stays generic.
-    const actionable = body.error.issues.find(i => i.path[0] === 'equipment' || (i.path[0] === 'name' && i.code === 'custom'))
+    const actionable = body.error.issues.find(i => i.path[0] === 'equipment' || (i.path[0] === 'name' && (i.code === 'custom' || i.code === 'too_small')))
     return NextResponse.json(
       { error: actionable?.message ?? 'Invalid body' },
       { status: 400 },

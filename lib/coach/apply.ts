@@ -219,7 +219,7 @@ export async function undoCoachChange(db: Db, userId: string, changeId: string):
           .where(and(eq(s.coachChanges.id, changeId), eq(s.coachChanges.userId, userId), isNull(s.coachChanges.undoneAt)))
           .returning({ id: s.coachChanges.id })
         if (marked.length !== 1) throw new Refused({ ok: false, reason: 'invalid', detail: 'Already undone' })
-        return { ok: true as const, changeId, summary: `Undid: ${record.summary}` }
+        return { ok: true as const, changeId, summary: `Undid: ${record.summary}${restored.note ? `. ${restored.note}` : ''}` }
       })
     } catch (err) {
       if (err instanceof Refused) return err.outcome
@@ -255,7 +255,7 @@ export async function undoCoachChange(db: Db, userId: string, changeId: string):
         .returning({ id: s.coachChanges.id })
       // Cannot happen under the lock; if it ever does, the restore rolls back with it.
       if (marked.length !== 1) throw new Refused({ ok: false, reason: 'invalid', detail: 'Already undone' })
-      return { ok: true, changeId, summary: `Undid: ${record.summary}` }
+      return { ok: true, changeId, summary: `Undid: ${record.summary}${restored.note ? `. ${restored.note}` : ''}` }
     })
   } catch (err) {
     if (err instanceof Refused) return err.outcome

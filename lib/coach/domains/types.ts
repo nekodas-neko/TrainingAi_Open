@@ -79,7 +79,7 @@ export interface DomainHandler {
     userId: string,
     targetId: string,
     beforeState: Record<string, unknown>,
-  ): Promise<{ ok: true } | Exclude<ApplyOutcome, { ok: true }>>
+  ): Promise<{ ok: true; /** Said to the user after the summary when the undo restored nothing. */ note?: string } | Exclude<ApplyOutcome, { ok: true }>>
   /**
    * The target's current values, keyed by patch field — what `undoCoachChange` compares against
    * the change's `to` before restoring (Q-468).

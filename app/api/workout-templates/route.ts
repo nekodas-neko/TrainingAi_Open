@@ -6,7 +6,7 @@ import { computeDefaultVolumeTargets } from "@trainingai/shared/ai-periodization
 import type { Program } from "@trainingai/shared/types";
 import { reportServerError } from '@/lib/observability'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
-import { WorkoutTemplateWriteSchema } from '@trainingai/shared/validation/program-write'
+import { WorkoutTemplateWriteRequestSchema } from '@trainingai/shared/validation/program-write-request'
 
 // A whole program with its sessions and exercises.
 const MAX_BODY_BYTES = 256 * 1024
@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
   // LA-74. Typed and `.strict()` at last — see `validation/program-write.ts` for the three
   // producers every optional below was read off, and for why the activate path makes this schema
   // permanently coupled to `listPrograms`' mapper.
-  const parsed = WorkoutTemplateWriteSchema.safeParse(read.body ?? {});
+  const parsed = WorkoutTemplateWriteRequestSchema.safeParse(read.body ?? {});
   if (!parsed.success) return invalidBodyResponse(parsed.error);
   const body = parsed.data as { program?: Program; linkPhaseSetOwnership?: boolean; recalibrateCycleAnchor?: boolean; programId?: string };
 

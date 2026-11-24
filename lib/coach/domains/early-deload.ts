@@ -82,6 +82,8 @@ async function loadState(db: Db, userId: string, today: string, timezone: string
   }
 }
 
+const UNDO_NOT_APPLICABLE_NOTE = 'The program is now run by hand, so the deload week was not put back.'
+
 export function earlyDeloadHandler(today: string, timezone: string): DomainHandler {
   return {
     async currentState(db, userId) {
@@ -208,6 +210,16 @@ export function earlyDeloadHandler(today: string, timezone: string): DomainHandl
     async undo(db, userId, targetId, before) {
       const sessionIds = Array.isArray(before.sessionIds) ? (before.sessionIds as string[]) : []
       const wasFlagged = before.wasFlagged === true
+      // Undoing a CANCEL puts the week back. If the program was switched to manual since, a week would
+      // be written that the program ignores and the Coach could not start itself: restore nothing, the
+      // week stays cleared, and say so.
+      if (before.earlyDeloadWeekStart != null) {
+        const [program] = await db.select({ phaseMode: s.programs.phaseMode }).from(s.programs)
+          .where(and(eq(s.programs.id, targetId), eq(s.programs.userId, userId))).limit(1)
+        if (program && !earlyDeloadApplies(program.phaseMode)) {
+          return { ok: true, note: UNDO_NOT_APPLICABLE_NOTE }
+        }
+      }
       await db.transaction(async tx => {
         await tx.update(s.programs)
           .set({ earlyDeloadWeekStart: (before.earlyDeloadWeekStart as string | null) ?? null })

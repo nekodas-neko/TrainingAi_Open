@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { hasVisibleCharacter, BLANK_EXERCISE_NAME_MESSAGE } from '@trainingai/shared/validation/visible-name'
-import { WorkoutTemplateWriteSchema } from '@trainingai/shared/validation/program-write'
+import { WorkoutTemplateWriteRequestSchema as WorkoutTemplateWriteSchema } from '@trainingai/shared/validation/program-write-request'
 import { promptLineName, UNNAMED_PROMPT_LINE_NAME } from '@trainingai/shared/ai-periodization/prompt'
 import { LogExercisePayloadSchema } from '@trainingai/shared/workout/log-payload'
 
@@ -17,6 +17,10 @@ const REAL = [
   '벤치 프레스', '卧推', 'ベンチプレス', // Hangul, CJK, kana
   'a'.repeat(120),
   'x​',                        // a real letter beside an invisible one
+  'ក្ខ\u17B4ក',                       // Khmer: an inherent vowel between visible letters
+  'ᠮᠣ\u180Bᠩ', 'ᠬ\u180Dᠠ',          // Mongolian: a free variation selector between letters
+  'é', 'e\u0301', 'ا\u064Eب',       // combining accents
+  '👩‍🏋️', '🏋🏽‍♂️',                    // emoji ZWJ sequences
 ]
 
 describe('hasVisibleCharacter (#4129)', () => {
@@ -53,5 +57,18 @@ describe('the program write schema refuses a lift with nothing visible in its na
   it('a lift stored with a blank name can still be logged (the log payload does not ask for a visible name)', () => {
     const r = LogExercisePayloadSchema.safeParse({ sessionName: 'Day', exercise: '\u200B', weights: [40, 40], sets: 2, reps: [8, 8] })
     expect(r.success, JSON.stringify(!r.success && r.error.issues)).toBe(true)
+  })
+})
+
+describe('the class is derived from Unicode properties (#4134 review)', () => {
+  it('every default-ignorable code point and every Cf code point is invisible', () => {
+    const di = /\p{Default_Ignorable_Code_Point}|\p{Cf}/u
+    const missed: string[] = []
+    for (let cp = 1; cp <= 0x10ffff; cp++) {
+      if (cp >= 0xd800 && cp <= 0xdfff) continue
+      const ch = String.fromCodePoint(cp)
+      if (di.test(ch) && hasVisibleCharacter(ch)) missed.push(cp.toString(16))
+    }
+    expect(missed).toEqual([])
   })
 })
