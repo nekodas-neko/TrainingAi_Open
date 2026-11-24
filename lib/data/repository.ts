@@ -739,6 +739,8 @@ export interface WorkoutRepository {
 
   // ── Block Periodization ────────────────────────────────────────────────────
   listProgramPhases(userId: string, programId: string): Promise<ProgramPhase[]>
+  // A program's phases and its sessions' completed counts in ONE query (#4050); the counts are empty when there are no phases.
+  getProgramPhaseState(userId: string, programId: string): Promise<{ phases: ProgramPhase[]; sessionCounts: Map<string, number> }>
   listPhaseSets(userId: string): Promise<PhaseSetWithPhases[]>
   createPhaseSet(userId: string, name: string, phases: Omit<ProgramPhase, 'id' | 'phaseSetId'>[]): Promise<PhaseSetWithPhases>
   updatePhaseSet(phaseSetId: string, userId: string, name: string, phases: Omit<ProgramPhase, 'id' | 'phaseSetId'>[]): Promise<PhaseSetWithPhases>

@@ -806,7 +806,6 @@ export async function countAllSessionsSinceStart(db: Db, userId: string, program
     .select({ id: s.programSessions.id, name: s.programSessions.name })
     .from(s.programSessions)
     .where(and(eq(s.programSessions.programId, programId), isNull(s.programSessions.deletedAt)))
-  const idByNameLower = new Map(progSessions.map(ps => [ps.name.toLowerCase(), ps.id]))
 
   const sessionNameLower = sql<string>`lower(${s.workoutSessions.sessionName})`
   const rows = await db
@@ -824,6 +823,15 @@ export async function countAllSessionsSinceStart(db: Db, userId: string, program
     ))
     .groupBy(s.workoutSessions.programSessionId, sessionNameLower)
 
+  return foldSessionCounts(progSessions, rows)
+}
+
+/** One group of completed workouts: the program-session id they carry (null on legacy and APK-sync rows), the lower-cased name, how many. */
+type SessionCountGroup = { sessionId: string | null; sessionName: string; count: number }
+
+/** Resolves the groups to a count per current program-session id, name-matching the null-id rows. */
+function foldSessionCounts(progSessions: { id: string; name: string }[], rows: SessionCountGroup[]): Map<string, number> {
+  const idByNameLower = new Map(progSessions.map(ps => [ps.name.toLowerCase(), ps.id]))
   const counts = new Map<string, number>()
   for (const r of rows) {
     const id = r.sessionId ?? idByNameLower.get(r.sessionName)
@@ -831,6 +839,71 @@ export async function countAllSessionsSinceStart(db: Db, userId: string, program
     counts.set(id, (counts.get(id) ?? 0) + r.count)
   }
   return counts
+}
+
+/**
+ * A program's phases and the completed-session counts that place each session in them, in ONE
+ * statement (#4050). `listProgramPhases` and `countAllSessionsSinceStart` each re-read the program
+ * row, and the counts read the session names too: 5 statements for what the program row, one phase
+ * query and one grouped count already hold. The scoping, the rows and the counts are exactly those
+ * two functions': the program and the phase set are the caller's, the phases are in position order,
+ * the counts are the same grouped query folded by `foldSessionCounts`.
+ *
+ * A program with no phases (no phase set, or an empty one) returns an empty count map: a count only
+ * places a session inside a phase, so with no phase there is nothing for it to place. It is a plain
+ * read: no lock, no `FOR UPDATE`, no write (docs/lift-write-lock-order.md).
+ */
+export async function getProgramPhaseState(
+  db: Db, userId: string, programId: string,
+): Promise<{ phases: ProgramPhase[]; sessionCounts: Map<string, number> }> {
+  const { rows } = await db.execute<{ phases: PhaseJson[]; names: { id: string; name: string }[]; groups: SessionCountGroup[] }>(sql`
+    WITH prog AS (
+      SELECT p.id, p.phase_set_id, p.cycle_anchor_at, p.started_at
+      FROM programs p WHERE p.id = ${programId} AND p.user_id = ${userId}
+    ), ph AS (
+      SELECT pp.* FROM prog
+      JOIN phase_sets ps ON ps.id = prog.phase_set_id AND ps.user_id = ${userId}
+      JOIN program_phases pp ON pp.phase_set_id = ps.id
+    )
+    SELECT
+      (SELECT coalesce(json_agg(json_build_object(
+          'id', ph.id, 'phaseSetId', ph.phase_set_id, 'position', ph.position, 'name', ph.name,
+          'durationCycles', ph.duration_cycles, 'phaseType', ph.phase_type,
+          'primaryStyleId', ph.primary_style_id, 'secondaryStyleId', ph.secondary_style_id
+        ) ORDER BY ph.position), '[]'::json) FROM ph) AS phases,
+      (SELECT coalesce(json_agg(json_build_object('id', x.id, 'name', x.name)), '[]'::json)
+         FROM program_sessions x
+        WHERE x.program_id = ${programId} AND x.deleted_at IS NULL AND EXISTS (SELECT 1 FROM ph)) AS names,
+      (SELECT coalesce(json_agg(json_build_object('sessionId', g.sid, 'sessionName', g.sname, 'count', g.cnt)), '[]'::json)
+         FROM (
+           SELECT w.session_id AS sid, lower(w.session_name) AS sname, count(*)::int AS cnt
+           FROM workout_sessions w, prog
+           WHERE w.user_id = ${userId} AND w.is_early_deload = false AND w.deleted_at IS NULL
+             AND w.started_at > coalesce(prog.cycle_anchor_at, prog.started_at::timestamptz, '-infinity'::timestamptz)
+             AND EXISTS (SELECT 1 FROM ph)
+           GROUP BY w.session_id, lower(w.session_name)
+         ) g) AS groups
+  `)
+  const row = rows[0]
+  if (!row || row.phases.length === 0) return { phases: [], sessionCounts: new Map() }
+  return {
+    phases: row.phases.map(p => ({
+      id: p.id,
+      phaseSetId: p.phaseSetId!,
+      position: p.position,
+      name: p.name,
+      durationCycles: p.durationCycles,
+      phaseType: p.phaseType as ProgramPhaseType,
+      primaryStyleId: p.primaryStyleId ?? undefined,
+      secondaryStyleId: p.secondaryStyleId ?? undefined,
+    })),
+    sessionCounts: foldSessionCounts(row.names, row.groups),
+  }
+}
+
+type PhaseJson = {
+  id: string; phaseSetId: string | null; position: number; name: string; durationCycles: number
+  phaseType: string; primaryStyleId: string | null; secondaryStyleId: string | null
 }
 
 export async function autoRecalibrateCycleAnchor(db: Db, userId: string, programId: string): Promise<void> {
