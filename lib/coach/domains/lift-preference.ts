@@ -461,9 +461,15 @@ function measure(ctx: Context, before: PrefColumns, after: PrefColumns, accepted
     const was = readRow(ctx, plan, plan.prescription, ctx.target.id)!
     const storedRow = plan.prescription.exercises.find(e => e.sessionExerciseId === ctx.target.id)!
     if (excluded || storedRow.deloaded) {
+      // "Train full instead" puts the lift's recorded full numbers back and, when the session is served,
+      // applies the lift's current rep range and rest to them (#4101). Only a deload that records those
+      // numbers offers it, and only a rep-range or rest change reaches them.
+      const fullTakesIt = excluded !== 'baseline' && storedRow.deloaded === true && !!storedRow.preDeload
+        && accepted.some(c => c.field === 'repRange' || c.field === 'restSec')
+      const fullClause = accepted.some(c => c.field === 'repRange') ? ' If you train full today, it uses the new range.' : ' If you train full today, it uses the new rest.'
       consequences.push({
         kind: 'info',
-        text: `Your next ${ctx.target.sessionName} is ${excluded === 'baseline' ? 'a baseline test' : 'a deload'}, so it stays at ${line(was)}. This applies from the session after it.`,
+        text: `Your next ${ctx.target.sessionName} is ${excluded === 'baseline' ? 'a baseline test' : 'a deload'}, so it stays at ${line(was)}. This applies from the session after it.${fullTakesIt ? fullClause : ''}`,
       })
     } else {
       const now = readRow(ctx, plan, restatePlan(ctx, plan, pref), ctx.target.id)!
