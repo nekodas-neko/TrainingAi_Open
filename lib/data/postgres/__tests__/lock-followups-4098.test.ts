@@ -8,21 +8,33 @@
  *   self-heal's personal records do not replace them.
  *
  * Real Postgres only (DATABASE_URL). Made-up user; everything removed in `afterAll`.
+ *
+ * Safe beside another run of this file, or another suite, on the same database (CI runs four shards against one):
+ * every id, name, trigger, function and advisory-lock key below is made fresh per run, a held read is asserted
+ * against a bound far above its own work and far below the 4 s wait it replaces, and the one DDL (the gate
+ * triggers) is made once, with a lock_timeout and retries, never per test.
  */
 import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from 'vitest'
+import { randomUUID, randomInt } from 'node:crypto'
 
 vi.mock('@/lib/observability', () => ({ reportServerError: vi.fn() }))
 import { isBusyError } from '@trainingai/shared/errors'
 
 const canRun = !!process.env.DATABASE_URL
 const TZ = 'Australia/Brisbane'
-const U = '00000000-0000-4000-8000-000000004098'
-const GATE = 40981 // advisory key the triggers below wait on
-const PROGRAM = '00000000-0000-4000-8000-0000000040a1'
-const SLOT = '00000000-0000-4000-8000-0000000040a2'
-const LIFT = 'Q4098 Squat'
-const ALT = 'Q4098 Hack Squat'
-const RENAMED = 'Q4098 Back Squat'
+const U = randomUUID()
+const TAG = U.slice(0, 8)
+// Advisory keys the gate triggers below wait on, one per trigger, random per run so another run's gate is never ours.
+const GATE_SLOT = randomInt(1_000_000, 2_000_000_000)
+const GATE_PROGRAM = randomInt(1_000_000, 2_000_000_000)
+const PROGRAM = randomUUID()
+const SLOT = randomUUID()
+const LIFT = `Q4098 Squat ${TAG}`
+const ALT = `Q4098 Hack Squat ${TAG}`
+const RENAMED = `Q4098 Back Squat ${TAG}`
+/** A held read does its own work in a few ms and a wait of its own would be the 4 s write wait: this sits between,
+ *  loose enough for a database that other suites are using. */
+const FAST_MS = 2500
 
 describe.skipIf(!canRun)('lock follow-ups (#4098)', () => {
   let pool: import('pg').Pool
@@ -92,7 +104,7 @@ describe.skipIf(!canRun)('lock follow-ups (#4098)', () => {
       await holding(async () => {
         const t0 = Date.now()
         await syncProgramPhase(repo, U, program, TZ, new Date(), { read: true })
-        expect(Date.now() - t0).toBeLessThan(1000)
+        expect(Date.now() - t0).toBeLessThan(FAST_MS)
       })
       expect((await row(session)).pending_transition, 'repair skipped while the lock was held').toBeNull()
       await syncProgramPhase(repo, U, program, TZ, new Date(), { read: true })
@@ -116,7 +128,7 @@ describe.skipIf(!canRun)('lock follow-ups (#4098)', () => {
       await holding(async () => {
         const t0 = Date.now()
         await expect(period.setBaselineComplete(db, U, session, baseline, { read: true })).rejects.toSatisfy(isBusyError)
-        expect(Date.now() - t0).toBeLessThan(1000)
+        expect(Date.now() - t0).toBeLessThan(FAST_MS)
       })
       expect((await row(session)).baseline_complete).toBe(false)
       await period.setBaselineComplete(db, U, session, baseline, { read: true })
@@ -136,7 +148,7 @@ describe.skipIf(!canRun)('lock follow-ups (#4098)', () => {
       await holding(async () => {
         const t0 = Date.now()
         await completeWorkoutFromPayload(U, { workoutSessionId: ws.id })
-        expect(Date.now() - t0, 'the finish is not delayed by the anchor write').toBeLessThan(1500)
+        expect(Date.now() - t0, 'the finish is not delayed by the anchor write').toBeLessThan(FAST_MS)
         const deadline = Date.now() + 8000
         while (Object.keys((await row(session)).baseline_1rm ?? {}).length < 2 && Date.now() < deadline) await new Promise(r => setTimeout(r, 20))
       })
@@ -151,31 +163,60 @@ describe.skipIf(!canRun)('lock follow-ups (#4098)', () => {
   describe('item 5: swap accept against an exercise rename (same person)', () => {
     const libIds: string[] = []
     const ids = {} as Record<string, string>
+    const gateSlotFn = `test_4098_slot_${TAG}`
+    const gateProgramFn = `test_4098_program_${TAG}`
+    let dropGates: () => Promise<void> = async () => undefined
     let engine: typeof import('@/lib/weekly-checkin/engine')
     let checkin: string
     beforeAll(async () => {
       engine = await import('@/lib/weekly-checkin/engine')
-      // Gates: while the test holds the advisory lock exclusively, an update of the slot row (the swap) or of
-      // the program row (the rename's bump) waits holding the rows it already locked.
-      await pool.query(`CREATE OR REPLACE FUNCTION test_4098_gate() RETURNS trigger LANGUAGE plpgsql AS $f$
-        BEGIN PERFORM pg_advisory_xact_lock_shared(${GATE}, 1); RETURN NEW; END $f$`)
+      // Gates: while the test holds a gate's advisory lock exclusively, an update of the slot row (the swap) or of
+      // the program row (the rename's bump) waits holding the rows it already locked. Both are made once per run
+      // and fire only for this run's own slot and program rows; a gate whose lock nobody holds costs one shared
+      // lock. DDL needs a lock on the table that another suite's writers may hold, so it waits a bounded time and
+      // tries again rather than failing the file.
+      const ddl = async (text: string) => {
+        for (let attempt = 1; ; attempt++) {
+          const c = await pool.connect()
+          try {
+            await c.query(`SET lock_timeout = '2s'`)
+            await c.query(text)
+            return
+          } catch (err) {
+            const code = (err as { code?: string }).code
+            if (attempt >= 10 || (code !== '55P03' && code !== '40P01')) throw err
+          } finally {
+            await c.query(`RESET lock_timeout`).catch(() => undefined)
+            c.release()
+          }
+          await new Promise(r => setTimeout(r, 100 * attempt))
+        }
+      }
+      await ddl(`CREATE OR REPLACE FUNCTION ${gateSlotFn}() RETURNS trigger LANGUAGE plpgsql AS $f$
+        BEGIN PERFORM pg_advisory_xact_lock_shared(${GATE_SLOT}, 1); RETURN NEW; END $f$`)
+      await ddl(`CREATE OR REPLACE FUNCTION ${gateProgramFn}() RETURNS trigger LANGUAGE plpgsql AS $f$
+        BEGIN PERFORM pg_advisory_xact_lock_shared(${GATE_PROGRAM}, 1); RETURN NEW; END $f$`)
+      await ddl(`CREATE TRIGGER ${gateSlotFn} BEFORE UPDATE ON session_exercises FOR EACH ROW WHEN (OLD.id = '${SLOT}'::uuid) EXECUTE FUNCTION ${gateSlotFn}()`)
+      await ddl(`CREATE TRIGGER ${gateProgramFn} BEFORE UPDATE ON programs FOR EACH ROW WHEN (OLD.id = '${PROGRAM}'::uuid) EXECUTE FUNCTION ${gateProgramFn}()`)
+      dropGates = async () => {
+        await ddl(`DROP TRIGGER IF EXISTS ${gateSlotFn} ON session_exercises`).catch(() => undefined)
+        await ddl(`DROP TRIGGER IF EXISTS ${gateProgramFn} ON programs`).catch(() => undefined)
+        await ddl(`DROP FUNCTION IF EXISTS ${gateSlotFn}()`).catch(() => undefined)
+        await ddl(`DROP FUNCTION IF EXISTS ${gateProgramFn}()`).catch(() => undefined)
+      }
     })
     afterAll(async () => {
-      await pool.query(`DROP TRIGGER IF EXISTS test_4098_slot ON session_exercises`).catch(() => undefined)
-      await pool.query(`DROP TRIGGER IF EXISTS test_4098_program ON programs`).catch(() => undefined)
-      await pool.query(`DROP FUNCTION IF EXISTS test_4098_gate()`).catch(() => undefined)
+      await dropGates()
       await pool.query(`DELETE FROM exercise_library WHERE id = ANY($1::uuid[]) OR name = ANY($2)`, [libIds, [LIFT, ALT, RENAMED]])
     })
     beforeEach(async () => {
-      await pool.query(`DROP TRIGGER IF EXISTS test_4098_slot ON session_exercises`)
-      await pool.query(`DROP TRIGGER IF EXISTS test_4098_program ON programs`)
       await pool.query(`DELETE FROM exercise_library WHERE name = ANY($1)`, [[LIFT, ALT, RENAMED]])
       libIds.length = 0
       const lib: Record<string, string> = {}
       for (const name of [LIFT, ALT]) {
         lib[name] = (await pool.query(
           `INSERT INTO exercise_library (name, equipment, muscles, created_by) VALUES ($1, ARRAY['barbell'], $2::jsonb, $3) RETURNING id`,
-          [name, JSON.stringify([{ muscle: 'q4098-quads', role: 'main' }]), U])).rows[0].id
+          [name, JSON.stringify([{ muscle: `q4098-quads-${TAG}`, role: 'main' }]), U])).rows[0].id
         libIds.push(lib[name])
       }
       await pool.query(`INSERT INTO programs (id, user_id, name, phase_mode, is_active) VALUES ($1,$2,'Q4098 swap','manual',true)`, [PROGRAM, U])
@@ -214,11 +255,11 @@ describe.skipIf(!canRun)('lock follow-ups (#4098)', () => {
     const rename = () => repo.renameExercise(U, ids.lift, RENAMED)
 
     /** `first` runs until it stops at the gate, holding what it took; `second` queues behind it; the gate opens. */
-    const gated = async (first: () => Promise<unknown>, second: () => Promise<unknown>) => {
+    const gated = async (key: number, first: () => Promise<unknown>, second: () => Promise<unknown>) => {
       const gate = await pool.connect()
       try {
         await gate.query('BEGIN')
-        await gate.query(`SELECT pg_advisory_xact_lock(${GATE}, 1)`)
+        await gate.query(`SELECT pg_advisory_xact_lock(${key}, 1)`)
         const gatePid = (await gate.query(`SELECT pg_backend_pid() AS pid`)).rows[0].pid as number
         const a = first(); a.catch(() => undefined)
         let firstPid = 0
@@ -234,8 +275,7 @@ describe.skipIf(!canRun)('lock follow-ups (#4098)', () => {
     }
 
     it('the accept holds the slot row, the rename queues behind it: both finish, no deadlock', async () => {
-      await pool.query(`CREATE TRIGGER test_4098_slot BEFORE UPDATE ON session_exercises FOR EACH ROW WHEN (OLD.id = '${SLOT}'::uuid) EXECUTE FUNCTION test_4098_gate()`)
-      const [accepted, renamed] = await gated(accept, rename)
+      const [accepted, renamed] = await gated(GATE_SLOT, accept, rename)
       expect(outcome(accepted)).toBe('ok')
       expect(outcome(renamed)).toBe('ok')
       expect((await pool.query(`SELECT exercise_name FROM session_exercises WHERE id = $1`, [SLOT])).rows[0].exercise_name).toBe(ALT)
@@ -244,8 +284,7 @@ describe.skipIf(!canRun)('lock follow-ups (#4098)', () => {
 
     it('the rename holds the slot row, the accept queues behind it: both finish, no deadlock', async () => {
       // The rename's second statement bumps the program, after its first statement locked the slot row.
-      await pool.query(`CREATE TRIGGER test_4098_program BEFORE UPDATE ON programs FOR EACH ROW WHEN (OLD.id = '${PROGRAM}'::uuid) EXECUTE FUNCTION test_4098_gate()`)
-      const [renamed, accepted] = await gated(rename, accept)
+      const [renamed, accepted] = await gated(GATE_PROGRAM, rename, accept)
       expect(outcome(renamed)).toBe('ok')
       expect(outcome(accepted)).toBe('ok')
       expect((await pool.query(`SELECT exercise_name FROM session_exercises WHERE id = $1`, [SLOT])).rows[0].exercise_name).toBe(ALT)
