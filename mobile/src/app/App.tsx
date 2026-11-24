@@ -64,7 +64,7 @@ import { WalkScreen } from '../features/activities/screens/WalkScreen';
 import { BaselinesScreen } from '../features/activities/screens/BaselinesScreen';
 import { CardioScreen } from '../features/activities/screens/CardioScreen';
 import { CardioPlanScreen } from '../features/activities/screens/CardioPlanScreen';
-import { ActivityScreen } from '../features/activities/screens/ActivityScreen';
+import { ActivityBoundary } from '../features/activities/screens/ActivityBoundary';
 import { WeighInBanner } from '../features/devices/components/WeighInBanner';
 import { AlertNavigation } from '../features/platform/components/AlertNavigation';
 import { TooOldScreen, useTooOldNotice } from '../features/platform/components/TooOldNotice';
@@ -263,7 +263,9 @@ function AppShell() {
           />
         );
       case 'activity-recording':
-        return <ActivityScreen key={accountKey} onBack={back} onSaved={back} />;
+        return (
+          <ActivityBoundary key={accountKey} onBack={back} />
+        );
       case 'more-data':
         return <DataSyncScreen onBack={back} />;
       case 'more-about':
