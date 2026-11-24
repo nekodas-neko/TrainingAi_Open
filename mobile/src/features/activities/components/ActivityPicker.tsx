@@ -1,5 +1,6 @@
 import {
   AppText,
+  Notice,
   IconTileGrid,
   Sheet,
   StableContent,
@@ -10,17 +11,24 @@ import { activityIcon, activityTypesSpec, type ActivityType } from '../data/mode
 export function ActivityPicker({
   visible,
   onClose,
+  onDismiss,
   onSelect,
   busy = false,
+  error = null,
 }: {
   visible: boolean;
   onClose: () => void;
+  /** The sheet has finished closing. */
+  onDismiss?: () => void;
   onSelect: (type: ActivityType) => void;
   busy?: boolean;
+  /** Why starting the chosen activity failed, shown where it was tapped. */
+  error?: string | null;
 }) {
   const state = useWorkoutResource(activityTypesSpec, visible);
   return (
-    <Sheet visible={visible} title="Log Activity" onClose={onClose}>
+    <Sheet visible={visible} title="Log Activity" onClose={onClose} onDismiss={onDismiss}>
+      {error && <Notice error title="Could not start the activity" message={error} />}
       <StatusIndicator
         label="Activity types"
         busy={state.loading || busy}
