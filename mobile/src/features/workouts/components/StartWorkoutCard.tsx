@@ -5,6 +5,7 @@ import { WorkoutSaveNotice } from './WorkoutSaveNotice';
 import { StaleWorkoutCard, useStaleWorkout } from './StaleWorkoutCard';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import type { SessionStartOptions } from '../logging/session-options';
+import { resumeLabel } from '../data/plan-start';
 
 export function StartWorkoutCard({
   session,
@@ -72,9 +73,7 @@ export function StartWorkoutCard({
         <AppButton
           title={
             active
-              ? active.sessionId === session.id
-                ? 'Resume workout'
-                : `Resume ${active.sessionName}`
+              ? resumeLabel(active, session.id)
               : completed
                 ? 'Start Again'
                 : (actionLabel ?? 'Start Workout')
