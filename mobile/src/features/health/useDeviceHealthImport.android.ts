@@ -72,5 +72,5 @@ export function useDeviceHealthImport(): DeviceImportState {
     store?.getSnapshot ?? (() => emptyHealthConnectImport),
     () => emptyHealthConnectImport,
   );
-  return { ...state, store, refresh: () => store?.run(true) ?? Promise.resolve() };
+  return { ...state, store, refresh: (options) => store?.run(true, options) ?? Promise.resolve() };
 }

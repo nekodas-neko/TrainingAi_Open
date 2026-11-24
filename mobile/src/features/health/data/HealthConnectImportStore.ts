@@ -12,6 +12,7 @@ import type { ScopedStorage } from '../../../core/storage/LocalStorage.ts';
 import type { AccountConnection } from '../../account/session.ts';
 import type { HealthConnectReader } from '../../../integrations/health-connect/types.ts';
 import { failureNotice, reportError } from '../../../core/reporting/index.ts';
+import { withDeadline } from '../../../core/sync/deadline.ts';
 import { HealthConnectPersistence } from './health-connect-persistence.ts';
 import { DEFAULT_TZ, midnightDaysAgoInTz } from '@trainingai/shared/date-utils';
 import {
@@ -23,6 +24,9 @@ import {
  * Health Connect's own read limit, an instant rule rather than a calendar window: without the
  * history permission an app reads back to 30 days before its first grant.
  */
+/** A permission read answers at once; the permission sheet waits on a person, so it waits longer. */
+const NATIVE_READ_MS = 20_000;
+const NATIVE_SHEET_MS = 120_000;
 const READ_LIMIT_MS = 30 * 24 * 60 * 60 * 1000;
 /** Records held back for a revoked permission are dropped, and counted as skipped, after this. */
 const BLOCKED_TTL_MS = 30 * 24 * 60 * 60 * 1000;
@@ -257,16 +261,23 @@ export class HealthConnectImportStore {
   }
   /** The granted read types; with none and `ask`, asks for every type once more (a tap, not a sync). */
   private async granted(ask: boolean) {
-    let types = await this.reader.permissions();
+    let types = await this.native(this.reader.permissions(), NATIVE_READ_MS);
     if (!types.length && ask && this.reader.request && !this.canceled) {
       await this.write({
         ...this.disk,
         requested: [...new Set([...this.disk.requested, ...healthConnectTypes])],
       });
-      types = (await this.reader.request([...healthConnectTypes]).catch(() => null)) ?? [];
+      types =
+        (await this.native(this.reader.request([...healthConnectTypes]), NATIVE_SHEET_MS).catch(
+          () => null,
+        )) ?? [];
     }
     if (!this.canceled) this.publish({ needsPermission: !types.length });
     return types;
+  }
+  /** A native call that never answers must not hold a run, or Sync now, busy for good. */
+  private native<T>(work: Promise<T>, ms: number): Promise<T> {
+    return withDeadline(work, ms, 'Health Connect did not answer.');
   }
   private guard() {
     if (!this.state.ready || this.canceled)
@@ -295,19 +306,26 @@ export class HealthConnectImportStore {
       throw cause;
     }
   }
+  /** The Allow button: the one place Import history opens the system dialog. */
+  async requestPermission() {
+    await this.initialize();
+    await this.running;
+    this.guard();
+    if ((await this.granted(true)).length && this.disk.enabled) void this.run(true);
+  }
   async importHistory(from: string) {
     await this.initialize();
     await this.running;
     this.guard();
     if (!Number.isFinite(Date.parse(from)) || Date.parse(from) > this.now())
       throw new Error('Choose a valid history start date.');
+    // #3906: the in-app answer comes first. Android's own dialogs open only from the button that
+    // answers it (`requestPermission`), never from this tap: without a read permission, stop here.
+    if (!(await this.granted(false)).length) throw new Error(IMPORT_NEEDS_PERMISSION);
     if (Date.parse(from) < Date.parse(this.disk.from)) {
       if (!this.reader.historyPermission) throw new Error('Extended history is unavailable.');
       await this.reader.historyPermission();
     }
-    // #3906: without a read permission, clearing the token would only queue a read that cannot run.
-    // Said as the tap's own outcome, since the switch's note does not show while it is off.
-    if (!(await this.granted(true)).length) throw new Error(IMPORT_NEEDS_PERMISSION);
     await this.write({
       ...this.disk,
       from,
@@ -552,7 +570,7 @@ export class HealthConnectImportStore {
     if (Object.keys(records).length !== Object.keys(this.disk.records).length)
       await this.write({ ...this.disk, records });
   }
-  run(manual = false): Promise<void> {
+  run(manual = false, options: { ask?: boolean } = {}): Promise<void> {
     if (this.running) return this.running;
     if (this.canceled || (!manual && this.now() - this.lastAttempt < 300000))
       return Promise.resolve();
@@ -562,16 +580,18 @@ export class HealthConnectImportStore {
       if (!this.state.ready || !this.disk.enabled || this.canceled) return;
       this.publish({ busy: true, error: null });
       try {
-        let types = await this.reader.permissions();
+        let types = await this.native(this.reader.permissions(), NATIVE_READ_MS);
         if (this.canceled) return;
         // A type this install has never been asked for, once. Recorded before asking, so a denial,
         // a dismissed sheet or a crash is not asked again; the sync carries on with what is granted.
         const unasked = healthConnectTypes.filter(
           (type) => !types.includes(type) && !this.disk.requested.includes(type),
         );
-        if (unasked.length && this.reader.request) {
+        if (unasked.length && this.reader.request && options.ask !== false) {
           await this.write({ ...this.disk, requested: [...this.disk.requested, ...unasked] });
-          const granted = await this.reader.request(unasked).catch(() => null);
+          const granted = await this.native(this.reader.request(unasked), NATIVE_SHEET_MS).catch(
+            () => null,
+          );
           if (this.canceled) return;
           if (granted?.length) types = granted;
         }

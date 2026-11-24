@@ -27,11 +27,14 @@ export type DeviceImportState = {
     cancel(): void;
     setEnabled(enabled: boolean): Promise<void>;
     importHistory(from: string): Promise<void>;
-    run(manual?: boolean): Promise<void>;
+    run(manual?: boolean, options?: { ask?: boolean }): Promise<void>;
+    /** Health Connect only: asks for the read permission, from a button (#3906). */
+    requestPermission?(): Promise<void>;
     /** Work owed (batches, a rebuild, a scan in progress): lets a rerun skip the throttle (#3906). */
     owed(): boolean;
   } | null;
-  refresh: () => Promise<void>;
+  /** `ask: false`: a sync reads what is allowed and never opens a system permission sheet. */
+  refresh: (options?: { ask?: boolean }) => Promise<void>;
 };
 /**
  * #3906: what a status icon shows for the device import. With the switch off nothing is wrong,
