@@ -252,6 +252,8 @@ export const workoutSessions = pgTable('workout_sessions', {
   sessionRpe:        integer('session_rpe'),
   /** #3266: whole seconds the workout was paused; NULL means never paused, the same as 0. */
   pausedSec:         integer('paused_sec'),
+  /** #4119: the phase the trained plan was made for, as the app sent it at the finish; NULL when it did not say. */
+  planPhase:         text('plan_phase'),
   updatedAt:         timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   deletedAt:         timestamp('deleted_at', { withTimezone: true }),
 })

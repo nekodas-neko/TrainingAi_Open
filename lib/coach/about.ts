@@ -21,7 +21,7 @@ import type { Db } from './domains/types'
  * answers 404. The client never sends text: the lift's name is read from its own row and its next
  * prescription from the reader the plan uses — the stored AI plan as the workout screen reads it
  * (`readExerciseContext`), or the program as written with the lift's preference applied
- * (`staticNextExercise` → `buildWorkoutExercises`). The model is not involved.
+ * (`staticNextExercise` → `readSessionFromStoredState`, the reader the session screen and the Next workout card use). The model is not involved.
  */
 
 export type CoachAboutResult = { ok: true; about: CoachAbout } | { ok: false }

@@ -1206,6 +1206,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
 
   // ── Block Periodization ───────────────────────────────────────────────────
   async listProgramPhases(userId: string, programId: string): Promise<ProgramPhase[]> { return prog.listProgramPhases(this.db, userId, programId) }
+  async getProgramPhaseState(userId: string, programId: string): Promise<{ phases: ProgramPhase[]; sessionCounts: Map<string, number> }> { return prog.getProgramPhaseState(this.db, userId, programId) }
   async listPhaseSets(userId: string): Promise<PhaseSetWithPhases[]> { return prog.listPhaseSets(this.db, userId) }
   async createPhaseSet(userId: string, name: string, phases: Omit<ProgramPhase, 'id' | 'phaseSetId'>[]): Promise<PhaseSetWithPhases> { return prog.createPhaseSet(this.db, userId, name, phases) }
 

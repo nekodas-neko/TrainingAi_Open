@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { ScopedStorage } from '../storage/LocalStorage.ts';
+import { withDeadline } from './deadline.ts';
 
 // One kind of history, downloaded one key (a date, a month or a view name) at a time. `keys` is
 // ordered newest first, so an interrupted download has already saved the most useful days.
@@ -14,13 +15,21 @@ export type HistoryDomain = {
 // Thrown by a domain whose source is briefly busy: the download stops and carries on later
 // rather than skipping the key.
 export class RetryLater extends Error {}
-type Failure = 'offline' | 'account' | 'busy' | 'unreadable';
+// One request (a day, a month, a view) that gets no answer, and a run that has gone on this long,
+// each stop the download in a resumable state instead of leaving it "running" for good (#3906).
+export const HISTORY_REQUEST_MS = 40_000;
+export const HISTORY_RUN_MS = 10 * 60_000;
+export class NoAnswer extends Error {}
+class RunLong extends Error {}
+type Failure = 'offline' | 'account' | 'busy' | 'unreadable' | 'slow' | 'long';
 // An HTTP status or a reply that does not parse comes from the server; anything else thrown by a
 // read (a fetch that never connected) is the phone being offline.
 function classify(error: unknown): Failure {
   if (error instanceof RetryLater) {
     return 'busy';
   }
+  if (error instanceof NoAnswer) return 'slow';
+  if (error instanceof RunLong) return 'long';
   const status =
     error && typeof error === 'object' && 'status' in error && typeof error.status === 'number'
       ? error.status
@@ -37,6 +46,8 @@ function classify(error: unknown): Failure {
   return 'offline';
 }
 const failureText: Record<Exclude<Failure, 'unreadable'>, string> = {
+  slow: 'History download paused: a request got no answer. It carries on from where it stopped.',
+  long: 'History download paused to rest. It carries on from where it stopped.',
   offline:
     'History download paused: no connection. It carries on from where it stopped once you are online.',
   account: 'History download paused: check your account, then tap Resume.',
@@ -221,6 +232,7 @@ export class HistoryDownload {
     return this.running;
   }
   private async run(generation: number) {
+    const startedAt = Date.now();
     try {
       await this.save('running');
       for (const domain of this.domains) {
@@ -228,6 +240,7 @@ export class HistoryDownload {
           if (generation !== this.generation) {
             return;
           }
+          if (Date.now() - startedAt > HISTORY_RUN_MS) throw new RunLong();
           const item = domain.keys[index];
           const fetched = await this.fetch(domain, item, generation);
           if (generation !== this.generation) {
@@ -265,7 +278,17 @@ export class HistoryDownload {
   private async fetch(domain: HistoryDomain, key: string, generation: number) {
     for (let attempt = 1; ; attempt++) {
       try {
-        await domain.fetch(key);
+        // The read itself is not stopped; the cursor stays on this key, and a late save of it only
+        // overwrites the same keyed copy.
+        await withDeadline(
+          Promise.resolve().then(() => domain.fetch(key)),
+          HISTORY_REQUEST_MS,
+          'no answer',
+        ).catch((error: unknown) => {
+          throw error instanceof Error && error.message === 'no answer' && !(error instanceof RetryLater)
+            ? new NoAnswer('no answer')
+            : error;
+        });
         return true;
       } catch (error) {
         if (classify(error) !== 'unreadable' || generation !== this.generation) {
