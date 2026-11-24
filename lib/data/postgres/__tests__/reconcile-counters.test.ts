@@ -208,9 +208,9 @@ describe.skipIf(!canRun)('reconcileSessionsInPhase canonical definition (AI-5)',
     expect(row.rows[0].sessions_in_phase).toBe(0)
   })
 
-  // #3799 item 5: the phase moved mid warm-up. The session started before phase_started_at and was
-  // finished after it, so it ran in the new phase and counts there. It read `started_at` before.
-  it('a session started before the phase moved and completed after it counts, on reconcile, increment and delete', async () => {
+  // #4097 (it was #3799 item 5, which counted such a session in the new phase): a session that started before
+  // phase_started_at was trained in the phase before, whenever it was finished. Preview fixes its plan at Start.
+  it('a session started before the phase moved and completed after it belongs to the phase before, on reconcile, increment and delete', async () => {
     const { deleteWorkoutSession } = await import('@/lib/workout/delete-session')
     const { incrementSessionsInPhase } = await import('@/lib/data/postgres/slices/periodization')
     const read = async () => (await pool.query(
@@ -235,18 +235,28 @@ describe.skipIf(!canRun)('reconcileSessionsInPhase canonical definition (AI-5)',
     )
     await pool.query(`INSERT INTO set_logs (exercise_log_id, set_number, weight_kg, reps) VALUES ($1, 1, 100, 5)`, [el.rows[0].id])
 
+    await pool.query(`UPDATE session_periodization SET sessions_in_phase = 1 WHERE user_id = $1 AND program_session_id = $2`, [TEST_USER_ID, programSessionId])
     await reconcileSessionsInPhase(db, TEST_USER_ID, programId)
-    expect(await read()).toBe(1)
+    expect(await read()).toBe(0) // not counted in the phase it did not start in
 
-    // The increment follows the same rule: completed after the move counts, before it does not.
+    // The increment follows the same rule: it needs the start after the move, and the finish after it.
+    const startedBefore = new Date(Date.now() - 45 * 60_000)
+    await incrementSessionsInPhase(db, TEST_USER_ID, programSessionId, new Date(Date.now() - 5 * 60_000), { startedAt: startedBefore })
+    expect(await read()).toBe(0)
+    await incrementSessionsInPhase(db, TEST_USER_ID, programSessionId, new Date(Date.now() - 5 * 60_000), { startedAt: new Date(Date.now() - 20 * 60_000) })
+    expect(await read()).toBe(1)
+    await incrementSessionsInPhase(db, TEST_USER_ID, programSessionId, new Date(Date.now() - 60 * 60_000), { startedAt: new Date(Date.now() - 90 * 60_000) })
+    expect(await read()).toBe(1)
+    // A caller that names no start keeps the earlier rule (the completion only).
     await incrementSessionsInPhase(db, TEST_USER_ID, programSessionId, new Date(Date.now() - 5 * 60_000))
     expect(await read()).toBe(2)
-    await incrementSessionsInPhase(db, TEST_USER_ID, programSessionId, new Date(Date.now() - 60 * 60_000))
+    // The plan's phase must be the stored one.
+    await incrementSessionsInPhase(db, TEST_USER_ID, programSessionId, new Date(Date.now() - 5 * 60_000), { trainedPhase: 'deload' })
     expect(await read()).toBe(2)
 
-    await pool.query(`UPDATE session_periodization SET sessions_in_phase = 1 WHERE user_id = $1 AND program_session_id = $2`, [TEST_USER_ID, programSessionId])
+    // Deleting it decrements nothing: it was never counted here.
     await deleteWorkoutSession(TEST_USER_ID, id)
-    expect(await read()).toBe(0)
+    expect(await read()).toBe(2)
   })
 
   it('a session completed before the phase moved does not count in the new phase', async () => {

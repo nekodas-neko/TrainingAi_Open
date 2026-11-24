@@ -145,24 +145,37 @@ export async function completeWorkoutWithRepo(
     const periodizationState = await repo.getSessionPeriodization(userId, programSessionId).catch(() => null)
     // #4097: a Preview workout is uploaded only at its finish, so the stored plan may no longer be the one it
     // was trained on: voided by another type's phase move (no plan, status 'consumed'), or replaced by a plan
-    // made after Start. The phone says which plan it trained (`planGeneratedAt`), and a workout that trained one
-    // ran a prescription whatever is stored now. The rep-completion read of this session (signals.ts) is gated
-    // on it. Everything else a finish records (the sets' planned reps, weights and %, the 1RM, the deload
-    // flag) comes from the numbers the phone sent per set, never from the stored plan, so it is unaffected.
-    // The stored plan, whichever one it is, is still spent below: a session of this type has just been trained
-    // and the next plan must be made with it.
-    const trainedPlanAt = payload.planGeneratedAt ? new Date(payload.planGeneratedAt) : null
+    // made after Start. The phone says which plan it trained (`planGeneratedAt`) and the phase it was made for
+    // (`planPhase`); the stored plan is "the one trained" exactly when its generation time equals that
+    // identity. What follows from the comparison:
+    //  - `last_session_ran_prescription` (the rep-completion read of the next plan, signals.ts): true when a
+    //    plan was trained whatever is stored now; false when the phone says it trained none (explicit null:
+    //    the program as written, even if a plan was stored mid-workout); read from the stored status only
+    //    when the phone says nothing (an older build).
+    //  - the phase the workout belongs to, for the count (below): `planPhase`, else the stored plan's phase
+    //    when the stored plan is the trained one, else unknown.
+    //  - the stored plan, whichever one it is, is still spent: a session of this type has just been trained,
+    //    and a plan made before it finished was made without it. The next open makes a new one.
+    // Everything else a finish records (the sets' planned reps, weights and %, the 1RM) comes from the
+    // numbers the phone sent per set, never from the stored plan.
+    const sentIdentity = payload.planGeneratedAt
+    const trainedPlanAt = typeof sentIdentity === 'string' ? new Date(sentIdentity) : null
     const trainedAServedPlan = trainedPlanAt != null && !Number.isNaN(trainedPlanAt.getTime()) &&
       trainedPlanAt.getTime() <= completedAt.getTime() + COMPLETED_AT_FUTURE_TOLERANCE_MS
-    const ranPrescription =
-      trainedAServedPlan ||
+    const storedPlanWasTrained = trainedAServedPlan &&
+      periodizationState?.prescriptionGeneratedAt != null &&
+      periodizationState.prescriptionGeneratedAt.getTime() === trainedPlanAt!.getTime()
+    const legacyRanPrescription =
       periodizationState?.prescriptionStatus === 'accepted' ||
       periodizationState?.prescriptionStatus === 'auto_applied' ||
       (periodizationState?.prescriptionStatus === 'pending' && periodizationState?.prescription != null)
-    repo.setLastSessionRanPrescription(userId, programSessionId, ranPrescription).catch(() => {})
+    const ranPrescription = sentIdentity === null ? false : trainedAServedPlan || legacyRanPrescription
+    const trainedPhase = sentIdentity === null ? undefined
+      : payload.planPhase ?? (storedPlanWasTrained ? periodizationState?.phase : undefined)
+    repo.setLastSessionRanPrescription(userId, programSessionId, ranPrescription, existing.startedAt).catch(() => {})
 
     await repo.updatePrescriptionStatus(userId, programSessionId, 'consumed')
-    repo.incrementSessionsInPhase(userId, programSessionId, completedAt).catch(e =>
+    repo.incrementSessionsInPhase(userId, programSessionId, completedAt, { startedAt: existing.startedAt, trainedPhase }).catch(e =>
       console.error('incrementSessionsInPhase failed (advisory, workout completion unaffected):', e)
     )
 

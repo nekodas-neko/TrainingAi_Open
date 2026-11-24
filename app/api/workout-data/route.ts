@@ -16,7 +16,7 @@ import { latestIllnessFromDerived } from "@trainingai/shared/health/illness-rada
 import { isAiPrescriptionPending } from "@trainingai/shared/ai-periodization/prescription-pending";
 import { readProgramDeloadCheck } from "@trainingai/shared/ai-periodization/program-phase";
 import { moodMuscleMatches } from "@trainingai/shared/muscles";
-import type { AiPrescription } from "@trainingai/shared/types/ai-periodization";
+import type { AiPrescription, PeriodizationPhase } from "@trainingai/shared/types/ai-periodization";
 import {
   buildWorkoutExercises,
   aiDynamicFallbackPhaseStatus,
@@ -222,6 +222,7 @@ async function handleWorkoutData(req: NextRequest) {
       aiPrescriptionPending: boolean
       prescriptionSource?: AiPrescription['source']
       prescriptionGeneratedAt?: string
+      prescriptionPhase?: PeriodizationPhase
     }> = {}
 
     for (const programSession of program.sessions) {
@@ -256,6 +257,8 @@ async function handleWorkoutData(req: NextRequest) {
         // #4097: which plan drives the bar. The phone copies the plan at Start and echoes this with the
         // finish, so the server can tell the plan a workout trained from one made after it started.
         prescriptionGeneratedAt: read.aiDrivesLoad ? aiPeriodizationState?.prescriptionGeneratedAt?.toISOString() : undefined,
+        // The phase the plan was made for: the session's phase now (a move voids the plan, so a served plan is of it).
+        prescriptionPhase: read.aiDrivesLoad ? aiPeriodizationState?.phase : undefined,
       }
     }
 
@@ -611,6 +614,7 @@ async function handleWorkoutData(req: NextRequest) {
   const prescriptionSource = aiDrivesLoad ? aiPrescription!.source : undefined
   // #4097: the plan's identity, only while it drives the bar (absent otherwise, so other program kinds are unchanged).
   const prescriptionGeneratedAt = aiDrivesLoad ? aiPeriodizationState?.prescriptionGeneratedAt?.toISOString() : undefined
+  const prescriptionPhase = aiDrivesLoad ? aiPeriodizationState?.phase : undefined
 
-  return NextResponse.json({ exercises, program, session: programSession, phaseStatus: sessionPhaseStatus, dataDate: todayStr, aiPrescriptionPending, prescriptionSource, prescriptionGeneratedAt }, { headers: cacheHeaders });
+  return NextResponse.json({ exercises, program, session: programSession, phaseStatus: sessionPhaseStatus, dataDate: todayStr, aiPrescriptionPending, prescriptionSource, prescriptionGeneratedAt, prescriptionPhase }, { headers: cacheHeaders });
 }

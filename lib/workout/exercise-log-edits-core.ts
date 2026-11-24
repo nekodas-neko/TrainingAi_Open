@@ -267,20 +267,21 @@ export async function deleteExerciseLogWithRepo(
         )
         const programSessionId = wsRows[0]?.session_id ?? null
         const completedAt = wsRows[0]?.completed_at ?? null
+        const startedAt = wsRows[0]?.started_at ?? null
 
         await client.query('UPDATE workout_sessions SET deleted_at = $2, updated_at = $2 WHERE id = $1', [workoutSessionId, now])
         sessionDeleted = true
 
         // Completing a session increments sessions_in_phase, so deleting one must decrement
         // it — but only when the deleted session falls inside the current phase window
-        // (completed_at >= phase_started_at, #3799) AND was actually completed (canonical definition,
+        // (started_at >= phase_started_at, #4097; completed_at before that, #3799) AND was actually completed (canonical definition,
         // AI-5) — an abandoned session that never completed was never counted. A session from
         // a prior phase was already excluded from the current count, so decrementing for it
         // would under-count. Floor at 0.
         if (programSessionId && completedAt) {
           await client.query(
             DECREMENT_SESSIONS_IN_PHASE_SQL,
-            [userId, programSessionId, completedAt],
+            [userId, programSessionId, startedAt],
           )
         }
       }

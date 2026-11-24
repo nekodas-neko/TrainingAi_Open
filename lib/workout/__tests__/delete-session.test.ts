@@ -61,8 +61,8 @@ describe('deleteWorkoutSession', () => {
     expect(counter.text).toContain('sessions_in_phase - 1')
     expect(counter.text).toContain('>= phase_started_at')
     expect(counter.params[0]).toBe('user-1')
-    // #3799: the window is tested on the session's completion, not its start.
-    expect(counter.params[2]).toEqual(new Date('2026-07-01T09:00:00Z'))
+    // #4097: the window is tested on the session's start (a workout belongs to the phase it started in; #3799 had its completion).
+    expect(counter.params[2]).toEqual(new Date('2026-07-01T08:00:00Z'))
 
     expect(queries.some(q => q.text.includes('BEGIN'))).toBe(true)
     expect(queries.some(q => q.text.includes('COMMIT'))).toBe(true)

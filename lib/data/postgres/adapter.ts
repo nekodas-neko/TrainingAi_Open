@@ -8723,8 +8723,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async updatePrescriptionExercisesCache(userId: string, programSessionId: string, prescription: AiPrescription) { return period.updatePrescriptionExercisesCache(this.db, userId, programSessionId, prescription) }
   async replacePrescriptionIfUnchanged(userId: string, programSessionId: string, before: AiPrescription, after: AiPrescription) { return period.replacePrescriptionIfUnchanged(this.db, userId, programSessionId, before, after) }
   async storePendingTransition(userId: string, programSessionId: string, transition: PendingTransition | null) { return period.storePendingTransition(this.db, userId, programSessionId, transition) }
-  async incrementSessionsInPhase(userId: string, programSessionId: string, completedAt?: Date) { return period.incrementSessionsInPhase(this.db, userId, programSessionId, completedAt) }
-  async setLastSessionRanPrescription(userId: string, programSessionId: string, ranPrescription: boolean) { return period.setLastSessionRanPrescription(this.db, userId, programSessionId, ranPrescription) }
+  async incrementSessionsInPhase(userId: string, programSessionId: string, completedAt?: Date, trained?: { startedAt?: Date; trainedPhase?: PeriodizationPhase }) { return period.incrementSessionsInPhase(this.db, userId, programSessionId, completedAt, trained) }
+  async setLastSessionRanPrescription(userId: string, programSessionId: string, ranPrescription: boolean, startedAt?: Date) { return period.setLastSessionRanPrescription(this.db, userId, programSessionId, ranPrescription, startedAt) }
   async listSessionPeriodizationForProgram(userId: string, programId: string) { return period.listSessionPeriodizationForProgram(this.db, userId, programId) }
   async reconcileSessionsInPhase(userId: string, programId: string) { return period.reconcileSessionsInPhase(this.db, userId, programId) }
   async reconcileUserStats(userId: string) { return userStatsSlice.reconcileUserStats(this.db, userId) }

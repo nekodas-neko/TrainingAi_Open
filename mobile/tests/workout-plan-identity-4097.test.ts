@@ -13,7 +13,7 @@ import { workoutFixture } from './workout-fixture.ts';
 
 const PLAN = '2026-10-20T05:00:00.123Z';
 
-async function finishedWith(t: { after(fn: () => void): void }, planGeneratedAt: string | null | undefined) {
+async function finishedWith(t: { after(fn: () => void): void }, planGeneratedAt: string | null | undefined, planPhase?: 'accumulation') {
   const db = sqliteFixture();
   t.after(() => db.connection.close());
   const storage = await createLocalStorage(db.database);
@@ -24,6 +24,8 @@ async function finishedWith(t: { after(fn: () => void): void }, planGeneratedAt:
   await controller.initialize();
   await controller.sync();
   if (planGeneratedAt !== undefined) f.session.planGeneratedAt = planGeneratedAt;
+  else delete f.session.planGeneratedAt;
+  if (planPhase) f.session.planPhase = planPhase;
   const id = (await controller.start(f.session, programId, true))!;
   await controller.beginExercises(id);
   const [first] = controller.getSnapshot().data.workouts[0].exercises[0].sets;
@@ -43,12 +45,21 @@ test('the finish carries the identity of the plan the workout was started on (#4
   assert.equal(complete.workoutSessionId, done.id);
 });
 
-test('a session with no AI plan driving it sends no identity, as an older build did (#4097)', async (t) => {
-  for (const value of [null, undefined]) {
-    const { done, complete } = await finishedWith(t, value);
-    assert.equal(done.planGeneratedAt, null);
-    assert.equal('planGeneratedAt' in complete, false);
-  }
+test('a workout started on no AI plan says so (null); one from a catalogue that never asked says nothing (#4097)', async (t) => {
+  const none = await finishedWith(t, null);
+  assert.equal(none.done.planGeneratedAt, null);
+  assert.equal(none.complete.planGeneratedAt, null, 'an explicit null: it trained no plan');
+  assert.equal('planPhase' in none.complete, false);
+  const unknown = await finishedWith(t, undefined);
+  assert.equal(unknown.done.planGeneratedAt, undefined);
+  assert.equal('planGeneratedAt' in unknown.complete, false, 'a catalogue saved before this build: unknown, as an older build sent');
+});
+
+test('the finish carries the phase the plan was made for with its identity (#4097)', async (t) => {
+  const f = await finishedWith(t, PLAN, 'accumulation');
+  assert.equal(f.complete.planPhase, 'accumulation');
+  const noIdentity = await finishedWith(t, null, 'accumulation');
+  assert.equal('planPhase' in noIdentity.complete, false, 'a phase with no plan names nothing');
 });
 
 test('a journal saved before the field existed still reads, and finishes without an identity (#4097)', async (t) => {
@@ -56,7 +67,7 @@ test('a journal saved before the field existed still reads, and finishes without
   const saved = JSON.parse(JSON.stringify(controller.getSnapshot().data));
   delete saved.workouts[0].planGeneratedAt;
   const read = readJournal(JSON.stringify(saved), f.connection);
-  assert.equal(read.workouts[0].planGeneratedAt, null);
+  assert.equal(read.workouts[0].planGeneratedAt, undefined);
   const complete = mutationFor(read.workouts[0], read.workouts[0].pending.find((x) => x.domain === 'complete_workout')!);
   assert.equal('planGeneratedAt' in (complete.payload as object), false);
 });
@@ -70,7 +81,7 @@ test('the catalogue keeps the plan identity the server serves, and drops anythin
     return buildCatalog(f.meta, f.next, f.all, f.reader, 123).program!.sessions[0];
   };
   assert.equal(sessionOf(PLAN).planGeneratedAt, PLAN);
-  assert.equal(sessionOf(undefined).planGeneratedAt, null, 'a server that does not send it');
+  assert.equal(sessionOf(undefined).planGeneratedAt, null, 'a server that does not send it: no plan drove the bar');
   assert.equal(sessionOf('last Tuesday').planGeneratedAt, null);
   assert.equal(sessionOf(12345).planGeneratedAt, null);
   // It survives the saved catalogue, and a catalogue saved without it reads as having none.
@@ -78,5 +89,10 @@ test('the catalogue keeps the plan identity the server serves, and drops anythin
   assert.equal(readSavedCatalog(JSON.stringify(catalog), f.reader)!.program!.sessions[0].planGeneratedAt, PLAN);
   const older = JSON.parse(JSON.stringify(catalog));
   delete older.program.sessions[0].planGeneratedAt;
-  assert.equal(readSavedCatalog(JSON.stringify(older), f.reader)!.program!.sessions[0].planGeneratedAt, null);
+  assert.equal(readSavedCatalog(JSON.stringify(older), f.reader)!.program!.sessions[0].planGeneratedAt, undefined, 'unknown, not "no plan"');
+  // The phase the plan was made for is kept, and an unknown one is dropped.
+  const phased = (value: unknown) => buildCatalog(f.meta, f.next, { perSession: { 'session-one': { ...response, prescriptionGeneratedAt: PLAN, prescriptionPhase: value } } }, f.reader, 123).program!.sessions[0].planPhase;
+  assert.equal(phased('deload'), 'deload');
+  assert.equal(phased('warp'), null);
+  assert.equal(phased(undefined), null);
 });

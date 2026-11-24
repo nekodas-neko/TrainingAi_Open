@@ -55,6 +55,14 @@ export type PhaseRow = Pick<
 export interface ProgramCompletion {
   programSessionId: string
   completedAt: Date
+  /** When the workout started (#4097): the phase it belongs to is the one it STARTED in, whenever it was
+   *  finished. Absent: read as `completedAt` (the earlier rule). */
+  startedAt?: Date
+}
+
+/** The instant that decides which phase a completion belongs to. */
+function belongsFrom(c: ProgramCompletion): number {
+  return (c.startedAt ?? c.completedAt).getTime()
 }
 
 /** One session type's model answer, as it votes. */
@@ -142,7 +150,7 @@ export function programPhaseView(
   const lastTrainedThisWeek = new Map<string, Date>()
   for (const c of completions) {
     const week = trainingWeekOf(c.completedAt, tz)
-    if (c.completedAt.getTime() < phaseStartedAt.getTime()) {
+    if (belongsFrom(c) < phaseStartedAt.getTime()) {
       if (week === startWeek) startWeekBegunBefore = true
       continue
     }
@@ -409,7 +417,7 @@ export function planSwitchOver(
   let lastFinish: Date | null = null
   for (const r of counting) {
     const done = completions
-      .filter(c => c.programSessionId === r.programSessionId && c.completedAt.getTime() >= r.phaseStartedAt.getTime())
+      .filter(c => c.programSessionId === r.programSessionId && belongsFrom(c) >= r.phaseStartedAt.getTime())
       .map(c => c.completedAt)
       .sort((a, b) => a.getTime() - b.getTime())
     const finish = done[DELOAD_FLOOR - 1]

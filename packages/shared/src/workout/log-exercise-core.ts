@@ -122,7 +122,15 @@ export async function logExerciseWithRepo(
     // Only native sends `'full'`: the WebView sends `intensityMode` only for a deload and omits it for
     // full weight, and an outbox replay carries null. So anything but an explicit deload counts as full.
     const overriddenToFull = wasOverride === true && intensityMode !== 'deload';
-    if (periodizationState?.phase === 'deload' && !overriddenToFull) {
+    // #4097: what was TRAINED decides what is recorded. A Preview workout uploads at its finish, so the stored
+    // phase may have moved since it was started (a full workout uploaded after the program entered a deload
+    // was stored as one: 1RM 0, no record, counted as a deload session; a deload uploaded after the phase left
+    // it stored no phase at all). When the upload says how it was trained ('full' or 'deload'; native sends
+    // both, the WebView sends only 'deload'), that is the answer; without it (an older build, an outbox
+    // replay) the stored phase decides, exactly as before.
+    const trainedAsDeload = intensityMode === 'deload'
+      || (intensityMode !== 'full' && periodizationState?.phase === 'deload' && !overriddenToFull);
+    if (trainedAsDeload) {
       currentPhaseType = 'deload';
     } else if (periodizationState?.phase === 'baseline' && !periodizationState.baselineComplete) {
       // TN-75: the same test `workout-data` uses for `isAiDynamicBaseline`, so the server agrees

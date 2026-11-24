@@ -80,6 +80,7 @@ export async function tombstoneWorkoutSessionInTx(
   )
   const programSessionId = sessRows[0]?.session_id ?? null
   const completedAt = sessRows[0]?.completed_at ?? null
+  const startedAt = sessRows[0]?.started_at ?? null
 
   const ws = await client.query(
     `UPDATE workout_sessions SET deleted_at = $3, updated_at = $3 WHERE id = $1 AND user_id = $2`,
@@ -97,14 +98,14 @@ export async function tombstoneWorkoutSessionInTx(
 
   // Completing a session increments sessions_in_phase, so deleting one must
   // decrement it — but only when the deleted session fell inside the current
-  // phase window (completed_at >= phase_started_at, #3799) AND was actually completed
+  // phase window (started_at >= phase_started_at, #4097; completed_at before that, #3799) AND was actually completed
   // (canonical definition, AI-5) — an abandoned session that never completed
   // was never counted, so deleting it must not decrement. Floor at 0.
   let phaseCountersDecremented = 0
   if (programSessionId && completedAt) {
     const d = await client.query(
       DECREMENT_SESSIONS_IN_PHASE_SQL,
-      [userId, programSessionId, completedAt],
+      [userId, programSessionId, startedAt],
     )
     phaseCountersDecremented = d.rowCount ?? 0
   }

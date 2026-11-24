@@ -685,3 +685,38 @@ describe('generation follows the program', () => {
     expect(r).toMatchObject({ ok: false, status: 409 })
   })
 })
+
+// #4097: a workout belongs to the phase it STARTED in. The aligned program's window count reads the start.
+describe('a workout that started before the phase began belongs to the phase before (#4097)', () => {
+  const started = (id: string, startLocal: string, doneLocal: string): ProgramCompletion =>
+    ({ programSessionId: id, startedAt: at(startLocal), completedAt: at(doneLocal) })
+  const moveAt = at('2026-11-12T12:00:00') // a Thursday: the deload begins
+  const rows = [row('a', 'deload', moveAt), row('b', 'deload', moveAt)]
+
+  it('started on Wednesday, finished on Thursday after the move: not a deload session, and not a deload week', () => {
+    // Everything else is real deload sessions, in the weeks of 16 Nov and 23 Nov (the current week, not yet done).
+    const sessions = [
+      started('a', '2026-11-12T11:00:00', '2026-11-12T13:00:00'),
+      started('a', '2026-11-17T11:00:00', '2026-11-17T12:00:00'),
+      started('b', '2026-11-24T11:00:00', '2026-11-24T12:00:00'),
+    ]
+    const view = programPhaseView(rows, sessions, TZ, at('2026-11-26T12:00:00'))
+    // The week of 9 Nov holds only the straddling session, which was the phase before's: no stub week.
+    expect(view.trainingWeeksDone).toBe(1)
+    // The same workout counted by its finish (an earlier reading) would have made the week of the move count:
+    const byFinish = programPhaseView(rows, sessions.map(c => ({ ...c, startedAt: undefined })), TZ, at('2026-11-26T12:00:00'))
+    expect(byFinish.trainingWeeksDone).toBe(2)
+  })
+
+  it('this week: a straddling workout does not mark its type trained in the new phase', () => {
+    const view = programPhaseView(rows, [started('a', '2026-11-12T11:00:00', '2026-11-12T13:00:00')], TZ, at('2026-11-12T14:00:00'))
+    expect(view.trainedThisWeek.has('a')).toBe(false)
+    const real = programPhaseView(rows, [started('a', '2026-11-12T12:30:00', '2026-11-12T13:30:00')], TZ, at('2026-11-12T14:00:00'))
+    expect(real.trainedThisWeek.has('a')).toBe(true)
+  })
+
+  it('a completion that names no start reads as its finish, as before', () => {
+    const view = programPhaseView(rows, [{ programSessionId: 'a', completedAt: at('2026-11-12T13:00:00') }], TZ, at('2026-11-12T14:00:00'))
+    expect(view.trainedThisWeek.has('a')).toBe(true)
+  })
+})

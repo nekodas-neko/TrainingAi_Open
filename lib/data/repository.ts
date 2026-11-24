@@ -1491,8 +1491,8 @@ export interface WorkoutRepository {
   replacePrescriptionIfUnchanged?(userId: string, programSessionId: string, before: AiPrescription, after: AiPrescription): Promise<boolean>
   storePendingTransition(userId: string, programSessionId: string, transition: PendingTransition | null): Promise<void>
   /** #3799: `completedAt` set, the row is counted only when the phase began at or before it. */
-  incrementSessionsInPhase(userId: string, programSessionId: string, completedAt?: Date): Promise<void>
-  setLastSessionRanPrescription(userId: string, programSessionId: string, ranPrescription: boolean): Promise<void>
+  incrementSessionsInPhase(userId: string, programSessionId: string, completedAt?: Date, trained?: { startedAt?: Date; trainedPhase?: PeriodizationPhase }): Promise<void>
+  setLastSessionRanPrescription(userId: string, programSessionId: string, ranPrescription: boolean, startedAt?: Date): Promise<void>
 
   // `program_volume_targets` has no user_id column, so these take the userId and scope through
   // `programs` themselves rather than trusting the caller to have checked (Q-174).
