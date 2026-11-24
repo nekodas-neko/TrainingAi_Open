@@ -41,11 +41,10 @@ import {
   type PatchChange,
 } from '../patch'
 import {
-  liftPreferenceFromRow, preferenceAppliesIn, PREFERENCE_REP_CEILING, PREFERENCE_REP_FLOOR,
+  liftPreferenceFromRow, PREFERENCE_REP_CEILING, PREFERENCE_REP_FLOOR,
   PREFERENCE_REST_MAX_SEC, PREFERENCE_REST_MIN_SEC, type LiftPreference,
 } from '@trainingai/shared/ai-periodization/lift-preference'
-import { restatePlanRow, repRangeForRequest } from '@trainingai/shared/ai-periodization/lift-preference-restate'
-import { rewriteHeldRow, sameHoldRecord } from '@trainingai/shared/ai-periodization/checkin-plan-hold'
+import { planExcluded, restatePlan, repRangeForRequest } from '@trainingai/shared/ai-periodization/lift-preference-restate'
 import { normalizeStoredPrescription } from '@trainingai/shared/ai-periodization/reconcile-prescription'
 import { prescriptionDrivesLoad } from '@trainingai/shared/ai-periodization/apply-prescription'
 import { isAiPrescriptionPending } from '@trainingai/shared/ai-periodization/prescription-pending'
@@ -389,45 +388,6 @@ function driftOf(current: PrefColumns, accepted: LiftChange[]): Drift[] {
 }
 
 // ── Plans ────────────────────────────────────────────────────────────────────
-
-/** A plan a preference never applies in: a deload, or the baseline test (design §3a). */
-function planExcluded(plan: Pick<StoredPlan, 'phase' | 'prescription'>): 'deload' | 'baseline' | null {
-  const deload = plan.prescription.deload === true || plan.prescription.phase === 'deload'
-  const baseline = plan.phase === 'baseline'
-  if (preferenceAppliesIn({ deload, baseline })) return null
-  return baseline ? 'baseline' : 'deload'
-}
-
-/** The plan as generation would store it with `pref`, or the same object when nothing changes. */
-type RestateInputs = Pick<Context, 'slots' | 'trainingGoal' | 'bodyweight' | 'basisKg' | 'equipment'>
-export function restatePlan(ctx: RestateInputs, plan: Pick<StoredPlan, 'programSessionId' | 'phase' | 'prescription'>, pref: LiftPreference | null): AiPrescription {
-  if (planExcluded(plan)) return plan.prescription
-  const slotIds = new Map(ctx.slots.filter(x => x.programSessionId === plan.programSessionId).map(x => [x.sessionExerciseId, x.role]))
-  let changed = false
-  // #3890: a row the weekly check-in's hold lowered is restated from its own load, with the hold's
-  // ceiling put back over it (`rewriteHeldRow`), so the plan is still held and still knows its own load.
-  const hold = plan.prescription.checkinHold
-  const heldRows: NonNullable<AiPrescription['checkinHold']>['rows'] = { ...hold?.rows }
-  const exercises = plan.prescription.exercises.map(ex => {
-    const role = slotIds.get(ex.sessionExerciseId)
-    if (!role) return ex
-    const { row: out, held } = rewriteHeldRow(ex, hold, row => restatePlanRow(row, pref, {
-      trainingGoal: ctx.trainingGoal, phase: plan.prescription.phase, role,
-      bodyweight: ctx.bodyweight, basisKg: ctx.basisKg, equipment: ctx.equipment,
-      budgetHeldRest: plan.prescription.refitBaseline?.restSec?.[ex.sessionExerciseId] != null,
-    }))
-    if (hold?.rows[ex.sessionExerciseId]) {
-      if (held) heldRows[ex.sessionExerciseId] = held
-      else delete heldRows[ex.sessionExerciseId]
-    }
-    if (out !== ex) changed = true
-    return out
-  })
-  if (hold && !sameHoldRecord({ ...hold, rows: heldRows }, hold)) changed = true
-  if (!changed) return plan.prescription
-  const { checkinHold: _hold, ...rest } = plan.prescription
-  return { ...rest, exercises, ...(hold && Object.keys(heldRows).length > 0 && { checkinHold: { ...hold, rows: heldRows } }) }
-}
 
 /** One slot's numbers as the workout screen reads them: the stored plan through the read-side
  *  normalisation, and the bar `prescribedBar` gives. */

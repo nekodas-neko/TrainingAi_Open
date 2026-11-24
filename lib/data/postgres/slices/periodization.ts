@@ -8,6 +8,9 @@ import * as s from '../schema'
 import { shiftDateStr, dateStrMidnightInTz } from '@trainingai/shared/date-utils'
 import { normalizeMuscle } from '@trainingai/shared/muscles'
 import { holdsOneDayDeload } from '@trainingai/shared/ai-periodization/one-day-deload'
+import { preferencesFromRows, withCheckinHold } from '@trainingai/shared/ai-periodization/lift-preference-read'
+import { liftPreferencesStamp } from '@trainingai/shared/ai-periodization/lift-preference-moved'
+import { readExercisePreferenceRows } from './exercise-preferences'
 import { slotHoldsPlan } from '@trainingai/shared/ai-periodization/plan-status'
 import { sessionUnderWayCutoff } from '@trainingai/shared/ai-periodization/session-under-way'
 import { oneRmImplausible, MAX_PLAUSIBLE_ONE_RM_KG } from '@trainingai/shared/validation/plausibility'
@@ -725,7 +728,18 @@ export async function storePrescription(
   /** #4098 review: `read: true` from the check-in fit a READ makes: bounded, a miss answers false. */
   mode: LockMode = {},
 ): Promise<boolean> {
-  const run = (d: Db) => d
+  const run = (d: Db) => storePrescriptionRow(d, userId, programSessionId, prescription, expiresAt, status, generatedFor)
+  if (!mode.read) return (await run(db)).length > 0
+  const stored = await boundedReadWrite(db, async tx => (await run(tx)).length > 0)
+  return stored.done && stored.value
+}
+
+/** The one statement that stores a generated plan, guarded on the phase, its start and the structure stamp. */
+function storePrescriptionRow(
+  d: Db, userId: string, programSessionId: string, prescription: AiPrescription, expiresAt: Date,
+  status: PrescriptionStatus, generatedFor: GeneratedFor | undefined,
+) {
+  return d
     .update(s.sessionPeriodization)
     .set({
       prescription: prescription as unknown as Record<string, unknown>,
@@ -745,9 +759,40 @@ export async function storePrescription(
         : []),
     ))
     .returning({ id: s.sessionPeriodization.id })
-  if (!mode.read) return (await run(db)).length > 0
-  const stored = await boundedReadWrite(db, async tx => (await run(tx)).length > 0)
-  return stored.done && stored.value
+}
+
+/**
+ * #4007: a generation's store that refuses a plan whose lift preferences have moved since it read them.
+ *
+ * Generation reads the session's lift preferences at its start, then calls the model for seconds, then
+ * stores. A lift change landing in between (the Coach, the rep-range editor, a check-in save or undo)
+ * restates the stored plan at once, and a plain store then replaced that with a plan built from the old
+ * preferences. Holding the lift lock across the model call would queue the person's own taps behind a
+ * generation, so the lock is taken only here, AFTER the model: in one short transaction (`withProgramWriteLock`:
+ * the per-user lift lock first, then `lock_timeout` 4 s for the row wait, nothing slower than two selects
+ * and one UPDATE inside), the lifts' preferences are read again, and compared with the stamp the plan was
+ * built from (`liftPreferencesStamp`). Equal: the plan is stored, by the same statement as `storePrescription`.
+ * Not equal: nothing is written and the caller restates its plan for the current preferences
+ * (`restateForMovedPreferences`) and stores again. A wait past the bound is a `BusyError` (nothing written),
+ * which the caller answers by storing the plan as before: the paid plan is never lost (docs/lift-write-lock-order.md).
+ *
+ * A writer that holds the lift lock commits its preference row and its restated plan together, so this
+ * transaction sees either both or neither; the same lock is what keeps a writer from changing a preference
+ * between the read here and the store.
+ */
+export async function storePrescriptionIfPreferencesUnchanged(
+  db: Db, userId: string, programSessionId: string, prescription: AiPrescription, expiresAt: Date,
+  status: PrescriptionStatus, generatedFor: GeneratedFor | undefined,
+  guard: { names: string[]; weekStart: string; stamp: string },
+): Promise<'stored' | 'not_stored' | 'preferences_moved'> {
+  return withProgramWriteLock(db, userId, async tx => {
+    const rows = await readExercisePreferenceRows(tx as unknown as Db, userId, guard.names, undefined, guard.weekStart)
+    const { prefs, held } = preferencesFromRows(rows, guard.weekStart)
+    for (const name of held) withCheckinHold(prefs, name, guard.weekStart, null)
+    if (liftPreferencesStamp(prefs, guard.names) !== guard.stamp) return 'preferences_moved' as const
+    return (await storePrescriptionRow(tx as unknown as Db, userId, programSessionId, prescription, expiresAt, status, generatedFor)).length > 0
+      ? 'stored' as const : 'not_stored' as const
+  })
 }
 
 // Void the cached AI prescription for every session in a program, WITHOUT resetting

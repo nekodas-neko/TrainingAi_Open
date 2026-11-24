@@ -1466,6 +1466,11 @@ export interface WorkoutRepository {
    *  `generatedFor`, stored only while the slot is still in that phase and start (#3766), and while
    *  the session's structure stamp still matches when one is given (#3895); false if not. */
   storePrescription(userId: string, programSessionId: string, prescription: AiPrescription, expiresAt: Date, status?: PrescriptionStatus, generatedFor?: import('@trainingai/shared/types/ai-periodization').PrescriptionGeneratedFor, mode?: { read?: boolean }): Promise<boolean>
+  /** #4007: `storePrescription` that refuses a plan whose lift preferences moved since generation read them: under the
+   *  per-user lift-write lock, in one short transaction, the lifts' preferences and check-in holds are read again and
+   *  compared with `guard.stamp` (`liftPreferencesStamp`). 'preferences_moved' writes nothing (the caller restates its plan
+   *  and asks again); a wait past the lock's bound throws `BusyError`. Optional: a repository without it stores as before. */
+  storePrescriptionIfPreferencesUnchanged?(userId: string, programSessionId: string, prescription: AiPrescription, expiresAt: Date, status: PrescriptionStatus, generatedFor: import('@trainingai/shared/types/ai-periodization').PrescriptionGeneratedFor | undefined, guard: { names: string[]; weekStart: string; stamp: string }): Promise<'stored' | 'not_stored' | 'preferences_moved'>
   /** #3895: a stamp of what the session's plan is made from (budget and live exercises), read at a
    *  generation's start and re-checked by `storePrescription`. Null when the session is not the user's. */
   getSessionStructureStamp(userId: string, programSessionId: string): Promise<string | null>

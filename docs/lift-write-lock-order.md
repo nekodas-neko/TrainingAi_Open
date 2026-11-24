@@ -40,8 +40,9 @@ Code: `lib/coach/lock-wait.ts` (`lockLiftWrites`, `tryLiftWrites`, `withDomainLo
 | Rename against the program editor save and the Coach swap (`programs` and `session_exercises` in opposite orders) | not changed | #4096 |
 | Account deletion and the admin wipe (`slices/account-deletion.ts`, `DELETE FROM users` in one transaction) | none of the lift locks. Waits, exactly as the code sets them: for a **wipe** (`keepAccount`) only, `lock_timeout = '15s'` around the user-write advisory lock, then `lock_timeout = 0` (none) before the row lock and the cascade; a plain **account deletion** sets no `lock_timeout` at all. Both run `users ... FOR UPDATE` under the pool's 15 s `statement_timeout`, then the cascade under `SET LOCAL statement_timeout = '120s'` (`DELETION_STATEMENT_TIMEOUT`) | The cascade deletes the person's plan, preference and program rows in table order, not lift order. So a deletion racing a check-in save can **wait on plan rows for up to 120 s** (the cascade's statement timeout), and the save can wait on the `users` row (a foreign-key insert takes `KEY SHARE`, which the deletion's `FOR UPDATE` blocks) until its own 4 s bound answers busy. It is **not shown that it cannot cycle**: a save holding a plan row that then needs the `users` row, against a deletion holding the `users` row that then needs that plan row, is a cycle; Postgres's deadlock detector would end it (`40P01`, after `deadlock_timeout`, 1 s by default) and one side would roll back whole. That outcome is inferred from Postgres's behaviour, **not reproduced and not analysed further here**. Not given the lift lock: that would put a 4 s busy refusal into a data-destroying path, which is the owner's to decide (#4105) |
 | Admin exercise delete (`adapter.ts` `deleteExercise`, the foreign keys' `ON DELETE SET NULL`) | none; one statement | The `SET NULL` updates preference rows, session exercises and check-in rows that reference the exercise, across users, in one statement. A cycle needs a check-in or a Coach write on the same exercise at that moment; the outcome is the same as above (one side rolled back whole, repeatable). An admin catalogue write, rare; not given the lift lock for the same reason (#4105) |
+| A generation's store on the AI plan, `storePrescriptionIfPreferencesUnchanged` (#4007) | program lock (lift lock, then `lock_timeout` 4 s) → the lifts' preference rows (a plain select, no row lock) → the session's one plan row (one UPDATE) | takes the lift lock first, and holds one plan row for one statement. It is taken AFTER the model call and held for two statements, so no lock spans a model call |
 | Other Coach domains: apply and undo (goals, targets, program phase, early deload, injury, session exercise) | domain lock → that domain's rows | they touch none of the lift writers' rows; a session-exercise apply voids one plan row per statement and holds no second plan row while it waits |
-| `restateSpentOneShot`, `voidSessionPrescription`, `consumeLiftOneShot`, `storePrescription`, `exitDeload`, `advancePhase`, `storePendingTransition`, `incrementSessionsInPhase`, the decrement, `setLastSessionRanPrescription`, `updatePrescriptionStatus`, the cache and replace writers | none | one statement on one row each, released with the statement: they wait on a row, never while holding another |
+| `restateSpentOneShot`, `voidSessionPrescription`, `consumeLiftOneShot`, `storePrescription` (the plain store: a plan that carries no preference, a program that is not the AI plan, the check-in fit on a read, and the fallback below), `exitDeload`, `advancePhase`, `storePendingTransition`, `incrementSessionsInPhase`, the decrement, `setLastSessionRanPrescription`, `updatePrescriptionStatus`, the cache and replace writers | none | one statement on one row each, released with the statement: they wait on a row, never while holding another |
 | `replaceVolumeTargets`, phase-set and phase edits (`program_phases`), `updateProgramPhaseSettings`, `autoRecalibrateCycleAnchor`, `confirmEarlyDeload` | none | no lift writer touches `program_volume_targets` or `program_phases`; the others write one `programs` row |
 | On-device SQLite writers | none | not Postgres |
 
@@ -65,6 +66,38 @@ above as outside the order (rename against the editor, account deletion, the adm
   awaited; the pending-plan adoption, the check-in fit and hold, the preferences restate and the phase
   reconcile are awaited, which is why each is bounded. A write (the transition route, a generation, a
   save) keeps the 4 s wait.
+
+## The generation's store and a lift change made meanwhile (#4007)
+
+A generation reads the session's lift preferences (rep range, rest, a one-off step or ±1 set, the weekly
+check-in's hold) at its start, calls the model (seconds), and stores a plan built from them. A change made in
+between (the Coach, the rep-range editor, a check-in save or undo) restates the STORED plan at once, and the
+store then replaced that with a plan built from the old preferences. The lock cannot be held across the model
+call: that would queue the person's own taps and check-in behind a generation, and every rule above stands.
+
+So the lock is taken only at the store, after the model, in one short transaction
+(`storePrescriptionIfPreferencesUnchanged`, through `withProgramWriteLock`): the lifts' preferences are read
+again with the same select the start used (`readExercisePreferenceRows`) and compared with the stamp of what
+the plan was built from (`liftPreferencesStamp`: rep range, rest, one-off, whether the check-in holds the lift;
+not the hold's bar). Equal: the plan is stored by the same statement as before. Not equal: nothing is written, the
+generator restates the plan IT MADE for the preferences now in force (`restateForMovedPreferences`: the Coach's
+`restatePlan` for a lift whose range, rest or one-off moved, the stored-plan hold `holdStoredPrescription` for a
+lift whose hold moved; no model call) and asks again, at most 3 times. A writer that holds the lift lock commits
+its preference row and its restated plan together, so the store sees both or neither, and the same lock keeps a
+writer from changing a preference between the read and the store.
+
+- **Busy.** The lift lock waits the usual 4 s (two statements, so at most about 8 s); a miss is a `BusyError` and
+  nothing was written. The plan is already paid for, so the generator stores it as it always did (plain
+  `storePrescription`, the plan it holds, restated if an earlier attempt had restated it) and goes on. The same rule as
+  a busy phase move after the model (#4106, next section): no retry, no second model call. What is left in that
+  case is the old window: a change made meanwhile is not in that plan until it is next remade.
+- **Cost.** A generation with no change meanwhile adds one transaction after the model: the lock, one select, the
+  same UPDATE. Counted with a mocked model: 1 model call with or without a change, 0 wasted.
+- **Not covered.** A workout log that consumes a one-off takes no lift lock (one statement). The log's own restate and
+  the preferences read's retry (#4007) clean a stamp it leaves in a stored plan, so that case is healed by the
+  next preferences read, not by this store.
+- **Not taken.** Plans for `automatic` and `manual` programs, deload plans, a baseline, and a session with no lifts
+  store as before: they carry no preference the Coach restates.
 
 ## What a read may write
 

@@ -46,7 +46,10 @@ import { reconcilePrescription } from '@trainingai/shared/ai-periodization/recon
 import { buildPrescriptionShadow } from '@trainingai/shared/ai-periodization/prescription-shadow'
 import { loadSessionReads } from '@trainingai/shared/ai-periodization/session-read-plan'
 import { checkinBudgetApplies } from '@trainingai/shared/ai-periodization/checkin-plan-budget'
-import { loadLiftPreferences } from '@trainingai/shared/ai-periodization/lift-preference-read'
+import { liftWorkingBases, loadLiftPreferences } from '@trainingai/shared/ai-periodization/lift-preference-read'
+import {
+  liftPreferencesStamp, liftsWithMovedHold, liftsWithMovedPreference, restateForMovedPreferences,
+} from '@trainingai/shared/ai-periodization/lift-preference-moved'
 import { holdPlanRows } from '@trainingai/shared/ai-periodization/checkin-plan-hold'
 import { clampReps, preferenceAppliesIn, appliedAfterBudgetRest } from '@trainingai/shared/ai-periodization/lift-preference'
 import {
@@ -476,6 +479,9 @@ async function checkinSessionBudgetMin(repo: WorkoutRepository, userId: string, 
   }
 }
 
+/** How many times a store restates its plan for lift preferences that moved again between two attempts (#4007). */
+const MAX_PREFERENCE_RESTATES = 3
+
 async function runPrescriptionGeneration(
   userId: string,
   programSessionId: string,
@@ -559,19 +565,73 @@ async function runPrescriptionGeneration(
   // and read by nothing that builds it; a failed read stores no read and the plan is unchanged.
   // #3896: the session's lift preferences, read once for the session read and the plan.
   // #3890: with this week's check-in hold ("Heavy") in the same read, for the week the plan is made in.
-  const liftPreferences = await loadLiftPreferences(
-    repo, userId, (validSession.exercises ?? []).map(e => e.exerciseName), { checkinWeekStart: startOfWeekInTz(tz) },
-  )
+  const checkinWeekStart = startOfWeekInTz(tz)
+  const sessionLiftNames = (validSession.exercises ?? []).map(e => e.exerciseName)
+  const liftPreferences = await loadLiftPreferences(repo, userId, sessionLiftNames, { checkinWeekStart })
   const sessionReads = await loadSessionReads(repo, userId, activeProgram, validSession, tz, liftPreferences).catch(() => null)
-  const storePrescription = (p: AiPrescription, expiresAt: Date, status: 'pending' | 'auto_applied', storeFor: PrescriptionGeneratedFor) =>
-    repo.storePrescription(userId, programSessionId, {
-      ...p,
-      ...(sessionReads && sessionReads.length > 0 ? { sessionReads } : {}),
-      sessionsInPhaseAtPlan: state.sessionsInPhase,
-      // An aligned program's deload ends at its cap, not the type's count: the same once-only stamp,
-      // in the program's weeks.
-      ...(programPhase.aligned && { programWeeksDoneAtPlan: programPhase.trainingWeeksDone }),
-    }, expiresAt, status, storeFor)
+  // What the plan is built from, for the store to compare (#4007).
+  const builtFromPreferences = liftPreferencesStamp(liftPreferences, sessionLiftNames)
+  /** The stored plan carries what generation derived beside it. */
+  const withStoredExtras = (p: AiPrescription): AiPrescription => ({
+    ...p,
+    ...(sessionReads && sessionReads.length > 0 ? { sessionReads } : {}),
+    sessionsInPhaseAtPlan: state.sessionsInPhase,
+    // An aligned program's deload ends at its cap, not the type's count: the same once-only stamp,
+    // in the program's weeks.
+    ...(programPhase.aligned && { programWeeksDoneAtPlan: programPhase.trainingWeeksDone }),
+  })
+  /**
+   * Stores the plan and answers the plan as stored (false: the slot's phase, start or structure moved, so
+   * nothing was stored). On the AI plan the store also checks the lift preferences have not moved since
+   * they were read (#4007): a change made while the model was answering restated the stored plan, and a
+   * plain store would put the old preferences back. When they moved, this plan is restated for the ones in
+   * force now (`restateForMovedPreferences`, no model call) and stored again. Deload plans carry no
+   * preference and are stored as before.
+   */
+  const storePrescription = async (p: AiPrescription, expiresAt: Date, status: 'pending' | 'auto_applied', storeFor: PrescriptionGeneratedFor): Promise<AiPrescription | false> => {
+    const plain = async (plan: AiPrescription) =>
+      // Only an explicit `false` is a refused store, as it has always been read here.
+      (await repo.storePrescription(userId, programSessionId, withStoredExtras(plan), expiresAt, status, storeFor)) === false ? false : plan
+    if (!aiPlan || p.deload || state.phase === 'baseline' || sessionLiftNames.length === 0
+      || typeof repo.storePrescriptionIfPreferencesUnchanged !== 'function') return plain(p)
+    let plan = p
+    let stamp = builtFromPreferences
+    for (let attempt = 0; attempt < MAX_PREFERENCE_RESTATES; attempt++) {
+      let outcome: Awaited<ReturnType<NonNullable<WorkoutRepository['storePrescriptionIfPreferencesUnchanged']>>> | undefined
+      try {
+        outcome = await repo.storePrescriptionIfPreferencesUnchanged(
+          userId, programSessionId, withStoredExtras(plan), expiresAt, status, storeFor,
+          { names: sessionLiftNames, weekStart: checkinWeekStart, stamp },
+        )
+      } catch (err) {
+        // The lift lock stayed busy past its 4 s: nothing was written. The plan is paid for, so it is stored
+        // as it always was (the same rule as a busy phase move after the model, #4106) rather than lost.
+        if (!isBusyError(err)) throw err
+        return plain(plan)
+      }
+      if (outcome === 'stored') return plan
+      if (outcome === 'not_stored') return false
+      if (outcome !== 'preferences_moved') return plain(plan)
+      // A lift changed while the model was answering. Restate the plan generation made, for the preferences now.
+      try {
+        const current = await loadLiftPreferences(repo, userId, sessionLiftNames, { checkinWeekStart })
+        // Every store comes after the signals were built; a null here would be a store before them.
+        if (!signals) return plain(plan)
+        const lifts = signals.exercises.map(e => ({
+          sessionExerciseId: e.sessionExerciseId, name: e.name, role: e.role, equipment: e.equipment, bodyweight: e.exerciseType === 'bodyweight',
+        }))
+        const ctx = { programSessionId, phase: storeFor.phase as PeriodizationPhase, trainingGoal: signals.trainingGoal, weekStart: checkinWeekStart, lifts, built: liftPreferences, current }
+        const moved = new Set([...liftsWithMovedPreference(ctx), ...liftsWithMovedHold(ctx)])
+        const bases = await liftWorkingBases(repo, userId, [...moved], moved.size > 0 ? await repo.listPersonalRecords(userId) : new Map())
+        plan = restateForMovedPreferences(p, { ...ctx, basisKg: name => bases.get(name) ?? null })
+        stamp = liftPreferencesStamp(current, sessionLiftNames)
+      } catch (err) {
+        console.error('[prescribe] restating the plan for lift preferences that moved failed; storing it as generated:', err)
+        return plain(plan)
+      }
+    }
+    return plain(plan)
+  }
   // #3766: the phase this plan is made in. A program move while it is being made (another session's
   // tap or auto-apply) voids this slot; the plan is then not stored (`storePrescription` checks the
   // slot is still in this phase and start), so the slot regenerates in the new phase.
@@ -786,9 +846,9 @@ async function runPrescriptionGeneration(
       if (stored === false) return PHASE_MOVED
       return {
         ok: true,
-        prescription: rules,
+        prescription: stored,
         prescriptionStatus: status,
-        estimatedSessionDurationMin: rules.estimatedSessionDurationMin,
+        estimatedSessionDurationMin: stored.estimatedSessionDurationMin,
       }
     }
     // No exercise in the session carries a progression style, so there are no numbers to fall
@@ -1301,18 +1361,17 @@ async function runPrescriptionGeneration(
   // status to 'pending') and then set 'auto_applied' in a second statement; two concurrent
   // generations for this session could interleave between them and leave the status describing the
   // other run's prescription (Q-54).
-  if (await storePrescription(prescription, expiresAt, prescriptionStatus, storeFor) === false) {
-    return PHASE_MOVED
-  }
+  const stored = await storePrescription(prescription, expiresAt, prescriptionStatus, storeFor)
+  if (stored === false) return PHASE_MOVED
 
   // BF-199 Phase 1: record what the rules prescriber would have said beside what was given.
   // Best-effort and after the store: evidence must never cost the lifter a plan.
   await (async () => repo.recordPrescriptionShadow(userId, programSessionId, buildPrescriptionShadow({
-    modelPhase, modelPhaseAction, final: prescription, rules: buildRulesPrescription(signals, ''), modelExercises,
+    modelPhase, modelPhaseAction, final: stored, rules: buildRulesPrescription(signals, ''), modelExercises,
   })))().catch(err => console.error('[prescribe] shadow record failed (ignored):', err))
 
   // The stored plan's own estimate (a forced move into deload is costed by the engine's deload, review G).
-  return { ok: true, prescription, prescriptionStatus, estimatedSessionDurationMin: prescription.estimatedSessionDurationMin }
+  return { ok: true, prescription: stored, prescriptionStatus, estimatedSessionDurationMin: stored.estimatedSessionDurationMin }
 }
 
 /** #3766: while the program waits for its switch-over, a move on offer is this type's alone (the
