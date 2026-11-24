@@ -467,7 +467,7 @@ describe.skipIf(!canRun)('repository ownership scoping — sweep survivors (#242
   // is the argument, not a leak — the `after` check carries the real assertion instead.
   type Writer = [name: string, call: (r: Repo) => Promise<unknown>, after?: (v: unknown) => Promise<void> | void, opts?: { echoes: true }]
   const WRITERS: Writer[] = [
-    ['completeWorkoutSession', r => r.completeWorkoutSession(bOpenSession, USER_A, AT)],
+    ['completeWorkoutSession', r => r.completeWorkoutSession(bOpenSession, USER_A, AT, undefined, 'deload')],
     ['setSessionRpe', r => r.setSessionRpe(USER_A, bId('workout_sessions'), 9)],
     ['setWorkoutSessionWarmupEnd', r => r.setWorkoutSessionWarmupEnd(USER_A, bId('workout_sessions'), AT)],
     ['confirmScaleSample', r => r.confirmScaleSample(USER_A, bNum('scale_raw_samples'))],
@@ -544,7 +544,7 @@ describe.skipIf(!canRun)('repository ownership scoping — sweep survivors (#242
     ['clearProgramPrescriptions', r => r.clearProgramPrescriptions(USER_A, bId('programs'))],
     ['updatePrescriptionStatus', r => r.updatePrescriptionStatus(USER_A, bId('program_sessions'), 'expired' as never)],
     ['storePendingTransition', r => r.storePendingTransition(USER_A, bId('program_sessions'), null)],
-    ['incrementSessionsInPhase', r => r.incrementSessionsInPhase(USER_A, bId('program_sessions'))],
+    ['incrementSessionsInPhase', r => r.incrementSessionsInPhase(USER_A, bId('program_sessions'), bId('workout_sessions'))],
     ['reconcileSessionsInPhase', r => r.reconcileSessionsInPhase(USER_A, bId('programs'))],
     ['setLastSessionRanPrescription', r => r.setLastSessionRanPrescription(USER_A, bId('program_sessions'), true)],
     ['revertAutoAdoptedBaseline', r => r.revertAutoAdoptedBaseline(USER_A, bId('program_sessions'))],

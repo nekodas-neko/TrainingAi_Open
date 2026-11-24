@@ -9,7 +9,7 @@ import {
 } from '@trainingai/shared/workout/effort-vs-plan';
 import type { PendingWrite } from '../../../core/sync/pushMutation.ts';
 import { rejectionSchema } from '../../../core/sync/set-aside.ts';
-import type { CatalogIdentity, SessionPreview } from '../catalog.ts';
+import { PLAN_PHASES, type CatalogIdentity, type SessionPreview } from '../catalog.ts';
 import { workoutFlow } from './flow.ts';
 import { dropOpenDefaults, dropUnseenDefaults, effortPayload } from './effort.ts';
 import { measuredExerciseTiming } from './timing.ts';
@@ -101,6 +101,12 @@ const workoutSchema = z.object({
   phaseDetail: z.string().nullable().default(null),
   isBaseline: z.boolean(),
   fromSavedPlan: z.boolean(),
+  // #4097: the AI plan this workout was trained on (its `prescription_generated_at`), copied at Start and
+  // sent with the finish. A workout saved before this build reads as having none.
+  // Absent in a workout saved before this build: unknown, so the finish says nothing about it. `null` is a
+  // workout started on no AI plan, which the finish says.
+  planGeneratedAt: z.string().datetime().max(40).nullable().optional(),
+  planPhase: z.enum(PLAN_PHASES).nullable().optional(),
   startedAt: timestamp,
   warmupEndedAt: timestamp.nullable().default(null),
   warmupGoalSeconds: z.number().int().positive().default(600),
@@ -433,6 +439,8 @@ export function createWorkout(
     phaseDetail: session.phaseDetail ?? session.phase,
     isBaseline: session.isBaseline,
     fromSavedPlan,
+    planGeneratedAt: session.planGeneratedAt,
+    planPhase: session.planPhase,
     startedAt: now,
     warmupEndedAt: null,
     warmupGoalSeconds:
@@ -530,6 +538,11 @@ export function mutationFor(
       payload: CompleteWorkoutPayloadSchema.parse({
         workoutSessionId: workout.id,
         completedAtMs: workout.completedAt,
+        // #4097: which plan the workout was trained on, since the server may have replaced it meanwhile.
+        // `null`: it trained no plan (the program as written, whatever was stored since). Left out when this
+        // workout was saved before the build knew to say.
+        ...(workout.planGeneratedAt !== undefined ? { planGeneratedAt: workout.planGeneratedAt } : {}),
+        ...(workout.planGeneratedAt && workout.planPhase ? { planPhase: workout.planPhase } : {}),
         // Only a workout that was paused says so: the rest stay as they were before pause existed.
         ...(workout.pausedMs > 0 ? { pausedSec: Math.round(workout.pausedMs / 1000) } : {}),
       }),

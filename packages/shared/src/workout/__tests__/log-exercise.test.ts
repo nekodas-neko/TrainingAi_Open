@@ -226,10 +226,25 @@ describe('logExerciseFromPayload — a deload overridden to full weight (#3877)'
     expect(result.isPR).toBe(false)
   })
 
-  it('full weight without an override (the plan itself) is still the phase\'s deload', async () => {
+  // #4097: what was trained decides. A workout that says it was trained at full weight is full whatever the stored
+  // phase is by the time it uploads; one that says nothing (an older build, the WebView's full weight) still
+  // takes the stored phase, as before.
+  it('an upload that says full weight is full, even when the stored phase has since become the deload', async () => {
     const result = await logExerciseFromPayload('u1', { ...basePayload, intensityMode: 'full', wasOverride: false }, TZ)
+    expect(result.estimated1rm).toBeGreaterThan(0)
+    expect(createWorkoutSession).toHaveBeenCalledWith('u1', 'ps-1', 'Push', expect.any(Date), undefined, undefined, false, 'full', false)
+  })
+
+  it('an upload that says nothing about how it was trained is the stored phase\'s deload, as before', async () => {
+    const result = await logExerciseFromPayload('u1', { ...basePayload, intensityMode: undefined, wasOverride: false }, TZ)
     expect(result.estimated1rm).toBe(0)
     expect(result.isPR).toBe(false)
+  })
+
+  it('an upload that says deload is a deload whatever the stored phase is', async () => {
+    getSessionPeriodization.mockResolvedValue({ phase: 'accumulation', baselineComplete: true } as never)
+    const result = await logExerciseFromPayload('u1', { ...basePayload, intensityMode: 'deload', wasOverride: false }, TZ)
+    expect(result.estimated1rm).toBe(0)
   })
 
   // #3888: with no `workoutSessionId` and no open session of that name, the create branch stored

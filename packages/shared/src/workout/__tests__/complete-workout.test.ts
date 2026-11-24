@@ -45,7 +45,7 @@ describe('completeWorkoutFromPayload', () => {
     expect(result).toEqual({ alreadyCompleted: false, programSessionId: 'ps-1' })
     expect(completeWorkoutSession).toHaveBeenCalledTimes(1)
     expect(updatePrescriptionStatus).toHaveBeenCalledWith('u1', 'ps-1', 'consumed')
-    expect(incrementSessionsInPhase).toHaveBeenCalledWith('u1', 'ps-1', expect.any(Date))
+    expect(incrementSessionsInPhase).toHaveBeenCalledWith('u1', 'ps-1', 'ws-1')
   })
 
   it('is idempotent on replay: never double-consumes the prescription or double-increments the phase counter', async () => {
@@ -176,7 +176,7 @@ describe('completeWorkoutFromPayload', () => {
 
         await completeWorkoutFromPayload('u1', { workoutSessionId: 'ws-1' })
 
-        expect(setLastSessionRanPrescription).toHaveBeenCalledWith('u1', 'ps-1', true)
+        expect(setLastSessionRanPrescription).toHaveBeenCalledWith('u1', 'ps-1', true, expect.any(Date))
       },
     )
 
@@ -187,7 +187,7 @@ describe('completeWorkoutFromPayload', () => {
 
       await completeWorkoutFromPayload('u1', { workoutSessionId: 'ws-1' })
 
-      expect(setLastSessionRanPrescription).toHaveBeenCalledWith('u1', 'ps-1', true)
+      expect(setLastSessionRanPrescription).toHaveBeenCalledWith('u1', 'ps-1', true, expect.any(Date))
     })
 
     it('records ranPrescription=false when pending but no prescription is stored', async () => {
@@ -197,7 +197,7 @@ describe('completeWorkoutFromPayload', () => {
 
       await completeWorkoutFromPayload('u1', { workoutSessionId: 'ws-1' })
 
-      expect(setLastSessionRanPrescription).toHaveBeenCalledWith('u1', 'ps-1', false)
+      expect(setLastSessionRanPrescription).toHaveBeenCalledWith('u1', 'ps-1', false, expect.any(Date))
     })
 
     it.each(['none', 'dismissed', 'consumed'] as const)(
@@ -209,7 +209,7 @@ describe('completeWorkoutFromPayload', () => {
 
         await completeWorkoutFromPayload('u1', { workoutSessionId: 'ws-1' })
 
-        expect(setLastSessionRanPrescription).toHaveBeenCalledWith('u1', 'ps-1', false)
+        expect(setLastSessionRanPrescription).toHaveBeenCalledWith('u1', 'ps-1', false, expect.any(Date))
       },
     )
 
@@ -220,7 +220,7 @@ describe('completeWorkoutFromPayload', () => {
 
       await completeWorkoutFromPayload('u1', { workoutSessionId: 'ws-1' })
 
-      expect(setLastSessionRanPrescription).toHaveBeenCalledWith('u1', 'ps-1', false)
+      expect(setLastSessionRanPrescription).toHaveBeenCalledWith('u1', 'ps-1', false, expect.any(Date))
     })
 
     it('does not record on a replayed (already-completed) session', async () => {
@@ -273,5 +273,62 @@ describe('resolveCompletedAt', () => {
 
   it('falls back to server time when absent, as before', () => {
     expect(resolveCompletedAt(undefined, startedAt, now)).toEqual(now)
+  })
+})
+
+// #4097: the finish names the plan the workout was trained on.
+describe('CompleteWorkoutPayloadSchema planGeneratedAt and planPhase (#4097)', () => {
+  const base = { workoutSessionId: '00000000-0000-4000-8000-000000000001', completedAtMs: 1_795_000_000_000 }
+  const parse = async (extra: Record<string, unknown>) => {
+    const { CompleteWorkoutPayloadSchema } = await import('../complete-payload')
+    return CompleteWorkoutPayloadSchema.safeParse({ ...base, ...extra })
+  }
+  it('accepts the identity, an explicit null (trained no plan), and an older build that sends none', async () => {
+    const { CompleteWorkoutPayloadSchema } = await import('../complete-payload')
+    expect(CompleteWorkoutPayloadSchema.parse({ ...base, planGeneratedAt: '2026-10-20T05:00:00.123Z' }).planGeneratedAt).toBe('2026-10-20T05:00:00.123Z')
+    expect(CompleteWorkoutPayloadSchema.parse({ ...base, planGeneratedAt: null }).planGeneratedAt).toBeNull()
+    expect('planGeneratedAt' in CompleteWorkoutPayloadSchema.parse(base)).toBe(false)
+    expect('planPhase' in CompleteWorkoutPayloadSchema.parse(base)).toBe(false)
+  })
+  it('drops anything that is not a believable timestamp rather than refusing the completion', async () => {
+    const future = new Date(Date.now() + 3 * 3_600_000).toISOString()
+    for (const bad of ['yesterday', 17, '2026-10-20T05:00:00Z'.repeat(4), '2001-01-01T00:00:00.000Z', future]) {
+      const parsed = await parse({ planGeneratedAt: bad })
+      expect(parsed.success).toBe(true)
+      expect(parsed.success && parsed.data.planGeneratedAt).toBeUndefined()
+    }
+  })
+  it('allows a little clock skew ahead, and reads the phase', async () => {
+    const soon = new Date(Date.now() + 2 * 60_000).toISOString()
+    const parsed = await parse({ planGeneratedAt: soon, planPhase: 'deload' })
+    expect(parsed.success && parsed.data).toMatchObject({ planGeneratedAt: soon, planPhase: 'deload' })
+    const unknown = await parse({ planPhase: 'warp' })
+    expect(unknown.success && unknown.data.planPhase).toBeUndefined()
+  })
+})
+
+// #4119: the plan phase the phone names is stored in the statement that stamps the completion, and the
+// increment reads the workout as stored (it is given the workout's id, not a value to trust).
+describe('the finish stores the plan phase (#4119)', () => {
+  const completedAtMs = 1_795_000_000_000
+  beforeEach(() => {
+    getWorkoutSessionById.mockResolvedValue({ id: 'ws-1', startedAt: new Date(completedAtMs - 3_600_000), completedAt: null })
+    getWorkoutSessionProgramSessionId.mockResolvedValue('ps-1')
+  })
+  it('passes planPhase to the stamping call', async () => {
+    await completeWorkoutFromPayload('u1', { workoutSessionId: 'ws-1', completedAtMs, planPhase: 'accumulation' })
+    expect(completeWorkoutSession).toHaveBeenCalledWith('ws-1', 'u1', new Date(completedAtMs), undefined, 'accumulation')
+  })
+  it('keeps the pause and the plan phase together', async () => {
+    await completeWorkoutFromPayload('u1', { workoutSessionId: 'ws-1', completedAtMs, pausedSec: 600, planPhase: 'deload' })
+    expect(completeWorkoutSession).toHaveBeenCalledWith('ws-1', 'u1', new Date(completedAtMs), 600, 'deload')
+  })
+  it('an older payload says nothing: the call is the three-argument one it always was', async () => {
+    await completeWorkoutFromPayload('u1', { workoutSessionId: 'ws-1', completedAtMs })
+    expect(completeWorkoutSession.mock.calls[0]).toHaveLength(3)
+  })
+  it('the increment is given the workout id and no value of its own: a plan phase is read from the stored row', async () => {
+    await completeWorkoutFromPayload('u1', { workoutSessionId: 'ws-1', completedAtMs, planPhase: 'deload', planGeneratedAt: '2026-11-01T00:00:00.000Z' })
+    expect(incrementSessionsInPhase).toHaveBeenCalledWith('u1', 'ps-1', 'ws-1')
   })
 })

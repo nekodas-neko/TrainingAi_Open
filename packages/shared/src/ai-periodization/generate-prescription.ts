@@ -1186,8 +1186,12 @@ async function runPrescriptionGeneration(
   // a deload phase (#2402). The deload zone's numbers were a second source for one thing (3×6 @ 55 %
   // against the engine's 2×6 @ 50 % on strength). The guards below then write the move on it as on any
   // plan; the phase and action are the model's settled ones so they can.
+  // #4079: the autoregulation pass above already wrote a lift's "You said it felt …, this is a deload
+  // week" sentence (it ran in `loadPhase` = deload) but this plan is built apart from its rows, so the
+  // sentence is carried onto the row's deload note, where a deloaded row's note is read from. Only a
+  // row with no note of its own takes it; no number moves.
   const engineDeload = forcedMove === 'deload'
-    ? buildWholeSessionDeloadPrescription(signals, parsed.reasoning)
+    ? withEffortNotes(buildWholeSessionDeloadPrescription(signals, parsed.reasoning), autoreg.notes)
     : null
   const builtPrescription: AiPrescription = engineDeload ? {
     ...engineDeload,
@@ -1398,6 +1402,18 @@ function withProgramMove(
 function joinNotes(...notes: Array<string | undefined>): string | undefined {
   const kept = notes.filter((n): n is string => !!n)
   return kept.length > 0 ? kept.join(' · ') : undefined
+}
+
+/** #4079: puts the notes the autoregulation pass wrote (by `sessionExerciseId`) on the engine's
+ *  deload rows as their deload note. A row that already has a deload note keeps it; nothing is worded
+ *  here and no number is read or changed. */
+function withEffortNotes(prescription: AiPrescription, notes: Record<string, string>): AiPrescription {
+  if (Object.keys(notes).length === 0) return prescription
+  return {
+    ...prescription,
+    exercises: prescription.exercises.map(ex =>
+      !ex.deloadNote && notes[ex.sessionExerciseId] ? { ...ex, deloadNote: notes[ex.sessionExerciseId] } : ex),
+  }
 }
 
 /**

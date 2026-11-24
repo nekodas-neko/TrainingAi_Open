@@ -63,6 +63,14 @@ export type SessionPreview = {
   exercises: ExercisePreview[];
   phase: string | null;
   prescriptionPending: boolean;
+  /**
+   * #4097: `prescription_generated_at` of the AI plan that drives this session's numbers, as the server served
+   * it. Copied into the workout at Start and sent with the finish, so the server knows which plan was trained.
+   * Null when no AI plan drives it (and from a server that does not send it).
+   */
+  planGeneratedAt?: string | null;
+  /** #4097: the phase that plan was made for (the session's phase when the server served it), sent with the finish. */
+  planPhase?: PlanPhase | null;
   isBaseline: boolean;
   icon?: string | null;
   phaseDetail?: string | null;
@@ -168,6 +176,12 @@ function optionalText(value: unknown) {
     return null;
   }
   return text(value);
+}
+export const PLAN_PHASES = ['baseline', 'accumulation', 'intensification', 'realisation', 'deload'] as const;
+export type PlanPhase = (typeof PLAN_PHASES)[number];
+/** The phase a served plan was made for, or null. Never throws: an unknown value only means none is sent. */
+export function planPhaseOf(value: unknown): PlanPhase | null {
+  return PLAN_PHASES.find((phase) => phase === value) ?? null;
 }
 /** An ISO time the server stamped, or null. Never throws: an unknown value only means no echo. */
 export function oneShotTime(value: unknown): string | null {
@@ -441,6 +455,8 @@ export function buildCatalog(
         exercises,
         phase,
         prescriptionPending: data.aiPrescriptionPending,
+        planGeneratedAt: oneShotTime(data.prescriptionGeneratedAt),
+        planPhase: planPhaseOf(data.prescriptionPhase),
         isBaseline: data.phaseStatus != null && object(data.phaseStatus).isBaseline === true,
         icon: optionalText(session.icon),
         phaseDetail,
@@ -559,6 +575,10 @@ export function readSavedCatalog(
         ) {
           throw new Error('Invalid saved prescription status.');
         }
+        // #4097: a catalogue saved before this build has no such key: "unknown", not "no plan". Only a build
+        // that knew to ask says there was none (null), and only that is sent to the server as such.
+        if ('planGeneratedAt' in session) session.planGeneratedAt = oneShotTime(session.planGeneratedAt);
+        if ('planPhase' in session) session.planPhase = planPhaseOf(session.planPhase);
         const exercises = array(session.exercises);
         unique(
           exercises.map((value) => {

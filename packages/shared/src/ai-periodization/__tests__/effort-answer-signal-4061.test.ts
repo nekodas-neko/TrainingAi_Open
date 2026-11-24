@@ -9,7 +9,7 @@ import {
   RPE_DEAD_BAND, TAPPED_EASIER_RPE_DELTA, TAPPED_HARDER_RPE_DELTA,
   computeRpeAdjustment, effortRpeDelta, tappedEffort, type AutoregSignal,
 } from '../autoregulation'
-import { buildUserPrompt, promptLineName } from '../prompt'
+import { buildUserPrompt, promptLineName, UNNAMED_PROMPT_LINE_NAME } from '../prompt'
 import { perExerciseRpeDelta, rpeTrendFromSets } from '../expected-rpe'
 import { deriveSessionRpe, sessionEffort } from '../../workout/derive-session-rpe'
 import { isReportedRpe } from '../../workout/rpe-source'
@@ -162,6 +162,27 @@ describe('a user-named exercise on a prompt line (#4061)', () => {
 
   it('an ordinary name is passed through unchanged', () => {
     expect(promptLineName('Incline DB Press (neutral grip)')).toBe('Incline DB Press (neutral grip)')
+  })
+
+  it('a run of spaces, tabs or a non-breaking space becomes one space (#4079)', () => {
+    expect(promptLineName('Incline  DB   Press')).toBe('Incline DB Press')
+    expect(promptLineName('  Incline\tDB  Press  ')).toBe('Incline DB Press')
+  })
+
+  it('a name of nothing but whitespace reads as an unnamed exercise, never an empty name (#4079)', () => {
+    for (const blank of ['', ' ', '   ', '\n', ' \t\r\n ', ' 　']) {
+      expect(promptLineName(blank), JSON.stringify(blank)).toBe(UNNAMED_PROMPT_LINE_NAME)
+    }
+    expect(UNNAMED_PROMPT_LINE_NAME).toBe('Unnamed exercise')
+  })
+
+  it('an all-space name prints as the fallback in both prompt lines, and nowhere as an empty name (#4079)', () => {
+    const s = signals({ exercises: [exercise('p', 'primary', 'quadriceps')] })
+    s.exercises[0].name = '   '
+    s.exercises[0].effortAnswer = 1
+    const lines = buildUserPrompt(s, state, '2026-11-21').split('\n')
+    expect(lines.find(l => l.includes('(id: p,'))).toMatch(/^ {2}- Unnamed exercise \(id: p,/)
+    expect(lines.find(l => l.startsWith('Effort answer'))).toMatch(/: Unnamed exercise: harder than expected$/)
   })
 })
 

@@ -254,9 +254,11 @@ function phaseLine(signals: PrescriptionSignals): string {
 }
 
 /** A user-named exercise as one prompt line's worth of text: line breaks and runs of whitespace become
- *  single spaces, so a name cannot imitate a prompt line of its own (#4061). Ordinary names are unchanged. */
+ *  single spaces, so a name cannot imitate a prompt line of its own (#4061). Ordinary names are unchanged.
+ *  A name of nothing but whitespace would print as an empty name, so it reads as `UNNAMED_PROMPT_LINE_NAME`. */
+export const UNNAMED_PROMPT_LINE_NAME = 'Unnamed exercise'
 export function promptLineName(name: string): string {
-  return name.replace(/\s+/g, ' ').trim()
+  return name.replace(/\s+/g, ' ').trim() || UNNAMED_PROMPT_LINE_NAME
 }
 
 export function buildUserPrompt(

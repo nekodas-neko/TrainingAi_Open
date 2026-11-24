@@ -153,7 +153,7 @@ test('finishing from a pause ends it, and the pause is not in the duration (#325
   assert.equal((upload.payload as { pausedSec: number }).pausedSec, 480);
 });
 
-test('a workout that was never paused uploads exactly what it did before (#3255)', async (t) => {
+test('a workout that was never paused uploads exactly what it did before, plus the plan it trained (#3255, #4097)', async (t) => {
   const f = await setup(t);
   const id = (await f.controller.start(f.session, programId, true))!;
   await f.controller.beginExercises(id);
@@ -164,7 +164,9 @@ test('a workout that was never paused uploads exactly what it did before (#3255)
   await f.controller.finish(id);
   const done = f.workout();
   const upload = mutationFor(done, done.pending.find((x) => x.domain === 'complete_workout')!);
-  assert.deepEqual(Object.keys(upload.payload as object).sort(), ['completedAtMs', 'workoutSessionId']);
+  // `planGeneratedAt: null` (#4097): this fixture's session had no AI plan, and the build now says so.
+  assert.deepEqual(Object.keys(upload.payload as object).sort(), ['completedAtMs', 'planGeneratedAt', 'workoutSessionId']);
+  assert.equal((upload.payload as { pausedSec?: number }).pausedSec, undefined);
 });
 
 test('a journal saved before pause existed reads as never paused (#3255)', async (t) => {
