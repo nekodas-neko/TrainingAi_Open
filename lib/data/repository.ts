@@ -1433,7 +1433,8 @@ export interface WorkoutRepository {
   // ── AI Periodization ───────────────────────────────────────────────────────
   getSessionPeriodization(userId: string, programSessionId: string): Promise<SessionPeriodization | null>
   // Creates the row if it doesn't exist yet; otherwise returns the existing row unchanged.
-  ensureSessionPeriodization(userId: string, programSessionId: string): Promise<SessionPeriodization>
+  /** `read: true` from a READ path: the insert waits at most the read wait for a conflicting uncommitted insert. */
+  ensureSessionPeriodization(userId: string, programSessionId: string, mode?: { read?: boolean }): Promise<SessionPeriodization>
   setBaselineComplete(userId: string, programSessionId: string, baseline1rm: Record<string, Baseline1rmEntry>, mode?: { read?: boolean }): Promise<SessionPeriodization>
   /** BF-131 — the per-exercise 1RM a completed session already wrote, for the baseline hop. */
   getSessionExercise1rms(userId: string, workoutSessionId: string): Promise<{ exerciseName: string; estimated1rm: number }[]>

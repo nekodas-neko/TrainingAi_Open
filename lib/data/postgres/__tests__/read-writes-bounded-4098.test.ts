@@ -318,6 +318,37 @@ describe.skipIf(!canRun)('writes a read reaches wait at most readLockWait (#4098
     expect(JSON.stringify((await row()).prescription)).not.toContain('oneShotSetAt')
   })
 
+  it('ensureSessionPeriodization: a READ answers within readLockWait while the same row\'s insert is uncommitted; a WRITE waits for it and gets the row', async () => {
+    const period = await import('@/lib/data/postgres/slices/periodization')
+    const { getDb } = await import('@/lib/data/postgres/client')
+    const db = getDb()
+    // A third session with no state row yet, and another connection half way through creating it (a program save).
+    const arms = (await pool.query(`INSERT INTO program_sessions (program_id, name, position, time_budget_minutes) VALUES ($1,'Arms',2,60) RETURNING id`, [program])).rows[0].id as string
+    const other = await pool.connect()
+    try {
+      await other.query('BEGIN')
+      await other.query(`INSERT INTO session_periodization (user_id, program_session_id, phase) VALUES ($1,$2,'accumulation')`, [USER, arms])
+      // The read does not wait for the commit, and has no row to answer with yet.
+      const read = await timed(() => period.ensureSessionPeriodization(db, USER, arms, { read: true }))
+      expect(read.ms).toBeLessThan(FAST_MS)
+      expect(read.out ?? null).toBeNull()
+      // The write waits. It is still waiting well after the read wait has passed, and gets the row at the commit.
+      let settled = false
+      const write = period.ensureSessionPeriodization(db, USER, arms).then(out => { settled = true; return out })
+      await new Promise(r => setTimeout(r, 900))
+      expect(settled, 'a write is not cut short at the read wait').toBe(false)
+      await other.query('COMMIT')
+      const state = await write
+      expect(state).not.toBeNull()
+      expect(state.phase).toBe('accumulation')
+    } finally {
+      await other.query('ROLLBACK').catch(() => undefined)
+      other.release()
+    }
+    // With nothing racing, both create or return the row at once.
+    expect((await period.ensureSessionPeriodization(db, USER, arms, { read: true })).phase).toBe('accumulation')
+  })
+
   it('the weekly check-in state read: the row insert waits at most readLockWait for an uncommitted insert of the same row, writes nothing, and the next read creates it', async () => {
     const { readCheckinState } = await import('@/lib/weekly-checkin/engine')
     const { getDb } = await import('@/lib/data/postgres/client')

@@ -29,7 +29,8 @@ export async function GET(
   const validSession = program?.sessions.find(s => s.id === sessionId)
   if (!validSession) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-  let state = await repo.ensureSessionPeriodization(userId, sessionId)
+  // A read: the row's insert waits at most the read wait (#4098). Writers call it without the mode.
+  let state = await repo.ensureSessionPeriodization(userId, sessionId, { read: true })
   if (!state) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   // #3890: in the applies-to week, the weekly check-in's shorter session (no model call, no query for
   // a person without one).

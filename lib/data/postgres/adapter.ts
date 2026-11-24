@@ -8682,7 +8682,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
 
   // ── AI Periodization (delegated to slices/periodization.ts) ─────────────────
   async getSessionPeriodization(userId: string, programSessionId: string) { return period.getSessionPeriodization(this.db, userId, programSessionId) }
-  async ensureSessionPeriodization(userId: string, programSessionId: string) { return period.ensureSessionPeriodization(this.db, userId, programSessionId) }
+  async ensureSessionPeriodization(userId: string, programSessionId: string, mode?: { read?: boolean }) { return period.ensureSessionPeriodization(this.db, userId, programSessionId, mode) }
   async setBaselineComplete(userId: string, programSessionId: string, baseline1rm: Record<string, Baseline1rmEntry>, mode?: { read?: boolean }) { return period.setBaselineComplete(this.db, userId, programSessionId, baseline1rm, mode) }
   async getSessionExercise1rms(userId: string, workoutSessionId: string) { return period.getSessionExercise1rms(this.db, userId, workoutSessionId) }
   async recordBaselineAnchors(userId: string, programSessionId: string, anchors: Record<string, Baseline1rmEntry>, complete: boolean) { return period.recordBaselineAnchors(this.db, userId, programSessionId, anchors, complete) }

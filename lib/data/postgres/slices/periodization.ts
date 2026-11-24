@@ -89,18 +89,28 @@ export async function getSessionPeriodization(db: Db, userId: string, programSes
   }
 }
 
-export async function ensureSessionPeriodization(db: Db, userId: string, programSessionId: string): Promise<SessionPeriodization> {
-  // #4098 review: also reached by a READ (the session-state GET). An INSERT ... ON CONFLICT DO NOTHING waits
-  // only for a conflicting insert that has not committed; bounded like every read-reachable write, and a miss
-  // answers with the stored row (the conflicting insert is that row).
-  const inserted = await boundedReadWrite(db, async tx => {
+export async function ensureSessionPeriodization(db: Db, userId: string, programSessionId: string, mode: LockMode = {}): Promise<SessionPeriodization> {
+  const insert = async (tx: Db) => {
     const [row] = await tx
       .insert(s.sessionPeriodization)
       .values({ userId, programSessionId })
       .onConflictDoNothing()
       .returning()
     return row
-  })
+  }
+  // An INSERT ... ON CONFLICT DO NOTHING waits only for a conflicting insert that has not committed. A WRITE
+  // (a generation, the baseline-complete route) waits for it, as it always has, because it goes on to use the
+  // row: bounding it here answered `null` to a caller typed non-null, and a generation racing a program save
+  // then failed on `state.phase` (#4098 second review).
+  if (!mode.read) {
+    const row = await insert(db)
+    if (row) return mapPeriodization(row)
+    return (await getSessionPeriodization(db, userId, programSessionId))!
+  }
+  // A READ (the session-state GET) is bounded like every read-reachable write. On a miss it answers with the
+  // stored row; while the conflicting insert is still uncommitted there is none, and the GET answers 404 as it
+  // does for any session with no state. The next read finds the row.
+  const inserted = await boundedReadWrite(db, insert)
   if (inserted.done && inserted.value) return mapPeriodization(inserted.value)
   const existing = await getSessionPeriodization(db, userId, programSessionId)
   return existing!

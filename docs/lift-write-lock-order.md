@@ -88,11 +88,16 @@ which is a write path with the 4 s wait.
 | workout-data, session-state | `reconcileSessionsInPhase` (a count repair; try-locks the lift lock) | `readLockWait` for its row waits, in the same statement | the count is repaired by the next read |
 | session-state | `revertAutoAdoptedBaseline` (UPDATE) | `readLockWait` | the stored state is served; the next read reverts |
 | session-state | `setBaselineComplete(..., { read: true })` | try-lock + `readLockWait` (since the first commit of #4098) | the baseline is completed by the next read |
-| session-state | `ensureSessionPeriodization` (INSERT ... ON CONFLICT DO NOTHING) | `readLockWait` | it answers the stored row. It can wait only for an uncommitted insert of the same row, and a session the read can see already has its row committed, so this is a guard, not a measured case (no test) |
+| session-state | `ensureSessionPeriodization(..., { read: true })` (INSERT ... ON CONFLICT DO NOTHING) | `readLockWait`, in read mode only | it answers the stored row. It can wait only for an uncommitted insert of the same row; while that is uncommitted there is no row and the GET answers 404, and the next read finds it. A WRITE (a generation, the baseline-complete route) calls it without the mode and waits for that insert to commit, because it goes on to use the row (tested both ways) |
 | program-overview | `syncProgramPhase(..., { read: true })`: `setProgramPendingTransition`, `realignProgramPhase`, `setProgramPhase` | try-lock + `readLockWait` (since the first commit of #4098) | the view is built from the rows as they are; the next read repairs |
 | program-overview | `voidSessionPrescription` in the `waiting` branch (`{ read: true }`) | `readLockWait` | the stale move offer stays until the next read voids it |
 | workout-data, the preferences read, the weekly check-in state | `restateSpentOneShot` (a spent one-shot taken off stored plans, `{ read: true }`); the expired-one-shot clear is `FOR UPDATE SKIP LOCKED`, which never waits | `readLockWait` per plan; the first miss ends this read's restating | the plan still carries the spent step; the next read finds it again (the `stale` select) and restates it |
 | weekly check-in state | the `weekly_checkins` row created when a card is due (INSERT ... ON CONFLICT DO NOTHING) | `readLockWait` | no row, so the state says no card yet; the next read creates it and shows the card |
+
+One write on these reads is NOT bounded: the rate limiter's `rate_limits` upsert (INSERT ... ON CONFLICT DO
+UPDATE), on `GET /api/next-session/prescription` and `GET /api/weekly-checkin`. It is one short statement on
+the person's own counter row, takes no lift lock and no plan row, and only that person's own concurrent
+requests can contend on it, each for the length of one statement. It is listed here so the list is complete.
 
 Tests: `lib/data/postgres/__tests__/read-writes-bounded-4098.test.ts` holds the lift lock AND `FOR UPDATE` on
 the person's plan rows (or an uncommitted insert of the check-in row) from another connection, for 6 s in
