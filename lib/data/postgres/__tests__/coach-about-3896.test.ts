@@ -95,7 +95,7 @@ describe.skipIf(!canRun)('the Coach\'s context line, buttons and the editor\'s r
        VALUES ($1,$2,'accumulation',$3,'accepted',true, now(), now() + interval '3 days')`,
       [A, ids.aUpper, JSON.stringify(plan)])
     ids.workout = (await pool.query(
-      `INSERT INTO workout_sessions (user_id, session_name, program_session_id, started_at, completed_at) VALUES ($1,'Upper',$2,'2026-11-20T01:00:00Z','2026-11-20T02:00:00Z') RETURNING id`,
+      `INSERT INTO workout_sessions (user_id, session_name, session_id, started_at, completed_at) VALUES ($1,'Upper',$2,'2026-11-20T01:00:00Z','2026-11-20T02:00:00Z') RETURNING id`,
       [A, ids.aUpper])).rows[0].id
     // What was planned against what was done, for "Why this weight?"'s last-time sentence.
     const log = (await pool.query(

@@ -2076,7 +2076,6 @@ SELECT
   t.phase_id,
   t.is_early_deload,
   t.phase_type,
-  t.program_session_id,
   t.hr_synced_at,
   t.was_override,
   t.intensity_mode,
