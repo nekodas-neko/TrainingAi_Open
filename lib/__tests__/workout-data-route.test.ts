@@ -38,6 +38,8 @@ const listProgressionStyles = vi.fn(async (_u: string) => [] as Row[])
 const listExerciseLibrary = vi.fn(async () => [] as Row[])
 const listProgramPhases = vi.fn(async (_u: string, _p: string) => [] as Row[])
 const countAllSessionsSinceStart = vi.fn(async (_u: string, _p: string) => new Map<string, number>())
+// The route reads phases and counts in one call (#4050); this answers from the two mocks above.
+const getProgramPhaseState = vi.fn(async (u: string, p: string) => ({ phases: await listProgramPhases(u, p), sessionCounts: await countAllSessionsSinceStart(u, p) }))
 const getLastExerciseLogsBatch = vi.fn(async (_u: string, _n: string[], _p?: string) => new Map<string, Row>())
 const getLastRealOneRmBatch = vi.fn(async (_u: string, _n: string[]) => new Map<string, number>())
 const getDayExerciseNames = vi.fn(async (_u: string, _d: string, _tz: string) =>
@@ -74,7 +76,7 @@ vi.mock('@/lib/data', () => {
   // Built inside the returned function: `vi.mock` is hoisted above the consts above.
   const repo = async () => ({
     getActiveProgram, listProgressionStyles, listExerciseLibrary, listProgramPhases,
-    countAllSessionsSinceStart, getLastExerciseLogsBatch, getLastRealOneRmBatch,
+    countAllSessionsSinceStart, getProgramPhaseState, getLastExerciseLogsBatch, getLastRealOneRmBatch,
     getDayExerciseNames, listPersonalRecords, getExerciseEstimates, getSessionPeriodization,
     reconcileSessionsInPhase, getMoodLog, getDayCheckin, listInjuries, getRecentSessionsOfType,
     getExerciseMuscleAssignments, getOuraDailyDerived, updatePrescriptionExercisesCache,

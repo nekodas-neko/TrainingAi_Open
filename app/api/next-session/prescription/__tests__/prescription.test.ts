@@ -31,6 +31,7 @@ vi.mock('@/lib/data', () => ({
     getActiveProgram,
     listProgramPhases: async () => [],
     countAllSessionsSinceStart: async () => new Map(),
+    getProgramPhaseState: async () => ({ phases: [], sessionCounts: new Map() }),
     listExercisePreferences: async () => new Map(),
     listProgressionStyles,
     listExerciseLibrary,

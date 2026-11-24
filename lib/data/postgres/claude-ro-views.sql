@@ -2082,7 +2082,8 @@ SELECT
   t.session_rpe,
   t.warmup_ended_at,
   t.deleted_at,
-  t.paused_sec
+  t.paused_sec,
+  t.plan_phase
 FROM public.workout_sessions t
 WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
 

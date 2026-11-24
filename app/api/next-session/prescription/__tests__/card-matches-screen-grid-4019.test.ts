@@ -5,11 +5,16 @@
 //   program kind (manual · automatic · ai_dynamic with a plan driving · with no plan stored · with the
 //   plan consumed) × phase (normal · deload · baseline · testing, where the kind has one) × lift kind
 //   (primary · accessory · bodyweight) × a stored rep range or none × a weekly check-in hold or none.
+// #4049: the Coach's "About" line (`staticNextExercise`) reads the same stored state through the same
+// reader, so on every cell where no stored plan drives the bar it must equal the screen too, and it
+// must call a deload, baseline or test week excluded exactly where the screen is in one.
 // Made-up numbers; no model call (the regeneration entry points are mocked and counted).
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 import { prescribedBar } from '@trainingai/shared/workout/load-rounding'
 import { startOfWeekInTz, todayInTz } from '@trainingai/shared/date-utils'
+import { loadLiftPreferences } from '@trainingai/shared/ai-periodization/lift-preference-read'
+import { staticNextExercise } from '@/lib/coach/domains/lift-preference'
 
 type Row = Record<string, unknown>
 const TZ = 'Australia/Brisbane'
@@ -50,6 +55,8 @@ const repo = {
   }))),
   listProgramPhases: vi.fn(async () => state.phases),
   countAllSessionsSinceStart: vi.fn(async () => new Map([['sess-1', state.sessionCount]])),
+  // The routes and the Coach read phases and counts in one call (#4050).
+  getProgramPhaseState: vi.fn(async () => ({ phases: state.phases, sessionCounts: new Map([['sess-1', state.sessionCount]]) })),
   getLastExerciseLogsBatch: vi.fn(async (_u: string, names: string[]) => new Map(names.map(n => [n, {
     estimated1rm: 100, loggedAt: new Date('2026-11-20T08:00:00Z'), styleName: 'Main',
     sets: [{ weightKg: 60, reps: 8 }, { weightKg: 70, reps: 8 }],
@@ -190,8 +197,30 @@ async function onCard(): Promise<{ lifts: Lift[]; body: Row; writes: number }> {
   return { lifts: body.exercises, body, writes: calls.writes }
 }
 
+/** The Coach's answer for every lift: its sets as the screen shows them, or `excluded` (a deload, baseline or test). */
+async function onCoach(): Promise<Array<{ name: string; excluded: boolean; sets: Sets }>> {
+  const prefs = await loadLiftPreferences(repo as never, 'user-1', LIFTS.map(l => l.name), { checkinWeekStart: weekStart })
+  const out = []
+  for (const l of LIFTS) {
+    const target = {
+      id: l.id, sessionId: 'sess-1', exerciseName: l.name, exerciseId: null, styleId: l.styleId, position: 0, muscleGroups: [],
+      exerciseRole: l.role, sessionName: 'Push', programId: 'prog-1', phaseMode: state.program!.phaseMode, accessoryPhaseStyled: false,
+    }
+    const next = await staticNextExercise(repo as never, 'user-1', target as never, today, prefs)
+    const ex = next?.exercise
+    out.push({
+      name: l.name, excluded: next?.excluded ?? false,
+      sets: (ex?.progressionStyle ?? []).map(s => ({
+        weightKg: ex!.exerciseType === 'bodyweight' || !ex!.estimated1rm ? null : prescribedBar(ex!.estimated1rm, s.pct, ex!.equipment),
+        reps: s.reps, restSec: s.restSec,
+      })),
+    })
+  }
+  return out
+}
+
 const KINDS = Object.keys(PHASES_BY_KIND) as Kind[]
-const tally = { cases: 0, liftCases: 0, mismatches: 0, nonEmpty: 0 }
+const tally = { cases: 0, liftCases: 0, mismatches: 0, nonEmpty: 0, coachCompared: 0, coachExcluded: 0 }
 
 describe('the Next workout card equals the session screen for every program kind and phase (#4019)', () => {
   beforeEach(() => { vi.clearAllMocks(); calls.regenerate = 0; calls.generate = 0; calls.writes = 0 })
@@ -211,6 +240,21 @@ describe('the Next workout card equals the session screen for every program kind
         expect(cardLifts.map(l => l.sessionExerciseId)).toEqual(screen.map(l => l.sessionExerciseId))
         for (const [i, s] of screen.entries()) expect(cardLifts[i], `${s.name}`).toEqual(s)
         tally.nonEmpty += screen.filter(l => l.sets.length > 0).length
+        // The Coach, #4049. Where a stored plan drives the bar the Coach is not asked (it describes the program
+        // as written); the Coach reads no stored plan, so an ai_dynamic baseline is not one it can see.
+        const coach = await onCoach()
+        // The Coach is excluded for a phase's deload, baseline or test, and for a confirmed early-deload week
+        // (how the ai_dynamic cells reach 'deload'). It cannot see a stored plan's own deload or baseline.
+        const storedPlanOnly = kind === 'ai driving' || (kind.startsWith('ai') && phase === 'baseline')
+        const excludedHere = kind === 'automatic' ? phase !== 'normal' : kind.startsWith('ai') && phase === 'deload' && kind !== 'ai driving'
+        if (!storedPlanOnly) {
+          for (const c of coach) expect(c.excluded, `coach ${kind} ${phase} ${c.name}: excluded`).toBe(excludedHere)
+          if (excludedHere) tally.coachExcluded += coach.length
+          else {
+            for (const [i, s] of screen.entries()) expect(coach[i].sets, `coach ${s.name}`).toEqual(s.sets)
+            tally.coachCompared += coach.length
+          }
+        }
         // Reading the card changes nothing and calls no model.
         // The card never writes a status or the plan cache (only the serve-time fit and hold, as on main).
         expect(writes).toBe(0)
@@ -223,7 +267,10 @@ describe('the Next workout card equals the session screen for every program kind
     expect(tally.liftCases).toBe(tally.cases * 3)
     expect(tally.nonEmpty).toBeGreaterThan(tally.liftCases / 2)
     expect(tally.mismatches).toBe(0)
-    console.info(`[#4019 grid] cases run: ${tally.cases} (${tally.liftCases} lift comparisons), mismatches: ${tally.mismatches}`)
+    // The Coach was compared to the screen on every cell it can be, and was excluded where the screen is in a deload, baseline or test.
+    expect(tally.coachCompared).toBeGreaterThan(0)
+    expect(tally.coachExcluded).toBeGreaterThan(0)
+    console.info(`[#4019 grid] cases run: ${tally.cases} (${tally.liftCases} lift comparisons), mismatches: ${tally.mismatches}; Coach compared on ${tally.coachCompared} lifts, excluded on ${tally.coachExcluded}`)
   })
 
   it('an AI-driven accessory with no plan driving shows the accessory target-effort load the screen shows (was 80 vs 75)', async () => {

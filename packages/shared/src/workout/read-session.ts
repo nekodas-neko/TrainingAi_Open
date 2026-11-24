@@ -67,6 +67,75 @@ function syntheticPhaseStatus(name: 'Baseline' | 'Deload', phaseType: 'baseline'
   }
 }
 
+/** What phase resolution is told. The same inputs for every reader of a session. */
+export interface SessionPhaseInputs {
+  program: Program
+  /** The user's local date. */
+  todayStr: string
+  /** `automatic` programs only: the program's phases (empty otherwise). */
+  allPhases: ProgramPhase[]
+  /** `automatic` programs only: completed sessions of THIS session since the program started. */
+  thisSessionCount: number
+  /** `ai_dynamic` only: the session's stored periodization. */
+  periodization: SessionPeriodization | null
+  /** The pre-workout Full/Deload toggle (`?aiDeload=1`). Only the session screen's own read has one. */
+  aiDeload?: boolean
+}
+
+export interface SessionPhase {
+  currentPhase: ProgramPhase | null
+  phaseStatus: PhaseStatus | null
+  isBaselinePhase: boolean
+}
+
+/**
+ * The ONE resolution of which phase a session is in: an automatic program's phase, an ai_dynamic
+ * baseline, and a confirmed early-deload week (from Home, or the pre-workout toggle). The session
+ * screen's single-session read, its `?tab=all` batch and the Next workout card all call this before
+ * they build anything, so none of them holds its own copy (#4019).
+ */
+export function resolveSessionPhase(i: SessionPhaseInputs): SessionPhase {
+  const { program, todayStr, allPhases, periodization } = i
+  const isAutomatic = program.phaseMode === 'automatic'
+  const isAiDynamic = program.phaseMode === 'ai_dynamic'
+  const sessionPerWeek = getScheduledSessionsPerWeek(program) / Math.max(1, program.sessions.length)
+
+  let currentPhase: ProgramPhase | null = null
+  let phaseStatus: PhaseStatus | null = null
+  if (isAutomatic && allPhases.length > 0) {
+    phaseStatus = buildAutomaticPhaseStatus(allPhases, i.thisSessionCount, program, todayStr, sessionPerWeek)
+    currentPhase = phaseStatus.phase
+  }
+
+  // BF-148 — a row still reading `baseline && !baselineComplete` means what it says.
+  const isAiDynamicBaseline = isAiDynamic
+    && periodization?.phase === 'baseline'
+    && !periodization?.baselineComplete
+
+  const isBaselinePhase = currentPhase?.phaseType === 'baseline' || isAiDynamicBaseline
+
+  // The app has two deload-confirmation entry points and they converge here: the toggle and Home's
+  // "Take deload week now" (`programs.earlyDeloadWeekStart`).
+  const deloadNow = i.aiDeload === true || isEarlyDeloadWeek(program, todayStr)
+
+  // Surface isBaseline to the client for AI Dynamic programs so the workout shows the AMRAP banner.
+  if (isAiDynamicBaseline && !phaseStatus) phaseStatus = syntheticPhaseStatus('Baseline', 'baseline')
+
+  if (deloadNow && isAiDynamic && !phaseStatus) {
+    phaseStatus = syntheticPhaseStatus('Deload', 'deload')
+  } else if (deloadNow && isAiDynamic && phaseStatus) {
+    phaseStatus = { ...phaseStatus, isDeloadActive: true }
+  }
+
+  // Not baseline, not a confirmed deload: still an explicit phaseStatus, so the client can clear a
+  // stale baseline from its cache. The engine-chosen `phase: 'deload'` lands here too.
+  if (isAiDynamic && !phaseStatus && periodization) {
+    phaseStatus = aiDynamicFallbackPhaseStatus(periodization)
+  }
+
+  return { currentPhase, phaseStatus, isBaselinePhase }
+}
+
 /**
  * One program session's exercises as the session screen builds them, from stored state alone: no
  * re-evaluation against today's signals, no regeneration, no write, no `?aiDeload` toggle. The ONE
@@ -76,39 +145,13 @@ function syntheticPhaseStatus(name: 'Baseline' | 'Deload', phaseType: 'baseline'
  * `/api/next-session/prescription` (the Next workout card).
  */
 export function readSessionFromStoredState(i: ReadSessionInputs): ReadSessionResult {
-  const { program, programSession, todayStr, allPhases, periodization, programDeload } = i
-  const isAutomatic = program.phaseMode === 'automatic'
+  const { program, programSession, allPhases, periodization, programDeload } = i
   const isAiDynamic = program.phaseMode === 'ai_dynamic'
-  const sessionPerWeek = getScheduledSessionsPerWeek(program) / Math.max(1, program.sessions.length)
 
-  // A confirmed early-deload week is the only deload signal a stored-state read can see.
-  const earlyDeloadWeek = isEarlyDeloadWeek(program, todayStr)
-
-  let currentPhase: ProgramPhase | null = null
-  let phaseStatus: PhaseStatus | null = null
-  if (isAutomatic && allPhases.length > 0) {
-    phaseStatus = buildAutomaticPhaseStatus(allPhases, i.thisSessionCount, program, todayStr, sessionPerWeek)
-    currentPhase = phaseStatus.phase
-  }
-
-  // BF-148 — same two-term condition as the single-session path of /api/workout-data.
-  const isAiDynamicBaseline = isAiDynamic
-    && periodization?.phase === 'baseline'
-    && !periodization?.baselineComplete
-
-  const isBaselinePhase = currentPhase?.phaseType === 'baseline' || isAiDynamicBaseline
-
-  if (isAiDynamicBaseline && !phaseStatus) phaseStatus = syntheticPhaseStatus('Baseline', 'baseline')
-
-  if (earlyDeloadWeek && isAiDynamic && !phaseStatus) {
-    phaseStatus = syntheticPhaseStatus('Deload', 'deload')
-  } else if (earlyDeloadWeek && isAiDynamic && phaseStatus) {
-    phaseStatus = { ...phaseStatus, isDeloadActive: true }
-  }
-
-  if (isAiDynamic && !phaseStatus && periodization) {
-    phaseStatus = aiDynamicFallbackPhaseStatus(periodization)
-  }
+  // A confirmed early-deload week is the only deload signal a stored-state read can see, so no toggle.
+  const { currentPhase, phaseStatus, isBaselinePhase } = resolveSessionPhase({
+    program, todayStr: i.todayStr, allPhases, thisSessionCount: i.thisSessionCount, periodization,
+  })
 
   const aiPrescription = isAiDynamic && !isBaselinePhase && periodization?.prescription
     ? normalizeStoredPrescription(
