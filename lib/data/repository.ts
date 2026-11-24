@@ -1477,7 +1477,7 @@ export interface WorkoutRepository {
     names: string[]; weekStart: string; stamp: string
     /** What is stored for a plan (the generation's derived extras added); the answer is the plan without them. */
     finalize: (plan: AiPrescription) => AiPrescription
-    restate: (current: { prefs: Map<string, import('@trainingai/shared/ai-periodization/lift-preference').LiftPreference>; held: string[] }) => Promise<AiPrescription>
+    restate: (current: { prefs: Map<string, import('@trainingai/shared/ai-periodization/lift-preference').LiftPreference>; held: string[] }) => AiPrescription
   }): Promise<{ stored: boolean; prescription: AiPrescription }>
   /** #3895: a stamp of what the session's plan is made from (budget and live exercises), read at a
    *  generation's start and re-checked by `storePrescription`. Null when the session is not the user's. */

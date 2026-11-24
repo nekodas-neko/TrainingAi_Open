@@ -46,7 +46,7 @@ import { reconcilePrescription } from '@trainingai/shared/ai-periodization/recon
 import { buildPrescriptionShadow } from '@trainingai/shared/ai-periodization/prescription-shadow'
 import { loadSessionReads } from '@trainingai/shared/ai-periodization/session-read-plan'
 import { checkinBudgetApplies } from '@trainingai/shared/ai-periodization/checkin-plan-budget'
-import { liftWorkingBases, loadLiftPreferences, withCheckinHold } from '@trainingai/shared/ai-periodization/lift-preference-read'
+import { loadLiftPreferences, loadRestateReads, withCheckinHold, workingBasesFrom, type RestateReads } from '@trainingai/shared/ai-periodization/lift-preference-read'
 import {
   liftPreferencesStamp, liftsWithMovedHold, liftsWithMovedPreference, restateForMovedPreferences,
 } from '@trainingai/shared/ai-periodization/lift-preference-moved'
@@ -582,8 +582,9 @@ async function runPrescriptionGeneration(
    * nothing was stored). On the AI plan the store keeps the lift preferences in force when it commits (#4007):
    * a change made while the model was answering restated the stored plan, and a plain store would put the old
    * preferences back. The repository takes the lift lock, reads the preferences again, and, when they moved,
-   * asks `restate` for the plan this generation made restated for them (no model call: plain selects and a
-   * pure function), then stores it before the lock is released. One attempt, no loop. Deload plans carry no
+   * asks `restate` for the plan this generation made restated for them, then stores it before the lock is released.
+   * `restate` is a pure function of reads made BEFORE the store takes the lock (no model call, no read of its own), so
+   * nothing but the transaction's own statements runs while the lock is held. One attempt, no loop. Deload plans carry no
    * preference and are stored as before.
    */
   const storePrescription = async (p: AiPrescription, expiresAt: Date, status: 'pending' | 'auto_applied', storeFor: PrescriptionGeneratedFor): Promise<AiPrescription | false> => {
@@ -592,20 +593,28 @@ async function runPrescriptionGeneration(
       (await repo.storePrescription(userId, programSessionId, withStoredExtras(plan), expiresAt, status, storeFor)) === false ? false : plan
     if (!aiPlan || p.deload || state.phase === 'baseline' || sessionLiftNames.length === 0
       || typeof repo.storePrescriptionForCurrentPreferences !== 'function') return plain(p)
-    // Reads here throw on failure (never "no preferences"): the repository then stores the plan as generated.
-    const restate = async ({ prefs: current, held }: { prefs: Map<string, LiftPreference>; held: string[] }): Promise<AiPrescription> => {
+    // #4007 second review: the restate reads (last bars, records, 1RMs, estimates) are made HERE, for every lift of
+    // the session, before the store takes the lift lock: inside it nothing may use another pooled connection (as many
+    // stores as the pool has connections would each wait for one that never frees). A failed read stores the plan as
+    // generated, no restate, one log line.
+    let reads: RestateReads
+    try {
+      reads = await loadRestateReads(repo, userId, sessionLiftNames)
+    } catch (err) {
+      console.error('[prescribe] reading what a restate needs before the store failed; storing the plan as generated:', err)
+      return plain(p)
+    }
+    // Pure: a function of the plan, the reads above and the preferences the repository read under the lock.
+    const restate = ({ prefs: current, held }: { prefs: Map<string, LiftPreference>; held: string[] }): AiPrescription => {
       // Every store comes after the signals were built; a null here would be a store before them.
       if (!signals) throw new Error('signals not built')
-      if (held.length > 0) {
-        const lastLogs = await repo.getLastExerciseLogsBatch(userId, held)
-        for (const name of held) withCheckinHold(current, name, checkinWeekStart, lastSessionBarKg(lastLogs.get(name)))
-      }
+      for (const name of held) withCheckinHold(current, name, checkinWeekStart, lastSessionBarKg(reads.lastLogs.get(name)))
       const lifts = signals.exercises.map(e => ({
         sessionExerciseId: e.sessionExerciseId, name: e.name, role: e.role, equipment: e.equipment, bodyweight: e.exerciseType === 'bodyweight',
       }))
       const ctx = { programSessionId, phase: storeFor.phase as PeriodizationPhase, trainingGoal: signals.trainingGoal, weekStart: checkinWeekStart, lifts, built: liftPreferences, current }
       const moved = new Set([...liftsWithMovedPreference(ctx), ...liftsWithMovedHold(ctx)])
-      const bases = await liftWorkingBases(repo, userId, [...moved], moved.size > 0 ? await repo.listPersonalRecords(userId) : new Map())
+      const bases = workingBasesFrom(reads, [...moved], reads.records)
       return restateForMovedPreferences(p, { ...ctx, basisKg: name => bases.get(name) ?? null })
     }
     try {

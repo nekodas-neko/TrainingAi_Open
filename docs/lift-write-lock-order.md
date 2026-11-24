@@ -40,7 +40,7 @@ Code: `lib/coach/lock-wait.ts` (`lockLiftWrites`, `tryLiftWrites`, `withDomainLo
 | Rename against the program editor save and the Coach swap (`programs` and `session_exercises` in opposite orders) | not changed | #4096 |
 | Account deletion and the admin wipe (`slices/account-deletion.ts`, `DELETE FROM users` in one transaction) | none of the lift locks. Waits, exactly as the code sets them: for a **wipe** (`keepAccount`) only, `lock_timeout = '15s'` around the user-write advisory lock, then `lock_timeout = 0` (none) before the row lock and the cascade; a plain **account deletion** sets no `lock_timeout` at all. Both run `users ... FOR UPDATE` under the pool's 15 s `statement_timeout`, then the cascade under `SET LOCAL statement_timeout = '120s'` (`DELETION_STATEMENT_TIMEOUT`) | The cascade deletes the person's plan, preference and program rows in table order, not lift order. So a deletion racing a check-in save can **wait on plan rows for up to 120 s** (the cascade's statement timeout), and the save can wait on the `users` row (a foreign-key insert takes `KEY SHARE`, which the deletion's `FOR UPDATE` blocks) until its own 4 s bound answers busy. It is **not shown that it cannot cycle**: a save holding a plan row that then needs the `users` row, against a deletion holding the `users` row that then needs that plan row, is a cycle; Postgres's deadlock detector would end it (`40P01`, after `deadlock_timeout`, 1 s by default) and one side would roll back whole. That outcome is inferred from Postgres's behaviour, **not reproduced and not analysed further here**. Not given the lift lock: that would put a 4 s busy refusal into a data-destroying path, which is the owner's to decide (#4105) |
 | Admin exercise delete (`adapter.ts` `deleteExercise`, the foreign keys' `ON DELETE SET NULL`) | none; one statement | The `SET NULL` updates preference rows, session exercises and check-in rows that reference the exercise, across users, in one statement. A cycle needs a check-in or a Coach write on the same exercise at that moment; the outcome is the same as above (one side rolled back whole, repeatable). An admin catalogue write, rare; not given the lift lock for the same reason (#4105) |
-| A generation's store on the AI plan, `storePrescriptionForCurrentPreferences` (#4007) | program lock (lift lock, then `lock_timeout` 4 s) → the lifts' preference rows (a plain select, no row lock) → the caller's restate reads (plain selects on other pooled connections, no row lock; no model call) → the session's one plan row (one UPDATE) | takes the lift lock first, and holds one plan row for one statement. It is taken AFTER the model call and held for the re-read, the restate's selects and one UPDATE (measured below), so no lock spans a model call. The restate's selects wait for no lock another writer could hold, and a writer queued behind the lift lock holds nothing |
+| A generation's store on the AI plan, `storePrescriptionForCurrentPreferences` (#4007) | program lock (lift lock, then `lock_timeout` 4 s) → the lifts' preference rows (a plain select, no row lock) → the caller's restate (a pure function: no read, no model call) → the session's one plan row (one UPDATE) | takes the lift lock first, and holds one plan row for one statement. It is taken AFTER the model call and held for the re-read, the restate (CPU only) and one UPDATE, all on the transaction's own connection (measured below), so no lock spans a model call and no statement runs on another pooled connection while it is held. A writer queued behind the lift lock holds nothing |
 | Other Coach domains: apply and undo (goals, targets, program phase, early deload, injury, session exercise) | domain lock → that domain's rows | they touch none of the lift writers' rows; a session-exercise apply voids one plan row per statement and holds no second plan row while it waits |
 | `restateSpentOneShot`, `voidSessionPrescription`, `consumeLiftOneShot`, `storePrescription` (the plain store: a plan that carries no preference, a program that is not the AI plan, the check-in fit on a read, and the fallback below), `exitDeload`, `advancePhase`, `storePendingTransition`, `incrementSessionsInPhase`, the decrement, `setLastSessionRanPrescription`, `updatePrescriptionStatus`, the cache and replace writers | none | one statement on one row each, released with the statement: they wait on a row, never while holding another (#4097, #4119: `setLastSessionRanPrescription` gained a `NOT EXISTS` read of `workout_sessions`. `incrementSessionsInPhase` is now one `UPDATE ... FROM workout_sessions` that reads the finished workout's own row (`completed_at`, `plan_phase`) and writes only the one `session_periodization` row; `completeWorkoutSession` stamps `plan_phase` in the statement that already stamped `completed_at`. A plain read takes no lock, and none of the three holds a second row or takes a lift lock. Measured: with the lift lock held from another connection, a `workout_log` + `complete_workout` upload took 118-135 ms.) |
 | `replaceVolumeTargets`, phase-set and phase edits (`program_phases`), `updateProgramPhaseSettings`, `autoRecalibrateCycleAnchor`, `confirmEarlyDeload` | none | no lift writer touches `program_volume_targets` or `program_phases`; the others write one `programs` row |
@@ -83,8 +83,9 @@ So the lock is taken only at the store, after the model, in ONE transaction
    lift; not the hold's bar);
 2. equal: the plan is stored by the same statement as before. Not equal: the generator's `restate` gives the plan IT MADE
    for the preferences now in force (`restateForMovedPreferences`: the Coach's `restatePlan` for a lift whose range, rest or
-   one-off moved, the stored-plan hold `holdStoredPrescription` for a lift whose hold moved; its reads, the held lifts' last bars,
-   the personal records and the working bases, are plain selects) and THAT plan is stored, before the lock is released.
+   one-off moved, the stored-plan hold `holdStoredPrescription` for a lift whose hold moved; its inputs, the held lifts' last bars,
+   the personal records and the working bases, were read BEFORE the lock, see the rule below) and THAT plan is stored, before the
+   lock is released.
 
 No writer can move a preference while the lift lock is held, and a writer that holds it commits its preference row and its
 restated plan together, so the store sees both or neither and what it stores always matches the preferences in force when it
@@ -92,15 +93,46 @@ commits, however many changes were made while the model answered. There is no lo
 this PR looped three times and then stored with no check; a fourth change in that window was lost. Every attempt can be done
 inside one locked transaction, so the loop was deleted rather than patched: one path instead of two.)
 
+- **The rule: no read outside the transaction while the lift lock is held.** The store's transaction holds one pooled
+  connection and the lift lock. If anything inside it waited for ANOTHER pooled connection, then as many stores at once as the
+  pool has connections (up to 10) would each hold one and wait for one that never frees: the reads fail after the pool's 5 s
+  `connectionTimeoutMillis`, the plan is stored as generated, the person's change is lost, and their lift lock was held about 5 s
+  (the second independent review measured 3 people on a pool of 3: all 3 changes lost, 5.3 s each; 10 on 10 all lost; 6 on 5
+  lost; 5 on 10 all kept). So everything the restate can need (the last bars of the session's lifts, the personal records, the last
+  real 1RMs, the typed estimates: `loadRestateReads`, four reads) is read after the model call and BEFORE the lock, for EVERY lift of
+  the session, whether or not a preference has moved yet (which lifts moved is only known under the lock). Inside the lock the
+  store does only: re-read the preferences on the transaction's connection, compare, run `restate` (a pure function of the generated
+  plan, those reads and the preferences just read) and the one UPDATE. Nothing there takes a pooled connection or awaits anything
+  but the transaction. No read had to be passed the transaction handle instead: none depends on the preferences read under the lock
+  (the held lifts' bars are read for all lifts and picked by name). A new statement added to that function goes on the
+  transaction or before the lock, never on the pool.
+  - **What this accepts.** The hold's last bar is read before the lock, so a workout log landing between the prefetch and the
+    lock is not in the bar the restate uses. That is the same accepted behaviour as the stamp leaving the bar out (a log is not a
+    preference and takes no lift lock): the stored plan is healed the next time it is served (`holdStoredPlanUnderCheckin`).
+  - **A failed prefetch** stores the plan as generated, without the restate path, and logs one line (as a failed re-read does).
+    Tested.
+  - **Tests** (`generation-pool-pressure-4007.test.ts`, real Postgres, real Coach writer, model mocked, the restate's reads made
+    100 ms slow so the stores overlap): N stores at once for N different people with the pool N wide (N = 3 and 10), preferences
+    moved for every person during the model call: every change kept, the slowest request 123 ms (N = 3) and 143 ms (N = 10), and no
+    connection left idle in transaction; N + 1 stores on a pool of N: all kept (115 ms, 129 ms). All six tests fail on the previous
+    head (`b3bfcb4b`: the reads time out, the plans are stored as generated). A per-backend statement count over the locked section
+    sees one backend only.
 - **What is held, and for how long.** The lift lock, from the moment the store gets it until commit: the re-read (one select),
-  on a moved preference the restate's selects (no model call, no network call), and one UPDATE. Measured against local Postgres
-  with the model mocked, preferences moved on every run (the longest path), 20 runs: **median 7.1 ms, worst 12.6 ms**
-  (`generation-preference-race-4007.test.ts`, "measures how long the store keeps the lift lock"). With nothing moved it is the
-  re-read and the UPDATE only. A writer of the same person that arrives meanwhile waits behind it, holding nothing, and then
-  restates the stored plan itself (tested: a rest change sent while the store holds the lock ends equal to "landed after the store").
+  on a moved preference the restate (CPU only) and one UPDATE. Measured against local Postgres with the model mocked, 30 runs each
+  (`generation-preference-race-4007.test.ts`, "measures how long the store keeps the lift lock"): **preferences moved: median 5.1
+  ms, worst 10.7 ms; nothing moved: median 4.2 ms, worst 8.4 ms**. A writer of the same person that arrives meanwhile waits behind
+  it, holding nothing, and then restates the stored plan itself (tested: a rest change queued on the lock while the store waits for
+  it ends equal to "landed after the store").
+- **Cost of the prefetch.** It is made on every generation that reaches this store (moved or not): four reads, all four started
+  together before the lock. Statements per generation on a normal `ai_dynamic` plan, counted over 20 runs with the model mocked:
+  `main` 83 (78 on some runs), the previous head of this PR 86 to 91, this head 91 to 96 (+5 against the previous head); median
+  time of 20 generations 49 ms on `main` and on the previous head, 55 ms here (noise is about the size of the difference). Nothing is
+  skipped for a session without a preference or hold row: a change can arrive after the start's read, and a second code path that
+  decides whether to prefetch could be wrong in exactly that case.
 - **A failed re-read is not "no preferences".** The re-read inside the transaction throws on a database error (nothing is
-  written); the generator then stores the plan as it generated it, with no restate, and logs once. A failure in the restate's
-  own selects (a bar, the records) stores the plan as generated, under the same lock, and logs once. The start's read
+  written); the generator then stores the plan as it generated it, with no restate, and logs once. A failure of the restate itself
+  (it is pure, so only a bug in it) stores the plan as generated, under the same lock, and logs once; a failure of the reads it needs
+  happens before the lock and is covered below. The start's read
   (`loadLiftPreferences`) still answers "no preferences" when it fails, as before, because that is "plan as written" at the
   start; the store's re-read never does.
 - **Busy.** The lift lock waits the usual 4 s (two statements, so at most about 8 s); a miss is a `BusyError` and nothing was

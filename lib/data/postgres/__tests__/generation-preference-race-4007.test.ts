@@ -11,6 +11,8 @@
  * model is a mock (0 model requests). Runs only against a real Postgres (DATABASE_URL). Made-up names only.
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest'
+import pg from 'pg'
+import { appendFileSync } from 'node:fs'
 import { dateStrMidnightInTz, shiftDateStr, todayInTz, weekStartForDay } from '@trainingai/shared/date-utils'
 
 const mocks = vi.hoisted(() => ({
@@ -42,6 +44,9 @@ vi.mock('@/lib/data/postgres/slices/exercise-preferences', async importOriginal 
     },
   }
 })
+
+/** Measurements: printed, and appended to the file named by MEASURE_OUT when it is set (vitest's console is quiet for a passing test). */
+const report = (line: string) => { console.info(line); if (process.env.MEASURE_OUT) appendFileSync(process.env.MEASURE_OUT, line + '\n') }
 
 const canRun = !!process.env.DATABASE_URL
 const TZ = 'Australia/Brisbane'
@@ -380,39 +385,88 @@ describe.skipIf(!canRun)('a lift change made while a plan is generated survives 
     const storedA = scrub(await stored(a), a)
     expect(storedA).toEqual(after)
     expect(rowOf(storedA)!.liftPreference).toMatchObject({ repRange: { min: Number(rangeChain[n - 1].split('-')[0]), max: Number(rangeChain[n - 1].split('-')[1]) } })
-    console.info(`[4007] ${n} changes during the model call (model mocked, includes the ${n} writers): request ${ms} ms`)
+    report(`[4007] ${n} changes during the model call (model mocked, includes the ${n} writers): request ${ms} ms`)
   }, 60_000)
 
-  it('a change that arrives while the store holds the lock waits, and lands just after it: the plan ends equal to "after the store"', async () => {
+  it('a change that is queued on the lift lock when the model returns lands before the store: the plan ends equal to "after the store"', async () => {
     const a = await person()
     const b = await person()
     expect(await generateFor(b)).toMatchObject({ ok: true })
     expect(await coach(b, [{ id: 'c1', field: 'repRange', from: null, to: '12-15' }])).toMatchObject({ ok: true })
     expect(await coach(b, [{ id: 'c2', field: 'restSec', from: null, to: 45 }])).toMatchObject({ ok: true })
     const after = scrub(await served(b), b)
-    // A: the range lands during the model call; the rest is sent while the store holds the lock (during its restate's reads).
+    // A: the range lands during the model call; another writer holds the lift lock, the rest change queues behind it,
+    // and the store (after the model) queues behind the rest change. The rest change commits first.
     let late: Promise<unknown> | null = null
-    const via = new Proxy(repo, {
+    const holder = await pool.connect()
+    try {
+      const result = await generateWhile(a, async () => {
+        expect(await coach(a, [{ id: 'c1', field: 'repRange', from: null, to: '12-15' }])).toMatchObject({ ok: true })
+        await holder.query('BEGIN')
+        await holder.query(`SELECT pg_advisory_xact_lock(hashtext('lift_writes:user'), hashtext($1))`, [a.id])
+        late = coach(a, [{ id: 'c2', field: 'restSec', from: null, to: 45 }])
+        late.catch(() => undefined)
+        await new Promise(r => setTimeout(r, 400)) // long enough for the writer to be queued on the lift lock
+        setTimeout(() => { holder.query('ROLLBACK').catch(() => undefined) }, 800) // released after the store has queued
+      })
+      expect(result).toMatchObject({ ok: true })
+    } finally {
+      await holder.query('ROLLBACK').catch(() => undefined)
+      holder.release()
+    }
+    expect(late).not.toBeNull()
+    expect(await late).toMatchObject({ ok: true })
+    expect(scrub(await stored(a), a)).toEqual(after)
+  }, 60_000)
+
+  // The first version of this PR stored in up to three attempts, each comparing the preferences and restating outside
+  // the lock; a change landing after the last compare was lost, and these tests passed on it because every change in
+  // them landed before the first compare. Here a change lands at EACH of the generator's reads between the model and the
+  // store (the reads a restate makes, now made once before the lock is taken): on the three-attempt code that is a change
+  // after each compare, and the last is lost. On this code the reads happen once and every change that landed is kept.
+  it('changes that land at every read between the model and the store are all kept (fails on the three-attempt store)', async () => {
+    const steps: Record<string, unknown>[][] = [
+      [{ id: 'c2', field: 'repRange', from: null, to: '12-15' }],
+      [{ id: 'c3', field: 'nextLoadStep', from: null, to: 'lighter' }],
+      ...[60, 75, 90, 105, 120, 135].map((to, i) => [{ id: `r${i}`, field: 'restSec', from: i === 0 ? 45 : to - 15, to }]),
+    ]
+    const a = await person()
+    const b = await person()
+    expect(await generateFor(b)).toMatchObject({ ok: true })
+    let landed = 0
+    let inflight = 0
+    let armed = false // set once the model has answered, so the generation's own start reads are not gates
+    const gated = new Proxy(repo, {
       get(target, key) {
         const v = Reflect.get(target, key, target)
-        if (key === 'listPersonalRecords') {
+        if (armed && ['getLastExerciseLogsBatch', 'listPersonalRecords', 'getLastRealOneRmBatch', 'getExerciseEstimates'].includes(String(key))) {
           return async (...args: unknown[]) => {
-            if (!late) {
-              late = coach(a, [{ id: 'c2', field: 'restSec', from: null, to: 45 }])
-              late.catch(() => undefined)
-              await new Promise(r => setTimeout(r, 400)) // long enough for the writer to be queued on the lift lock
-            }
-            return (v as (...x: unknown[]) => unknown).apply(target, args)
+            // One change per ROUND of reads (the reads of one restate, or of one prefetch, are started together):
+            // the first read of a round lands the next change after its own read has been made.
+            const first = inflight++ === 0
+            try {
+              const out = await (v as (...x: unknown[]) => unknown).apply(target, args)
+              if (first && landed < steps.length) {
+                expect(await coach(a, steps[landed++])).toMatchObject({ ok: true })
+              }
+              return out
+            } finally { inflight-- }
           }
         }
         return typeof v === 'function' ? v.bind(target) : v
       },
     })
-    const result = await generateWhile(a, () => coach(a, [{ id: 'c1', field: 'repRange', from: null, to: '12-15' }]), via)
+    const result = await generateWhile(a, async () => {
+      expect(await coach(a, [{ id: 'c1', field: 'restSec', from: null, to: 45 }])).toMatchObject({ ok: true })
+      armed = true
+    }, gated)
     expect(result).toMatchObject({ ok: true })
-    expect(late).not.toBeNull()
-    expect(await late).toMatchObject({ ok: true })
-    expect(scrub(await stored(a), a)).toEqual(after)
+    expect(landed, 'at least one change landed after the model, before the store').toBeGreaterThanOrEqual(1)
+    // The reference: the same changes, in the same order, after the store.
+    expect(await coach(b, [{ id: 'c1', field: 'restSec', from: null, to: 45 }])).toMatchObject({ ok: true })
+    for (let i = 0; i < landed; i++) expect(await coach(b, steps[i])).toMatchObject({ ok: true })
+    expect(scrub(await stored(a), a)).toEqual(scrub(await served(b), b))
+    report(`[4007] changes that landed after the model call, before the store: ${landed + 1}`)
   }, 60_000)
 
   it('the re-read of the preferences fails: the plan is stored as generated, no restate, the preferences untouched, logged once', async () => {
@@ -431,6 +485,37 @@ describe.skipIf(!canRun)('a lift change made while a plan is generated survives 
     log.mockRestore()
     expect(reads).toHaveLength(1)
     // The plan as generated, byte for byte (no restate, nothing stripped); the person's range is still in force.
+    expect(scrub(await stored(a), a)).toEqual(generated)
+    const pref = (await pool.query(`SELECT rep_min, rep_max FROM exercise_preferences WHERE user_id = $1`, [a.id])).rows
+    expect(pref).toEqual([{ rep_min: 12, rep_max: 15 }])
+  }, 60_000)
+
+  it('a read the restate needs fails before the store: the plan is stored as generated, no restate, the change untouched, logged once', async () => {
+    const a = await person()
+    const noChange = await person()
+    expect(await generateFor(noChange)).toMatchObject({ ok: true })
+    const generated = scrub(await stored(noChange), noChange)
+    let armed = false
+    const failing = new Proxy(repo, {
+      get(target, key) {
+        const v = Reflect.get(target, key, target)
+        if (armed && key === 'listPersonalRecords') return () => Promise.reject(new Error('records read failed (test)'))
+        return typeof v === 'function' ? v.bind(target) : v
+      },
+    })
+    const log = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    try {
+      const calls = mocks.calls
+      const result = await generateWhile(a, async () => {
+        expect(await coach(a, [{ id: 'c1', field: 'repRange', from: null, to: '12-15' }])).toMatchObject({ ok: true })
+        armed = true
+      }, failing)
+      expect(result).toMatchObject({ ok: true })
+      expect(mocks.calls - calls).toBe(1)
+    } finally { armed = false }
+    const logged = log.mock.calls.filter(c => String(c[0]).includes('reading what a restate needs'))
+    log.mockRestore()
+    expect(logged).toHaveLength(1)
     expect(scrub(await stored(a), a)).toEqual(generated)
     const pref = (await pool.query(`SELECT rep_min, rep_max FROM exercise_preferences WHERE user_id = $1`, [a.id])).rows
     expect(pref).toEqual([{ rep_min: 12, rep_max: 15 }])
@@ -542,30 +627,66 @@ describe.skipIf(!canRun)('a lift change made while a plan is generated survives 
     expect(await serveHeld(a)).toEqual(after)
   }, 60_000)
 
-  // How long the store holds the lift lock when the preferences moved (the longest path: re-read, restate's reads, store).
-  it('measures how long the store keeps the lift lock: 20 runs, preferences moved each time', async () => {
-    const times: number[] = []
-    const timed = new Proxy(repo, {
-      get(target, key) {
-        const v = Reflect.get(target, key, target)
-        if (key === 'storePrescriptionForCurrentPreferences') {
-          return async (...args: unknown[]) => {
-            const t0 = performance.now()
-            try { return await (v as (...x: unknown[]) => unknown).apply(target, args) } finally { times.push(performance.now() - t0) }
-          }
-        }
-        return typeof v === 'function' ? v.bind(target) : v
-      },
-    })
-    for (let k = 0; k < 20; k++) {
-      const a = await person()
-      expect(await generateWhile(a, () => coach(a, [{ id: 'c1', field: 'repRange', from: null, to: '12-15' }]), timed)).toMatchObject({ ok: true })
+  // How long the store holds the lift lock when the preferences moved (the longest path: re-read, restate, store).
+  it('measures how long the store keeps the lift lock: 30 runs with the preferences moved, 30 with nothing moved', async () => {
+    const stat = (times: number[]) => {
+      const t = [...times].sort((x, y) => x - y)
+      return { median: (t[14] + t[15]) / 2, worst: t[29] }
     }
+    const measure = async (moved: boolean) => {
+      const times: number[] = []
+      const timed = new Proxy(repo, {
+        get(target, key) {
+          const v = Reflect.get(target, key, target)
+          if (key === 'storePrescriptionForCurrentPreferences') {
+            return async (...args: unknown[]) => {
+              const t0 = performance.now()
+              try { return await (v as (...x: unknown[]) => unknown).apply(target, args) } finally { times.push(performance.now() - t0) }
+            }
+          }
+          return typeof v === 'function' ? v.bind(target) : v
+        },
+      })
+      for (let k = 0; k < 30; k++) {
+        const a = await person()
+        const r = moved
+          ? await generateWhile(a, () => coach(a, [{ id: 'c1', field: 'repRange', from: null, to: '12-15' }]), timed)
+          : (mocks.answer = model(a.slot), await generate(a.id, a.session, timed, TZ))
+        expect(r).toMatchObject({ ok: true })
+      }
+      return times
+    }
+    const movedTimes = await measure(true)
+    const unmovedTimes = await measure(false)
+    const m = stat(movedTimes), u = stat(unmovedTimes)
+    report(`[4007] lift lock held by the store, 30 runs each: moved median ${m.median.toFixed(1)} ms worst ${m.worst.toFixed(1)} ms; unmoved median ${u.median.toFixed(1)} ms worst ${u.worst.toFixed(1)} ms`)
+    expect(movedTimes).toHaveLength(30)
+    expect(unmovedTimes).toHaveLength(30)
+    expect(m.worst).toBeLessThan(2000)
+    expect(u.worst).toBeLessThan(2000)
+  }, 180_000)
+
+  it('counts the statements and the time of one generation (no change made meanwhile), 20 runs', async () => {
+    const counts: number[] = []
+    const times: number[] = []
+    const realQuery = pg.Client.prototype.query
+    let n = 0
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(pg.Client.prototype as any).query = function (this: pg.Client, ...args: unknown[]) { n++; return (realQuery as any).apply(this, args) } // eslint-disable-line @typescript-eslint/no-explicit-any
+    try {
+      for (let k = 0; k < 20; k++) {
+        const a = await person()
+        mocks.answer = model(a.slot)
+        n = 0
+        const t0 = performance.now()
+        expect(await generate(a.id, a.session, repo, TZ)).toMatchObject({ ok: true })
+        times.push(performance.now() - t0)
+        counts.push(n)
+      }
+    } finally { pg.Client.prototype.query = realQuery }
     times.sort((x, y) => x - y)
-    const median = (times[9] + times[10]) / 2
-    console.info(`[4007] lift lock held by the store, moved preferences, 20 runs: median ${median.toFixed(1)} ms, worst ${times[19].toFixed(1)} ms`)
-    expect(times).toHaveLength(20)
-    expect(times[19]).toBeLessThan(2000)
+    report(`[4007] one generation, nothing moved, 20 runs: statements per run ${counts.join(",")}, median ${((times[9] + times[10]) / 2).toFixed(1)} ms`)
+    expect(counts.length).toBe(20)
   }, 120_000)
 
   const busyRows = async (p: Person) =>
@@ -606,6 +727,6 @@ describe.skipIf(!canRun)('a lift change made while a plan is generated survives 
     const ms = Math.round(performance.now() - t0)
     await released
     await new Promise(r => setTimeout(r, 300))
-    console.info(`[4007] lock held 10 s: request ${ms} ms, ${await busyRows(a)} busy error rows`)
+    report(`[4007] lock held 10 s: request ${ms} ms, ${await busyRows(a)} busy error rows`)
   }, 60_000)
 })

@@ -82,22 +82,55 @@ export async function liftPreferenceBases(
   return liftWorkingBases(repo, userId, names, prMap)
 }
 
-/** The working basis of each of `names`, by the resolver the workout screen's bar uses. */
-export async function liftWorkingBases(
-  repo: WorkoutRepository, userId: string, names: readonly string[], prMap: ReadonlyMap<string, number>,
-): Promise<Map<string, number | null>> {
-  const out = new Map<string, number | null>()
-  if (names.length === 0) return out
-  const [lastReal, estimates] = await Promise.all([
-    repo.getLastRealOneRmBatch(userId, [...names]),
+/**
+ * Everything the store's restate (#4007) can need, read before the store takes the lift lock: the session's
+ * lifts' last logged bars (for a check-in hold), the personal records, the last real 1RMs and the typed
+ * estimates (for the working basis). Read for EVERY lift of the session, moved or not, because which lifts
+ * moved is only known inside the lock. The restate is then a pure function of these, so nothing but the
+ * transaction's own statements runs while the lock is held (`docs/lift-write-lock-order.md`).
+ */
+export interface RestateReads {
+  lastLogs: Awaited<ReturnType<WorkoutRepository['getLastExerciseLogsBatch']>>
+  records: Awaited<ReturnType<WorkoutRepository['listPersonalRecords']>>
+  lastReal: Awaited<ReturnType<WorkoutRepository['getLastRealOneRmBatch']>>
+  estimates: { exerciseName: string; estimated1rm: number }[]
+}
+
+/** Throws on a failed read (the caller then stores the plan as generated). A failed estimates read is `[]`, as `liftWorkingBases` has it. */
+export async function loadRestateReads(repo: WorkoutRepository, userId: string, exerciseNames: readonly string[]): Promise<RestateReads> {
+  const names = [...new Set(exerciseNames)]
+  const [lastLogs, records, lastReal, estimates] = await Promise.all([
+    repo.getLastExerciseLogsBatch(userId, names),
+    repo.listPersonalRecords(userId),
+    repo.getLastRealOneRmBatch(userId, names),
     repo.getExerciseEstimates(userId).catch(() => []),
   ])
+  return { lastLogs, records, lastReal, estimates }
+}
+
+/** The working basis of each of `names` from reads already made. Pure. */
+export function workingBasesFrom(
+  reads: Pick<RestateReads, 'lastReal' | 'estimates'>, names: readonly string[], prMap: ReadonlyMap<string, number>,
+): Map<string, number | null> {
+  const out = new Map<string, number | null>()
   for (const name of names) {
     out.set(name, resolveWorkingBasisWithSource({
-      lastNonDeload1rm: lastReal.get(name)?.estimated1rm,
-      seedEstimate: estimates.find(e => e.exerciseName === name)?.estimated1rm,
+      lastNonDeload1rm: reads.lastReal.get(name)?.estimated1rm,
+      seedEstimate: reads.estimates.find(e => e.exerciseName === name)?.estimated1rm,
       allTimePr1rm: prMap.get(name),
     }).kg)
   }
   return out
+}
+
+/** The working basis of each of `names`, by the resolver the workout screen's bar uses. */
+export async function liftWorkingBases(
+  repo: WorkoutRepository, userId: string, names: readonly string[], prMap: ReadonlyMap<string, number>,
+): Promise<Map<string, number | null>> {
+  if (names.length === 0) return new Map()
+  const [lastReal, estimates] = await Promise.all([
+    repo.getLastRealOneRmBatch(userId, [...names]),
+    repo.getExerciseEstimates(userId).catch(() => []),
+  ])
+  return workingBasesFrom({ lastReal, estimates }, names, prMap)
 }

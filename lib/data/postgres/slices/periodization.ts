@@ -789,8 +789,8 @@ function storePrescriptionRow(
  * generation, so the lock is taken only here, after it, in one transaction (`withProgramWriteLock`: the
  * per-user lift lock first, then `lock_timeout` 4 s for the row wait):
  *   1. the lifts' preferences are read again (a plain select) and compared with the stamp the plan was built from;
- *   2. when they moved, `restate` (the caller's, no model call: plain selects for the bases, then a pure
- *      function) gives the plan IT MADE for the preferences now in force;
+ *   2. when they moved, `restate` (the caller's: a PURE function of the generated plan, the reads the caller made
+ *      BEFORE this call, and the preferences read in step 1; it makes no read of its own) gives the plan IT MADE for the preferences now in force;
  *   3. the plan is stored by the same statement as `storePrescription`.
  * No writer can move a preference while the lock is held, so there is no loop: what is stored always matches
  * what is in force when it commits, however many changes were made meanwhile.
@@ -806,7 +806,7 @@ export async function storePrescriptionForCurrentPreferences(
     names: string[]; weekStart: string; stamp: string
     /** What is stored for a plan (the generation's derived extras added); the answer is the plan without them. */
     finalize: (plan: AiPrescription) => AiPrescription
-    restate: (current: { prefs: Map<string, LiftPreference>; held: string[] }) => Promise<AiPrescription>
+    restate: (current: { prefs: Map<string, LiftPreference>; held: string[] }) => AiPrescription
   },
 ): Promise<{ stored: boolean; prescription: AiPrescription }> {
   return withProgramWriteLock(db, userId, async tx => {
@@ -816,7 +816,7 @@ export async function storePrescriptionForCurrentPreferences(
     let plan = prescription
     if (liftPreferencesStamp(prefs, guard.names) !== guard.stamp) {
       try {
-        plan = await guard.restate({ prefs, held })
+        plan = guard.restate({ prefs, held })
       } catch (err) {
         console.error('[prescribe] restating the plan for lift preferences that moved failed; storing it as generated:', err)
       }
