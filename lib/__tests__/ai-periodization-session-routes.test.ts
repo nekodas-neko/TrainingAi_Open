@@ -25,7 +25,7 @@ type Row = Record<string, unknown>
 const getActiveProgram = vi.fn(async (_u: string) => program() as Row | null)
 const ensureSessionPeriodization = vi.fn(async (_u: string, _s: string) => state() as Row | null)
 const getSessionPeriodization = vi.fn(async (_u: string, _s: string) => state() as Row | null)
-const setBaselineComplete = vi.fn(async (_u: string, _s: string, _b: Row) => state({ phase: 'accumulation', baselineComplete: true }) as Row)
+const setBaselineComplete = vi.fn(async (_u: string, _s: string, _b: Row, _mode?: { read?: boolean }) => state({ phase: 'accumulation', baselineComplete: true }) as Row)
 const advancePhase = vi.fn(async (_u: string, _s: string, _p: string) => state({ phase: 'deload' }) as Row)
 const storePrescription = vi.fn(async (_u: string, _s: string, _p: Row, _e: Date) => undefined)
 const updatePrescriptionStatus = vi.fn(async (_u: string, _s: string, _st: string) => undefined)
@@ -674,6 +674,22 @@ describe('GET …/session/[sessionId] — the stale-baseline auto-heal', () => {
       [SQUAT]: { kg: 120, source: 'personal_record' },
       [CURL]: { kg: 30, source: 'personal_record' },
     })
+  })
+
+  // #4098: a baseline workout finished while the lock was busy stored its measured anchors by the partial
+  // write. The self-heal completes from them: a personal record only fills what was not measured.
+  it('keeps a measured anchor over a personal record, and asks for the read mode (a busy lock is skipped)', async () => {
+    ensureSessionPeriodization.mockResolvedValue(state({
+      phase: 'baseline', baselineComplete: false, baseline1rm: { [SQUAT]: { kg: 135, source: 'amrap' } },
+    }))
+    loggedSincePhaseStart()
+    listPersonalRecords.mockResolvedValue(new Map([['Squat', 120], ['Curl', 30]]))
+    await getSession()
+    expect(setBaselineComplete.mock.calls[0][2]).toEqual({
+      [SQUAT]: { kg: 135, source: 'amrap' },
+      [CURL]: { kg: 30, source: 'personal_record' },
+    })
+    expect(setBaselineComplete.mock.calls[0][3]).toEqual({ read: true })
   })
 
   // BF-143 ①. The owner rebuilt a session inside an existing program and it never asked for an

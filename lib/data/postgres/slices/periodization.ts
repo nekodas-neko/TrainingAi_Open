@@ -1,6 +1,6 @@
 import { eq, and, inArray, asc, desc, sql, isNull, gte, lte } from 'drizzle-orm'
 import { NotFoundError, BusyError } from '@trainingai/shared/errors'
-import { lockLiftWrites, lockWait } from '../../../coach/lock-wait'
+import { lockLiftWrites, lockWait, readLockWait, tryLiftWrites } from '../../../coach/lock-wait'
 import { isLockWaitTimeout } from '@/lib/api/route-errors'
 import { trackPendingWrite } from '@/lib/observability/pending-writes'
 import type { getDb } from '../client'
@@ -89,15 +89,56 @@ export async function getSessionPeriodization(db: Db, userId: string, programSes
   }
 }
 
-export async function ensureSessionPeriodization(db: Db, userId: string, programSessionId: string): Promise<SessionPeriodization> {
-  const [row] = await db
-    .insert(s.sessionPeriodization)
-    .values({ userId, programSessionId })
-    .onConflictDoNothing()
-    .returning()
-  if (row) return mapPeriodization(row)
+export async function ensureSessionPeriodization(db: Db, userId: string, programSessionId: string, mode: LockMode = {}): Promise<SessionPeriodization> {
+  const insert = async (tx: Db) => {
+    const [row] = await tx
+      .insert(s.sessionPeriodization)
+      .values({ userId, programSessionId })
+      .onConflictDoNothing()
+      .returning()
+    return row
+  }
+  // An INSERT ... ON CONFLICT DO NOTHING waits only for a conflicting insert that has not committed. A WRITE
+  // (a generation, the baseline-complete route) waits for it, as it always has, because it goes on to use the
+  // row: bounding it here answered `null` to a caller typed non-null, and a generation racing a program save
+  // then failed on `state.phase` (#4098 second review).
+  if (!mode.read) {
+    const row = await insert(db)
+    if (row) return mapPeriodization(row)
+    return (await getSessionPeriodization(db, userId, programSessionId))!
+  }
+  // A READ (the session-state GET) is bounded like every read-reachable write. On a miss it answers with the
+  // stored row; while the conflicting insert is still uncommitted there is none, and the GET answers 404 as it
+  // does for any session with no state. The next read finds the row.
+  const inserted = await boundedReadWrite(db, insert)
+  if (inserted.done && inserted.value) return mapPeriodization(inserted.value)
   const existing = await getSessionPeriodization(db, userId, programSessionId)
   return existing!
+}
+
+/** #4098: `read: true` is a caller on a READ path: it skips its repair when the lock is not free (`BusyError`)
+ *  instead of waiting the write's 4 s. A write leaves it off. */
+export type LockMode = { read?: boolean }
+
+/**
+ * #4098 review: a write that a READ path reaches (a repair or a cached value: adopting a pending plan, voiding
+ * a stale offer, restating a stored plan, ...) never waits longer than `readLockWait` for a row another
+ * writer holds. It runs in a transaction with `lock_timeout` set LOCAL to that; past it the write is skipped
+ * (`{ done: false }`, nothing written, the transaction rolled back) and the caller answers the read with what
+ * is stored. The next read repeats the write. A plain row UPDATE has no wait of its own, and before this one
+ * waited for a check-in's row lock up to the pool's 15 s statement timeout (a measured 15,017 ms read).
+ */
+export async function boundedReadWrite<T>(db: Db, write: (tx: Db) => Promise<T>): Promise<{ done: true; value: T } | { done: false }> {
+  try {
+    const value = await db.transaction(async tx => {
+      await tx.execute(sql`SELECT set_config('lock_timeout', ${`${readLockWait.ms}ms`}, true)`)
+      return write(tx as unknown as Db)
+    })
+    return { done: true, value }
+  } catch (err) {
+    if (isLockWaitTimeout(err)) return { done: false }
+    throw err
+  }
 }
 
 /**
@@ -115,9 +156,18 @@ export async function ensureSessionPeriodization(db: Db, userId: string, program
  * its model call before or after. A wait past `lockWait`, a statement timeout or a deadlock rolls the
  * whole transaction back, so nothing was written: reported once, answered as `BusyError` (409).
  */
-export async function withProgramWriteLock<T>(db: Db, userId: string, run: (tx: Tx) => Promise<T>): Promise<T> {
+export async function withProgramWriteLock<T>(db: Db, userId: string, run: (tx: Tx) => Promise<T>, mode: LockMode = {}): Promise<T> {
+  const read = mode.read === true
   try {
     return await db.transaction(async tx => {
+      if (read) {
+        // #4098: a repair on a READ never waits for a writer: the lift lock is try-locked, the row waits are
+        // `readLockWait`, and a miss is a `BusyError` the caller skips (the next read repairs). Not reported:
+        // it is the expected answer while a check-in or a Coach apply holds the lock, and nothing failed.
+        if (!(await tryLiftWrites(tx as never, userId))) throw new BusyError()
+        await tx.execute(sql`SELECT set_config('lock_timeout', ${`${readLockWait.ms}ms`}, true)`)
+        return run(tx)
+      }
       await lockLiftWrites(tx as never, userId)
       // #4082 review 2: the row waits after the lift lock are bounded too, by the same `lockWait`, set LOCAL
       // (it ends with this transaction). Without it they ran to the pool's 15 s `statement_timeout`: past the
@@ -128,6 +178,7 @@ export async function withProgramWriteLock<T>(db: Db, userId: string, run: (tx: 
       return run(tx)
     })
   } catch (err) {
+    if (isLockWaitTimeout(err) && read) throw new BusyError()
     if (isLockWaitTimeout(err)) {
       // Written straight to `error_events` with the same handle: `reportServerError` reaches the database
       // through `@/lib/data`, which would make this slice import its own composition root (as `oura.ts`'s
@@ -294,7 +345,7 @@ async function joiningPhase(tx: Tx, userId: string, programSessionId: string): P
   return joiningPhaseFor(siblings, new Date())
 }
 
-export async function setBaselineComplete(db: Db, userId: string, programSessionId: string, baseline1rm: Record<string, Baseline1rmEntry>): Promise<SessionPeriodization> {
+export async function setBaselineComplete(db: Db, userId: string, programSessionId: string, baseline1rm: Record<string, Baseline1rmEntry>, mode: LockMode = {}): Promise<SessionPeriodization> {
   // #4082 review 2: `joiningPhase` locks ALL of the program's plan rows in id order, so this is a
   // multi-row writer like the phase movers: lift-write lock first, or it cycles with a check-in save.
   return withProgramWriteLock(db, userId, async tx => {
@@ -316,7 +367,7 @@ export async function setBaselineComplete(db: Db, userId: string, programSession
       ))
       .returning()
     return mapPeriodization(row)
-  })
+  }, mode)
 }
 
 /**
@@ -458,7 +509,7 @@ export async function setProgramPhase(
       ))
     if (toVoid.length > 0) await voidPlans(tx, userId, toVoid, now)
     return true
-  })
+  }, { read: opts.read })
 }
 
 /** 'consumed' + no plan is what the open-time trigger regenerates from (as `clearProgramPrescriptions`). */
@@ -475,7 +526,7 @@ async function voidPlans(tx: Tx, userId: string, rowIds: string[], now: Date): P
  * was not already there has its count reset and its plan voided (a held one-day deload excepted);
  * the others keep their plans and just get the mark.
  */
-export async function realignProgramPhase(db: Db, userId: string, programId: string, decide: DecideTarget): Promise<void> {
+export async function realignProgramPhase(db: Db, userId: string, programId: string, decide: DecideTarget, mode: LockMode = {}): Promise<void> {
   await withProgramWriteLock(db, userId, async tx => {
     const locked = await lockProgramRows(tx, userId, programId)
     const target = decide(locked)
@@ -496,14 +547,14 @@ export async function realignProgramPhase(db: Db, userId: string, programId: str
     await tx.update(s.sessionPeriodization)
       .set({ pendingTransition: pending, updatedAt: now })
       .where(and(eq(s.sessionPeriodization.userId, userId), inArray(s.sessionPeriodization.id, phased.map(r => r.id))))
-  })
+  }, mode)
 }
 
 /** A scheduled move on every phased row of the program, phase, start and plans untouched: the
  *  program's mark on its first read, or the switch-over's waiting stamp and date (#3766). `decide`
  *  works it out from the LOCKED rows, so a switch-over landing after the caller's read is not
  *  overwritten by a waiting stamp; null writes nothing. */
-export async function setProgramPendingTransition(db: Db, userId: string, programId: string, decide: DecidePending): Promise<void> {
+export async function setProgramPendingTransition(db: Db, userId: string, programId: string, decide: DecidePending, mode: LockMode = {}): Promise<void> {
   await withProgramWriteLock(db, userId, async tx => {
     const locked = await lockProgramRows(tx, userId, programId)
     const phased = locked.filter(r => r.baselineComplete && r.phase !== 'baseline')
@@ -513,7 +564,7 @@ export async function setProgramPendingTransition(db: Db, userId: string, progra
     await tx.update(s.sessionPeriodization)
       .set({ pendingTransition: pending as unknown as Record<string, unknown>, updatedAt: new Date() })
       .where(and(eq(s.sessionPeriodization.userId, userId), inArray(s.sessionPeriodization.id, phased.map(r => r.id))))
-  })
+  }, mode)
 }
 
 /** The program move made from one session type's screen or generation: moves the program that
@@ -671,8 +722,10 @@ export async function storePrescription(
   db: Db, userId: string, programSessionId: string, prescription: AiPrescription, expiresAt: Date,
   status: PrescriptionStatus = 'pending',
   generatedFor?: GeneratedFor,
+  /** #4098 review: `read: true` from the check-in fit a READ makes: bounded, a miss answers false. */
+  mode: LockMode = {},
 ): Promise<boolean> {
-  const stored = await db
+  const run = (d: Db) => d
     .update(s.sessionPeriodization)
     .set({
       prescription: prescription as unknown as Record<string, unknown>,
@@ -692,7 +745,9 @@ export async function storePrescription(
         : []),
     ))
     .returning({ id: s.sessionPeriodization.id })
-  return stored.length > 0
+  if (!mode.read) return (await run(db)).length > 0
+  const stored = await boundedReadWrite(db, async tx => (await run(tx)).length > 0)
+  return stored.done && stored.value
 }
 
 // Void the cached AI prescription for every session in a program, WITHOUT resetting
@@ -734,14 +789,18 @@ export async function voidProgramPrescriptionsIn(tx: Tx, userId: string, program
 
 /** One session's stored plan voided to 'consumed' + no plan, which the open-time trigger regenerates
  *  from (as `clearProgramPrescriptions`, for one session). Phase and counts are untouched. */
-export async function voidSessionPrescription(db: Db, userId: string, programSessionId: string): Promise<void> {
-  await db
+export async function voidSessionPrescription(db: Db, userId: string, programSessionId: string, mode: LockMode = {}): Promise<void> {
+  const run = (d: Db) => d
     .update(s.sessionPeriodization)
     .set({ prescription: null, prescriptionStatus: 'consumed', prescriptionGeneratedAt: null, prescriptionExpiresAt: null, updatedAt: new Date() })
     .where(and(
       eq(s.sessionPeriodization.userId, userId),
       eq(s.sessionPeriodization.programSessionId, programSessionId),
     ))
+  // #4098 review: `read: true` from a read path (the program overview's sync): the row wait is bounded and a
+  // miss skips the void (the next read makes it). A write path leaves it off and waits as before.
+  if (mode.read) await boundedReadWrite(db, tx => run(tx))
+  else await run(db)
 }
 
 /**
@@ -753,17 +812,22 @@ export async function voidSessionPrescription(db: Db, userId: string, programSes
 export async function adoptPendingPrescription(
   db: Db, userId: string, programSessionId: string, generatedAt: Date, status: PrescriptionStatus, expiresAt: Date,
 ): Promise<boolean> {
-  const rows = await db
-    .update(s.sessionPeriodization)
-    .set({ prescriptionStatus: status, prescriptionExpiresAt: expiresAt, updatedAt: new Date() })
-    .where(and(
-      eq(s.sessionPeriodization.userId, userId),
-      eq(s.sessionPeriodization.programSessionId, programSessionId),
-      eq(s.sessionPeriodization.prescriptionStatus, 'pending'),
-      sql`date_trunc('milliseconds', ${s.sessionPeriodization.prescriptionGeneratedAt}) = ${generatedAt.toISOString()}::timestamptz`,
-    ))
-    .returning({ id: s.sessionPeriodization.id })
-  return rows.length > 0
+  // #4098 review: only ever called from a read, so the row wait is bounded; a miss is "did not write", the
+  // plan is served as stored (still pending) and the next read adopts it.
+  const wrote = await boundedReadWrite(db, async tx => {
+    const rows = await tx
+      .update(s.sessionPeriodization)
+      .set({ prescriptionStatus: status, prescriptionExpiresAt: expiresAt, updatedAt: new Date() })
+      .where(and(
+        eq(s.sessionPeriodization.userId, userId),
+        eq(s.sessionPeriodization.programSessionId, programSessionId),
+        eq(s.sessionPeriodization.prescriptionStatus, 'pending'),
+        sql`date_trunc('milliseconds', ${s.sessionPeriodization.prescriptionGeneratedAt}) = ${generatedAt.toISOString()}::timestamptz`,
+      ))
+      .returning({ id: s.sessionPeriodization.id })
+    return rows.length > 0
+  })
+  return wrote.done && wrote.value
 }
 
 export async function updatePrescriptionStatus(db: Db, userId: string, programSessionId: string, status: PrescriptionStatus): Promise<void> {
@@ -781,13 +845,15 @@ export async function updatePrescriptionStatus(db: Db, userId: string, programSe
 // generatedAt are left untouched, unlike storePrescription (which is for a fresh
 // generation and would wrongly reset an 'accepted' status back to 'pending').
 export async function updatePrescriptionExercisesCache(db: Db, userId: string, programSessionId: string, prescription: AiPrescription): Promise<void> {
-  await db
+  // #4098 review: written by `/api/workout-data` (not awaited there, but it holds a pooled connection while it
+  // waits), so bounded; a miss skips the cache and the next read re-derives it.
+  await boundedReadWrite(db, tx => tx
     .update(s.sessionPeriodization)
     .set({ prescription: prescription as unknown as Record<string, unknown>, updatedAt: new Date() })
     .where(and(
       eq(s.sessionPeriodization.userId, userId),
       eq(s.sessionPeriodization.programSessionId, programSessionId),
-    ))
+    )))
 }
 
 /**
@@ -796,16 +862,21 @@ export async function updatePrescriptionExercisesCache(db: Db, userId: string, p
  * remade or rewritten meanwhile is left alone.
  */
 export async function replacePrescriptionIfUnchanged(db: Db, userId: string, programSessionId: string, before: AiPrescription, after: AiPrescription): Promise<boolean> {
-  const rows = await db
-    .update(s.sessionPeriodization)
-    .set({ prescription: after as unknown as Record<string, unknown>, updatedAt: new Date() })
-    .where(and(
-      eq(s.sessionPeriodization.userId, userId),
-      eq(s.sessionPeriodization.programSessionId, programSessionId),
-      sql`${s.sessionPeriodization.prescription} = ${JSON.stringify(before)}::jsonb`,
-    ))
-    .returning({ id: s.sessionPeriodization.id })
-  return rows.length === 1
+  // #4098 review: only called from reads (the week's hold on a stored plan), so the row wait is bounded; a
+  // miss is "lost the swap": the caller serves the plan held, unstored, and the next read stores it.
+  const wrote = await boundedReadWrite(db, async tx => {
+    const rows = await tx
+      .update(s.sessionPeriodization)
+      .set({ prescription: after as unknown as Record<string, unknown>, updatedAt: new Date() })
+      .where(and(
+        eq(s.sessionPeriodization.userId, userId),
+        eq(s.sessionPeriodization.programSessionId, programSessionId),
+        sql`${s.sessionPeriodization.prescription} = ${JSON.stringify(before)}::jsonb`,
+      ))
+      .returning({ id: s.sessionPeriodization.id })
+    return rows.length === 1
+  })
+  return wrote.done && wrote.value
 }
 
 export async function storePendingTransition(db: Db, userId: string, programSessionId: string, transition: PendingTransition | null): Promise<void> {
@@ -861,15 +932,28 @@ export async function reconcileSessionsInPhase(db: Db, userId: string, programId
   // now: it runs on most reads and is self-healing, so it skips rather than queue behind a check-in (and
   // a writer that never waits cannot be one side of a cycle). The next read repairs what it skipped.
   //
-  // #4082 review 2: the try-lock is part of the same statement (`got`, read by the WHERE only for a row that
-  // really drifted), not a BEGIN / try-lock / UPDATE / COMMIT of its own: this runs on most
-  // `/api/workout-data` reads, and four round trips there was a cost for the common read that has nothing
-  // to repair. One statement is one implicit transaction, so the advisory lock is released with it; a read
-  // with nothing to repair never takes the lock at all, and one that has something costs the same single
-  // round trip it did before the lock. While the lock is held no other lift-lock taker holds any row, and
-  // the lock-free writers hold one row for one statement, so the scan order of the update cannot cycle.
-  await db.execute(sql`
-    WITH got AS (SELECT pg_try_advisory_xact_lock(hashtext('lift_writes:user'), hashtext(${userId})) AS ok)
+  // #4082 review 2: the try-lock is part of the same statement (`got`), not a BEGIN / try-lock / UPDATE /
+  // COMMIT of its own: this runs on most `/api/workout-data` reads, and four round trips there was a cost
+  // for the common read. One statement is one implicit transaction, so the advisory lock is released with it.
+  //
+  // #4098: what the statement does, exactly. The try-lock runs FIRST ON EVERY CALL (the planner's One-Time
+  // Filter evaluates `got` once, before any row is looked at), so every read takes the person's lift lock
+  // for the length of this one statement, drift or not; the WHERE only lets the update write while it was
+  // free. A check-in that arrives meanwhile waits milliseconds behind it. It does not queue the other way:
+  // a read that finds the lock held skips the repair.
+  //
+  // Row order: the update does not lock its rows in id order, and no cycle follows. It writes only while it
+  // holds the lift lock, and while it does no other lift-lock taker holds a plan row (each takes the lift
+  // lock before its first row); the lock-free writers (`recordBaselineAnchors` partial, the restate, the
+  // store) hold one row for one statement and wait for nothing while holding it. So it never waits on a
+  // row held by a writer that is itself waiting for this one's rows.
+  //
+  // #4098 review: its row waits are bounded too (`set_config` ... local, in the same statement's first CTE, so
+  // no extra round trip; it ends with the statement's implicit transaction). A row held by a lock-free writer
+  // or a cascade (a rename, an account deletion) past `readLockWait` skips the repair like a held lift lock.
+  try { await db.execute(sql`
+    WITH got AS (SELECT pg_try_advisory_xact_lock(hashtext('lift_writes:user'), hashtext(${userId})) AS ok,
+                        set_config('lock_timeout', ${`${readLockWait.ms}ms`}, true) AS bound)
     UPDATE session_periodization sp
     SET sessions_in_phase = sub.cnt, updated_at = NOW()
     FROM (
@@ -888,7 +972,7 @@ export async function reconcileSessionsInPhase(db: Db, userId: string, programId
       GROUP BY sp2.id
     ) sub
     WHERE sp.id = sub.id AND sp.sessions_in_phase <> sub.cnt AND (SELECT ok FROM got)
-  `)
+  `) } catch (err) { if (!isLockWaitTimeout(err)) throw err }
 }
 
 export async function setLastSessionRanPrescription(db: Db, userId: string, programSessionId: string, ranPrescription: boolean): Promise<void> {
@@ -1408,6 +1492,8 @@ export async function revertAutoAdoptedBaseline(
   userId: string,
   programSessionId: string,
 ): Promise<SessionPeriodization | null> {
+  // #4098 review: reached by the session-state GET, so its UPDATE is bounded (`boundedReadWrite`); a miss
+  // answers null, which the caller reads as "serve the stored state" and the next read repairs.
   const [current] = await db.select().from(s.sessionPeriodization).where(and(
     eq(s.sessionPeriodization.userId, userId),
     eq(s.sessionPeriodization.programSessionId, programSessionId),
@@ -1418,7 +1504,8 @@ export async function revertAutoAdoptedBaseline(
   // An empty map is not evidence of the auto-adopt path, so it is left alone rather than reverted.
   if (anchors.length === 0 || !anchors.every(a => a.source === 'personal_record')) return null
 
-  const [row] = await db
+  const reverted = await boundedReadWrite(db, async tx => {
+  const [row] = await tx
     .update(s.sessionPeriodization)
     .set({
       phase: 'baseline', phaseStartedAt: new Date(), baselineComplete: false,
@@ -1434,5 +1521,7 @@ export async function revertAutoAdoptedBaseline(
       eq(s.sessionPeriodization.programSessionId, programSessionId),
     ))
     .returning()
-  return row ? mapPeriodization(row) : null
+  return row
+  })
+  return reverted.done && reverted.value ? mapPeriodization(reverted.value) : null
 }

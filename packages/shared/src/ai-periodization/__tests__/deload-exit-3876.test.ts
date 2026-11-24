@@ -20,14 +20,14 @@ import { BusyError } from '@trainingai/shared/errors'
 import { isAiPrescriptionPending } from '../prescription-pending'
 import { hidePrescriptionAgedOutOnScreen, prescribedDeloadDefault, servePrescriptionState } from '../prescription-expiry'
 
-const mocks = vi.hoisted(() => ({ signals: null as unknown, modelAnswer: null as unknown, whileBuilding: null as null | (() => void) }))
+const mocks = vi.hoisted(() => ({ signals: null as unknown, modelAnswer: null as unknown, whileBuilding: null as null | (() => void), modelCalls: 0 }))
 vi.mock('../signals', async importOriginal => ({
   ...(await importOriginal<typeof import('../signals')>()),
   // `whileBuilding` runs while the plan is being made: a change another request makes meanwhile.
   aggregateSignals: async () => { mocks.whileBuilding?.(); return mocks.signals },
 }))
 vi.mock('@/lib/ai/instrument', () => ({
-  loggedGenerateObject: async () => ({ object: structuredClone(mocks.modelAnswer) }),
+  loggedGenerateObject: async () => { mocks.modelCalls++; return { object: structuredClone(mocks.modelAnswer) } },
 }))
 const { generatePrescriptionForSession } = await import('../generate-prescription')
 
@@ -271,7 +271,9 @@ function memoryProgram(
       if (generatedFor && (r.phase !== generatedFor.phase || r.phaseStartedAt.getTime() !== generatedFor.phaseStartedAt.getTime())) return false
       if (generatedFor?.structure != null && generatedFor.structure !== opts.structure?.value) return false
       stored.push({ id, prescription, status })
-      rows = rows.map(x => (x.programSessionId === id ? { ...x, prescription, prescriptionStatus: status } as Slot : x))
+      rows = rows.map(x => (x.programSessionId === id
+        ? { ...x, prescription, prescriptionStatus: status, prescriptionGeneratedAt: new Date(), prescriptionExpiresAt: _e } as Slot
+        : x))
       return true
     },
   }
@@ -562,6 +564,86 @@ describe('generation, #3877', () => {
       expect(p.stored).toHaveLength(1)
       expect(p.stored[0]).toMatchObject({ id: 'b', status: 'pending' })
     })
+  })
+})
+
+// #4098 item 6: what a phase move refused as busy AFTER the model answered costs, now that a pending plan on
+// the AI plan is adopted at serve time (#4088, `adoptPendingAiPlan`). The model is the counter in the mock above.
+describe('the true cost of a busy phase move after the model answered (#4098)', () => {
+  const NOW = at('2026-11-20T12:00:00')
+  const alignedRows = () => {
+    const mark = programMoveMark('accumulation')
+    const start = at('2026-10-26T00:00:00')
+    return [row('a', 'accumulation', start, 2, { pendingTransition: mark }), row('b', 'accumulation', start, 2, { pendingTransition: mark })]
+  }
+  const history = () => [done('a', '2026-11-16T12:00:00'), done('a', '2026-11-18T12:00:00'), done('b', '2026-11-17T12:00:00'), done('b', '2026-11-19T08:00:00')]
+  const votes = () => ['a', 'b'].map(id => ({ programSessionId: id, phase: 'intensification', phaseAction: 'transition_recommended', createdAt: at('2026-11-17T10:00:00') }))
+  beforeEach(async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(NOW)
+    mocks.modelCalls = 0
+    ;(await import('../pending-plan-adoption')).resetRegenerationAttempts()
+    mocks.signals = signals({ autoApplyPrescriptions: true, confidence: 0.9 })
+    mocks.modelAnswer = {
+      ...stayAnswer('intensification'), phase_action: 'transition_recommended',
+      exercises: [{ session_exercise_id: 'x', name: 'Lift x', sets: 4, reps: 4, pct: 85, rest_sec: 180 }],
+    }
+  })
+  afterEach(() => vi.useRealTimers())
+
+  /** The workout screen's read of the session, as `/api/workout-data` makes it: adopt, and plan again where told. */
+  const open = async (p: ReturnType<typeof memoryProgram>) => {
+    // A minute later: inside 30 s a plan just made is returned as it is (RV-184), a real next open is later.
+    vi.setSystemTime(new Date(Date.now() + 60_000))
+    const { adoptPendingAiPlan } = await import('../pending-plan-adoption')
+    let regenerating: Promise<unknown> | null = null
+    await adoptPendingAiPlan('u', 'b', p.repo, TZ, { phaseMode: 'ai_dynamic' }, p.row('b'), { now: new Date(), onRegenerate: () => { regenerating = p.plan('b') } })
+    await regenerating
+    return regenerating !== null
+  }
+
+  it('(a) the busy request: ONE model call, the plan stored as an offer, the phase untouched', async () => {
+    const p = memoryProgram(alignedRows(), history(), {}, { busyMoves: 1, answers: votes() })
+    await p.plan('b')
+    expect(mocks.modelCalls).toBe(1)
+    expect(p.row('b')).toMatchObject({ phase: 'accumulation', prescriptionStatus: 'pending' })
+  })
+
+  it('(b) the next open of the workout screen plans the offer again: ONE more model call, and the move now lands', async () => {
+    const p = memoryProgram(alignedRows(), history(), {}, { busyMoves: 1, answers: votes() })
+    await p.plan('b')
+    expect(await open(p)).toBe(true)
+    expect(mocks.modelCalls).toBe(2) // the true cost of one busy move: two paid calls, the first offer thrown away
+    expect(p.row('b')).toMatchObject({ phase: 'intensification', prescriptionStatus: 'auto_applied' })
+    // Nothing pending is left to adopt, so a further open costs nothing.
+    expect(await open(p)).toBe(false)
+    expect(mocks.modelCalls).toBe(2)
+  })
+
+  it('the same offer read twice the same day is planned again once; the cap is per plan, not per move', async () => {
+    const p = memoryProgram(alignedRows(), history(), {}, { busyMoves: 1, answers: votes() })
+    await p.plan('b')
+    const { adoptPendingAiPlan } = await import('../pending-plan-adoption')
+    vi.setSystemTime(new Date(Date.now() + 60_000))
+    const asked = vi.fn()
+    for (let read = 0; read < 3; read++) {
+      await adoptPendingAiPlan('u', 'b', p.repo, TZ, { phaseMode: 'ai_dynamic' }, p.row('b'), { now: new Date(), onRegenerate: asked })
+    }
+    expect(asked).toHaveBeenCalledTimes(1) // three reads of one stored offer, one regeneration asked for
+  })
+
+  it('worst case: while the lock stays busy, every open that finds the new offer pays one more call (the 20-an-hour limit is the only cap)', async () => {
+    const p = memoryProgram(alignedRows(), history(), {}, { busyMoves: 3, answers: votes() })
+    await p.plan('b') // busy #1: call 1, an offer
+    expect(await open(p)).toBe(true) // busy #2: call 2, a NEW offer, so a new plan for the cap
+    expect(await open(p)).toBe(true) // busy #3: call 3
+    expect(mocks.modelCalls).toBe(3)
+    expect(p.row('b')).toMatchObject({ phase: 'accumulation', prescriptionStatus: 'pending' })
+    expect(await open(p)).toBe(true) // free: call 4, and the move lands
+    expect(mocks.modelCalls).toBe(4)
+    expect(p.row('b')).toMatchObject({ phase: 'intensification', prescriptionStatus: 'auto_applied' })
+    expect(await open(p)).toBe(false) // nothing pending any more: free
+    expect(mocks.modelCalls).toBe(4)
   })
 })
 

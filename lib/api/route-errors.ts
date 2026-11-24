@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { z, type ZodError } from 'zod'
-import { isNotFoundError, isUserFacingError } from '@trainingai/shared/errors'
+import { isBusyError, isNotFoundError, isUserFacingError } from '@trainingai/shared/errors'
 import { isUuid } from '@trainingai/shared/validation/uuid'
 
 /**
@@ -49,6 +49,9 @@ export async function withRouteErrors(run: () => Promise<NextResponse>): Promise
  */
 export function refusalResponse(err: unknown, fallback: string): NextResponse {
   if (isNotFoundError(err)) return NextResponse.json({ error: err.message }, { status: 404 })
+  // #4098: a busy answer says so (`busy: true`, like the Coach and transition routes), so a queued native
+  // write retries it with its normal backoff instead of counting it as a refusal.
+  if (isBusyError(err)) return NextResponse.json({ error: err.message, busy: true }, { status: err.status })
   if (isUserFacingError(err)) return NextResponse.json({ error: err.message }, { status: err.status })
   return NextResponse.json({ error: fallback }, { status: 500 })
 }

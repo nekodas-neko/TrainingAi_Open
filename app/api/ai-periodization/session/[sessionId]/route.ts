@@ -29,7 +29,8 @@ export async function GET(
   const validSession = program?.sessions.find(s => s.id === sessionId)
   if (!validSession) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-  let state = await repo.ensureSessionPeriodization(userId, sessionId)
+  // A read: the row's insert waits at most the read wait (#4098). Writers call it without the mode.
+  let state = await repo.ensureSessionPeriodization(userId, sessionId, { read: true })
   if (!state) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   // #3890: in the applies-to week, the weekly check-in's shorter session (no model call, no query for
   // a person without one).
@@ -77,8 +78,13 @@ export async function GET(
     const allPrs = await repo.listPersonalRecords(userId)
     const baseline1rm: Record<string, Baseline1rmEntry> = {}
     for (const ex of validSession.exercises) {
+      // #4098: a measured anchor (a baseline workout's AMRAP, stored by the partial write when the completing
+      // write was busy) is kept; a personal record only fills what was not measured.
+      const measured = state.baseline1rm?.[ex.id]
       const pr = allPrs.get(ex.exerciseName)
-      if (pr != null) {
+      if (measured != null) {
+        baseline1rm[ex.id] = measured
+      } else if (pr != null) {
         baseline1rm[ex.id] = { kg: pr, source: 'personal_record' }
       }
     }
@@ -88,7 +94,7 @@ export async function GET(
     if (validSession.exercises.every(ex => baseline1rm[ex.id] != null)) {
       // #4082 review 2: a busy lock is skipped, not an error: this is a self-heal on a read, and the next read
       // retries it. Anything else is still a fault.
-      state = await repo.setBaselineComplete(userId, sessionId, baseline1rm).catch(err => {
+      state = await repo.setBaselineComplete(userId, sessionId, baseline1rm, { read: true }).catch(err => {
         if (isBusyError(err)) return state
         throw err
       })

@@ -27,7 +27,8 @@
 import { and, eq, inArray, isNull, sql } from 'drizzle-orm'
 import { DEFAULT_TZ, todayInTz } from '@trainingai/shared/date-utils'
 import * as s from '@/lib/data/postgres/schema'
-import { voidSessionPrescription } from '@/lib/data/postgres/slices/periodization'
+import { voidSessionPrescription, boundedReadWrite } from '@/lib/data/postgres/slices/periodization'
+import { BusyError } from '@trainingai/shared/errors'
 import type { WorkoutRepository } from '@/lib/data/repository'
 import { buildWorkoutExercises } from '@trainingai/shared/workout/session-data'
 import { buildAutomaticPhaseStatus, isEarlyDeloadWeek } from '@trainingai/shared/phase-engine'
@@ -646,6 +647,10 @@ export function stripSpentOneShotRecord(prescription: AiPrescription, exerciseNa
  */
 export async function restateSpentOneShot(
   db: Db, reads: BasisReads, userId: string, exerciseName: string, spentAt: Date,
+  /** #4098 review: `read: true` from a preferences READ: each plan's UPDATE waits for its row at most
+   *  `readLockWait`; a miss throws `BusyError` (nothing of that plan written) and the read stops restating,
+   *  leaving the rest to the next read. The consume (a write) leaves it off and waits as before. */
+  mode: { read?: boolean } = {},
 ): Promise<number> {
   const rows = await db.select().from(s.sessionPeriodization).where(eq(s.sessionPeriodization.userId, userId))
   const spentMs = spentAt.getTime()
@@ -687,7 +692,7 @@ export async function restateSpentOneShot(
     }, { programSessionId: p.programSessionId, phase: p.phase as PeriodizationPhase, prescription }, pref)
     const next = stripSpentOneShotRecord(restated, exerciseName, spentMs)
     if (next === prescription) continue
-    const res = await db.update(s.sessionPeriodization)
+    const write = (d: Db) => d.update(s.sessionPeriodization)
       .set({ prescription: next as unknown as Record<string, unknown>, updatedAt: new Date() })
       .where(and(
         eq(s.sessionPeriodization.userId, userId),
@@ -695,7 +700,13 @@ export async function restateSpentOneShot(
         sql`${s.sessionPeriodization.prescription} = ${JSON.stringify(prescription)}::jsonb`,
       ))
       .returning({ id: s.sessionPeriodization.id })
-    rewritten += res.length
+    if (mode.read) {
+      const done = await boundedReadWrite(db, write)
+      if (!done.done) throw new BusyError()
+      rewritten += done.value.length
+    } else {
+      rewritten += (await write(db)).length
+    }
   }
   return rewritten
 }

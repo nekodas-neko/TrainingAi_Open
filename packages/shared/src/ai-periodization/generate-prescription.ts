@@ -1281,8 +1281,13 @@ async function runPrescriptionGeneration(
       // OFFER: pending, the phase it was planned from left as it is, `transition_recommended` as the model
       // chose it, so the person's tap makes the move (the way a program without auto-apply gets it). No
       // retry: the move already waited the bounded 4 s for the lock, a second wait only delays the same
-      // answer behind the same holder, and no lock is held across the model call either way. So a busy
-      // move wastes 0 model calls; the cost is one tap instead of an automatic move.
+      // answer behind the same holder, and no lock is held across the model call either way.
+      // #4098, the true cost: this request paid ONE call, and its offer is not kept for long. Since #4088 the
+      // next open of the workout screen finds the pending move and plans it again (`adoptPendingAiPlan`, one
+      // regeneration per stored plan per local day), which is a second paid call that makes the move itself
+      // when the lock is free. So one busy move costs two calls, and one more for each later open that finds
+      // it busy again (capped only by the 20-an-hour prescribe limit). Tested in deload-exit-3876.test.ts;
+      // the table is in docs/lift-write-lock-order.md.
       if (!isBusyError(err)) throw err
       prescriptionStatus = 'pending'
     }

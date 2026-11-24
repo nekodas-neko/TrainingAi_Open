@@ -1433,8 +1433,9 @@ export interface WorkoutRepository {
   // ── AI Periodization ───────────────────────────────────────────────────────
   getSessionPeriodization(userId: string, programSessionId: string): Promise<SessionPeriodization | null>
   // Creates the row if it doesn't exist yet; otherwise returns the existing row unchanged.
-  ensureSessionPeriodization(userId: string, programSessionId: string): Promise<SessionPeriodization>
-  setBaselineComplete(userId: string, programSessionId: string, baseline1rm: Record<string, Baseline1rmEntry>): Promise<SessionPeriodization>
+  /** `read: true` from a READ path: the insert waits at most the read wait for a conflicting uncommitted insert. */
+  ensureSessionPeriodization(userId: string, programSessionId: string, mode?: { read?: boolean }): Promise<SessionPeriodization>
+  setBaselineComplete(userId: string, programSessionId: string, baseline1rm: Record<string, Baseline1rmEntry>, mode?: { read?: boolean }): Promise<SessionPeriodization>
   /** BF-131 — the per-exercise 1RM a completed session already wrote, for the baseline hop. */
   getSessionExercise1rms(userId: string, workoutSessionId: string): Promise<{ exerciseName: string; estimated1rm: number }[]>
   /** BF-131 — merge measured anchors in, completing the phase only when every exercise has one. */
@@ -1453,10 +1454,10 @@ export interface WorkoutRepository {
   setProgramPhase(userId: string, programId: string, phase: PeriodizationPhase, startedAt: Date, pendingTransition: PendingTransition | null, opts?: import('@trainingai/shared/ai-periodization/program-phase').ProgramMoveOptions): Promise<boolean>
   /** #3766: write on every phased row the scheduled move `decide` works out from the locked rows
    *  (the program's mark, or the switch-over's wait); null writes nothing. */
-  setProgramPendingTransition(userId: string, programId: string, decide: import('@trainingai/shared/ai-periodization/program-phase').DecidePending): Promise<void>
+  setProgramPendingTransition(userId: string, programId: string, decide: import('@trainingai/shared/ai-periodization/program-phase').DecidePending, mode?: { read?: boolean }): Promise<void>
   /** #3766: re-align a program on one phase whose rows have come to disagree, to the target `decide`
    *  works out from the locked rows. */
-  realignProgramPhase(userId: string, programId: string, decide: import('@trainingai/shared/ai-periodization/program-phase').DecideTarget): Promise<void>
+  realignProgramPhase(userId: string, programId: string, decide: import('@trainingai/shared/ai-periodization/program-phase').DecideTarget, mode?: { read?: boolean }): Promise<void>
   /** #3766: completed sessions of the program since `since`, the input to training weeks. */
   listProgramCompletions(userId: string, programId: string, since: Date): Promise<import('@trainingai/shared/ai-periodization/program-phase').ProgramCompletion[]>
   /** #3766: every raw model phase answer of these session types since `since`, with when it was given. */
@@ -1464,7 +1465,7 @@ export interface WorkoutRepository {
   /** `status` is written atomically with the prescription — see the slice for why (Q-54). With
    *  `generatedFor`, stored only while the slot is still in that phase and start (#3766), and while
    *  the session's structure stamp still matches when one is given (#3895); false if not. */
-  storePrescription(userId: string, programSessionId: string, prescription: AiPrescription, expiresAt: Date, status?: PrescriptionStatus, generatedFor?: import('@trainingai/shared/types/ai-periodization').PrescriptionGeneratedFor): Promise<boolean>
+  storePrescription(userId: string, programSessionId: string, prescription: AiPrescription, expiresAt: Date, status?: PrescriptionStatus, generatedFor?: import('@trainingai/shared/types/ai-periodization').PrescriptionGeneratedFor, mode?: { read?: boolean }): Promise<boolean>
   /** #3895: a stamp of what the session's plan is made from (budget and live exercises), read at a
    *  generation's start and re-checked by `storePrescription`. Null when the session is not the user's. */
   getSessionStructureStamp(userId: string, programSessionId: string): Promise<string | null>
@@ -1483,7 +1484,7 @@ export interface WorkoutRepository {
    *  is still that plan (`pending`, generated at `generatedAt`). True when it wrote. */
   adoptPendingPrescription?(userId: string, programSessionId: string, generatedAt: Date, status: PrescriptionStatus, expiresAt: Date): Promise<boolean>
   /** #3766: void one session's stored plan so the next open regenerates it. */
-  voidSessionPrescription(userId: string, programSessionId: string): Promise<void>
+  voidSessionPrescription(userId: string, programSessionId: string, mode?: { read?: boolean }): Promise<void>
   updatePrescriptionExercisesCache(userId: string, programSessionId: string, prescription: AiPrescription): Promise<void>
   /** #3890: replace the stored plan only while it is still exactly `before`. True when it wrote.
    *  Optional: a repository without it serves stored plans as they are (no check-in hold). */

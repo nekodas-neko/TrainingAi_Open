@@ -62,6 +62,7 @@ import {
 } from '@/lib/data/postgres/slices/weekly-checkin'
 import { applyCoachPatch, undoCoachChange } from '@/lib/coach/apply'
 import { lockLiftWrites } from '@/lib/coach/lock-wait'
+import { boundedReadWrite } from '@/lib/data/postgres/slices/periodization'
 import { isBoundedLockTimeout, isDeadlock } from '@/lib/api/route-errors'
 import { reportServerError } from '@/lib/observability'
 import type { CoachPatch } from '@/lib/coach/patch'
@@ -332,9 +333,12 @@ export async function readCheckinState(ctx: EngineCtx): Promise<CheckinState> {
   if (!review) return empty
   let row = review.row
   if (!row && review.due) {
-    await ctx.db.insert(s.weeklyCheckins)
+    // #4098 review: this write is on a READ, so its wait is bounded (`boundedReadWrite`, `readLockWait`). A miss
+    // writes nothing: the state is answered from what is stored (no row, so no card yet) and the next read
+    // creates it.
+    await boundedReadWrite(ctx.db, tx => tx.insert(s.weeklyCheckins)
       .values({ userId: ctx.userId, weekStart: review.weekStart, appliesWeekStart: shiftDateStr(review.weekStart, 7) })
-      .onConflictDoNothing()
+      .onConflictDoNothing())
     row = await getCheckinByWeek(ctx.db, ctx.userId, review.weekStart)
   }
   const { summary, lifts } = await weekSummary(ctx, program, review.weekStart)
