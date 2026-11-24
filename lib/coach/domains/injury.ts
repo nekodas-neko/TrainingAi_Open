@@ -1,9 +1,9 @@
 import { and, eq, isNull, sql } from 'drizzle-orm'
 import * as s from '@/lib/data/postgres/schema'
 import { normalizeMuscle } from '@trainingai/shared/muscles'
-import type { Consequence, DomainHandler, Db, PreviewResult } from './types'
+import type { Consequence, DomainHandler, Db, HandlerApplyResult, PreviewResult } from './types'
 import { driftAgainst } from './types'
-import { withBoundedLockWait } from '../lock-wait'
+import { withBoundedLockWait, withDomainLock } from '../lock-wait'
 
 /**
  * Logging an injury, and nothing else.
@@ -152,21 +152,26 @@ export const injuryHandler = (today: string): DomainHandler => ({
     if (resolving) {
       const id = patch.targetId
       if (!id) return { ok: false, reason: 'invalid', detail: 'No injury selected to mark recovered' }
-      const [row] = await db
-        .select({ id: s.injuries.id, muscleName: s.injuries.muscleName, resolvedDate: s.injuries.resolvedDate })
-        .from(s.injuries)
-        .where(and(eq(s.injuries.id, id), eq(s.injuries.userId, userId)))
-        .limit(1)
-      if (!row) return { ok: false, reason: 'not_found' }
+      // #4082: the read of the injury's current state and the write under one lock per user and injury, so
+      // two taps at once do not both record the same "before" (the second records what the first wrote,
+      // and the undo chain is then consistent). A sequential second apply behaves as it always did.
+      return withDomainLock<HandlerApplyResult>(db, userId, `injury_resolve:${id}`, async t => {
+        const [row] = await t
+          .select({ id: s.injuries.id, muscleName: s.injuries.muscleName, resolvedDate: s.injuries.resolvedDate })
+          .from(s.injuries)
+          .where(and(eq(s.injuries.id, id), eq(s.injuries.userId, userId)))
+          .limit(1)
+        if (!row) return { ok: false, reason: 'not_found' }
 
-      await db.update(s.injuries).set({ resolvedDate: today, updatedAt: new Date() })
-        .where(and(eq(s.injuries.id, id), eq(s.injuries.userId, userId)))
-      return {
-        ok: true,
-        summary: `Marked ${row.muscleName} recovered`,
-        beforeState: { resolvedDate: row.resolvedDate },
-        targetId: id,
-      }
+        await t.update(s.injuries).set({ resolvedDate: today, updatedAt: new Date() })
+          .where(and(eq(s.injuries.id, id), eq(s.injuries.userId, userId)))
+        return {
+          ok: true,
+          summary: `Marked ${row.muscleName} recovered`,
+          beforeState: { resolvedDate: row.resolvedDate },
+          targetId: id,
+        }
+      })
     }
 
     if (!muscleChange) return { ok: false, reason: 'invalid', detail: 'No body area given' }

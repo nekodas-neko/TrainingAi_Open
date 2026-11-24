@@ -4,6 +4,7 @@ import { getRepository } from '@/lib/data'
 import { z } from 'zod'
 import type { Baseline1rmEntry } from '@trainingai/shared/types/ai-periodization'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+import { isBusyError } from '@trainingai/shared/errors'
 
 // A baseline completion marker.
 const MAX_BODY_BYTES = 8 * 1024
@@ -86,7 +87,14 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  await repo.setBaselineComplete(userId, sessionId, baseline1rm)
+  try {
+    await repo.setBaselineComplete(userId, sessionId, baseline1rm)
+  } catch (err) {
+    // #4082 review 2: completing a baseline waits for the person's lift-write lock like the phase movers.
+    // A wait past the bound or a deadlock rolled the write back whole: nothing was changed, try again.
+    if (isBusyError(err)) return NextResponse.json({ error: err.message, busy: true }, { status: 409 })
+    throw err
+  }
 
   // Fire prescription generation (best effort)
   let prescription = null

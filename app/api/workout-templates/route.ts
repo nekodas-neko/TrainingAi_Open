@@ -90,7 +90,7 @@ export async function POST(req: NextRequest) {
       id: body.program.id ?? '',
       createdAt: body.program.createdAt ?? new Date(),
       updatedAt: new Date(),
-    });
+    }, { voidPrescriptions: true });
 
     // Only update phase settings when the caller explicitly sets phaseSetId or sessionsPerCycle.
     // Simple activation calls (spreading the existing program) must not touch phase_set_id so
@@ -135,9 +135,10 @@ export async function POST(req: NextRequest) {
 
     // A structural edit (roles, exercises, time budget) must void any cached AI
     // prescription for this program's sessions — otherwise the pre-edit prescription
-    // keeps driving load until its 7-day expiry. Cleared to 'consumed' so the next
-    // view of each session regenerates a fresh, edit-aware prescription.
-    if (saved.id) await repo.clearProgramPrescriptions(userId, saved.id);
+    // keeps driving load until its 7-day expiry. `saveProgram` does it in the SAME transaction as the
+    // edit (`voidPrescriptions`, cleared to 'consumed' so the next view of each session regenerates a
+    // fresh, edit-aware prescription): when the lock is busy nothing was saved and the 409 below is
+    // true, and an ok answer means the old plans are already void (#4082 review 2).
 
     return NextResponse.json({ ok: true, program: saved });
   } catch (e) {
@@ -164,12 +165,19 @@ export async function DELETE(req: NextRequest) {
   if (!body.id && !body.name) return NextResponse.json({ error: "Missing id or name" }, { status: 400 });
 
   const repo = await getRepository();
-  if (body.id) {
-    await repo.deleteProgram(userId, body.id);
-  } else {
-    const programs = await repo.listPrograms(userId);
-    const program = programs.find(p => p.name === body.name);
-    if (program) await repo.deleteProgram(userId, program.id);
+  try {
+    if (body.id) {
+      await repo.deleteProgram(userId, body.id);
+    } else {
+      const programs = await repo.listPrograms(userId);
+      const program = programs.find(p => p.name === body.name);
+      if (program) await repo.deleteProgram(userId, program.id);
+    }
+  } catch (e) {
+    // #4082 review 2: the delete waits for the lift-write lock like the program save; busy is a 409 refusal
+    // with nothing deleted. Anything else is a fault and stays one.
+    if (!isRefusal(e)) throw e
+    return refusalResponse(e, 'Delete failed')
   }
   return NextResponse.json({ ok: true });
 }

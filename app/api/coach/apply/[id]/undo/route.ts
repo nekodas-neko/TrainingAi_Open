@@ -64,6 +64,11 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
           { status: 409 },
         )
       }
+      if (result.reason === 'busy') {
+        // #4082: another change to this person's lifts held the lock past the wait (or a deadlock was
+        // broken against this one). Nothing was undone; the same request can be sent again.
+        return NextResponse.json({ error: 'Another change to this is still saving. Nothing was changed; try again in a moment.', busy: true }, { status: 409 })
+      }
       const detail = result.reason === 'invalid' ? result.detail : 'This change can no longer be undone'
       return NextResponse.json({ error: detail }, { status: 400 })
     }

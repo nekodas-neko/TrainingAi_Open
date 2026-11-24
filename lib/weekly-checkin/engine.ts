@@ -61,6 +61,9 @@ import {
   type CheckinLiftRow, type CheckinRow, type ProgramLift,
 } from '@/lib/data/postgres/slices/weekly-checkin'
 import { applyCoachPatch, undoCoachChange } from '@/lib/coach/apply'
+import { lockLiftWrites } from '@/lib/coach/lock-wait'
+import { isBoundedLockTimeout, isDeadlock } from '@/lib/api/route-errors'
+import { reportServerError } from '@/lib/observability'
 import type { CoachPatch } from '@/lib/coach/patch'
 import { dateStrMidnightInTz, daysBetweenDateStrs, shiftDateStr } from '@trainingai/shared/date-utils'
 import { checkinDue, checkinWeekStart, localClock, plannedWeekOf, type CheckinDueWhy } from '@trainingai/shared/weekly-checkin/due'
@@ -89,6 +92,33 @@ export class CheckinRefusal extends Error {
 const notFound = () => new CheckinRefusal(404, 'not_found', 'Not found')
 /** The check-in's existing "try again" refusal (409), for a save that timed out waiting for a lock (#4080). */
 const CHECKIN_BUSY = () => new CheckinRefusal(409, 'stale', 'Another change is still saving; nothing was saved. Try again in a moment.')
+
+/**
+ * #4082: one transaction for a check-in write that can touch a lift's preference or a stored plan (a save, an
+ * offer, an undo). It takes the person's lift-write lock before anything else, so the lifts it applies one
+ * after another cannot be met in a cycle by a Coach apply or undo on a sibling lift: that writer waits for
+ * the lock, holding nothing, and goes on after the commit.
+ *
+ * Backstop: a deadlock (40P01) or a lock wait past the bound (55P03) anywhere in the transaction is answered
+ * with the existing "busy, try again" refusal, reported once, and nothing was saved, because one transaction
+ * wraps every write. (A `busy` an apply inside it returned is already reported by `applyCoachPatch`, and
+ * reaches here as the refusal, not as a database error.)
+ */
+async function liftTransaction(ctx: EngineCtx, run: (tx: Db) => Promise<void>): Promise<void> {
+  try {
+    await ctx.db.transaction(async txRaw => {
+      const tx = txRaw as unknown as Db
+      await lockLiftWrites(tx, ctx.userId)
+      await run(tx)
+    })
+  } catch (err) {
+    if (isDeadlock(err) || isBoundedLockTimeout(err)) {
+      reportServerError(err, { userId: ctx.userId, url: '/api/weekly-checkin' })
+      throw CHECKIN_BUSY()
+    }
+    throw err
+  }
+}
 
 export interface EngineCtx {
   db: Db
@@ -344,6 +374,11 @@ async function tryUndo(db: Db, userId: string, changeId: string): Promise<{ ok: 
   if (await trainedSince(db, userId, changeId)) return { ok: false, detail: "You've trained since this change, so it stays." }
   const res = await undoCoachChange(db, userId, changeId)
   if (res.ok) return { ok: true }
+  // #4082 review: a lock timeout or deadlock in the undo is not an answer about the change. Turning it
+  // into "no longer the one in effect" let the save carry on and commit the new answer with the old
+  // change still in effect, half applied. The whole save fails instead, and every write of it rolls back.
+  // Already reported by `undoCoachChange`.
+  if (res.reason === 'busy') throw CHECKIN_BUSY()
   return { ok: false, detail: res.reason === 'invalid' ? res.detail : 'This change is no longer the one in effect.' }
 }
 
@@ -426,8 +461,7 @@ export async function saveCheckin(ctx: EngineCtx, input: SaveInput): Promise<Sav
   const kept: SaveOutcome['kept'] = []
   const notApplied: SaveOutcome['notApplied'] = []
 
-  await ctx.db.transaction(async txRaw => {
-    const tx = txRaw as unknown as Db
+  await liftTransaction(ctx, async tx => {
     await tx.insert(s.weeklyCheckins)
       .values({ userId: ctx.userId, weekStart: input.weekStart, appliesWeekStart: shiftDateStr(input.weekStart, 7) })
       .onConflictDoNothing()
@@ -682,8 +716,7 @@ export async function resolveOffer(
   const swapChoices = offer.kind === 'swap' && decision === 'accept' && pre.swapExerciseName
     ? await swapAlternatives(ctx, { exerciseId: pre.swapExerciseId, exerciseName: pre.swapExerciseName }) : []
 
-  await ctx.db.transaction(async txRaw => {
-    const tx = txRaw as unknown as Db
+  await liftTransaction(ctx, async tx => {
     const row = await savedCheckin(tx, ctx.userId, checkinId)
 
     if (offer.kind === 'step_up') {
@@ -775,8 +808,7 @@ export type UndoTarget =
  */
 export async function undoCheckinEffect(ctx: EngineCtx, checkinId: string, target: UndoTarget): Promise<CheckinState> {
   const { today } = localClock(ctx.now ?? new Date(), ctx.tz)
-  await ctx.db.transaction(async txRaw => {
-    const tx = txRaw as unknown as Db
+  await liftTransaction(ctx, async tx => {
     const row = await savedCheckin(tx, ctx.userId, checkinId)
     const undoChange = async (changeId: string | null) => {
       if (!changeId) return

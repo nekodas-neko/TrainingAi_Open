@@ -1,4 +1,5 @@
 import { sql } from 'drizzle-orm'
+import { lockLiftWrites } from '../../coach/lock-wait'
 
 type SqlTx = { execute: (query: ReturnType<typeof sql>) => Promise<{ rows: unknown[]; rowCount?: number | null }> }
 
@@ -82,6 +83,32 @@ export const EXERCISE_NAME_TABLES = {
  *    leftover old-name record, if that user collided on the same name pair.
  *  - `set_hr_stats` has no name uniqueness, so every row simply moves.
  */
+/**
+ * #4082 review 2: a rename's preference statements update two rows of one person when that person holds a
+ * row under BOTH names (the live source, and the target it collides with): the target first (the revive),
+ * then the source. A weekly check-in that saves both lifts updates them in LIFT order, so the two met in a
+ * cycle (the check-in holding the source and wanting the target, the rename the other way round): 40P01,
+ * one side answers 500. Every writer that holds more than one of a person's rows takes the person's
+ * lift-write lock first, so the rename does for each such person: in user order, before any other
+ * statement of the rename (the callers run this first), waiting holding nothing, bounded by `lockWait`
+ * (a timeout is the rename's existing "busy" refusal, nothing renamed).
+ *
+ * Only people with a row under both names need it: any other person has at most one preference row that
+ * a rename touches, and a writer holding one row wants no other row the rename holds. A row created under
+ * the new name between this read and the statements below is not covered (it needs a first-ever save of
+ * a lift under the new name in that window).
+ */
+export async function lockCollidingLiftWrites(tx: SqlTx, oldName: string, newName: string): Promise<void> {
+  if (oldName === newName) return
+  const users = (await tx.execute(sql`
+    SELECT DISTINCT s.user_id FROM exercise_preferences s
+      JOIN exercise_preferences t ON t.user_id = s.user_id AND t.exercise_name = ${newName}
+     WHERE s.exercise_name = ${oldName}
+     ORDER BY s.user_id
+  `)).rows as { user_id: string }[]
+  for (const u of users) await lockLiftWrites(tx as never, u.user_id)
+}
+
 export async function repointStoredExerciseNames(tx: SqlTx, oldName: string, newName: string): Promise<void> {
   if (oldName === newName) return
 

@@ -12,6 +12,7 @@ import { aestMidnight, toAestDateStr, todayInTz, DEFAULT_TZ } from '@trainingai/
 import { buildOwnedPhaseSetName } from '@trainingai/shared/phase-set-naming'
 import { isUuid } from '@trainingai/shared/validation/uuid'
 import { UNCLASSIFIED_EXERCISE_ROLE } from '@trainingai/shared/workout/exercise-role'
+import { withProgramWriteLock, voidProgramPrescriptionsIn } from './periodization'
 
 type Db = ReturnType<typeof getDb>
 
@@ -167,8 +168,21 @@ async function programsWithChildren(db: Db, pRows: (typeof s.programs.$inferSele
   })
 }
 
-export async function saveProgram(db: Db, userId: string, program: Program): Promise<Program> {
-  return db.transaction(async tx => {
+type Tx = Parameters<Parameters<Db['transaction']>[0]>[0]
+
+/**
+ * `voidPrescriptions`: the program editor's save. A structural edit must void the program's stored AI
+ * plans, and does so in THIS transaction (#4082 review 2), so a save the lock refused as busy neither saved
+ * the edit nor left it half done, and one that answered ok has already voided the old plans.
+ *
+ * An edit of an existing program deletes and re-inserts its replaced sessions, and the cascade deletes
+ * those sessions' stored-plan rows (several rows, no stated order); a weekly check-in updates one plan row
+ * per lift. So an edit takes the person's lift-write lock first, like the phase movers (#4082 review 2):
+ * a wait past the bound, a statement timeout or a deadlock rolls the whole save back as `BusyError` (409).
+ * A new program has no plan rows and takes none.
+ */
+export async function saveProgram(db: Db, userId: string, program: Program, opts: { voidPrescriptions?: boolean } = {}): Promise<Program> {
+  const write = async (tx: Tx): Promise<Program> => {
     const [nameClash] = await tx.select({ id: s.programs.id })
       .from(s.programs)
       .where(and(
@@ -452,15 +466,22 @@ export async function saveProgram(db: Db, userId: string, program: Program): Pro
       }
     }
 
+    if (opts.voidPrescriptions) await voidProgramPrescriptionsIn(tx, userId, programId)
+
     return {
       ...program, id: programId, sessions: savedSessions,
       createdAt: pRow.createdAt, updatedAt: pRow.updatedAt,
     }
-  })
+  }
+  return program.id ? withProgramWriteLock(db, userId, write) : db.transaction(write)
 }
 
+/**
+ * The program's cascade deletes its sessions' stored-plan rows (several rows, no stated order), so it takes
+ * the person's lift-write lock first, like the phase movers (#4082 review 2); busy is `BusyError` (409).
+ */
 export async function deleteProgram(db: Db, userId: string, programId: string): Promise<void> {
-  await db.transaction(async tx => {
+  await withProgramWriteLock(db, userId, async tx => {
     const [owned] = await tx.select({ id: s.phaseSets.id })
       .from(s.phaseSets)
       .where(and(eq(s.phaseSets.ownerProgramId, programId), eq(s.phaseSets.userId, userId)))

@@ -82,3 +82,24 @@ export function isUserFacingError(err: unknown): err is UserFacingError {
     (typeof err === 'object' && err !== null && (err as { __kind?: unknown }).__kind === USER_FACING_MARKER)
   )
 }
+
+/**
+ * #4082 review: a write that gave up waiting for a lock another writer held, or was ended as a deadlock
+ * victim, and wrote nothing. A refusal ("busy, try again"), not a fault: it is a `UserFacingError` with
+ * status 409, so every route that already maps refusals answers it, and a caller that can carry on
+ * without the write (the program-phase sync on a read) recognises it by its marker.
+ */
+const BUSY_MARKER = 'trainingai/busy'
+
+export class BusyError extends UserFacingError {
+  readonly __busy = BUSY_MARKER
+
+  constructor(message = 'That is busy saving another change. Nothing was changed; try again in a moment.') {
+    super(message, 409)
+    this.name = 'BusyError'
+  }
+}
+
+export function isBusyError(err: unknown): err is BusyError {
+  return err instanceof BusyError || (typeof err === 'object' && err !== null && (err as { __busy?: unknown }).__busy === BUSY_MARKER)
+}
