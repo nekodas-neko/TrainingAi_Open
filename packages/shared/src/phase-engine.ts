@@ -114,6 +114,28 @@ export function isDeloadActive(
   return isEarlyDeloadWeek(program, today)
 }
 
+/**
+ * Whether a confirmed early-deload week can change anything on a program of this kind (#4114).
+ * An automatic program lightens through its phase status and an AI-planned one through its plan; a
+ * manual program has no deload mechanism, so the session screen has never lightened it. The Coach
+ * and `confirmEarlyDeload` ask this before they start a week, so neither confirms one that changes nothing.
+ */
+export function earlyDeloadApplies(phaseMode: 'manual' | 'automatic' | 'ai_dynamic' | string | null | undefined): boolean {
+  return phaseMode === 'automatic' || phaseMode === 'ai_dynamic'
+}
+
+/** What a person is told when they ask for an early deload week on a program run by hand. */
+export const EARLY_DELOAD_MANUAL_REFUSAL =
+  'An early deload week applies to automatic and AI-planned programs. On a program you run by hand, lighten the session yourself, or switch the program\'s mode.'
+
+/** Thrown by `confirmEarlyDeload` for a manual program: nothing was written. */
+export class EarlyDeloadNotAvailableError extends Error {
+  constructor() {
+    super(EARLY_DELOAD_MANUAL_REFUSAL)
+    this.name = 'EarlyDeloadNotAvailableError'
+  }
+}
+
 /** How long a confirmed early deload runs. The two readers below both take it from here. */
 const EARLY_DELOAD_WEEK_LENGTH_DAYS = 7
 

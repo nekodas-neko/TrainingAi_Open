@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto'
+import { earlyDeloadApplies, EarlyDeloadNotAvailableError } from '@trainingai/shared/phase-engine'
 import { NotFoundError, UserFacingError } from '@trainingai/shared/errors'
 import { eq, and, inArray, gte, lt, asc, desc, sql, isNull } from 'drizzle-orm'
 import type { getDb } from '../client'
@@ -934,6 +935,10 @@ export async function confirmEarlyDeload(db: Db, userId: string, programId: stri
   const dayStart = aestMidnight(y, m, d, timezone)
   const dayEnd   = aestMidnight(y, m, d + 1, timezone)
   await db.transaction(async tx => {
+    // A manual program has no deload to apply: refuse before anything is written (#4114).
+    const [prog] = await tx.select({ phaseMode: s.programs.phaseMode }).from(s.programs)
+      .where(and(eq(s.programs.id, programId), eq(s.programs.userId, userId)))
+    if (prog && !earlyDeloadApplies(prog.phaseMode)) throw new EarlyDeloadNotAvailableError()
     await tx.update(s.programs)
       .set({ earlyDeloadWeekStart: today })
       .where(and(eq(s.programs.id, programId), eq(s.programs.userId, userId)))

@@ -116,11 +116,14 @@ const plan = (deload: boolean) => ({
   ],
 })
 
-type Kind = 'manual' | 'automatic' | 'ai driving' | 'ai no plan' | 'ai consumed'
+type Kind = 'manual' | 'manual leftover week' | 'automatic' | 'ai driving' | 'ai no plan' | 'ai consumed'
 type Phase = 'normal' | 'deload' | 'baseline' | 'testing'
 
 const PHASES_BY_KIND: Record<Kind, Phase[]> = {
   manual: ['normal'],
+  // #4114: a manual program carrying a stored early-deload week (a leftover from before the Coach declined it).
+  // The screen has never lightened it, so the card and the Coach show the full numbers too.
+  'manual leftover week': ['normal'],
   automatic: ['normal', 'deload', 'baseline', 'testing'],
   'ai driving': ['normal', 'deload', 'baseline'],
   'ai no plan': ['normal', 'deload', 'baseline'],
@@ -130,10 +133,10 @@ const PHASES_BY_KIND: Record<Kind, Phase[]> = {
 function setUp(kind: Kind, phase: Phase, o: { range: boolean; hold: boolean }) {
   const ai = kind.startsWith('ai')
   const program: Row = {
-    id: 'prog-1', userId: 'user-1', phaseMode: kind === 'manual' ? 'manual' : ai ? 'ai_dynamic' : 'automatic',
+    id: 'prog-1', userId: 'user-1', phaseMode: kind.startsWith('manual') ? 'manual' : ai ? 'ai_dynamic' : 'automatic',
     trainingGoal: 'strength', sessions: [session], autoApplyPrescriptions: true,
     // An early-deload week confirmed from Home is how an ai_dynamic program reaches a "deload" without phase rows.
-    ...(ai && phase === 'deload' && kind !== 'ai driving' ? { earlyDeloadWeekStart: today } : {}),
+    ...((ai && phase === 'deload' && kind !== 'ai driving') || kind === 'manual leftover week' ? { earlyDeloadWeekStart: today } : {}),
   }
   state.program = program
   repo.getNextSession.mockResolvedValue({ isRestDay: false, session, reason: '', program })
@@ -263,7 +266,7 @@ describe('the Next workout card equals the session screen for every program kind
     }
 
   it('the grid was not vacuous: it ran every kind × phase, with lifts that carry sets', () => {
-    expect(tally.cases).toBe((1 + 4 + 3 + 3 + 3) * 4)
+    expect(tally.cases).toBe((1 + 1 + 4 + 3 + 3 + 3) * 4)
     expect(tally.liftCases).toBe(tally.cases * 3)
     expect(tally.nonEmpty).toBeGreaterThan(tally.liftCases / 2)
     expect(tally.mismatches).toBe(0)

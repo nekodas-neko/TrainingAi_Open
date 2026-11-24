@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { getRepository } from "@/lib/data";
 import { todayInTz, DEFAULT_TZ } from "@trainingai/shared/date-utils";
+import { earlyDeloadApplies, EARLY_DELOAD_MANUAL_REFUSAL, EarlyDeloadNotAvailableError } from '@trainingai/shared/phase-engine'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 
 // One program id.
@@ -33,6 +34,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Can only early-deload the active program" }, { status: 403 });
   }
 
-  await repo.confirmEarlyDeload(userId, programId, today, tz);
+  // A manual program has no deload to apply (#4114): a plain 400, nothing written. The repository
+  // refuses it too, so a race with a mode switch cannot slip through.
+  if (!earlyDeloadApplies(activeProgram.phaseMode)) {
+    return NextResponse.json({ error: EARLY_DELOAD_MANUAL_REFUSAL }, { status: 400 });
+  }
+  try {
+    await repo.confirmEarlyDeload(userId, programId, today, tz);
+  } catch (e) {
+    if (e instanceof EarlyDeloadNotAvailableError) return NextResponse.json({ error: e.message }, { status: 400 });
+    throw e;
+  }
   return NextResponse.json({ ok: true, earlyDeloadWeekStart: today, programId });
 }

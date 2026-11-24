@@ -1,4 +1,5 @@
 import { and, eq, isNotNull, isNull, sql } from 'drizzle-orm'
+import { hasVisibleCharacter, BLANK_EXERCISE_NAME_MESSAGE } from '@trainingai/shared/validation/visible-name'
 import { recommendExerciseRole, UNCLASSIFIED_EXERCISE_ROLE } from '@trainingai/shared/workout/exercise-role'
 import { isLighterRole } from '@trainingai/shared/ai-periodization/role-plausibility'
 import type { ExerciseRole } from '@trainingai/shared/types/program'
@@ -226,6 +227,10 @@ export const sessionExerciseHandler: DomainHandler = {
     const proposedMuscles = newMuscles
       ? (newMuscles.to as string).split(',').map(m => m.trim()).filter(Boolean)
       : undefined
+    // #4129: a swap to a name with nothing visible in it would put a nameless lift in the plan.
+    if (swap && !hasVisibleCharacter(String(swap.to ?? ''))) {
+      return { consequences, drift, target: { id: row.id, label: `${row.exerciseName} in ${row.sessionName}` }, refusal: BLANK_EXERCISE_NAME_MESSAGE }
+    }
     if (swap) {
       const [existing] = await db
         .select({
@@ -359,6 +364,9 @@ export const sessionExerciseHandler: DomainHandler = {
       // Resolve a swap before writing anything, so a bad name fails the whole apply rather than
       // leaving a half-applied patch behind.
       const swap = accepted.find(c => c.field === 'exerciseName')
+      if (swap && !hasVisibleCharacter(String(swap.to ?? ''))) {
+        return { ok: false, reason: 'invalid', detail: BLANK_EXERCISE_NAME_MESSAGE }
+      }
       let replacement: { id: string; muscles: { muscle: string }[] } | null = null
       // No role is written: the slot keeps its own (#2215 — see `preview`).
       if (swap) {
