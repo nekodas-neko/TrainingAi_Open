@@ -96,11 +96,11 @@ export async function GET() {
   // the week nothing is logged and the list is empty, which scales by 1 — the accumulation
   // baseline, and exactly what the card showed before this existed.
   //
-  // **`session_id`, not `program_session_id` (#2561).** `workout_sessions` has two foreign keys to
-  // `program_sessions`; `session_id` is the live one and `program_session_id` is dead (see the note
-  // above `workoutSessions` in the schema), NULL on every row. This read the dead one, so it always
-  // returned nothing and the phase scale was 1 whatever phase the week's sessions were in. The column
-  // is aliased to the name `phaseBySession` is keyed on below.
+  // **`session_id`, not `program_session_id` (#2561).** `workout_sessions` once had two foreign keys to
+  // `program_sessions`; `session_id` is the live one and `program_session_id` was dead, NULL on every
+  // row, and was dropped in #2412 (see the note above `workoutSessions` in the schema). This read the
+  // dead one, so it always returned nothing and the phase scale was 1 whatever phase the week's
+  // sessions were in. The column is aliased to the name `phaseBySession` is keyed on below.
   const phaseRows = program ? await db.execute<{ program_session_id: string }>(sql`
     SELECT ws.session_id AS program_session_id
     FROM workout_sessions ws

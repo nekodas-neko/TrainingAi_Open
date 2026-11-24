@@ -218,20 +218,15 @@ export const scheduleDays = pgTable('schedule_days', {
   updatedAt:  timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, t => [primaryKey({ columns: [t.scheduleId, t.dayOfWeek] })])
 
-// TWO foreign keys to `program_sessions`, and until 2026-08-23 the dead one owned the name the live
-// one was used under (Q-474). `session_id` is the live link — every read and the only write use it.
-// `program_session_id` (079_ai_dynamic_periodization.sql, "for prescription trigger linkage") has
-// never been written or read by any code, and 0 of the owner's 91 rows have it set.
+// ONE foreign key to `program_sessions`, and it is `session_id`. Until 2026-08-23 a second, dead
+// column, `program_session_id`, owned the name the live one was used under (Q-474); it was added by
+// 079_ai_dynamic_periodization.sql "for prescription trigger linkage" and no code ever wrote or read
+// it. #2412 removed it: step 1 stopped declaring it here, step 2
+// (202611241514_drop_workout_sessions_program_session_id.sql) dropped it from the database. Do not
+// re-declare it.
 //
-// The Drizzle property names now match what the columns hold, which is the whole fix: reaching for
-// `workoutSessions.programSessionId` gets the column that actually stores a program-session id.
-// #2412 step 1: the dead column is no longer declared here, so Drizzle stops selecting it and no
-// deployed code reads it. That makes dropping it (step 2, a data-losing migration released on its
-// own) safe to deploy, but the drop itself needs the owner's confirmation and is not done yet: the
-// column still exists in the database until then. Do not re-declare it.
-//
-// It has already cost a session: a repro fixture populated `program_session_id`, the periodization
-// block took its `null` branch, and the honest reading of that run was "the race does not exist".
+// The Drizzle property names match what the columns hold: `workoutSessions.programSessionId` is the
+// column that stores a program-session id, and that column is `session_id`.
 //
 // #2120: every FK here is DEFERRABLE in the database — see the note above `programPhases`.
 export const workoutSessions = pgTable('workout_sessions', {

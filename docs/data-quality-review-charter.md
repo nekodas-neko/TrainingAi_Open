@@ -153,8 +153,8 @@ reference on 21 of 23 exercises (the 2 exceptions corroborate Q-5); `baseline_1r
 PRs as of their generation date; prescription `confidence` is deterministic, not LLM-reported (explicit
 guard in `lib/ai-periodization/confidence.ts`); `pending` status still drives load by design
 (`prescriptionDrivesLoad`); no NULL `style_id` and no expired prescriptions. **Two traps here too:**
-derive `sessions_in_phase` by joining **`ws.session_id`**, never `ws.program_session_id` (dead column,
-NULL on all 75 rows — joining on it makes every row look drifted to 0); and `ws.session_id` is NULL on
+derive `sessions_in_phase` by joining **`ws.session_id`**, never `ws.program_session_id` (a dead column,
+NULL on all 75 rows, dropped in #2412 — joining on it made every row look drifted to 0, and now fails); and `ws.session_id` is NULL on
 46 of 75 rows but **all of them are May/June** — every session since 2026-07-01 carries it.
 
 **Clean as of audit #2 — do not re-raise without new evidence:** FK integrity (0 orphans anywhere);
