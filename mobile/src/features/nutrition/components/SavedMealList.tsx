@@ -15,13 +15,20 @@ import { useNutrition } from '../data/NutritionProvider';
 export function SavedMealList({
   date,
   onOpen,
+  query: held,
+  onQueryChange,
 }: {
   date: string;
   onOpen: (meal: SavedMeal) => void;
+  /** Kept by the caller when the list sits in a sheet that can be dropped with its screen (#4099). */
+  query?: string;
+  onQueryChange?: (query: string) => void;
 }) {
   const n = useNutrition(date);
   const { theme } = useTheme();
-  const [query, setQuery] = useState('');
+  const [own, setOwn] = useState('');
+  const query = held ?? own;
+  const setQuery = onQueryChange ?? setOwn;
   const all = n.view.meals;
   const meals = filterMeals(all, query);
   if (!all.length) return null;

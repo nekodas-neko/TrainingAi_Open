@@ -8,11 +8,17 @@ export type PickDeps = {
   store: { start(type: ActivityType): Promise<unknown> } | null;
   hasSession: boolean;
   closeSheet(): void;
-  afterSheet(next: () => void): void;
+  /** Runs `next` once the sheet has closed; `settled` when that is over (ran or dropped). */
+  afterSheet(next: () => void, settled: () => void): void;
   openActivity(): void;
+  /** An activity is already open: say so instead of starting another. */
+  inProgress(): void;
   setBusy(busy: boolean): void;
   setError(message: string | null): void;
 };
+// The tiles stay locked from the first tap until the navigation has happened or been dropped, not
+// just until `start` returns: the sheet takes 180 ms to close and a second tap in that window must
+// not start anything.
 export async function pickActivity(
   guard: { current: boolean },
   deps: PickDeps,
@@ -22,14 +28,24 @@ export async function pickActivity(
   guard.current = true;
   deps.setBusy(true);
   deps.setError(null);
+  const release = () => {
+    guard.current = false;
+    deps.setBusy(false);
+  };
+  if (deps.hasSession) {
+    release();
+    deps.inProgress();
+    return;
+  }
+  let handedOff = false;
   try {
-    if (!deps.hasSession) await deps.store.start(type);
-    deps.afterSheet(deps.openActivity);
+    await deps.store.start(type);
+    deps.afterSheet(deps.openActivity, release);
+    handedOff = true;
     deps.closeSheet();
   } catch (cause) {
     deps.setError(cause instanceof Error ? cause.message : 'Could not start activity.');
   } finally {
-    guard.current = false;
-    deps.setBusy(false);
+    if (!handedOff) release();
   }
 }

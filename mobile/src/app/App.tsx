@@ -15,7 +15,7 @@ import { LocalStorageProvider } from './providers/LocalStorageProvider';
 import { AppStartupGate } from './providers/AppStartupGate';
 import { useTheme } from '../shared/theme/ThemeProvider';
 import { useGeistFonts } from '../shared/theme/font-loading';
-import { PageLayout, Notice, ScreenBoundary } from '../shared/ui';
+import { PageLayout, Notice } from '../shared/ui';
 import { useHealthContext } from '../features/health/HealthProvider';
 import { useHealthData } from '../features/health/data/HealthDataProvider';
 import { useHome } from '../features/home/data/HomeProvider';
@@ -64,7 +64,7 @@ import { WalkScreen } from '../features/activities/screens/WalkScreen';
 import { BaselinesScreen } from '../features/activities/screens/BaselinesScreen';
 import { CardioScreen } from '../features/activities/screens/CardioScreen';
 import { CardioPlanScreen } from '../features/activities/screens/CardioPlanScreen';
-import { ActivityScreen } from '../features/activities/screens/ActivityScreen';
+import { ActivityBoundary } from '../features/activities/screens/ActivityBoundary';
 import { WeighInBanner } from '../features/devices/components/WeighInBanner';
 import { AlertNavigation } from '../features/platform/components/AlertNavigation';
 import { TooOldScreen, useTooOldNotice } from '../features/platform/components/TooOldNotice';
@@ -264,9 +264,7 @@ function AppShell() {
         );
       case 'activity-recording':
         return (
-          <ScreenBoundary title="Activity" screen="activity-recording" onBack={back}>
-            <ActivityScreen key={accountKey} onBack={back} onSaved={back} />
-          </ScreenBoundary>
+          <ActivityBoundary key={accountKey} onBack={back} />
         );
       case 'more-data':
         return <DataSyncScreen onBack={back} />;

@@ -40,6 +40,7 @@ import {
   type ActivityType,
 } from '../data/models';
 import { ActivityPicker } from '../components/ActivityPicker';
+import { InProgressSheet } from '../components/InProgressSheet';
 import {
   BaselinesRow,
   HeartProfileCard,
@@ -82,6 +83,10 @@ export function CardioScreen({
   const [error, setError] = useState<string | null>(null),
     [busy, setBusy] = useState(false),
     [choose, setChoose] = useState(false);
+  // Why the last start failed, shown in the chooser itself; `error` only reaches the header.
+  const [pickError, setPickError] = useState<string | null>(null);
+  // An activity is already open: null, the notice, or the notice already asking to discard.
+  const [inProgress, setInProgress] = useState<null | 'notice' | 'discard'>(null);
   const data = week.data,
     plan = running.data;
   useMeasuredRunCompletion(plan?.heartHealth?.days);
@@ -132,11 +137,31 @@ export function CardioScreen({
   // A sheet's close and the navigation it leads to are never in the same commit (#4099): the
   // Modal has to finish closing before this screen is hidden behind the next one.
   const later = useRef<AfterClose | null>(null);
-  useEffect(() => () => later.current?.cancel(), []);
-  function afterSheet(next: () => void) {
+  // False while this screen is hidden behind another: nothing here navigates from a hidden screen.
+  const shown = useRef(true);
+  useEffect(() => {
+    shown.current = true;
+    return () => {
+      shown.current = false;
+      later.current?.cancel();
+    };
+  }, []);
+  function afterSheet(next: () => void, settled?: () => void) {
     later.current?.cancel();
-    later.current = openAfterClose(next);
+    later.current = openAfterClose(next, undefined, undefined, settled, () => shown.current);
   }
+  function openPicker() {
+    setError(null);
+    setPickError(null);
+    setPicker(true);
+  }
+  // The one answer to a start control while an activity is open (#4099).
+  const startable = (start: () => void) => () =>
+    activity.session ? setInProgress('notice') : start();
+  const resumeOpen = () => {
+    afterSheet(openActivity);
+    setInProgress(null);
+  };
   const select = (type: ActivityType) =>
     pickActivity(
       working,
@@ -146,8 +171,15 @@ export function CardioScreen({
         closeSheet: () => setPicker(false),
         afterSheet,
         openActivity,
+        inProgress: () => {
+          afterSheet(() => setInProgress('notice'));
+          setPicker(false);
+        },
         setBusy,
-        setError,
+        setError: (message) => {
+          setError(message);
+          setPickError(message);
+        },
       },
       type,
     );
@@ -167,7 +199,9 @@ export function CardioScreen({
         },
         minutes,
       )
-      .then(openActivity)
+      .then(() => {
+        if (shown.current) openActivity();
+      })
       .catch((cause) =>
         setError(cause instanceof Error ? cause.message : 'Could not open the activity.'),
       )
@@ -197,12 +231,19 @@ export function CardioScreen({
       }
     >
       {activity.session && (
-        <HubCard
-          title={activity.session.mode === 'done' ? 'Review activity' : 'Resume activity'}
-          subtitle={activity.session.title || activity.session.type.label}
-          icon="timer"
-          onPress={openActivity}
-        />
+        <>
+          <HubCard
+            title={activity.session.mode === 'done' ? 'Review activity' : 'Resume activity'}
+            subtitle={activity.session.title || activity.session.type.label}
+            icon="timer"
+            onPress={openActivity}
+          />
+          <AppButton
+            title="Discard activity"
+            variant="secondary"
+            onPress={() => setInProgress('discard')}
+          />
+        </>
       )}
       {!week.connected ? (
         <StateCard
@@ -221,10 +262,12 @@ export function CardioScreen({
                     <WalkingWeekCard walking={walking} />
                     <WalkingTodayCard
                       walking={walking}
-                      busy={busy || !!activity.session}
-                      onGuidedWalk={openWalk}
-                      onOther={() => setPicker(true)}
-                      onTreadmill={() => recordTreadmill(walking.targets.activeMinutesPerDay)}
+                      busy={busy}
+                      onGuidedWalk={startable(openWalk)}
+                      onOther={startable(openPicker)}
+                      onTreadmill={startable(() =>
+                        recordTreadmill(walking.targets.activeMinutesPerDay),
+                      )}
                     />
                   </>
                 )}
@@ -336,22 +379,21 @@ export function CardioScreen({
                         <HubCard
                           title="Run"
                           subtitle="Start a run"
-                          onPress={() =>
-                            activity.session
-                              ? openActivity()
-                              : void select({
-                                  id: 'run',
-                                  label: 'Run',
-                                  icon: 'PersonSimpleRun',
-                                  isDistanceBased: true,
-                                })
-                          }
+                          onPress={startable(
+                            () =>
+                              void select({
+                                id: 'run',
+                                label: 'Run',
+                                icon: 'PersonSimpleRun',
+                                isDistanceBased: true,
+                              }),
+                          )}
                           icon="legs"
                         />
                         <HubCard
                           title="Guided walk"
                           subtitle="Fast and easy intervals"
-                          onPress={openWalk}
+                          onPress={startable(openWalk)}
                           icon="legs"
                         />
                         <Card>
@@ -362,9 +404,9 @@ export function CardioScreen({
                                 key={minutes}
                                 title={`${minutes} min`}
                                 variant="surface"
-                                disabled={busy || !!activity.session}
+                                disabled={busy}
                                 style={{ flex: 1 }}
-                                onPress={() => recordTreadmill(minutes)}
+                                onPress={startable(() => recordTreadmill(minutes))}
                               />
                             ))}
                           </Stack>
@@ -373,7 +415,7 @@ export function CardioScreen({
                           title="Other activity"
                           subtitle="Treadmill, cycle, anything logged"
                           icon="activity"
-                          onPress={() => setPicker(true)}
+                          onPress={startable(openPicker)}
                         />
                       </>
                     )}
@@ -424,10 +466,10 @@ export function CardioScreen({
             icon="activity"
             tone="neutral"
             onPress={
-              activity.ready && !activity.session
-                ? () => setPicker(true)
-                : activity.session
-                  ? openActivity
+              activity.session
+                ? () => setInProgress('notice')
+                : activity.ready
+                  ? openPicker
                   : undefined
             }
           />
@@ -446,6 +488,7 @@ export function CardioScreen({
       <ActivityPicker
         visible={picker}
         busy={busy}
+        error={pickError}
         onClose={() => setPicker(false)}
         onDismiss={() => later.current?.closed()}
         onSelect={(type) => void select(type)}
@@ -499,13 +542,24 @@ export function CardioScreen({
         </Stack>
         <AppButton
           title="Log activity"
-          disabled={!activity.ready || !!activity.session}
+          disabled={!activity.ready}
           onPress={() => {
-            afterSheet(() => setPicker(true));
+            afterSheet(activity.session ? () => setInProgress('notice') : openPicker);
             setTimePicker(false);
           }}
         />
       </Sheet>
+      <InProgressSheet
+        visible={inProgress !== null}
+        title={activity.session?.title || activity.session?.type.label || 'The activity'}
+        startConfirming={inProgress === 'discard'}
+        onClose={() => setInProgress(null)}
+        onDismiss={() => later.current?.closed()}
+        onResume={resumeOpen}
+        onDiscard={async () => {
+          await activity.store?.discard();
+        }}
+      />
     </PageLayout>
   );
 }

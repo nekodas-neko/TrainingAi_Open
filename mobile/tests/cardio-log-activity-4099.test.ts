@@ -50,6 +50,17 @@ test('a close that never reports still opens the activity, once', () => {
   assert.equal(opened, 1);
 });
 
+test('the navigation does not run from a hidden screen, and the lock is still released', () => {
+  const t = clock();
+  let opened = 0,
+    settled = 0;
+  const after = openAfterClose(() => opened++, 700, t.timers, () => settled++, () => false);
+  after.closed();
+  t.advance(5000);
+  assert.equal(opened, 0);
+  assert.equal(settled, 1);
+});
+
 test('a cancelled navigation never runs', () => {
   const t = clock();
   let opened = 0;
@@ -75,6 +86,7 @@ function setup(over: Partial<PickDeps> = {}) {
     hasSession: false,
     closeSheet: () => log.push('close'),
     afterSheet: () => void log.push('armed'),
+    inProgress: () => void log.push('in-progress'),
     openActivity: () => log.push('open'),
     setBusy: (busy) => log.push(`busy:${busy}`),
     setError: (message) => log.push(`error:${message}`),
@@ -90,7 +102,9 @@ test('choosing a tile starts one session, arms the navigation, then closes the s
   s.release();
   await chosen;
   assert.deepEqual(s.started, ['treadmill']);
-  assert.deepEqual(s.log, ['busy:true', 'error:null', 'armed', 'close', 'busy:false']);
+  // `busy` stays true: the tiles are locked until the sheet has closed and the navigation has run.
+  assert.deepEqual(s.log, ['busy:true', 'error:null', 'armed', 'close']);
+  assert.equal(guard.current, true, 'a second tile is still ignored while the sheet closes');
   assert.ok(!s.log.includes('open'), 'the screen opens from the sheet\'s close, not from here');
 });
 
@@ -115,15 +129,50 @@ test('a second tap while the first is starting is ignored: one session', async (
   await first;
   assert.deepEqual(s.started, ['treadmill']);
   assert.equal(s.log.filter((entry) => entry === 'close').length, 1);
-  assert.equal(guard.current, false, 'ready for the next choice');
 });
 
-test('with a session already open, nothing is started and the open session is opened', async () => {
+test('with a session already open, nothing is started and the in-progress notice is shown', async () => {
   const guard = { current: false };
   const s = setup({ hasSession: true });
   await pickActivity(guard, s.deps, type);
   assert.deepEqual(s.started, []);
-  assert.deepEqual(s.log, ['busy:true', 'error:null', 'armed', 'close', 'busy:false']);
+  assert.deepEqual(s.log, ['busy:true', 'error:null', 'busy:false', 'in-progress']);
+  assert.equal(guard.current, false);
+});
+
+test('the tiles unlock when the navigation runs, or when it is dropped', async () => {
+  for (const how of ['runs', 'dropped'] as const) {
+    const guard = { current: false };
+    const t = clock();
+    let opened = 0;
+    const s = setup({
+      afterSheet: (next, settled) => {
+        const after = openAfterClose(next, 700, t.timers, settled);
+        if (how === 'dropped') after.cancel();
+        else after.closed();
+      },
+      openActivity: () => opened++,
+    });
+    const chosen = pickActivity(guard, s.deps, type);
+    s.release();
+    await chosen;
+    assert.equal(guard.current, false, how);
+    assert.equal(opened, how === 'runs' ? 1 : 0, how);
+    assert.ok(s.log.includes('busy:false'));
+  }
+});
+
+test('a second tap in the closing window starts nothing', async () => {
+  const guard = { current: false };
+  const t = clock();
+  const s = setup({ afterSheet: (next, settled) => void openAfterClose(next, 700, t.timers, settled) });
+  const first = pickActivity(guard, s.deps, type);
+  s.release();
+  await first;
+  await pickActivity(guard, s.deps, { ...type, id: 'run' });
+  assert.deepEqual(s.started, ['treadmill']);
+  t.advance(700);
+  assert.equal(guard.current, false);
 });
 
 test('a start that fails shows the message, keeps the sheet open and releases the tiles', async () => {

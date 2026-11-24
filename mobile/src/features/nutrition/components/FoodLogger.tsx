@@ -172,6 +172,8 @@ export function FoodLogger({
     setFailure(message ? { message, retryPhoto } : null);
   }
   const [query, setQuery] = useState('');
+  // The My Foods filter lives here, not in the list, so hiding this screen with the sheet open keeps it.
+  const [mealQuery, setMealQuery] = useState('');
   const term = useSearchTerm(query);
   const [unit, setUnit] = useState<QtyUnit>('serving');
   const recent = useWorkoutResource(
@@ -675,7 +677,12 @@ export function FoodLogger({
                   variant="secondary"
                   onPress={() => onRecipes()}
                 />
-                <SavedMealList date={date} onOpen={onRecipes} />
+                <SavedMealList
+                  date={date}
+                  onOpen={onRecipes}
+                  query={mealQuery}
+                  onQueryChange={setMealQuery}
+                />
               </>
             ) : (
               <>
