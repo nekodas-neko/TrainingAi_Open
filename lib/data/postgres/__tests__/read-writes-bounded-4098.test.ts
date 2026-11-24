@@ -53,7 +53,7 @@ describe.skipIf(!canRun)('writes a read reaches wait at most readLockWait (#4098
   let nextSession: typeof import('@/app/api/next-session/route').GET
   let overview: typeof import('@/app/api/ai-periodization/program-overview/route').GET
   const libIds: string[] = []
-  let program: string, push: string, legs: string, pushLift: string, pushAcc: string
+  let program: string, push: string, legs: string, pushLift: string
 
   const plan = (status: string, over: Record<string, unknown> = {}) => ({
     phase: 'accumulation', phaseAction: 'stay', reasoning: 'From before.', confidence: 0.9, deload: false,
@@ -111,7 +111,7 @@ describe.skipIf(!canRun)('writes a read reaches wait at most readLockWait (#4098
         `INSERT INTO session_exercises (session_id, exercise_name, exercise_id, position, exercise_role, muscle_groups) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
         [session, name, libId, position, role, [muscle]])).rows[0].id as string
     pushLift = await ex(push, LIFT, libIds[0], 0, 'primary', 'quads')
-    pushAcc = await ex(push, ACC, libIds[1], 1, 'accessory', 'biceps')
+    await ex(push, ACC, libIds[1], 1, 'accessory', 'biceps')
     await ex(legs, LIFT, libIds[0], 0, 'primary', 'quads')
     // Accumulation begun 6 weeks ago, aligned and marked, a completed Legs session in each week (as #3900's seed).
     const today = todayInTz(TZ)
