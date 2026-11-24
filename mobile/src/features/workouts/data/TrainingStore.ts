@@ -62,6 +62,17 @@ const frameSchema = z.object({
 type Frame = z.infer<typeof frameSchema>;
 export type TrainingState = Frame & { ready: boolean; syncing: boolean; error: string | null };
 const key = 'training-changes.v1';
+// #4098: a busy answer (409 `busy: true`) is "try again shortly". The queue retries it, but not
+// forever at the head: after this many busy answers IN A ROW for one change, and at least this long
+// after the first, it is treated as stalled. The provider retries every 60 s, so 8 answers is about
+// 7 minutes, far beyond any real lock wait (a few seconds). The streak lives in memory only.
+export const BUSY_CEILING = 8;
+export const BUSY_CEILING_MS = 3 * 60_000;
+const BUSY_NOTICE = 'The server is busy saving another change. This will upload shortly.';
+const STALLED_NOTICE =
+  'This change could not be uploaded yet: the server has stayed busy. It is saved on this phone. Tap Retry upload to try again.';
+const familyOf = (operation: { kind: string }) =>
+  operation.kind.startsWith('program_') ? 'program' : 'injury';
 
 export class TrainingStore {
   private current: TrainingState;
@@ -72,6 +83,7 @@ export class TrainingStore {
   private generation = 0;
   private cancelled = false;
   private uploadingId: string | null = null;
+  private busyStreaks = new Map<string, { count: number; since: number }>();
   private versions = { programs: 0, injuries: 0 };
   constructor(
     private storage: ScopedStorage,
@@ -651,18 +663,54 @@ export class TrainingStore {
       await this.writes;
       // A change set aside (#3638) is passed over; one short of that holds the queue (a program's
       // save before its delete), and the next sync tries it again.
-      while (
-        generation === this.generation &&
-        this.current.operations.some((operation) => !deadLettered(operation))
-      ) {
-        const command = this.current.operations.find((operation) => !deadLettered(operation))!;
+      // A change stalled by a busy server (see BUSY_CEILING) is passed over for this run, and so is
+      // any later change that must stay behind it: one of the same family (program saves and
+      // deletes keep their order and the active flag) or for the same target. Nothing is reordered
+      // within a family, dropped or marked refused.
+      const stalled = new Set<string>();
+      const nextCommand = () => {
+        const operations = this.current.operations;
+        return operations.find((operation, index) => {
+          if (deadLettered(operation) || stalled.has(operation.id)) {
+            return false;
+          }
+          return !operations
+            .slice(0, index)
+            .some(
+              (earlier) =>
+                stalled.has(earlier.id) &&
+                (familyOf(earlier) === familyOf(operation) ||
+                  ('targetId' in earlier &&
+                    'targetId' in operation &&
+                    earlier.targetId === operation.targetId)),
+            );
+        });
+      };
+      while (generation === this.generation && nextCommand()) {
+        const command = nextCommand()!;
         this.uploadingId = command.id;
         let response: unknown;
         try {
           response = await this.replay(command);
         } catch (failure) {
+          if (generation !== this.generation) {
+            throw failure;
+          }
+          if (failure instanceof ApiError && failure.busy) {
+            const now = this.now();
+            const streak = this.busyStreaks.get(command.id) ?? { count: 0, since: now };
+            streak.count++;
+            this.busyStreaks.set(command.id, streak);
+            this.uploadingId = null;
+            if (streak.count >= BUSY_CEILING && now - streak.since >= BUSY_CEILING_MS) {
+              stalled.add(command.id);
+              continue;
+            }
+            throw failure;
+          }
+          this.busyStreaks.delete(command.id);
           const refusal = refusalOf(failure);
-          if (refusal === null || generation !== this.generation) {
+          if (refusal === null) {
             throw failure;
           }
           const rejected = countRefusal(command.rejected, refusal, this.now());
@@ -681,6 +729,7 @@ export class TrainingStore {
         if (generation !== this.generation) {
           return;
         }
+        this.busyStreaks.delete(command.id);
         await this.commit((frame) => {
           if (command.kind === 'program_save') {
             const saved = z
@@ -726,13 +775,18 @@ export class TrainingStore {
         this.changed(true, true);
         this.uploadingId = null;
       }
+      if (stalled.size && generation === this.generation) {
+        this.publish({ error: STALLED_NOTICE });
+      }
     } catch (error) {
       if (generation === this.generation) {
         this.publish({
           error:
             error instanceof ApiError && [401, 403].includes(error.status)
               ? 'Sign in again to upload saved program and injury changes.'
-              : error instanceof ApiError && [400, 404, 409, 422].includes(error.status)
+              : error instanceof ApiError && error.busy
+                ? BUSY_NOTICE
+                : error instanceof ApiError && [400, 404, 409, 422].includes(error.status)
                 ? failureNotice(
                     'The backend refused a saved change. Review the pending program or injury and save corrections before retrying.',
                     error,
