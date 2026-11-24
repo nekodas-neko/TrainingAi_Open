@@ -25,7 +25,7 @@ type Row = Record<string, unknown>
 const getActiveProgram = vi.fn(async (_u: string) => program() as Row | null)
 const ensureSessionPeriodization = vi.fn(async (_u: string, _s: string) => state() as Row | null)
 const getSessionPeriodization = vi.fn(async (_u: string, _s: string) => state() as Row | null)
-const setBaselineComplete = vi.fn(async (_u: string, _s: string, _b: Row) => state({ phase: 'accumulation', baselineComplete: true }) as Row)
+const setBaselineComplete = vi.fn(async (_u: string, _s: string, _b: Row, _mode?: { read?: boolean }) => state({ phase: 'accumulation', baselineComplete: true }) as Row)
 const advancePhase = vi.fn(async (_u: string, _s: string, _p: string) => state({ phase: 'deload' }) as Row)
 const storePrescription = vi.fn(async (_u: string, _s: string, _p: Row, _e: Date) => undefined)
 const updatePrescriptionStatus = vi.fn(async (_u: string, _s: string, _st: string) => undefined)
