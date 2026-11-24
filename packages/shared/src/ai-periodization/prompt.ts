@@ -255,10 +255,23 @@ function phaseLine(signals: PrescriptionSignals): string {
 
 /** A user-named exercise as one prompt line's worth of text: line breaks and runs of whitespace become
  *  single spaces, so a name cannot imitate a prompt line of its own (#4061). Ordinary names are unchanged.
- *  A name of nothing but whitespace would print as an empty name, so it reads as `UNNAMED_PROMPT_LINE_NAME`. */
+ *  A name with nothing visible in it (whitespace, or only zero-width and filler characters: U+200B-U+200F,
+ *  U+2060, U+FEFF, U+00AD, U+3164) would print as an empty name, so it reads as `UNNAMED_PROMPT_LINE_NAME`.
+ *  #4124: those characters are dropped from any name, and a name longer than `PROMPT_LINE_NAME_MAX_CHARS`
+ *  is cut there with an ellipsis. The exercise API accepts names up to 120 characters and the longest
+ *  name in the `exercise_library` seed is 34, so no real name is touched. The text is only ever printed:
+ *  it is never stored as an exercise's name (`reconcilePrescriptionExercises` takes the name from the
+ *  session's own exercise). */
 export const UNNAMED_PROMPT_LINE_NAME = 'Unnamed exercise'
+export const PROMPT_LINE_NAME_MAX_CHARS = 120
+const INVISIBLE_NAME_CHARS = /[\u200B-\u200F\u2060\uFEFF\u00AD\u3164]/g
 export function promptLineName(name: string): string {
-  return name.replace(/\s+/g, ' ').trim() || UNNAMED_PROMPT_LINE_NAME
+  const visible = name.replace(INVISIBLE_NAME_CHARS, '').replace(/\s+/g, ' ').trim()
+  if (visible === '') return UNNAMED_PROMPT_LINE_NAME
+  const chars = Array.from(visible)
+  return chars.length > PROMPT_LINE_NAME_MAX_CHARS
+    ? `${chars.slice(0, PROMPT_LINE_NAME_MAX_CHARS - 1).join('').trimEnd()}\u2026`
+    : visible
 }
 
 export function buildUserPrompt(
