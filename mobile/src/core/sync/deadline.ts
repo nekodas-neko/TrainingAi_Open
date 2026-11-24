@@ -31,31 +31,109 @@ const reasonOf = (cause: unknown) =>
     .replace(/\.+$/, '')
     .toLowerCase();
 
-/** The steps of one run: each ends in done or a stated reason, and none can throw or hang the run. */
+/** What a store's own state says is still not uploaded; `null` when nothing is. Read live. */
+export type SyncCheck = () => string | null | undefined;
+type StepOptions = {
+  /** Read once the step is given up on or ends: what its own state says is left. */
+  check?: SyncCheck;
+  /** Why a step still going is going, when more than "no answer yet" is known. */
+  still?: () => string | null | undefined;
+};
+
+/**
+ * The steps of one run: each ends in done or a stated reason, and none can throw or hang the run.
+ * It keeps answering after the run's end: a step given up on is listed until it truly settles, and
+ * a store's own error or pending count is read live, so a notice built from it never claims
+ * something is waiting that is not (#3906 review).
+ */
 export class SyncBoard {
-  private readonly failed: SyncWaiting[] = [];
-  private readonly running = new Set<string>();
-  async step(label: string, work: (() => Promise<unknown>) | null | undefined, ms = SYNC_STEP_LIMIT_MS) {
+  private readonly failed = new Map<string, string>();
+  private readonly pending = new Set<{ label: string; still: StepOptions['still'] }>();
+  private readonly checks = new Map<string, SyncCheck[]>();
+  private readonly alsoNotes: (() => string | null | undefined)[] = [];
+  private readonly listeners = new Set<() => void>();
+  private readonly watched: ((notify: () => void) => () => void)[] = [];
+  private notify = () => this.listeners.forEach((listener) => listener());
+  async step(
+    label: string,
+    work: (() => Promise<unknown>) | null | undefined,
+    ms = SYNC_STEP_LIMIT_MS,
+    options: StepOptions = {},
+  ) {
     if (!work) return;
-    this.running.add(label);
+    if (options.check) this.checks.set(label, [...(this.checks.get(label) ?? []), options.check]);
+    const job = Promise.resolve().then(work);
+    let settled = false;
+    const entry = { label, still: options.still };
+    this.pending.add(entry);
+    job.then(
+      () => {
+        settled = true;
+        this.release(entry);
+      },
+      (cause) => {
+        settled = true;
+        this.failed.set(label, reasonOf(cause));
+        this.release(entry);
+      },
+    );
     try {
-      await withDeadline(Promise.resolve().then(work), ms, NO_ANSWER);
-    } catch (cause) {
-      this.failed.push({ label, reason: reasonOf(cause) });
-    } finally {
-      this.running.delete(label);
+      await withDeadline(job, ms, NO_ANSWER);
+    } catch {
+      // Thrown work is recorded above; a bound that fired leaves the step pending until it settles.
+      if (!settled) this.notify();
     }
+  }
+  private release(entry: object) {
+    this.pending.delete(entry as never);
+    this.notify();
   }
   /** A step that finished without throwing but left an error on its store. */
   fail(label: string, reason: string | null | undefined) {
-    if (reason && !this.failed.some((row) => row.label === label))
-      this.failed.push({ label, reason: reasonOf(reason) });
+    if (reason) this.check(label, () => reason);
+  }
+  /** What this store's own state says is left, read live each time the board is asked. */
+  check(label: string, read: SyncCheck) {
+    this.checks.set(label, [...(this.checks.get(label) ?? []), read]);
+  }
+  /** Something running outside the steps that the result should name while it goes (#3906). */
+  also(note: () => string | null | undefined) {
+    this.alsoNotes.push(note);
+  }
+  /** A store's own change feed, so a notice follows it after the run has ended. */
+  watch(subscribe: ((notify: () => void) => () => void) | undefined) {
+    if (subscribe) this.watched.push(subscribe);
+  }
+  alsoText() {
+    return this.alsoNotes
+      .map((note) => note())
+      .filter((text): text is string => !!text)
+      .join(' ');
   }
   waiting(): SyncWaiting[] {
-    return [
-      ...this.failed,
-      ...[...this.running].map((label) => ({ label, reason: NO_ANSWER })),
-    ];
+    const rows = new Map<string, string>(this.failed);
+    for (const { label, still } of this.pending)
+      if (!rows.has(label)) rows.set(label, still?.() || NO_ANSWER);
+    for (const [label, reads] of this.checks) {
+      if (rows.has(label)) continue;
+      for (const read of reads) {
+        const reason = read();
+        if (reason) {
+          rows.set(label, reasonOf(reason));
+          break;
+        }
+      }
+    }
+    return [...rows].map(([label, reason]) => ({ label, reason }));
+  }
+  /** Calls `fn` when a step settles or a watched store changes; returns how to stop. */
+  follow(fn: () => void) {
+    this.listeners.add(fn);
+    const stops = this.watched.map((subscribe) => subscribe(fn));
+    return () => {
+      this.listeners.delete(fn);
+      stops.forEach((stop) => stop());
+    };
   }
 }
 
@@ -77,6 +155,8 @@ type SyncNowView = {
  * Sync now, one run at a time. A tap while a run is going gets that run, not a second one. The run
  * ends in `view`: the success text `start` returns when every step finished, otherwise the steps
  * that did not. It always ends: past `end` it stops waiting and says what is still outstanding.
+ * After the end the notice follows what is still outstanding: when it finishes, the notice is
+ * replaced by the final state, until a new run takes the screen.
  */
 export function syncNowRunner(
   view: SyncNowView,
@@ -85,36 +165,69 @@ export function syncNowRunner(
   const slow = limits.slow ?? SYNC_NOW_LIMIT_MS,
     end = limits.end ?? SYNC_NOW_END_MS;
   let current: Promise<void> | null = null;
+  let stopFollowing: (() => void) | null = null;
+  let generation = 0;
   return (start: (board: SyncBoard) => Promise<string>): Promise<void> => {
     if (current) return current;
+    stopFollowing?.();
+    stopFollowing = null;
+    const mine = ++generation;
     const board = new SyncBoard();
+    let finished: string | null = null,
+      failure: string | null = null,
+      over = false;
+    const show = () => {
+      if (mine !== generation) return;
+      const waiting = board.waiting();
+      const extra = board.alsoText();
+      const tail = extra ? ` ${extra}` : '';
+      if (waiting.length) {
+        view.setMessage(null);
+        view.setError(waitingText(waiting) + tail);
+      } else if (finished) {
+        view.setMessage(finished + tail);
+        view.setError(null);
+      } else {
+        view.setMessage(null);
+        view.setError((failure ?? 'Could not sync. Your saved records are kept.') + tail);
+      }
+      if (over && !waiting.length && finished) {
+        stopFollowing?.();
+        stopFollowing = null;
+      }
+    };
     view.setBusy(true);
     view.setError(null);
     view.setMessage(null);
     const slowTimer = setTimeout(() => view.setMessage(SYNC_NOW_SLOW), slow);
-    const run = withDeadline(new Promise<string>((resolve) => resolve(start(board))), end, endedText)
+    const started = new Promise<string>((resolve) => resolve(start(board)));
+    // The work itself carries on past the end; when it finally answers, the notice catches up.
+    started.then(
+      (message) => {
+        finished = message;
+        if (over) show();
+      },
+      () => {},
+    );
+    const run = withDeadline(started, end, endedText)
       .then(
         (message) => {
-          const waiting = board.waiting();
-          view.setMessage(waiting.length ? null : message);
-          view.setError(waiting.length ? waitingText(waiting) : null);
+          finished = message;
         },
         (cause: unknown) => {
-          const waiting = board.waiting();
-          view.setMessage(null);
-          view.setError(
-            waiting.length
-              ? waitingText(waiting)
-              : cause instanceof Error
-                ? cause.message
-                : 'Could not sync. Your saved records are kept.',
-          );
+          failure = cause instanceof Error ? cause.message : null;
         },
       )
       .finally(() => {
         clearTimeout(slowTimer);
+        over = true;
+        show();
         view.setBusy(false);
         current = null;
+        const waiting = board.waiting();
+        if (mine === generation && (waiting.length || !finished)) {
+          stopFollowing = board.follow(show);
+        }
       });
     current = run;
     return run;

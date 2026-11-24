@@ -27,6 +27,12 @@ import {
 /** A permission read answers at once; the permission sheet waits on a person, so it waits longer. */
 const NATIVE_READ_MS = 20_000;
 const NATIVE_SHEET_MS = 120_000;
+/** A read page or an upload answers in seconds; past this the call is given up on. */
+const NATIVE_PAGE_MS = 30_000;
+/** The whole run ends here, under Sync now's 90 s end, so the header spinner and the Import
+ *  history button are never held by a run nobody is waiting on (#3906 review). */
+export const RUN_LIMIT_MS = 80_000;
+export const RUN_STILL_READING = 'Health Connect import still reading. Saved records are kept.';
 const READ_LIMIT_MS = 30 * 24 * 60 * 60 * 1000;
 /** Records held back for a revoked permission are dropped, and counted as skipped, after this. */
 const BLOCKED_TTL_MS = 30 * 24 * 60 * 60 * 1000;
@@ -277,8 +283,11 @@ export class HealthConnectImportStore {
   }
   /** A native call that never answers must not hold a run, or Sync now, busy for good. */
   private native<T>(work: Promise<T>, ms: number): Promise<T> {
-    return withDeadline(work, ms, 'Health Connect did not answer.');
+    const bounded = withDeadline(work, ms, 'Health Connect did not answer.');
+    // The run's own end cuts every wait short at once, so the run unwinds and clears busy.
+    return this.runEnd ? Promise.race([bounded, this.runEnd]) : bounded;
   }
+  private runEnd: Promise<never> | null = null;
   private guard() {
     if (!this.state.ready || this.canceled)
       throw new Error('Saved Health Connect data is unavailable. Reopen the app to retry.');
@@ -307,11 +316,13 @@ export class HealthConnectImportStore {
     }
   }
   /** The Allow button: the one place Import history opens the system dialog. */
-  async requestPermission() {
+  async requestPermission(): Promise<{ granted: string[]; missing: string[] }> {
     await this.initialize();
     await this.running;
     this.guard();
-    if ((await this.granted(true)).length && this.disk.enabled) void this.run(true);
+    const types = await this.granted(true);
+    if (types.length && this.disk.enabled) void this.run(true, { ask: false });
+    return { granted: types, missing: healthConnectTypes.filter((type) => !types.includes(type)) };
   }
   async importHistory(from: string) {
     await this.initialize();
@@ -334,7 +345,8 @@ export class HealthConnectImportStore {
       scan: null,
       enabled: true,
     });
-    return this.run(true);
+    // Never the sheet: a partial grant must not ask again for types never asked (#3906 review).
+    return this.run(true, { ask: false });
   }
   private async append(
     records: HealthConnectRecord[],
@@ -441,7 +453,10 @@ export class HealthConnectImportStore {
       }
       let reply;
       try {
-        reply = await this.connection.post('/api/health-connect/sync', item);
+        reply = await this.native(
+          this.connection.post('/api/health-connect/sync', item),
+          NATIVE_PAGE_MS,
+        );
       } catch (error) {
         // #2828 N3: a 400 is the server refusing this batch's shape, and it refuses it the same way
         // every time. Left at the head of the queue it blocked every later upload for good, so it is
@@ -575,6 +590,11 @@ export class HealthConnectImportStore {
     if (this.canceled || (!manual && this.now() - this.lastAttempt < 300000))
       return Promise.resolve();
     this.lastAttempt = this.now();
+    let endTimer: ReturnType<typeof setTimeout> | undefined;
+    this.runEnd = new Promise<never>((_, reject) => {
+      endTimer = setTimeout(() => reject(new Error(RUN_STILL_READING)), RUN_LIMIT_MS);
+    });
+    this.runEnd.catch(() => {});
     this.running = (async () => {
       await this.initialize();
       if (!this.state.ready || !this.disk.enabled || this.canceled) return;
@@ -622,7 +642,11 @@ export class HealthConnectImportStore {
         }
         if (!this.disk.grantedAt)
           await this.write({ ...this.disk, grantedAt: new Date(this.now()).toISOString() });
-        const hasHistory = (await this.reader.hasHistoryPermission?.()) ?? false;
+        const hasHistory =
+          (await this.native(
+            Promise.resolve(this.reader.hasHistoryPermission?.()),
+            NATIVE_READ_MS,
+          )) ?? false;
         await this.release(types);
         // Before the uploads, so an offline run still keeps the cache in bounds.
         await this.prune(hasHistory);
@@ -638,7 +662,7 @@ export class HealthConnectImportStore {
             permissionKey,
           });
         if (!this.disk.token && !this.disk.scan) {
-          const initial = await this.reader.changes(types);
+          const initial = await this.native(this.reader.changes(types), NATIVE_PAGE_MS);
           if (this.canceled) return;
           const from = new Date(this.rescanStart(hasHistory, this.disk.rescanFrom)).toISOString();
           await this.write({
@@ -678,11 +702,14 @@ export class HealthConnectImportStore {
             await this.flush(types);
             break;
           }
-          const page = await this.reader.history(
-            scan.types[scan.index],
-            scan.from,
-            scan.end,
-            scan.pageToken ?? undefined,
+          const page = await this.native(
+            this.reader.history(
+              scan.types[scan.index],
+              scan.from,
+              scan.end,
+              scan.pageToken ?? undefined,
+            ),
+            NATIVE_PAGE_MS,
           );
           if (this.canceled) return;
           await this.append(page.records, [], {
@@ -703,7 +730,7 @@ export class HealthConnectImportStore {
         }
         let more = true;
         while (!this.disk.scan && this.disk.token && more && !this.canceled && pages++ < 40) {
-          const page = await this.reader.changes(types, this.disk.token);
+          const page = await this.native(this.reader.changes(types, this.disk.token), NATIVE_PAGE_MS);
           if (this.canceled) return;
           if (page.expired) {
             await this.write({ ...this.disk, token: null, rescanFrom: this.disk.tokenAt });
@@ -742,6 +769,8 @@ export class HealthConnectImportStore {
         if (!this.canceled) this.publish({ busy: false });
       }
     })().finally(() => {
+      clearTimeout(endTimer);
+      this.runEnd = null;
       this.running = null;
     });
     return this.running;

@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
+  RUN_LIMIT_MS,
+  RUN_STILL_READING,
+} from '../src/features/health/data/HealthConnectImportStore.ts';
+import {
   HealthConnectImportStore,
   IMPORT_NEEDS_PERMISSION,
 } from '../src/features/health/data/HealthConnectImportStore.ts';
@@ -14,7 +18,12 @@ import type { HealthConnectType } from '@trainingai/shared/validation/health-con
 
 const start = Date.parse('2026-11-20T05:00:00Z');
 
-function fixture(options: { sheetNeverAnswers?: boolean } = {}) {
+function fixture(
+  options: {
+    sheetNeverAnswers?: boolean;
+    hang?: 'hasHistory' | 'changes' | 'history' | 'post';
+  } = {},
+) {
   const saved = new Map<string, string>();
   const storage = {
     get: async (key: string) => saved.get(key) ?? null,
@@ -44,12 +53,36 @@ function fixture(options: { sheetNeverAnswers?: boolean } = {}) {
     historyPermission: async () => {
       calls.historyRequests++;
     },
+    hasHistoryPermission: async () =>
+      options.hang === 'hasHistory' ? new Promise<boolean>(() => {}) : false,
     history: async () => {
       calls.reads++;
+      if (options.hang === 'history') return new Promise<never>(() => {});
       return { records: [], pageToken: endless ? `page-${calls.reads}` : null, skipped: 0 };
     },
     changes: async () => {
       calls.reads++;
+      if (options.hang === 'changes') return new Promise<never>(() => {});
+      if (options.hang === 'post' && calls.reads === 1)
+        return {
+          records: [
+            {
+              id: 'steps-one',
+              type: 'Steps' as const,
+              sourcePackage: 'com.test.watch',
+              recordingMethod: 2,
+              modifiedAt: '2026-11-19T03:00:00Z',
+              start: '2026-11-19T02:00:00Z',
+              end: '2026-11-19T03:00:00Z',
+              value: 1200,
+            },
+          ],
+          deleted: [],
+          token: 'cursor-1',
+          expired: false,
+          more: false,
+          skipped: 0,
+        };
       return { records: [], deleted: [], token: 'cursor-1', expired: false, more: false, skipped: 0 };
     },
   };
@@ -58,12 +91,23 @@ function fixture(options: { sheetNeverAnswers?: boolean } = {}) {
     userId: 'account-one',
     timezone: 'Australia/Brisbane',
     get: async () => ({}),
-    post: async () => ({ measurements: 0, nights: 0, days: 0, heartRate: 0, hrv: null, completedAt: new Date(clock).toISOString() }),
+    post: async () =>
+      options.hang === 'post'
+        ? new Promise<never>(() => {})
+        : { measurements: 0, nights: 0, days: 0, heartRate: 0, hrv: null, completedAt: new Date(clock).toISOString() },
   };
   const store = new HealthConnectImportStore(storage, connection, reader, () => {}, () => clock);
   return {
     store,
     calls,
+    /** A fresh store over the same disk with `requested` emptied: no type has ever been asked for. */
+    unasked: async () => {
+      const saved = (await new HealthConnectPersistence(storage).read()) as any;
+      await new HealthConnectPersistence(storage).write({ ...saved, requested: [] });
+      const next = new HealthConnectImportStore(storage, connection, reader, () => {}, () => clock);
+      await next.initialize();
+      return next;
+    },
     disk: () => new HealthConnectPersistence(storage).read() as Promise<any>,
     grant: (types: HealthConnectType[]) => {
       granted = types;
@@ -266,4 +310,83 @@ test('#3906: a sync never opens the permission sheet, and a sheet that never ans
   t.mock.timers.tick(120_000);
   await running;
   assert.equal(hung.store.getSnapshot().busy, false, 'the run ended');
+});
+
+// #3906 review. Nothing has been asked yet (`requested` is empty) and nothing is granted, so the
+// guard `options.ask !== false` is the only thing between a sync and the system sheet.
+test('#3906 review: a sync with nothing ever asked and no permission opens no sheet', async () => {
+  const f = fixture();
+  await f.store.setEnabled(true);
+  const store = await f.unasked();
+  assert.deepEqual((await f.disk()).requested, [], 'every type is still unasked');
+  const before = f.calls.requests;
+  await store.run(true, { ask: false });
+  assert.equal(f.calls.requests, before, 'ask: false asks nothing');
+  await store.run(true);
+  assert.equal(f.calls.requests, before + 1, 'without it, the same run does ask');
+});
+
+test('#3906 review: a partial grant does not make Import history open the sheet for types never asked', async () => {
+  const f = fixture();
+  await f.store.setEnabled(true);
+  const before = f.calls.requests;
+  f.grant(['Steps']);
+  await f.store.importHistory(older());
+  assert.equal(f.calls.requests, before, 'a tap on Import history never opens the permission sheet');
+});
+
+test('#3906 review: Allow reports what was granted and what is missing', async () => {
+  const f = fixture();
+  f.grantOnRequest(['Steps']);
+  await f.store.initialize();
+  const result = await f.store.requestPermission();
+  assert.deepEqual(result.granted, ['Steps']);
+  assert.ok(result.missing.length > 0 && !result.missing.includes('Steps'));
+  const denied = fixture();
+  await denied.store.initialize();
+  assert.deepEqual((await denied.store.requestPermission()).granted, []);
+  assert.equal(denied.store.getSnapshot().needsPermission, true);
+});
+
+for (const hang of ['hasHistory', 'changes', 'history', 'post'] as const) {
+  test(`#3906 review: a ${hang} call that never answers ends the run and clears busy`, async (t) => {
+    const f = fixture({ hang });
+    f.grant(['Steps']);
+    await f.store.setEnabled(true);
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    const flush = async () => {
+      for (let i = 0; i < 20; i++) await new Promise((resolve) => setImmediate(resolve));
+    };
+    f.advance(10 * 60_000);
+    const running = f.store.run(true, { ask: false });
+    await flush();
+    assert.equal(f.store.getSnapshot().busy, true, 'busy while it waits');
+    t.mock.timers.tick(30_000);
+    await flush();
+    t.mock.timers.tick(30_000);
+    await running;
+    const state = f.store.getSnapshot();
+    assert.equal(state.busy, false, 'the spinner and the Import history button are free again');
+    assert.ok(state.error, 'and the store says why');
+    assert.equal(state.pending >= 0, true);
+    // Nothing is marked uploaded: the queue (or the unfinished read) is still owed.
+    const again = f.store.run(true, { ask: false });
+    assert.equal(typeof again.then, 'function', 'the next run starts fresh, it does not join a stuck one');
+  });
+}
+
+test('#3906 review: the whole run has an end even when every call is slow in turn', async (t) => {
+  const f = fixture({ hang: 'history' });
+  f.grant(['Steps']);
+  await f.store.setEnabled(true);
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  f.advance(10 * 60_000);
+  const running = f.store.run(true, { ask: false });
+  for (let i = 0; i < 20; i++) await new Promise((resolve) => setImmediate(resolve));
+  t.mock.timers.tick(80_000);
+  await running;
+  assert.equal(f.store.getSnapshot().busy, false);
+  assert.match(f.store.getSnapshot().error ?? '', /Health Connect|did not answer/);
+  void RUN_LIMIT_MS;
+  void RUN_STILL_READING;
 });

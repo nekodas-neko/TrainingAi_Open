@@ -128,17 +128,18 @@ test('a second tap while one runs does not start another, and a later one can', 
   await third;
 });
 
-test('a run abandoned at its end changes nothing on the view when it finally settles', async (t) => {
+test('a run abandoned at its end says it stopped waiting, and the notice catches up when it finally settles', async (t) => {
   t.mock.timers.enable({ apis: ['setTimeout'] });
   const { v, api } = view();
   let finish: (m: string) => void = () => {};
   const pending = syncNowRunner(api)(() => new Promise<string>((resolve) => (finish = resolve)));
   t.mock.timers.tick(SYNC_NOW_END_MS);
   await pending;
-  const ended = { ...v };
-  finish(done);
-  await flush();
-  assert.deepEqual(v, ended);
   assert.equal(v.busy, false);
   assert.ok(v.error, 'an end with no step to blame still says it stopped waiting');
+  finish(done);
+  await flush();
+  assert.equal(v.busy, false, 'a late finish never makes the button busy again');
+  assert.equal(v.error, null, 'the notice no longer claims anything is waiting');
+  assert.equal(v.message, done);
 });

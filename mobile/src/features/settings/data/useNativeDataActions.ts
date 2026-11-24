@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useSyncExternalStore } from 'react';
 import { useHealthData } from '../../health/data/HealthDataProvider';
 import { useHome } from '../../home/data/HomeProvider';
 import { useNutrition } from '../../nutrition/data/NutritionProvider';
@@ -15,10 +15,9 @@ import { useHistoryDownload } from './HistoryDownloadProvider';
 import { useStrapSession } from '../../devices/strap/StrapProvider';
 import { useScaleSession } from '../../devices/scale/ScaleProvider';
 import { deviceUploadsWaiting, useQueued } from './device-uploads';
-import type { WorkoutResources } from '../../workouts/data/WorkoutResources';
-import { importPermissionNote, importStatusError } from '../../health/data/device-import';
 import { deviceHealthName } from '../../../integrations/device-health/platform';
-import { syncNowRunner, type SyncBoard } from '../../../core/sync/deadline';
+import { runSyncNow } from './sync-now-steps';
+import { syncNowShared } from './sync-now-state';
 export function useNativeDataActions() {
   const health = useHealthData(),
     home = useHome(),
@@ -30,10 +29,11 @@ export function useNativeDataActions() {
     resources = useWorkoutResources(),
     storage = useLocalStorage(),
     account = useAccountContext();
-  const [busy, setBusy] = useState(false),
-    [error, setError] = useState<string | null>(null),
-    [message, setMessage] = useState<string | null>(null);
-  const [runSync] = useState(() => syncNowRunner({ setBusy, setError, setMessage }));
+  const { busy, error, message } = useSyncExternalStore(
+    syncNowShared.subscribe,
+    syncNowShared.getSnapshot,
+    syncNowShared.getSnapshot,
+  );
   const activities = useActivities(),
     history = useHistoryQueue(),
     download = useHistoryDownload().download;
@@ -56,64 +56,29 @@ export function useNativeDataActions() {
     if (!resources) {
       return;
     }
-    await runSync((board) => run(board, resources, restore));
-  }
-  // Each step is bounded and named, so a store that never answers is given up on and said so.
-  async function run(
-    board: SyncBoard,
-    resources: WorkoutResources,
-    restore: boolean,
-  ): Promise<string> {
-    await Promise.all([
-      board.step('Health', health.store && (() => health.store!.sync())),
-      board.step('Home', home.store && (() => home.store!.sync())),
-      board.step('Nutrition', nutrition.store && (() => nutrition.store!.sync())),
-      board.step('Training', training.store && (() => training.store!.sync())),
-      board.step('Workouts', journal.controller && (() => journal.controller!.sync())),
-      // A sync never opens a system permission sheet: that is the Allow button's job (#3906).
-      board.step('Health Connect', () => imported.refresh({ ask: false })),
-      board.step('Activities', activities.store && (() => activities.store!.sync())),
-      board.step('History edits', history.queue && (() => history.queue!.sync())),
-    ]);
-    // Counted above, so sent here too; each publishes its own count when its upload settles.
-    strap?.sync();
-    scale?.sync();
-    await Promise.all([
-      board.step('Health', async () => health.store?.refresh(true)),
-      board.step('Home', async () => {
-        await home.store?.refresh('preferences', health.today, true);
-        await home.store?.refresh('mood', health.today, true);
-      }),
-    ]);
-    if (restore) {
-      await board.step('Nutrition', () =>
-        Promise.all(
-          (['mealTypes', 'foods', 'meals', 'supplements', 'targets', 'logs'] as const).map(
-            (kind) => nutrition.store?.refresh(kind, health.today, true),
-          ),
-        ),
-      );
-    }
-    workouts.refresh();
-    await board.step('Account views', () => refreshAccountViews(resources, restore));
-    board.fail('Health', health.store?.getSnapshot().error);
-    board.fail('Home', home.store?.getSnapshot().error);
-    board.fail('Nutrition', nutrition.store?.getSnapshot().error);
-    board.fail(
-      'Health Connect',
-      imported.store ? importStatusError(imported.store.getSnapshot()) : null,
-    );
-    board.fail('Activities', activities.store?.getSnapshot().error);
-    board.fail('History edits', history.queue?.getSnapshot().error);
-    // #3906: switched on with no permission is a note on a finished sync, not a failed one.
-    const note = imported.store
-      ? importPermissionNote(imported.store.getSnapshot(), deviceHealthName)
-      : null;
-    return (
-      (restore
-        ? 'Account data refreshed. Your history is now saving to this phone for offline use.'
-        : 'Sync finished. Any changes still waiting to upload remain saved on this phone.') +
-      (note ? ` ${note}` : '')
+    // Live reads, never this render's copies: the run outlives the render that started it.
+    await syncNowShared.run((board) =>
+      runSyncNow(
+        board,
+        {
+          health: health.store,
+          home: home.store,
+          nutrition: nutrition.store,
+          training: training.store,
+          journal: journal.controller,
+          imported,
+          activities: activities.store,
+          history: history.queue,
+          strap,
+          scale,
+          download,
+          today: health.today,
+          deviceHealthName,
+          refreshWorkouts: workouts.refresh,
+          refreshAccountViews: (restoring) => refreshAccountViews(resources, restoring),
+        },
+        restore,
+      ),
     );
   }
   async function clearAccount() {

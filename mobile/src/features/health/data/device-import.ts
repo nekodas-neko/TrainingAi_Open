@@ -23,13 +23,15 @@ export type DeviceImportState = {
       pending: number;
       enabled: boolean;
       needsPermission?: boolean;
+      busy?: boolean;
     };
+    subscribe?(listener: () => void): () => void;
     cancel(): void;
     setEnabled(enabled: boolean): Promise<void>;
     importHistory(from: string): Promise<void>;
     run(manual?: boolean, options?: { ask?: boolean }): Promise<void>;
     /** Health Connect only: asks for the read permission, from a button (#3906). */
-    requestPermission?(): Promise<void>;
+    requestPermission?(): Promise<{ granted: string[]; missing: string[] }>;
     /** Work owed (batches, a rebuild, a scan in progress): lets a rerun skip the throttle (#3906). */
     owed(): boolean;
   } | null;
@@ -51,4 +53,26 @@ export function importPermissionNote(
   return state.enabled && state.needsPermission
     ? `Needs permission: allow TrainingAi to read your data in ${name} to sync it.`
     : null;
+}
+/**
+ * #3906 review: what the Allow button says once the system dialog returns. Granted goes on to the
+ * import; denied keeps the in-app answer; a partial grant imports what it has and names the rest.
+ */
+export function permissionAnswer(
+  result: { granted: string[]; missing: string[] } | undefined,
+  name: string,
+): { needsPermission: boolean; proceed: boolean; text: string } {
+  if (!result || !result.granted.length)
+    return {
+      needsPermission: true,
+      proceed: false,
+      text: `Not allowed. Nothing was imported. Tap Allow to ask again, or allow TrainingAi in ${name}'s own settings.`,
+    };
+  return {
+    needsPermission: false,
+    proceed: true,
+    text: result.missing.length
+      ? `Allowed ${result.granted.join(', ')}. Still missing: ${result.missing.join(', ')}. Only what is allowed is imported.`
+      : `Allowed in ${name}. Importing history.`,
+  };
 }
