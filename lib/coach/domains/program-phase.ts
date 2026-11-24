@@ -2,8 +2,9 @@ import { and, eq, isNull, sql } from 'drizzle-orm'
 import * as s from '@/lib/data/postgres/schema'
 import { phaseSetIdOwned } from '@/lib/data/postgres/slices/programs'
 import { FIELD_LABEL } from '../patch'
-import type { Consequence, DomainHandler, Db, PreviewResult } from './types'
+import type { Consequence, DomainHandler, Db, HandlerApplyResult, PreviewResult } from './types'
 import { driftAgainst } from './types'
+import { withDomainLock } from '../lock-wait'
 
 /**
  * The periodisation model behind a program — the only tier-3 domain.
@@ -134,37 +135,42 @@ export const programPhaseHandler: DomainHandler = {
   },
 
   async apply(db, userId, patch, accepted) {
-    const state = await loadState(db, userId)
-    if (!state) return { ok: false, reason: 'not_found' }
+    // #4082: read, stale check and write under one lock per user and domain (see `withDomainLock`), so a
+    // double tap is refused as stale instead of writing twice with the same "before".
+    return withDomainLock<HandlerApplyResult>(db, userId, 'program_phase', async t => {
+      const state = await loadState(t, userId)
+      if (!state) return { ok: false, reason: 'not_found' }
 
-    const drift = driftAgainst(accepted, state as unknown as Record<string, unknown>)
-    if (drift.length > 0) return { ok: false, reason: 'stale', drift }
+      const drift = driftAgainst(accepted, state as unknown as Record<string, unknown>)
+      if (drift.length > 0) return { ok: false, reason: 'stale', drift }
 
-    // `phaseSetId` is written verbatim onto the program, so it must name one of the caller's own
-    // phase sets — the same check the program save route makes (Q-129).
-    const setChange = accepted.find(c => c.field === 'phaseSetId')
-    if (setChange && !(await phaseSetIdOwned(db, userId, setChange.to as string | null))) {
-      return { ok: false, reason: 'invalid', detail: 'That periodisation model is not one of yours' }
-    }
+      // `phaseSetId` is written verbatim onto the program, so it must name one of the caller's own
+      // phase sets — the same check the program save route makes (Q-129).
+      const setChange = accepted.find(c => c.field === 'phaseSetId')
+      if (setChange && !(await phaseSetIdOwned(t, userId, setChange.to as string | null))) {
+        return { ok: false, reason: 'invalid', detail: 'That periodisation model is not one of yours' }
+      }
 
-    const beforeState: Record<string, unknown> = {}
-    const set: Record<string, unknown> = {}
-    for (const c of accepted) {
-      beforeState[c.field] = (state as unknown as Record<string, unknown>)[c.field] ?? null
-      set[c.field] = c.to
-    }
+      const beforeState: Record<string, unknown> = {}
+      const set: Record<string, unknown> = {}
+      for (const c of accepted) {
+        beforeState[c.field] = (state as unknown as Record<string, unknown>)[c.field] ?? null
+        set[c.field] = c.to
+      }
 
-    // Scoped by user as well as id: `programs.id` came from our own read, but an UPDATE on a
-    // client-influenced patch is exactly where an unscoped write becomes a cross-user edit.
-    await db.update(s.programs).set(set)
-      .where(and(eq(s.programs.id, state.programId), eq(s.programs.userId, userId)))
+      // Scoped by user as well as id: `programs.id` came from our own read, but an UPDATE on a
+      // client-influenced patch is exactly where an unscoped write becomes a cross-user edit.
+      await t.update(s.programs).set(set)
+        .where(and(eq(s.programs.id, state.programId), eq(s.programs.userId, userId)))
 
-    return {
-      ok: true,
-      summary: `Changed ${accepted.map(c => FIELD_LABEL[c.field]).join(', ')} on ${state.programName}`,
-      beforeState,
-      targetId: state.programId,
-    }
+      return {
+        ok: true,
+        summary: `Changed ${accepted.map(c => FIELD_LABEL[c.field]).join(', ')} on ${state.programName}`,
+        beforeState,
+        targetId: state.programId,
+      }
+  
+    })
   },
 
   async undo(db, userId, targetId, before) {

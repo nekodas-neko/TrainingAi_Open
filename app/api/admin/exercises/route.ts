@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { refusalResponse, isRefusal, invalidUuidResponse, isStatementTimeout, renameBusyResponse } from "@/lib/api/route-errors";
+import { refusalResponse, isRefusal, invalidUuidResponse, isLockWaitTimeout, renameBusyResponse } from "@/lib/api/route-errors";
 import { reportServerError } from "@/lib/observability";
 import { auth } from "@/auth";
 import { requireAdmin, adminErrorResponse } from "@/lib/admin";
@@ -133,7 +133,7 @@ export async function PATCH(req: NextRequest) {
       exerciseType: body.data.exerciseType,
     });
   } catch (e) {
-    if (isStatementTimeout(e)) {
+    if (isLockWaitTimeout(e)) {
       // Still reported: 57014 is any statement over the pool's limit, so a slow query must not hide
       // behind the "busy" answer.
       reportServerError(e, { url: '/api/admin/exercises' });

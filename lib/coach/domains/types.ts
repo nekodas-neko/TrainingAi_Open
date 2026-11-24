@@ -101,6 +101,9 @@ export interface DomainHandler {
   ): Promise<Record<string, unknown> | null>
 }
 
+/** What a handler's `apply` returns: the written change, or a refusal. */
+export type HandlerApplyResult = Awaited<ReturnType<DomainHandler['apply']>>
+
 /**
  * Shared drift check for scalar fields. Kept in one place so every domain refuses a moved base the
  * same way — and, since Q-468, so that undo refuses one by exactly the same rule.

@@ -5,7 +5,7 @@ import { requireAdmin, adminErrorResponse } from '@/lib/admin'
 import { z } from 'zod'
 import type { MuscleAssignment } from '@trainingai/shared/types/program'
 import { reportServerError } from '@/lib/observability'
-import { refusalResponse, isRefusal, isStatementTimeout, renameBusyResponse } from '@/lib/api/route-errors'
+import { refusalResponse, isRefusal, isLockWaitTimeout, renameBusyResponse } from '@/lib/api/route-errors'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 import { promptSafeLine } from '@trainingai/shared/ai/untrusted-text'
 
@@ -89,7 +89,7 @@ export async function POST(req: NextRequest) {
       const exercise = await repo.renameExercise(session.user.id, body.data.mergeWithId, body.data.name)
       return NextResponse.json({ exercise })
     } catch (e) {
-      if (isStatementTimeout(e)) {
+      if (isLockWaitTimeout(e)) {
         // Still reported: 57014 is any statement over the pool's limit, so a slow query must not
         // hide behind the "busy" answer.
         reportServerError(e, { userId: session.user.id, url: '/api/exercises' })
