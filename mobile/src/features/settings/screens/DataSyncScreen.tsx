@@ -23,7 +23,8 @@ import { dateStrMidnightInTz, shiftDateStr, todayInTz } from '@trainingai/shared
 import { HISTORY_DOWNLOAD_DAYS } from '../data/history-domains';
 import { HISTORY_WINDOW_DAYS, dataSyncCopy, importCaption } from '../data/data-sync-copy';
 import { useHistoryDownload } from '../data/HistoryDownloadProvider';
-import { importPermissionNote, importStatusError } from '../../health/data/device-import';
+import { importPermissionNote, importStatusError, permissionAnswer } from '../../health/data/device-import';
+import { IMPORT_NEEDS_PERMISSION } from '../../health/data/HealthConnectImportStore';
 export function DataSyncScreen({ onBack }: { onBack: () => void }) {
   const actions = useNativeDataActions(),
     account = useAccountContext(),
@@ -37,7 +38,9 @@ export function DataSyncScreen({ onBack }: { onBack: () => void }) {
     [days, setDays] = useState('30'),
     [range, setRange] = useState('90'),
     [busy, setBusy] = useState(false),
-    [error, setError] = useState<string | null>(null);
+    [error, setError] = useState<string | null>(null),
+    [needsPermission, setNeedsPermission] = useState(false),
+    [answer, setAnswer] = useState<string | null>(null);
   async function exportData() {
     if (!account.dataReader) {
       return;
@@ -50,6 +53,40 @@ export function DataSyncScreen({ onBack }: { onBack: () => void }) {
       setError(cause instanceof Error ? cause.message : 'Could not export your data.');
     } finally {
       setBusy(false);
+    }
+  }
+  function importNow(keepAnswer = false) {
+    setNeedsPermission(false);
+    if (!keepAnswer) setAnswer(null);
+    setError(null);
+    void health.store
+      ?.importHistory(
+        dateStrMidnightInTz(shiftDateStr(today, -Number(days)), timezone).toISOString(),
+      )
+      .catch((cause) => {
+        // #3906: no permission is an answer on this card, not a failure in the header.
+        if (cause instanceof Error && cause.message === IMPORT_NEEDS_PERMISSION)
+          return setNeedsPermission(true);
+        setError(
+          cause instanceof Error ? cause.message : 'Could not import health history.',
+        );
+      });
+  }
+  // The system dialog opens only from here. Its answer stays on this card: granted goes on to the
+  // import and says so; denied or partly granted says what is still missing (#3906 review).
+  async function allow() {
+    setAnswer(null);
+    try {
+      const result = await health.store?.requestPermission?.();
+      const reply = permissionAnswer(result, deviceHealthName);
+      setNeedsPermission(reply.needsPermission);
+      setAnswer(reply.text);
+      if (!reply.proceed) return;
+      importNow(true);
+    } catch (cause) {
+      setError(
+        cause instanceof Error ? cause.message : `Could not ask ${deviceHealthName} for permission.`,
+      );
     }
   }
   return (
@@ -71,7 +108,7 @@ export function DataSyncScreen({ onBack }: { onBack: () => void }) {
           <Card>
             <AppText variant="subheading">{dataSyncCopy.sync.title}</AppText>
             <AppText variant="caption" tone="muted">
-              {dataSyncCopy.sync.caption}
+              {actions.error ?? actions.message ?? dataSyncCopy.sync.caption}
             </AppText>
             <AppText>
               {actions.pending
@@ -192,27 +229,24 @@ export function DataSyncScreen({ onBack }: { onBack: () => void }) {
               onChange={setDays}
             />
             <AppText variant="caption" tone="muted">
-              {importPermissionNote(health, deviceHealthName) ??
+              {answer ??
+                (needsPermission ? IMPORT_NEEDS_PERMISSION : null) ??
+                importPermissionNote(health, deviceHealthName) ??
                 'Reads permitted records and resumes across app opens. Records already imported are not added twice.'}
             </AppText>
             <AppButton
               title="Import history"
               disabled={!health.store || health.busy}
               busy={health.busy}
-              onPress={() =>
-                void health.store
-                  ?.importHistory(
-                    dateStrMidnightInTz(shiftDateStr(today, -Number(days)), timezone).toISOString(),
-                  )
-                  .catch((cause) =>
-                    setError(
-                      cause instanceof Error
-                        ? cause.message
-                        : 'Could not import health history.',
-                    ),
-                  )
-              }
+              onPress={() => importNow()}
             />
+            {needsPermission && health.store?.requestPermission && (
+              <AppButton
+                title={`Allow in ${deviceHealthName}`}
+                variant="secondary"
+                onPress={() => void allow()}
+              />
+            )}
           </Card>
           <Card>
             <AppText variant="subheading">{dataSyncCopy.exportData.title}</AppText>

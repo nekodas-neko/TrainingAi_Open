@@ -30,9 +30,9 @@ import * as s from '@/lib/data/postgres/schema'
 import { voidSessionPrescription, boundedReadWrite } from '@/lib/data/postgres/slices/periodization'
 import { BusyError } from '@trainingai/shared/errors'
 import type { WorkoutRepository } from '@/lib/data/repository'
-import { buildWorkoutExercises } from '@trainingai/shared/workout/session-data'
-import { buildAutomaticPhaseStatus, isEarlyDeloadWeek } from '@trainingai/shared/phase-engine'
-import { getScheduledSessionsPerWeek } from '@trainingai/shared/schedule-utils'
+import type { buildWorkoutExercises } from '@trainingai/shared/workout/session-data'
+import { readSessionFromStoredState } from '@trainingai/shared/workout/read-session'
+import { isEarlyDeloadWeek } from '@trainingai/shared/phase-engine'
 import { loadTarget, type TargetRow } from './session-exercise'
 import { lockLiftWrites, withBoundedLockWait } from '../lock-wait'
 import type { Consequence, Db, DomainHandler, Drift, PreviewResult } from './types'
@@ -58,7 +58,7 @@ import type { AiPrescription, PeriodizationPhase, PrescriptionStatus } from '@tr
 export type BasisReads = Pick<WorkoutRepository, 'getLastRealOneRmBatch' | 'getExerciseEstimates' | 'listPersonalRecords'>
 /** What the static reader (`staticBaseReps`) also reads: the program, its styles and phases, the library. */
 export type StaticReads = BasisReads & Pick<WorkoutRepository,
-  'getActiveProgram' | 'listProgressionStyles' | 'listExerciseLibrary' | 'listProgramPhases' | 'countAllSessionsSinceStart' | 'getLastExerciseLogsBatch'>
+  'getActiveProgram' | 'listProgressionStyles' | 'listExerciseLibrary' | 'getProgramPhaseState' | 'getLastExerciseLogsBatch'>
 
 type LiftField = 'repRange' | 'restSec' | 'nextLoadStep' | 'setsDelta'
 type LiftChange = Extract<PatchChange, { field: LiftField }>
@@ -522,8 +522,9 @@ function summaryOf(name: string, after: PrefColumns, accepted: LiftChange[]): st
 /**
  * The reps the lift's own session prescribes for it when no stored AI plan does (a `manual` or
  * `automatic` program, or an `ai_dynamic` one with no plan yet): the first set of the style the workout
- * screen would show. It is that screen's own reader, `buildWorkoutExercises` — the program's styles and
- * phases resolved exactly as the workout-data route resolves them — so no number is made up here.
+ * screen would show. It is that screen's own reader, `readSessionFromStoredState` (the Next workout card
+ * calls it too) — the program's styles and phases resolved exactly as the workout-data route resolves
+ * them — so no number is made up here.
  * Null when the session prescribes none (no style), or the next session is a deload, a baseline or a
  * test, where a preference does not apply and the reps shown are not the person's working reps; the
  * caller then refuses and asks for the range.
@@ -537,8 +538,8 @@ export async function staticBaseReps(reads: StaticReads, userId: string, target:
 
 /**
  * The lift as the workout screen would build it from the program as written (no stored AI plan):
- * `buildWorkoutExercises` with the program's styles and phases resolved as the workout-data route
- * resolves them. With `liftPreferences` (the user's stored preferences, as that route loads them) the
+ * `readSessionFromStoredState` (-> `buildWorkoutExercises`), with the program's styles and phases
+ * resolved as the workout-data route resolves them. With `liftPreferences` (the user's stored preferences, as that route loads them) the
  * built sets carry the preference, as the session screen shows them. `excluded` when the next session
  * is a deload, a baseline or a test. Null when the lift is not in the user's active program.
  */
@@ -553,52 +554,47 @@ export async function staticNextExercise(
   if (!programSession || !ex) return null
 
   const isAutomatic = program.phaseMode === 'automatic'
-  const [styles, library, allPhases, lastLogs, lastReal, estimates, prMap] = await Promise.all([
+  const [styles, library, phaseState, lastLogs, lastReal, estimates, prMap] = await Promise.all([
     reads.listProgressionStyles(userId),
     reads.listExerciseLibrary(),
-    isAutomatic ? reads.listProgramPhases(userId, program.id) : Promise.resolve([]),
+    // The phases and every session's count, in one query (#4050), as the screen and the card read them.
+    isAutomatic ? reads.getProgramPhaseState(userId, program.id) : Promise.resolve(null),
     reads.getLastExerciseLogsBatch(userId, [target.exerciseName]),
     reads.getLastRealOneRmBatch(userId, [target.exerciseName]),
     reads.getExerciseEstimates(userId).catch(() => []),
     reads.listPersonalRecords(userId),
   ])
-  let currentPhase: (typeof allPhases)[number] | null = null
-  let isDeloadActive = isEarlyDeloadWeek(program, today)
-  if (isAutomatic && allPhases.length > 0) {
-    const counts = await reads.countAllSessionsSinceStart(userId, program.id)
-    const perWeek = getScheduledSessionsPerWeek(program) / Math.max(1, program.sessions.length)
-    const status = buildAutomaticPhaseStatus(allPhases, counts.get(programSession.id) ?? 0, program, today, perWeek)
-    currentPhase = status.phase
-    isDeloadActive = isDeloadActive || status.isDeloadActive
-  }
-  const phaseType = currentPhase?.phaseType ?? 'normal'
-  const excluded = isDeloadActive || phaseType === 'deload' || phaseType === 'baseline' || phaseType === 'testing'
+
+  // The session as the screen reads it from stored state (`readSessionFromStoredState`, which the
+  // Next workout card calls too): no AI plan (`periodization: null`), so the program as written.
+  const read = readSessionFromStoredState({
+    program, programSession, todayStr: today,
+    allPhases: phaseState?.phases ?? [],
+    thisSessionCount: phaseState?.sessionCounts.get(programSession.id) ?? 0,
+    periodization: null,
+    programDeload: null,
+    loggedTodayInThisSession: new Set<string>(),
+    shared: {
+      lastLogs,
+      lastRealOneRm: lastReal,
+      prMap,
+      estimateMap: new Map(estimates.map(e => [e.exerciseName, e.estimated1rm])),
+      styleById: new Map(styles.map(x => [x.id, x.sets])),
+      styleByName: new Map(styles.map(x => [x.name, x.sets])),
+      styles,
+      libByName: new Map(library.map(e => [e.name.toLowerCase(), e])),
+      // The reader takes a map; absent preferences are an empty one (the builder's `?.get` finds none).
+      liftPreferences: liftPreferences ?? new Map(),
+    },
+  })
+  // A deload (a phase's, or a confirmed early-deload week on any program kind), a baseline or a test:
+  // a preference does not apply and the reps are not the person's working reps.
+  const phaseType = read.phaseStatus?.phase.phaseType ?? 'normal'
+  const excluded = isEarlyDeloadWeek(program, today) || (read.phaseStatus?.isDeloadActive ?? false) || read.isBaselinePhase
+    || phaseType === 'deload' || phaseType === 'baseline' || phaseType === 'testing'
   if (excluded) return { exercise: null, excluded: true }
 
-  const [built] = buildWorkoutExercises({ ...programSession, exercises: [ex] }, {
-    lastLogs,
-    lastRealOneRm: lastReal,
-    prMap,
-    estimateMap: new Map(estimates.map(e => [e.exerciseName, e.estimated1rm])),
-    styleById: new Map(styles.map(x => [x.id, x.sets])),
-    styleByName: new Map(styles.map(x => [x.name, x.sets])),
-    styles,
-    libByName: new Map(library.map(e => [e.name.toLowerCase(), e])),
-    currentPhase,
-    allPhases,
-    isDeloadActive: false,
-    isBaselinePhase: false,
-    aiDrivesLoad: false,
-    aiPrescription: null,
-    aiPhaseLabel: '',
-    isAiDynamic: program.phaseMode === 'ai_dynamic',
-    aiDeload: false,
-    droppedThisCycle: new Set(),
-    loggedTodayInThisSession: new Set(),
-    trainingGoal: program.trainingGoal,
-    ...(liftPreferences && { liftPreferences }),
-  })
-  return { exercise: built ?? null, excluded: false }
+  return { exercise: read.exercises.find(e => e.sessionExerciseId === ex.id) ?? null, excluded: false }
 }
 
 /** The reps a relative request is worked out from: the person's own range, else the next plan's reps,

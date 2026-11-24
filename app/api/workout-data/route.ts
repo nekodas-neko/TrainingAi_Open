@@ -5,7 +5,7 @@ import { auth } from "@/auth";
 import { getRepository } from "@/lib/data";
 import type { ProgramPhase } from "@trainingai/shared/types/program";
 import { todayInTz, shiftDateStr, startOfWeekInTz, DEFAULT_TZ } from "@trainingai/shared/date-utils";
-import { buildAutomaticPhaseStatus, isEarlyDeloadWeek } from "@trainingai/shared/phase-engine";
+import { buildAutomaticPhaseStatus } from "@trainingai/shared/phase-engine";
 import { getScheduledSessionsPerWeek } from "@trainingai/shared/schedule-utils";
 import { prescriptionDrivesLoad } from "@trainingai/shared/ai-periodization/apply-prescription";
 import { reevaluatePrescriptionForToday, reevaluationKey, type ReevaluationSignals } from "@trainingai/shared/ai-periodization/reevaluate";
@@ -19,7 +19,6 @@ import { moodMuscleMatches } from "@trainingai/shared/muscles";
 import type { AiPrescription, PeriodizationPhase } from "@trainingai/shared/types/ai-periodization";
 import {
   buildWorkoutExercises,
-  aiDynamicFallbackPhaseStatus,
   type WorkoutExercise,
   type PhaseStatus,
   type PerSessionPhaseStatus,
@@ -34,13 +33,16 @@ import { isSessionUnderWay, sessionUnderWayCheck } from "@trainingai/shared/ai-p
 import { slotHoldsPlan } from "@trainingai/shared/ai-periodization/plan-status";
 import { regeneratePrescriptionInBackground as regeneratePrescriptionSingleFlight } from "@trainingai/shared/ai-periodization/regenerate-in-background";
 import { loadLiftPreferences } from "@trainingai/shared/ai-periodization/lift-preference-read";
-import { readSessionFromStoredState } from "@trainingai/shared/workout/read-session";
+import { readSessionFromStoredState, resolveSessionPhase } from "@trainingai/shared/workout/read-session";
 import { rehold } from "@trainingai/shared/ai-periodization/checkin-plan-hold";
 import { resolveWorkingBasis } from "@trainingai/shared/1rm";
 
 // Re-exported so existing type imports (e.g. `import('@/app/api/workout-data/route').PhaseStatus`)
 // keep resolving after the interfaces moved to lib/workout/session-data.ts.
 export type { WorkoutExercise, PhaseStatus, PerSessionPhaseStatus };
+
+// What a program that is not `automatic` has for phases and counts (none are read).
+const NO_PHASE_STATE = { phases: [] as ProgramPhase[], sessionCounts: new Map<string, number>() };
 
 export async function GET(req: NextRequest) {
   try {
@@ -117,11 +119,10 @@ async function handleWorkoutData(req: NextRequest) {
     let phaseStatus: PhaseStatus | null = null
     let perSessionPhaseStatus: PerSessionPhaseStatus[] = []
     if (program.phaseMode === 'automatic') {
-      const phases = await repo.listProgramPhases(userId, program.id)
+      const { phases, sessionCounts } = await repo.getProgramPhaseState(userId, program.id)
       if (phases.length > 0) {
         const tz = session?.user?.timezone ?? DEFAULT_TZ
         const today = todayInTz(tz)
-        const sessionCounts = await repo.countAllSessionsSinceStart(userId, program.id)
         const totalPerWeek = getScheduledSessionsPerWeek(program)
         const numSessions = Math.max(1, program.sessions.length)
         const sessionPerWeek = totalPerWeek / numSessions
@@ -178,11 +179,11 @@ async function handleWorkoutData(req: NextRequest) {
     // per-session calls the single-tab path makes — no partitioning needed (buildWorkoutExercises
     // only ever looks up its own session's exercise names).
     const unionNames = [...new Set(program.sessions.flatMap(s => s.exercises.map(ex => ex.exerciseName)))]
-    const [allPhases, prMap, todayExercises, sessionCounts, lastLogs, lastRealOneRm, estimates, liftPreferences] = await Promise.all([
-      isAutomatic ? repo.listProgramPhases(userId, program.id) : Promise.resolve([] as ProgramPhase[]),
+    const [{ phases: allPhases, sessionCounts }, prMap, todayExercises, lastLogs, lastRealOneRm, estimates, liftPreferences] = await Promise.all([
+      // The phases and every session's count, in one query (#4050).
+      isAutomatic ? repo.getProgramPhaseState(userId, program.id) : Promise.resolve(NO_PHASE_STATE),
       repo.listPersonalRecords(userId),
       repo.getDayExerciseNames(userId, todayStr.replace(/-/g, '/'), tz),
-      isAutomatic ? repo.countAllSessionsSinceStart(userId, program.id) : Promise.resolve(new Map<string, number>()),
       repo.getLastExerciseLogsBatch(userId, unionNames),
       repo.getLastRealOneRmBatch(userId, unionNames),
       repo.getExerciseEstimates(userId).catch(() => []),
@@ -284,8 +285,9 @@ async function handleWorkoutData(req: NextRequest) {
   const tz = session?.user?.timezone ?? DEFAULT_TZ
   const todayStr = todayInTz(tz)
 
-  const [allPhases, lastLogs, lastRealOneRm, todayExercises, aiPeriodizationState, prMap, estimates, liftPreferences] = await Promise.all([
-    isAutomatic ? repo.listProgramPhases(userId, program.id) : Promise.resolve([] as ProgramPhase[]),
+  const [{ phases: allPhases, sessionCounts }, lastLogs, lastRealOneRm, todayExercises, aiPeriodizationState, prMap, estimates, liftPreferences] = await Promise.all([
+    // The phases and every session's count, in one query (#4050).
+    isAutomatic ? repo.getProgramPhaseState(userId, program.id) : Promise.resolve(NO_PHASE_STATE),
     repo.getLastExerciseLogsBatch(userId, exerciseNames),
     repo.getLastRealOneRmBatch(userId, exerciseNames),
     repo.getDayExerciseNames(userId, todayStr.replace(/-/g, '/'), tz),
@@ -321,97 +323,14 @@ async function handleWorkoutData(req: NextRequest) {
       .map(e => e.exerciseName),
   );
 
-  // Phase resolution — per-session count for this specific session
-  let currentPhase: ProgramPhase | null = null
-  let sessionPhaseStatus: PhaseStatus | null = null
-  if (isAutomatic && allPhases.length > 0) {
-    const sessionCounts = await repo.countAllSessionsSinceStart(userId, program.id)
-    const thisSessionCount = sessionCounts.get(programSession.id) ?? 0
-    const totalPerWeek = getScheduledSessionsPerWeek(program)
-    const numSessions = Math.max(1, program.sessions.length)
-    const sessionPerWeek = totalPerWeek / numSessions
-    sessionPhaseStatus = buildAutomaticPhaseStatus(allPhases, thisSessionCount, program, todayStr, sessionPerWeek)
-    currentPhase = sessionPhaseStatus.phase
-  }
-
-  // AI Dynamic baseline: first session before baseline is marked complete = 1 AMRAP set per exercise.
-  //
-  // BF-148. This used to carry a third term, `!hasAnyPriorLog`, standing for "these exercise names
-  // have been logged in this program before, so the baseline must already be done and the
-  // completion call was merely missed". It was a proxy for stale periodization state, and it was
-  // both WRONG and no longer needed:
-  //  - Wrong, because it is keyed on exercise NAMES. Rebuilding a session inside an existing
-  //    program reuses the names, so a genuinely uncalibrated session read as already-calibrated:
-  //    the header said "Baseline · S1" from this same `aiPeriodizationState` while the set card
-  //    prescribed a normal 3x8. That is the owner's report, and the same name-keyed shape BF-143
-  //    and BF-144 already corrected in two other places.
-  //  - Not needed, because BF-143 made the stale state it guarded against unreachable: the
-  //    auto-heal now completes a baseline only on evidence that THIS session was interrupted, so a
-  //    row still reading `baseline && !baselineComplete` means what it says.
-  // `generate-prescription.ts` already trusts exactly this pair to refuse a prescription, and the
-  // header and pre-workout panel already render from it — so the set card now agrees with what the
-  // rest of the screen was saying rather than holding a second opinion.
-  const isAiDynamicBaseline = isAiDynamic
-    && aiPeriodizationState?.phase === 'baseline'
-    && !aiPeriodizationState?.baselineComplete
-
-  const isBaselinePhase = currentPhase?.phaseType === 'baseline' || isAiDynamicBaseline
-
-  // Surface isBaseline to the client for AI Dynamic programs so the active workout
-  // shows the AMRAP banner and labels sets as "AMRAP" instead of "Set N".
-  if (isAiDynamicBaseline && !sessionPhaseStatus) {
-    sessionPhaseStatus = {
-      phase: { id: '', phaseSetId: '', position: 0, name: 'Baseline', durationCycles: 1, phaseType: 'baseline' } as ProgramPhase,
-      cycleInPhase: 1,
-      totalPhaseCycles: 1,
-      completedCycles: 0,
-      totalProgramCycles: 0,
-      sessionsPerCycle: 1,
-      sessionsInCurrentCycle: 0,
-      blockComplete: false,
-      approxWeeksRemaining: null,
-      isDeloadActive: false,
-      isBaseline: true,
-      openEnded: true,
-      phaseSessionNumber: 1,
-    }
-  }
-
-  // The app has TWO deload-confirmation entry points and they must converge here: the pre-workout
-  // Full/Deload/Rest toggle (`?aiDeload=1`) and Home's "Take deload week now" card, which writes
-  // `programs.earlyDeloadWeekStart` and passes no query param at all. Q-109 wired the first into
-  // the AI-dynamic load; Q-175 is the second arriving a week late, having produced byte-identical
-  // full-intensity prescriptions for the whole confirmed week.
-  const aiDeloadNow = aiDeload || isEarlyDeloadWeek(program, todayStr)
-
-  // ai_dynamic deload: user chose deload from the home screen — surface isDeloadActive to workout
-  if (aiDeloadNow && isAiDynamic && !sessionPhaseStatus) {
-    sessionPhaseStatus = {
-      phase: { id: '', phaseSetId: '', position: 0, name: 'Deload', durationCycles: 1, phaseType: 'deload' } as ProgramPhase,
-      cycleInPhase: 1,
-      totalPhaseCycles: 1,
-      completedCycles: 0,
-      totalProgramCycles: 0,
-      sessionsPerCycle: 1,
-      sessionsInCurrentCycle: 0,
-      blockComplete: false,
-      approxWeeksRemaining: null,
-      isDeloadActive: true,
-      isBaseline: false,
-      openEnded: true,
-      phaseSessionNumber: 1,
-    }
-  } else if (aiDeloadNow && isAiDynamic && sessionPhaseStatus) {
-    sessionPhaseStatus = { ...sessionPhaseStatus, isDeloadActive: true }
-  }
-
-  // For AI dynamic programs not already handled above (not baseline, not a user-confirmed
-  // deload), still return a non-null phaseStatus with isBaseline:false so the client always
-  // receives an explicit signal and can clear any stale baseline state from cache. The
-  // engine-chosen `phase: 'deload'` lands here too — see aiDynamicFallbackPhaseStatus.
-  if (isAiDynamic && !sessionPhaseStatus && aiPeriodizationState) {
-    sessionPhaseStatus = aiDynamicFallbackPhaseStatus(aiPeriodizationState)
-  }
+  // Phase, baseline and a confirmed deload week: the one resolver the card and the `?tab=all` batch
+  // call too (#4019). The pre-workout toggle (`aiDeload`) is this read's own input.
+  const { currentPhase, phaseStatus: sessionPhaseStatus, isBaselinePhase } = resolveSessionPhase({
+    program, todayStr, allPhases,
+    thisSessionCount: sessionCounts.get(programSession.id) ?? 0,
+    periodization: aiPeriodizationState,
+    aiDeload,
+  })
 
   // AI Dynamic: when a prescription is in effect (accepted/auto-applied, or a pending
   // "stay"), its per-exercise sets/reps/pct drive the loaded weights instead of the

@@ -13,6 +13,8 @@ import { rateLimit } from "@/lib/rate-limit";
 import { readSessionFromStoredState } from "@trainingai/shared/workout/read-session";
 import type { ExerciseType, ProgramPhase } from "@trainingai/shared/types/program";
 
+const NO_PHASE_STATE = { phases: [] as ProgramPhase[], sessionCounts: new Map<string, number>() };
+
 export interface NextSessionSetPreview {
   weightKg: number | null;
   reps: number;
@@ -84,10 +86,10 @@ export async function GET() {
   const isAiDynamic = program.phaseMode === 'ai_dynamic';
   const todayStr = todayInTz(tz);
 
-  const [allPhases, sessionCounts, lastLogs, lastRealOneRm, prMap, periodization, estimates, liftPreferences] = await Promise.all([
-    // The phase a static program's session is in, read as /api/workout-data reads it.
-    isAutomatic ? repo.listProgramPhases(userId, program.id) : Promise.resolve([] as ProgramPhase[]),
-    isAutomatic ? repo.countAllSessionsSinceStart(userId, program.id) : Promise.resolve(new Map<string, number>()),
+  const [phaseState, lastLogs, lastRealOneRm, prMap, periodization, estimates, liftPreferences] = await Promise.all([
+    // The phase a static program's session is in, read as /api/workout-data reads it: its phases and
+    // its sessions' counts in one query (#4050).
+    isAutomatic ? repo.getProgramPhaseState(userId, program.id) : Promise.resolve(NO_PHASE_STATE),
     repo.getLastExerciseLogsBatch(userId, exerciseNames),
     repo.getLastRealOneRmBatch(userId, exerciseNames),
     repo.listPersonalRecords(userId),
@@ -115,8 +117,8 @@ export async function GET() {
   // session: no re-evaluation against today's soreness and check-in (that step is a write and today's
   // signals are not that session's), and no `?aiDeload` toggle (the person has not opened it).
   const read = readSessionFromStoredState({
-    program, programSession, todayStr, allPhases,
-    thisSessionCount: sessionCounts.get(programSession.id) ?? 0,
+    program, programSession, todayStr, allPhases: phaseState.phases,
+    thisSessionCount: phaseState.sessionCounts.get(programSession.id) ?? 0,
     periodization, programDeload,
     underWay: isAiDynamic && periodization != null && slotHoldsPlan(periodization)
       ? await isSessionUnderWay(repo, userId, programSession.id) : false,

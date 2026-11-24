@@ -14,6 +14,7 @@ import { useWorkoutResources } from '../../workouts/data/WorkoutDataProvider';
 import { useHistoryQueue } from '../../workouts/data/HistoryQueueProvider';
 import { historyDomains } from './history-domains';
 import { followHistoryDownload } from './history-download-resume';
+import { syncNowShared } from './sync-now-state';
 
 const Context = createContext<HistoryDownload | null>(null);
 const noSubscribe = () => () => {};
@@ -23,6 +24,11 @@ export function HistoryDownloadProvider({ children }: PropsWithChildren) {
   const resources = useWorkoutResources();
   const nutrition = useNutrition().store;
   const queue = useHistoryQueue().queue;
+  // Sign-out, an expired session, delete-account or another user: Sync now starts over (#3906).
+  const accountKey = connection ? `${connection.origin}|${connection.userId}` : null;
+  useEffect(() => {
+    syncNowShared.setAccount(accountKey);
+  }, [accountKey]);
   const download = useMemo(
     () =>
       connection && resources
