@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
     // sheet renders `error` straight into its toast — so say what to do rather than "Invalid body".
     // #4129: the same for the name. Only these two issues' own messages are surfaced; every other
     // shape stays generic.
-    const actionable = body.error.issues.find(i => i.path[0] === 'equipment' || i.path[0] === 'name')
+    const actionable = body.error.issues.find(i => i.path[0] === 'equipment' || (i.path[0] === 'name' && i.code === 'custom'))
     return NextResponse.json(
       { error: actionable?.message ?? 'Invalid body' },
       { status: 400 },

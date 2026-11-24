@@ -47,7 +47,7 @@ describe.skipIf(!canRun)("undo takes its domain's lock (#4082 review)", () => {
     await pool.query(`DELETE FROM users WHERE id = $1`, [U])
     await pool.query(`INSERT INTO users (id, email, password_hash, timezone, steps_goal) VALUES ($1,$2,'x',$3,8000)`, [U, `q4082-undo-${U}@example.com`, TZ])
     ids.program = (await pool.query(
-      `INSERT INTO programs (user_id, name, phase_mode, is_active, training_goal, sessions_per_cycle) VALUES ($1,'Undo lock','manual',true,'strength',4) RETURNING id`, [U])).rows[0].id
+      `INSERT INTO programs (user_id, name, phase_mode, is_active, training_goal, sessions_per_cycle) VALUES ($1,'Undo lock','automatic',true,'strength',4) RETURNING id`, [U])).rows[0].id
     ids.session = (await pool.query(`INSERT INTO program_sessions (program_id, name, position) VALUES ($1,'Day',0) RETURNING id`, [ids.program])).rows[0].id
     ids.exercise = (await pool.query(
       `INSERT INTO session_exercises (session_id, exercise_name, position, exercise_role) VALUES ($1,'Q4082 Fly',0,'secondary') RETURNING id`, [ids.session])).rows[0].id
