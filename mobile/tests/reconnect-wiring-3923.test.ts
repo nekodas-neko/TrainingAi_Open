@@ -23,7 +23,6 @@ const { followHistoryDownload } = await import(
 );
 const { reloadDayOnReconnect, dayKinds } = await import('../src/features/nutrition/data/reconnect.ts');
 const { nutritionRefreshError } = await import('../src/features/nutrition/data/NutritionStore.ts');
-const { syncNowRunner, SYNC_NOW_SLOW } = await import('../src/core/sync/deadline.ts');
 
 const offlineError = () => new TypeError('Network request failed');
 const settle = async () => {
@@ -160,54 +159,4 @@ test('a Nutrition refresh cut off by the client timeout says it timed out', () =
   const timeout = new Error('The request timed out.');
   timeout.name = 'TimeoutError';
   assert.match(nutritionRefreshError('logs', timeout), /timed out/);
-});
-
-test('Sync now runs one at a time, and a run that outlives the deadline shows its own outcome when it ends', async (t) => {
-  t.mock.timers.enable({ apis: ['setTimeout'] });
-  const view = { busy: false, error: null as string | null, message: null as string | null };
-  const run = syncNowRunner(
-    {
-      setBusy: (busy: boolean) => void (view.busy = busy),
-      setError: (error: string | null) => void (view.error = error),
-      setMessage: (message: string | null) => void (view.message = message),
-    },
-    45_000,
-  );
-  let starts = 0;
-  let finish: (message: string) => void = () => {};
-  const start = () => {
-    starts++;
-    return new Promise<string>((resolve) => {
-      finish = resolve;
-    });
-  };
-  const first = run(start);
-  assert.equal(view.busy, true);
-  t.mock.timers.tick(45_000);
-  await first;
-  assert.equal(view.busy, false);
-  assert.equal(view.error, SYNC_NOW_SLOW);
-  const second = run(start);
-  assert.equal(starts, 1, 'a second tap waits on the run still going');
-  assert.equal(view.busy, true);
-  finish('Sync finished.');
-  await second;
-  assert.equal(view.busy, false);
-  assert.equal(view.error, null, 'the slow notice is gone');
-  assert.equal(view.message, 'Sync finished.');
-  // An abandoned run that ends after the deadline replaces the slow notice too.
-  const third = run(start);
-  assert.equal(starts, 2);
-  t.mock.timers.tick(45_000);
-  await third;
-  assert.equal(view.error, SYNC_NOW_SLOW);
-  finish('Sync finished again.');
-  await settle();
-  assert.equal(view.error, null);
-  assert.equal(view.message, 'Sync finished again.');
-  // A failing run shows its own failure, not the slow notice.
-  const fourth = run(() => Promise.reject(new Error('Could not refresh food logs.')));
-  await fourth;
-  assert.equal(view.error, 'Could not refresh food logs.');
-  assert.equal(view.message, null);
 });

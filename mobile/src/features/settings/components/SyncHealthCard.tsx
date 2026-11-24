@@ -15,6 +15,9 @@ import { useNutrition } from '../../nutrition/data/NutritionProvider';
 import { useHistoryQueue } from '../../workouts/data/HistoryQueueProvider';
 import { useWorkoutJournal } from '../../workouts/logging/WorkoutJournalProvider';
 import { useTrainingSync } from '../../workouts/data/WorkoutDataProvider';
+import { SYNC_STEP_LIMIT_MS, withDeadline } from '../../../core/sync/deadline';
+const RETRY_SLOW =
+  'Still retrying. The change stays saved on this phone and uploads on its own.';
 // Every Preview outbox that sets a refused change aside (`core/sync/set-aside.ts`, #3638), as one
 // list. Each hook re-renders this card when its queue changes.
 function useSetAsideQueues(): SetAsideQueue[] {
@@ -77,11 +80,11 @@ export function SyncHealthCard() {
         return queue ? [{ item, queue }] : [];
       });
       for (const { item, queue } of retried) {
-        await queue.retry(item);
+        await withDeadline(Promise.resolve(queue.retry(item)), SYNC_STEP_LIMIT_MS, RETRY_SLOW);
       }
       setNotice(retryNotice(retried.map(({ item, queue }) => queue.state(item))));
-    } catch {
-      setNotice('Retry failed');
+    } catch (cause) {
+      setNotice(cause instanceof Error && cause.message === RETRY_SLOW ? RETRY_SLOW : 'Retry failed');
     } finally {
       setBusy(false);
     }

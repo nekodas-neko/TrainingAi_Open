@@ -12,6 +12,7 @@ import type { ScopedStorage } from '../../../core/storage/LocalStorage.ts';
 import type { AccountConnection } from '../../account/session.ts';
 import type { HealthConnectReader } from '../../../integrations/health-connect/types.ts';
 import { failureNotice, reportError } from '../../../core/reporting/index.ts';
+import { withDeadline } from '../../../core/sync/deadline.ts';
 import { HealthConnectPersistence } from './health-connect-persistence.ts';
 import { DEFAULT_TZ, midnightDaysAgoInTz } from '@trainingai/shared/date-utils';
 import {
@@ -23,6 +24,15 @@ import {
  * Health Connect's own read limit, an instant rule rather than a calendar window: without the
  * history permission an app reads back to 30 days before its first grant.
  */
+/** A permission read answers at once; the permission sheet waits on a person, so it waits longer. */
+const NATIVE_READ_MS = 20_000;
+const NATIVE_SHEET_MS = 120_000;
+/** A read page or an upload answers in seconds; past this the call is given up on. */
+const NATIVE_PAGE_MS = 30_000;
+/** The whole run ends here, under Sync now's 90 s end, so the header spinner and the Import
+ *  history button are never held by a run nobody is waiting on (#3906 review). */
+export const RUN_LIMIT_MS = 80_000;
+export const RUN_STILL_READING = 'Health Connect import still reading. Saved records are kept.';
 const READ_LIMIT_MS = 30 * 24 * 60 * 60 * 1000;
 /** Records held back for a revoked permission are dropped, and counted as skipped, after this. */
 const BLOCKED_TTL_MS = 30 * 24 * 60 * 60 * 1000;
@@ -122,6 +132,8 @@ export const emptyHealthConnectImport = {
   /** #3906: the switch is on but no read permission is granted. Not an error, and not a change
    *  waiting to upload; nothing can be read until a permission is granted. */
   needsPermission: false,
+  /** #3906: the system permission sheet is open and the store is waiting for the person's answer. */
+  sheetOpen: false,
 };
 const newFilter = (sources: FirstHandSources | null) =>
   new FirstHandFilter<HealthConnectRecord>(
@@ -257,16 +269,49 @@ export class HealthConnectImportStore {
   }
   /** The granted read types; with none and `ask`, asks for every type once more (a tap, not a sync). */
   private async granted(ask: boolean) {
-    let types = await this.reader.permissions();
+    let types = await this.native(this.reader.permissions(), NATIVE_READ_MS);
     if (!types.length && ask && this.reader.request && !this.canceled) {
       await this.write({
         ...this.disk,
         requested: [...new Set([...this.disk.requested, ...healthConnectTypes])],
       });
-      types = (await this.reader.request([...healthConnectTypes]).catch(() => null)) ?? [];
+      types = (await this.sheet(this.reader.request([...healthConnectTypes]))) ?? [];
     }
     if (!this.canceled) this.publish({ needsPermission: !types.length });
     return types;
+  }
+  /** A native call that never answers must not hold a run, or Sync now, busy for good. */
+  private native<T>(work: Promise<T>, ms: number): Promise<T> {
+    const bounded = withDeadline(work, ms, 'Health Connect did not answer.');
+    // The run's own end cuts every wait short at once, so the run unwinds and clears busy.
+    return this.runEnd ? Promise.race([bounded, this.runEnd]) : bounded;
+  }
+  /**
+   * The system permission sheet waits on a person (up to 120 s), so the run's own clock stops while
+   * it is open and starts again, in full, when it returns (#3906 second check). A denial, a closed
+   * sheet or no answer is `null`.
+   */
+  private async sheet<T>(work: Promise<T>): Promise<T | null> {
+    this.stopRunClock();
+    if (!this.canceled) this.publish({ sheetOpen: true });
+    try {
+      return await withDeadline(work, NATIVE_SHEET_MS, 'Health Connect did not answer.');
+    } catch {
+      return null;
+    } finally {
+      if (!this.canceled) this.publish({ sheetOpen: false });
+      if (this.rejectEnd) this.startRunClock();
+    }
+  }
+  private runEnd: Promise<never> | null = null;
+  private rejectEnd: ((error: Error) => void) | null = null;
+  private runClock: ReturnType<typeof setTimeout> | undefined;
+  private startRunClock() {
+    clearTimeout(this.runClock);
+    this.runClock = setTimeout(() => this.rejectEnd?.(new Error(RUN_STILL_READING)), RUN_LIMIT_MS);
+  }
+  private stopRunClock() {
+    clearTimeout(this.runClock);
   }
   private guard() {
     if (!this.state.ready || this.canceled)
@@ -295,19 +340,28 @@ export class HealthConnectImportStore {
       throw cause;
     }
   }
+  /** The Allow button: the one place Import history opens the system dialog. */
+  async requestPermission(): Promise<{ granted: string[]; missing: string[] }> {
+    await this.initialize();
+    await this.running;
+    this.guard();
+    const types = await this.granted(true);
+    if (types.length && this.disk.enabled) void this.run(true, { ask: false });
+    return { granted: types, missing: healthConnectTypes.filter((type) => !types.includes(type)) };
+  }
   async importHistory(from: string) {
     await this.initialize();
     await this.running;
     this.guard();
     if (!Number.isFinite(Date.parse(from)) || Date.parse(from) > this.now())
       throw new Error('Choose a valid history start date.');
+    // #3906: the in-app answer comes first. Android's own dialogs open only from the button that
+    // answers it (`requestPermission`), never from this tap: without a read permission, stop here.
+    if (!(await this.granted(false)).length) throw new Error(IMPORT_NEEDS_PERMISSION);
     if (Date.parse(from) < Date.parse(this.disk.from)) {
       if (!this.reader.historyPermission) throw new Error('Extended history is unavailable.');
       await this.reader.historyPermission();
     }
-    // #3906: without a read permission, clearing the token would only queue a read that cannot run.
-    // Said as the tap's own outcome, since the switch's note does not show while it is off.
-    if (!(await this.granted(true)).length) throw new Error(IMPORT_NEEDS_PERMISSION);
     await this.write({
       ...this.disk,
       from,
@@ -316,7 +370,8 @@ export class HealthConnectImportStore {
       scan: null,
       enabled: true,
     });
-    return this.run(true);
+    // Never the sheet: a partial grant must not ask again for types never asked (#3906 review).
+    return this.run(true, { ask: false });
   }
   private async append(
     records: HealthConnectRecord[],
@@ -423,7 +478,10 @@ export class HealthConnectImportStore {
       }
       let reply;
       try {
-        reply = await this.connection.post('/api/health-connect/sync', item);
+        reply = await this.native(
+          this.connection.post('/api/health-connect/sync', item),
+          NATIVE_PAGE_MS,
+        );
       } catch (error) {
         // #2828 N3: a 400 is the server refusing this batch's shape, and it refuses it the same way
         // every time. Left at the head of the queue it blocked every later upload for good, so it is
@@ -552,33 +610,45 @@ export class HealthConnectImportStore {
     if (Object.keys(records).length !== Object.keys(this.disk.records).length)
       await this.write({ ...this.disk, records });
   }
-  run(manual = false): Promise<void> {
+  run(manual = false, options: { ask?: boolean } = {}): Promise<void> {
     if (this.running) return this.running;
     if (this.canceled || (!manual && this.now() - this.lastAttempt < 300000))
       return Promise.resolve();
     this.lastAttempt = this.now();
+    this.runEnd = new Promise<never>((_, reject) => {
+      this.rejectEnd = reject;
+    });
+    this.runEnd.catch(() => {});
+    this.startRunClock();
     this.running = (async () => {
       await this.initialize();
       if (!this.state.ready || !this.disk.enabled || this.canceled) return;
       this.publish({ busy: true, error: null });
       try {
-        let types = await this.reader.permissions();
+        let types = await this.native(this.reader.permissions(), NATIVE_READ_MS);
         if (this.canceled) return;
         // A type this install has never been asked for, once. Recorded before asking, so a denial,
         // a dismissed sheet or a crash is not asked again; the sync carries on with what is granted.
         const unasked = healthConnectTypes.filter(
           (type) => !types.includes(type) && !this.disk.requested.includes(type),
         );
-        if (unasked.length && this.reader.request) {
+        if (unasked.length && this.reader.request && options.ask !== false) {
           await this.write({ ...this.disk, requested: [...this.disk.requested, ...unasked] });
-          const granted = await this.reader.request(unasked).catch(() => null);
+          const granted = await this.sheet(this.reader.request(unasked));
           if (this.canceled) return;
           if (granted?.length) types = granted;
         }
         // #3906: nothing granted is a state to show, not a failure that fails Sync now.
         this.publish({ needsPermission: !types.length });
         if (!types.length) return;
-        const firstHand = await this.firstHandSources().catch(() => null);
+        // Bounded like every native call, so the run's end can cut it. A run end is not an
+        // "unknown", it ends the run; any other failure reads as no first-hand data, as before.
+        const firstHand = await this.native(this.firstHandSources(), NATIVE_READ_MS).catch(
+          (cause) => {
+            if (cause instanceof Error && cause.message === RUN_STILL_READING) throw cause;
+            return null;
+          },
+        );
         if (this.canceled) return;
         // A new filter each run, so its counts are that sync's: a rescan reads records again and
         // must not count them twice.
@@ -602,7 +672,11 @@ export class HealthConnectImportStore {
         }
         if (!this.disk.grantedAt)
           await this.write({ ...this.disk, grantedAt: new Date(this.now()).toISOString() });
-        const hasHistory = (await this.reader.hasHistoryPermission?.()) ?? false;
+        const hasHistory =
+          (await this.native(
+            Promise.resolve(this.reader.hasHistoryPermission?.()),
+            NATIVE_READ_MS,
+          )) ?? false;
         await this.release(types);
         // Before the uploads, so an offline run still keeps the cache in bounds.
         await this.prune(hasHistory);
@@ -618,7 +692,7 @@ export class HealthConnectImportStore {
             permissionKey,
           });
         if (!this.disk.token && !this.disk.scan) {
-          const initial = await this.reader.changes(types);
+          const initial = await this.native(this.reader.changes(types), NATIVE_PAGE_MS);
           if (this.canceled) return;
           const from = new Date(this.rescanStart(hasHistory, this.disk.rescanFrom)).toISOString();
           await this.write({
@@ -658,11 +732,14 @@ export class HealthConnectImportStore {
             await this.flush(types);
             break;
           }
-          const page = await this.reader.history(
-            scan.types[scan.index],
-            scan.from,
-            scan.end,
-            scan.pageToken ?? undefined,
+          const page = await this.native(
+            this.reader.history(
+              scan.types[scan.index],
+              scan.from,
+              scan.end,
+              scan.pageToken ?? undefined,
+            ),
+            NATIVE_PAGE_MS,
           );
           if (this.canceled) return;
           await this.append(page.records, [], {
@@ -683,7 +760,7 @@ export class HealthConnectImportStore {
         }
         let more = true;
         while (!this.disk.scan && this.disk.token && more && !this.canceled && pages++ < 40) {
-          const page = await this.reader.changes(types, this.disk.token);
+          const page = await this.native(this.reader.changes(types, this.disk.token), NATIVE_PAGE_MS);
           if (this.canceled) return;
           if (page.expired) {
             await this.write({ ...this.disk, token: null, rescanFrom: this.disk.tokenAt });
@@ -722,6 +799,9 @@ export class HealthConnectImportStore {
         if (!this.canceled) this.publish({ busy: false });
       }
     })().finally(() => {
+      this.stopRunClock();
+      this.rejectEnd = null;
+      this.runEnd = null;
       this.running = null;
     });
     return this.running;
