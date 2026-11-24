@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { View } from 'react-native';
+import { plural } from '@trainingai/shared/format/plural';
 import { AppButton, AppText, Badge, Card, Icon, Stack } from '../../../shared/ui';
 import { TouchSurface } from '../../../shared/ui/TouchSurface';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
@@ -29,6 +30,11 @@ export function PlanStartCard({
       <AppText variant="caption" tone="muted">
         {model.meta}
       </AppText>
+      {model.failure && (
+        <AppText variant="caption" tone="muted">
+          {model.failure}
+        </AppText>
+      )}
       <Stack gap="sm">
         {shown.map((row, index) => (
           <View key={row.id}>
@@ -103,10 +109,19 @@ export function PlanStartCard({
       {(hidden > 0 || expanded) && model.rows.length > PLAN_ROWS_SHOWN && (
         <AppButton
           variant="ghost"
-          title={expanded ? 'Show fewer' : `+ ${hidden} more`}
+          title={
+            expanded
+              ? 'Show fewer'
+              : `+ ${hidden} more${model.notesBehindMore ? ` · ${plural(model.notesBehindMore, 'note', 'notes')}` : ''}`
+          }
           onPress={() => setExpanded(!expanded)}
         />
       )}
+      {model.notes.map((line) => (
+        <AppText key={line} variant="caption" tone="muted">
+          {line}
+        </AppText>
+      ))}
       {model.reason && (
         <AppText variant="caption" tone="muted">
           {model.reason}

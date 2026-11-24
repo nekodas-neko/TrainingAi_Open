@@ -23,7 +23,7 @@ import {
 } from './targets.ts';
 import { timerPreferencesSchema, type TimerPreferences } from './preferences.ts';
 import { previousValueChanges, reusePreviousValues } from './reuse.ts';
-import { prepareSession, type SessionStartOptions } from './session-options.ts';
+import { prepareSession, recordedIntensity, type SessionStartOptions } from './session-options.ts';
 import {
   createWorkout,
   emptyJournal,
@@ -379,9 +379,7 @@ export class WorkoutJournalStore {
         ...x,
         weightUnit: this.current.data.preferences.units[x.id] ?? 'kg',
       }));
-      workout.intensityMode = options.aiDeload ? 'deload' : 'full';
-      workout.wasOverride =
-        !!options.fullOverride || !!options.revertedExerciseIds?.length;
+      Object.assign(workout, recordedIntensity(options, workout.exercises));
       await this.write((data) => ({ ...data, workouts: [...data.workouts, workout] }));
       if (generation !== this.generation) {
         return null;

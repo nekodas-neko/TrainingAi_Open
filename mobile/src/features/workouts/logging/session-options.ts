@@ -32,3 +32,20 @@ export function prepareSession(
     ),
   };
 }
+
+/**
+ * What a started workout records as its type. It follows what was put in front of the lifter: a
+ * session whose every row is still deloaded is a deload, even when Full was chosen over rows that
+ * carry no full numbers (a plan stored before `preDeloadStyle`), and then nothing was overridden.
+ */
+export function recordedIntensity(
+  options: SessionStartOptions,
+  exercises: readonly { deloaded: boolean }[],
+) {
+  const allLight = exercises.length > 0 && exercises.every((exercise) => exercise.deloaded);
+  const overridden = !!options.fullOverride || !!options.revertedExerciseIds?.length;
+  return {
+    intensityMode: options.aiDeload || allLight ? ('deload' as const) : ('full' as const),
+    wasOverride: overridden && !allLight,
+  };
+}

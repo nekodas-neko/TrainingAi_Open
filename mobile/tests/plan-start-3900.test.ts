@@ -71,7 +71,7 @@ test('an ordinary day: plan header, one Start, a quiet Deload link, nothing to c
   assert.equal(model.header, "Today's plan · Accumulation · Session 2");
   assert.equal(model.meta, '4 exercises · about 62 min');
   assert.equal(model.start.label, 'Start workout');
-  assert.deepEqual(model.link, { kind: 'deload', label: 'Deload today instead' });
+  assert.deepEqual(model.link, { kind: 'deload', label: 'Deload today instead', busy: false });
   assert.equal(model.suggestion, null);
   assert.equal(model.typeLabel, null);
   assert.equal(model.reason, 'Your lifts moved well last week.');
@@ -90,7 +90,7 @@ test('a day the plan prescribes a deload: Start deload, Train full instead, its 
   )!;
   assert.equal(model.header, "Today's plan · Deload · prescribed");
   assert.equal(model.start.label, 'Start deload');
-  assert.deepEqual(model.link, { kind: 'full', label: 'Train full instead' });
+  assert.deepEqual(model.link, { kind: 'full', label: 'Train full instead', busy: false });
   assert.equal(model.reason, 'Three hard weeks in a row.');
   assert.equal(model.meta, '4 exercises · about 40 min');
 });
@@ -218,12 +218,8 @@ test('a baseline day has no Deload link', () => {
 test('rows: scheme, and an arrow only when the load changed since last time', () => {
   const model = planStartModel(
     input({
-      exercises: [
-        lift('up', { lastWeights: [80] }),
-        lift('same', { lastWeights: [82.5] }),
-        lift('down', { lastWeights: [85] }),
-        lift('new', { lastWeights: [] }),
-      ],
+      exercises: [lift('up'), lift('same'), lift('down'), lift('new')],
+      previousTops: { up: 80, same: 82.5, down: 85 },
     }),
   )!;
   const [up, same, down, fresh] = model.rows;
@@ -252,7 +248,7 @@ test('a bodyweight lift reads in reps, with no load and no arrow', () => {
 
 test('a lift logged in pounds reads in pounds, and so does its change', () => {
   const model = planStartModel(
-    input({ exercises: [lift('a', { lastWeights: [80] })], units: { a: 'lb' } }),
+    input({ exercises: [lift('a')], units: { a: 'lb' }, previousTops: { a: 80 } }),
   )!;
   assert.equal(model.rows[0].scheme, '3 × 8 @ 181.9 lb');
   assert.deepEqual(model.rows[0].change, { direction: 'up', amount: '5.5' });

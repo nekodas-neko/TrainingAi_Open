@@ -24,7 +24,7 @@ import { injurySpec } from '../data/models';
 import { activeInjuredMuscles } from '@trainingai/shared/workout/injury-context';
 import { normalizeMuscle } from '@trainingai/shared/muscles';
 import { LiftCoachMenu } from '../../coach/components/LiftCoachMenu';
-import { planStartModel } from '../data/plan-start';
+import { lastComparableLoads, planStartModel } from '../data/plan-start';
 import { useWeightUnits } from '../logging/WorkoutJournalProvider';
 
 export function SessionScreen({
@@ -84,6 +84,9 @@ export function SessionScreen({
           prescription: preparation.prescribedState?.prescription,
           prescriptionStatus: preparation.prescribedState?.prescriptionStatus,
           deloadChosen: preparation.deload,
+          deloadLoading: preparation.deloadLoading,
+          deloadFailure: preparation.deloadFailure,
+          previousTops: lastComparableLoads(journal.data.workouts, session.id, units),
           active: activeWorkout
             ? {
                 sessionId: activeWorkout.sessionId,
@@ -97,15 +100,12 @@ export function SessionScreen({
           injuredMuscles: injuredMuscles,
         })
       : null;
-  const blocked =
-    session?.exercises
-      .filter((exercise) => exercise.deloaded && !exercise.preDeloadStyle?.length)
-      .map((exercise) => exercise.name) ?? [];
   return (
     <WorkoutLayout
       title={session?.name ?? 'Workout'}
       subtitle={date}
-      detail={session?.phaseDetail ?? session?.phase ?? undefined}
+      // On the AI plan the card's own header carries the phase; saying it twice is noise.
+      detail={plan ? undefined : (session?.phaseDetail ?? session?.phase ?? undefined)}
       onBack={closeSession}
       backLabel="Back to sessions"
       actions={
@@ -138,17 +138,9 @@ export function SessionScreen({
               <AppButton
                 variant="ghost"
                 title={plan.link.label}
-                disabled={preparation.action.busy}
-                onPress={() => {
-                  if (plan.link?.kind === 'deload') {
-                    preparation.chooseDeload(true);
-                    return;
-                  }
-                  preparation.chooseDeload(false);
-                  if (blocked.length) {
-                    void preparation.action.run(preparation.regenerate);
-                  }
-                }}
+                busy={plan.link.busy}
+                disabled={preparation.action.busy || plan.link.busy}
+                onPress={() => preparation.chooseDeload(plan.link?.kind === 'deload')}
               />
             )}
           </>
@@ -187,7 +179,7 @@ export function SessionScreen({
               onSelect={setSelectedId}
             />
           )}
-          {session.prescriptionPending && (
+          {session.prescriptionPending && !plan && (
             <Notice
               title="Preparing your workout"
               message="Your AI workout is still being prepared. Starting asks for it, and uses your program as written if it can't be made."

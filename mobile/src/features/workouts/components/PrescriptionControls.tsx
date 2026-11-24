@@ -35,18 +35,49 @@ export function PrescriptionControls({
   const workout = useWorkoutContext();
   const home = useHomeState();
   const [restError, setRestError] = useState<string | null>(null);
+  const [restRecorded, setRestRecorded] = useState(false);
+  const rest = (resting: boolean) =>
+    home.store
+      ?.chooseRestDay(todayInTz(workout.timezone), resting)
+      .then(() => {
+        setRestError(null);
+        setRestRecorded(resting);
+      })
+      .catch((failure) =>
+        setRestError(
+          failureNotice(
+            resting
+              ? 'Could not save your rest-day choice. Try again.'
+              : 'Could not undo your rest-day choice. Try again.',
+            failure,
+          ),
+        ),
+      );
   const prescription = preparation.prescribedState?.prescription;
   // Today's rest-or-lighter call is the app's daily check, the one Home's strip shows.
   const strip = dailyCheckStrip(workout.catalog?.recommendation);
-  const blocked =
-    preparation.session?.exercises
-      .filter((exercise) => exercise.deloaded && !exercise.preDeloadStyle?.length)
-      .map((exercise) => exercise.name) ?? [];
   const suggestion = model.suggestion;
   return (
     <>
       {strip && <DeloadStrip strip={strip} />}
-      {suggestion && (
+      {restRecorded && (
+        <Card tone="brand">
+          <AppText variant="label">Rest day recorded</AppText>
+          <AppText variant="caption" tone="muted">
+            Today is marked as a rest day. Start still works if you change your mind.
+          </AppText>
+          <Stack direction="row">
+            <AppButton
+              variant="secondary"
+              title="Undo rest day"
+              onPress={() => {
+                void rest(false);
+              }}
+            />
+          </Stack>
+        </Card>
+      )}
+      {suggestion && !restRecorded && (
         <Card tone="brand">
           <AppText variant="label">{suggestion.title}</AppText>
           <AppText variant="caption" tone="muted">
@@ -63,14 +94,7 @@ export function PrescriptionControls({
                     void action.run(() => preparation.respond('accept'));
                     return;
                   }
-                  home.store
-                    ?.chooseRestDay(todayInTz(workout.timezone), true)
-                    .then(() => setRestError(null))
-                    .catch((failure) =>
-                      setRestError(
-                        failureNotice('Could not save your rest-day choice. Try again.', failure),
-                      ),
-                    );
+                  void rest(true);
                 }}
               />
             </Stack>
@@ -101,12 +125,6 @@ export function PrescriptionControls({
           void action.run(() => preparation.setDuration(Number(value)));
         }}
       />
-      {preparation.options.fullOverride && blocked.length > 0 && (
-        <Notice
-          title="Some exercises remain deloaded"
-          message={`${blocked.join(', ')}: full numbers were not recorded. Regenerate or keep these prescribed loads.`}
-        />
-      )}
     </>
   );
 }

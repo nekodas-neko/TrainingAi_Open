@@ -9,7 +9,6 @@ import {
   Notice,
   NumericStepper,
   Picker,
-  SwitchRow,
   TextField,
   WeekdayPicker,
 } from '../../shared/ui';
@@ -189,13 +188,7 @@ export function ProgramEditor({
                 ].map((goal) => ({ value: goal, label: capitalize(goal) }))}
                 onChange={(trainingGoal) => draft.setValue({ ...value, trainingGoal })}
               />
-              <SwitchRow
-                label="Auto-apply AI changes"
-                value={value.autoApplyPrescriptions ?? false}
-                onValueChange={(autoApplyPrescriptions) =>
-                  draft.setValue({ ...value, autoApplyPrescriptions })
-                }
-              />
+              {/* No auto-apply switch: an AI-planned program applies every plan itself (#4088). */}
               {program?.isActive && program.phaseMode === 'ai_dynamic' && (
                 <ProgramPhaseRow program={program} />
               )}

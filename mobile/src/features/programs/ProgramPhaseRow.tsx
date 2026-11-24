@@ -1,6 +1,6 @@
 import { capitalize } from '@trainingai/shared/format/capitalize';
 import { useState } from 'react';
-import { ConfirmationCard, Notice, Picker, Sheet } from '../../shared/ui';
+import { AppText, ConfirmationCard, Notice, Picker, Sheet } from '../../shared/ui';
 import { periodizationSpec, type SavedProgram } from '../workouts/data/models';
 import { useWorkoutAction } from '../workouts/data/useWorkoutAction';
 import { useWorkoutResource, useWorkoutResources } from '../workouts/data/WorkoutDataProvider';
@@ -24,8 +24,11 @@ export function ProgramPhaseRow({ program }: { program: SavedProgram }) {
   const current = state.data?.state?.phase;
   return (
     <>
+      <AppText variant="caption" tone="muted">
+        The AI plan moves the phase for you. Change it here only to override the plan.
+      </AppText>
       <Picker
-        label="Change phase"
+        label="Change phase manually"
         value=""
         display={current ? capitalize(current) : 'Choose a phase'}
         options={PHASES.map((value) => ({ value, label: capitalize(value) }))}
