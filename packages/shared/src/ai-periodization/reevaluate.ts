@@ -259,6 +259,25 @@ export function reevaluatePrescriptionForToday(
         }),
       }
     }
+    if (isDeloaded && wasDeloaded && ex.modelDeload) {
+      // #4087: a row deloaded because the MODEL wrote the deload (not by this function) still answers a
+      // soreness or illness signal as it did before the model's deload was flagged: it takes the
+      // per-exercise override, and is never heavier than that. Per field the lighter: the fewer sets and
+      // the lower bar, with the override's reps and rest. `preDeload` stays the program's numbers.
+      const next = {
+        sets: Math.min(ex.sets, perEx.override.sets),
+        reps: perEx.override.reps,
+        pct: Math.min(ex.pct, perEx.override.pct),
+        restSec: perEx.override.restSec,
+      }
+      const note = notes[ex.sessionExerciseId]
+      if (next.sets !== ex.sets || next.reps !== ex.reps || next.pct !== ex.pct || next.restSec !== ex.restSec
+        || (note && note !== ex.deloadNote)) {
+        changed = true
+        return { ...ex, ...next, ...(note && { deloadNote: note }) }
+      }
+      return ex
+    }
     if (isDeloaded && wasDeloaded) {
       // Still sore — refresh the note (matched muscle labels can shift day to day).
       const note = notes[ex.sessionExerciseId]

@@ -24,6 +24,8 @@ import { injurySpec } from '../data/models';
 import { activeInjuredMuscles } from '@trainingai/shared/workout/injury-context';
 import { normalizeMuscle } from '@trainingai/shared/muscles';
 import { LiftCoachMenu } from '../../coach/components/LiftCoachMenu';
+import { lastComparableLoads, planStartModel } from '../data/plan-start';
+import { useWeightUnits } from '../logging/WorkoutJournalProvider';
 
 export function SessionScreen({
   sessionId,
@@ -57,7 +59,9 @@ export function SessionScreen({
   const session = preparation.session;
   const selected = session?.exercises.find((exercise) => exercise.id === selectedId);
   const today = todayInTz(workout.timezone);
-  const active = journal.data.workouts.some((workout) => workout.status === 'active');
+  const activeWorkout = journal.data.workouts.find((workout) => workout.status === 'active');
+  const active = !!activeWorkout;
+  const units = useWeightUnits();
   const done =
     session?.exercises
       .filter((exercise) => exercise.loggedDate === today)
@@ -65,11 +69,43 @@ export function SessionScreen({
   const allDone =
     !!session?.exercises.length && done.length === session.exercises.length && !active;
   const date = formatDateDisplay(today, 'long');
+  const plan =
+    session && program
+      ? planStartModel({
+          aiDynamic: program.phaseMode === 'ai_dynamic',
+          sessionId: session.id,
+          sessionName: session.name,
+          isBaseline: session.isBaseline,
+          exercises: session.exercises,
+          asSent: preparation.asSent,
+          durationMinutes: session.durationMinutes,
+          phaseDetail: session.phaseDetail ?? session.phase ?? null,
+          preparing: session.prescriptionPending,
+          prescription: preparation.prescribedState?.prescription,
+          prescriptionStatus: preparation.prescribedState?.prescriptionStatus,
+          deloadChosen: preparation.deload,
+          deloadLoading: preparation.deloadLoading,
+          deloadFailure: preparation.deloadFailure,
+          previousTops: lastComparableLoads(journal.data.workouts, session.id, units),
+          active: activeWorkout
+            ? {
+                sessionId: activeWorkout.sessionId,
+                sessionName: activeWorkout.sessionName,
+                intensityMode: activeWorkout.intensityMode,
+              }
+            : null,
+          units,
+          suggestedToday: !!workout.catalog?.recommendation?.deloadOrRestRecommended,
+          completedIds: done,
+          injuredMuscles: injuredMuscles,
+        })
+      : null;
   return (
     <WorkoutLayout
       title={session?.name ?? 'Workout'}
       subtitle={date}
-      detail={session?.phaseDetail ?? session?.phase ?? undefined}
+      // On the AI plan the card's own header carries the phase; saying it twice is noise.
+      detail={plan ? undefined : (session?.phaseDetail ?? session?.phase ?? undefined)}
       onBack={closeSession}
       backLabel="Back to sessions"
       actions={
@@ -88,14 +124,26 @@ export function SessionScreen({
             ✓ Done for today
           </AppText>
         ) : (
-          <StartWorkoutCard
-            session={session}
-            programId={program.id}
-            openWorkout={openWorkout}
-            inline
-            options={preparation.options}
-            disabled={preparation.action.busy || !!preparation.parseError}
-          />
+          <>
+            <StartWorkoutCard
+              session={session}
+              programId={program.id}
+              openWorkout={openWorkout}
+              inline
+              actionLabel={plan?.start.label}
+              options={preparation.options}
+              disabled={preparation.action.busy || !!preparation.parseError}
+            />
+            {plan?.link && (
+              <AppButton
+                variant="ghost"
+                title={plan.link.label}
+                busy={plan.link.busy}
+                disabled={preparation.action.busy || plan.link.busy}
+                onPress={() => preparation.chooseDeload(plan.link?.kind === 'deload')}
+              />
+            )}
+          </>
         ))
       }
     >
@@ -124,15 +172,21 @@ export function SessionScreen({
             <Notice title="Session update" message={preparation.current.error} />
           )}
           {injuries.error && <Notice title="Injury records" message={injuries.error} />}
-          {program?.phaseMode === 'ai_dynamic' && (
-            <PrescriptionControls preparation={preparation} />
+          {plan && (
+            <PrescriptionControls
+              preparation={preparation}
+              model={plan}
+              onSelect={setSelectedId}
+            />
           )}
-          {session.prescriptionPending && (
+          {session.prescriptionPending && !plan && (
             <Notice
               title="Preparing your workout"
               message="Your AI workout is still being prepared. Starting asks for it, and uses your program as written if it can't be made."
             />
           )}
+          {!plan && (
+            <>
           <Stack direction="row" justify="space-between">
             <AppText variant="eyebrow" tone="muted">
               Today&apos;s exercises
@@ -152,6 +206,8 @@ export function SessionScreen({
               <LiftCoachMenu sessionExerciseId={exercise.id} name={exercise.name} />
             )}
           />
+            </>
+          )}
           <Sheet
             visible={!!selected}
             title={selected?.name ?? 'Exercise'}

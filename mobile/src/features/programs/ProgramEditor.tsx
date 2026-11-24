@@ -9,7 +9,6 @@ import {
   Notice,
   NumericStepper,
   Picker,
-  SwitchRow,
   TextField,
   WeekdayPicker,
 } from '../../shared/ui';
@@ -21,6 +20,7 @@ import { useWorkoutAction } from '../workouts/data/useWorkoutAction';
 import { useWorkoutContext } from '../workouts/WorkoutProvider';
 import { ProgramDraftSchema, programDraft, programPayload } from './editor-model';
 import { ProgramSessionList } from './ProgramSessionList';
+import { ProgramPhaseRow } from './ProgramPhaseRow';
 
 export function ProgramEditor({
   program,
@@ -188,13 +188,10 @@ export function ProgramEditor({
                 ].map((goal) => ({ value: goal, label: capitalize(goal) }))}
                 onChange={(trainingGoal) => draft.setValue({ ...value, trainingGoal })}
               />
-              <SwitchRow
-                label="Auto-apply AI changes"
-                value={value.autoApplyPrescriptions ?? false}
-                onValueChange={(autoApplyPrescriptions) =>
-                  draft.setValue({ ...value, autoApplyPrescriptions })
-                }
-              />
+              {/* No auto-apply switch: an AI-planned program applies every plan itself (#4088). */}
+              {program?.isActive && program.phaseMode === 'ai_dynamic' && (
+                <ProgramPhaseRow program={program} />
+              )}
             </Card>
           ) : (
             <>

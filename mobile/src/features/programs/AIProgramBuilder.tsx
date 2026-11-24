@@ -505,15 +505,6 @@ export function AIProgramBuilder({ onBack, onSaved }: { onBack: () => void; onSa
               onValueChange={(includeBaseline) => draft.setValue({ ...value, includeBaseline })}
             />
           )}
-          {inputs.progressionMode === 'ai' && (
-            <SwitchRow
-              label="Auto-apply AI changes"
-              value={value.review.autoApplyPrescriptions ?? false}
-              onValueChange={(autoApplyPrescriptions) =>
-                draft.setValue({ ...value, review: { ...value.review!, autoApplyPrescriptions } })
-              }
-            />
-          )}
           {inputs.progressionMode === 'phase' && value.generated?.phases.length ? (
             <Card>
               <AppText variant="eyebrow" tone="muted">

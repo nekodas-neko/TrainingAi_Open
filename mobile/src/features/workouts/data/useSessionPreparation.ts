@@ -5,6 +5,7 @@ import {
   prescribedDeloadDefault,
 } from '@trainingai/shared/ai-periodization/prescription-expiry';
 import { readSessionResponse, type SessionPreview } from '../catalog';
+import { DELOAD_FAILED, deloadChoice } from './deload-choice';
 import { prepareSession, type SessionStartOptions } from '../logging/session-options';
 import { useWorkoutResource, useWorkoutResources } from './WorkoutDataProvider';
 import { periodizationSpec, sessionPreparationSchema } from './models';
@@ -22,18 +23,23 @@ export function useSessionPreparation(
   const chosen = useRef(false);
   const [duration, setDuration] = useState<DurationPreset | undefined>();
   const [reverted, setReverted] = useState<string[]>([]);
+  const [deloadFailure, setDeloadFailure] = useState<string | null>(null);
   const action = useWorkoutAction();
   const state = useWorkoutResource(
     periodizationSpec(session?.id ?? 'missing'),
     !!session && ai,
   );
-  const spec = {
+  // Two reads, never one keyed by the choice: the full plan is always there to fall back to, and the
+  // deload's own rows are drawn only once they have arrived (#4104).
+  const fullSpec = {
     path: '/api/workout-data',
-    query: { tab: session?.id ?? 'missing', ...(deload ? { aiDeload: '1' } : {}) },
+    query: { tab: session?.id ?? 'missing' },
     schema: sessionPreparationSchema,
     ttl: 60_000,
   };
-  const current = useWorkoutResource(spec, !!session);
+  const deloadSpec = { ...fullSpec, query: { ...fullSpec.query, aiDeload: '1' } };
+  const current = useWorkoutResource(fullSpec, !!session);
+  const deloadCurrent = useWorkoutResource(deloadSpec, !!session && deload);
   // #3716: an aged-out prescription is not the plan. It is never the card, the Deload default or
   // something to Accept; opening the session (the workout-data read above) regenerates it. Read
   // from the expiry too, because production does not send `prescriptionAgedOut` and a saved
@@ -45,6 +51,7 @@ export function useSessionPreparation(
     setDeload(false);
     setDuration(undefined);
     setReverted([]);
+    setDeloadFailure(null);
   }, [session?.id, initialFullOverride]);
   useEffect(() => {
     const raw = state.data?.state;
@@ -59,35 +66,59 @@ export function useSessionPreparation(
       setDeload(adopted);
     }
   }, [state.data]);
-  let prepared = session;
   let parseError: string | null = null;
-  if (session && programId && current.data && resources) {
+  const read = (data: typeof current.data) => {
+    if (!session || !programId || !data || !resources) {
+      return undefined;
+    }
     try {
-      prepared = {
-        ...readSessionResponse(current.data, resources.connection, programId, session.id),
+      return {
+        ...readSessionResponse(data, resources.connection, programId, session.id),
         durationMinutes: session.durationMinutes,
       };
     } catch (failure) {
-      parseError = failureNotice(
+      parseError ??= failureNotice(
         'This session changed while loading. Refresh it before starting.',
         failure,
         { apiPath: '/api/workout-data' },
       );
+      return undefined;
     }
-  }
+  };
+  const fullRead = read(current.data);
+  const deloadRead = deload ? read(deloadCurrent.data) : undefined;
   const prescribed = prescribedState?.prescription;
+  // A prescribed deload already arrives deloaded on the full read; a deload the lifter picks needs
+  // its own read. Either way it is the lifter's deload only once its rows are deloaded.
+  const deloadSource = deloadRead ?? (prescribed?.deload ? fullRead : undefined);
+  const choice = deloadChoice({
+    requested: deload,
+    prescribedDeload: !!prescribed?.deload,
+    deloadRows: deloadRead?.exercises,
+    fullRows: fullRead?.exercises,
+    read: deloadCurrent,
+  });
+  const deloadReady = choice.ready;
+  const deloadStatus = choice.status;
+  // A deload that could not be loaded puts the screen back on the full plan, and says so.
+  useEffect(() => {
+    if (deloadStatus === 'failed') {
+      setDeload(false);
+      setDeloadFailure(DELOAD_FAILED);
+    }
+  }, [deloadStatus]);
+  let prepared = deloadReady ? deloadSource : (fullRead ?? session);
   const options: SessionStartOptions = {
-    aiDeload: deload,
+    aiDeload: deloadReady,
     fullOverride:
-      !deload &&
+      !deloadReady &&
       (initialFullOverride ||
         (chosen.current &&
           !!(prescribed?.deload || prepared?.exercises.some((exercise) => exercise.deloaded)))),
     revertedExerciseIds: reverted,
     durationPreset: duration,
   };
-  // #3330: the list as the server sent it, before Full puts weights back, so the toggle can say
-  // what the other side changes before the lifter flips it.
+  // #3330: the list as the server sent it, before Full puts weights back.
   const asSent = prepared?.exercises ?? [];
   if (prepared) {
     prepared = prepareSession(prepared, options);
@@ -107,7 +138,8 @@ export function useSessionPreparation(
       ['/api/workout-data', '/api/ai-periodization', '/api/next-session'],
     );
     await Promise.all([
-      resources.load(spec, true),
+      resources.load(fullSpec, true),
+      deload ? resources.load(deloadSpec, true) : Promise.resolve(),
       resources.load(periodizationSpec(session.id), true),
     ]);
   }
@@ -121,12 +153,21 @@ export function useSessionPreparation(
     options,
     parseError,
     duration,
-    deload,
+    /** The deload is what is drawn: it was chosen and its rows have loaded. */
+    deload: deloadReady,
+    /** A deload the lifter asked for that has not loaded yet: show the link busy. */
+    deloadLoading: deloadStatus === 'loading',
+    /** Why a deload the lifter asked for is not on screen; null otherwise. */
+    deloadFailure,
     reverted,
     action,
     budget: session?.budgetMinutes ?? 60,
     chooseDeload: (value: boolean) => {
       chosen.current = true;
+      setDeloadFailure(null);
+      if (value && (deloadCurrent.error || (!deloadCurrent.data && !deloadCurrent.loading))) {
+        deloadCurrent.refresh();
+      }
       setDeload(value);
     },
     setDuration: async (value: DurationPreset) => {
@@ -145,6 +186,9 @@ export function useSessionPreparation(
       ),
     refresh: () => {
       current.refresh();
+      if (deload) {
+        deloadCurrent.refresh();
+      }
       state.refresh();
     },
   };
