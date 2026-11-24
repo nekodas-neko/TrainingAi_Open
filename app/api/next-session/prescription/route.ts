@@ -11,9 +11,9 @@ import { prescribedBar } from "@trainingai/shared/workout/load-rounding";
 import { loadLiftPreferences } from "@trainingai/shared/ai-periodization/lift-preference-read";
 import { rateLimit } from "@/lib/rate-limit";
 import { readSessionFromStoredState } from "@trainingai/shared/workout/read-session";
-import type { ExerciseType, ProgramPhase } from "@trainingai/shared/types/program";
+import { NO_PHASE_STATE } from "@/lib/data/repository";
+import type { ExerciseType } from "@trainingai/shared/types/program";
 
-const NO_PHASE_STATE = { phases: [] as ProgramPhase[], sessionCounts: new Map<string, number>() };
 
 export interface NextSessionSetPreview {
   weightKg: number | null;
@@ -114,8 +114,9 @@ export async function GET() {
   // #4019: the card takes every lift's sets, reps and bar from the same function the session screen's
   // batch read runs (`readSessionFromStoredState` -> `buildWorkoutExercises`), not from a copy of it. It
   // differs from the screen's own single-session read in two ways, both because it previews a FUTURE
-  // session: no re-evaluation against today's soreness and check-in (that step is a write and today's
-  // signals are not that session's), and no `?aiDeload` toggle (the person has not opened it).
+  // session: no re-check against today's soreness, injuries and check-in (today's signals are not that
+  // session's), and no `?aiDeload` toggle (the person has not opened it).
+  // The re-check as a read was built and reviewed at a54dca72 and taken out on purpose (#4019 item 2).
   const read = readSessionFromStoredState({
     program, programSession, todayStr, allPhases: phaseState.phases,
     thisSessionCount: phaseState.sessionCounts.get(programSession.id) ?? 0,

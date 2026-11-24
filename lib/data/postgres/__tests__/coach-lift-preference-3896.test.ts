@@ -218,6 +218,50 @@ describe.skipIf(!canRun)('Coach lift_preference domain (#3896 step 5)', () => {
       await doApply([resolvedMore])
       expect(await storedPlan(ids.upper)).toEqual(plan)
     })
+
+    // #4110 item 1: "Train full instead" takes the lift's new rep range and rest at once, so the card says so,
+    // only where Full is offered for this lift.
+    describe('a deload that offers Full (#4110)', () => {
+      const FULL_CLAUSE = 'If you train full today, it uses the new'
+      const deloadPlan = (withRecord: boolean, phase: 'deload' | 'accumulation' = 'deload') => {
+        const plan = upperPlan()
+        plan.exercises[1] = { ...plan.exercises[1], sets: 2, pct: 55, deloaded: true, ...(withRecord ? { preDeload: { sets: 3, reps: 8, pct: 70, restSec: 120 } } : {}) } as never
+        return { ...plan, deload: true, phase }
+      }
+      const setPlan = (plan: object, rowPhase = 'deload') => pool.query(
+        `UPDATE session_periodization SET prescription = $3, phase = $4 WHERE user_id = $1 AND program_session_id = $2`, [A, ids.upper, JSON.stringify(plan), rowPhase])
+      const textOf = async (changes: Change[]) => (await doPreview(changes)).consequences[0].text
+
+      it('a rep-range change says Full uses the new range', async () => {
+        await setPlan(deloadPlan(true))
+        expect(await textOf([more])).toMatch(/This applies from the session after it\. If you train full today, it uses the new range\.$/)
+      })
+      it('a rest change says Full uses the new rest', async () => {
+        await setPlan(deloadPlan(true))
+        expect(await textOf([{ id: 'r', field: 'restSec', from: null, to: 200 }])).toMatch(/If you train full today, it uses the new rest\.$/)
+      })
+      it('a rep-range and a rest change together say Full uses the new range and rest', async () => {
+        await setPlan(deloadPlan(true))
+        const text = await textOf([more, { id: 'r', field: 'restSec', from: null, to: 200 }])
+        expect(text).toMatch(/This applies from the session after it\. If you train full today, it uses the new range and rest\.$/)
+        // The other two cases keep their one-word clause (the two tests above), not this one.
+        expect(text).not.toMatch(/the new (range|rest)\.$/)
+      })
+      it('a deload with no record of the full numbers offers no Full: no clause', async () => {
+        await setPlan(deloadPlan(false))
+        expect(await textOf([more])).not.toContain(FULL_CLAUSE)
+      })
+      it('a baseline test offers no Full: no clause', async () => {
+        await setPlan(deloadPlan(true, 'accumulation'), 'baseline')
+        const text = await textOf([more])
+        expect(text).toMatch(/a baseline test/)
+        expect(text).not.toContain(FULL_CLAUSE)
+      })
+      it('a plate-step change does not reach Full: no clause', async () => {
+        await setPlan(deloadPlan(true))
+        expect(await textOf([{ id: 'h', field: 'nextLoadStep', from: null, to: 'heavier' }])).not.toContain(FULL_CLAUSE)
+      })
+    })
   })
 
   describe('undo restores exactly the previous state', () => {

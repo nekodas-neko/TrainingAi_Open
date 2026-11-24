@@ -1,21 +1,14 @@
 import { capitalize } from '@trainingai/shared/format/capitalize';
-import { sessionSoreness } from "@trainingai/shared/ai-periodization/session-soreness";
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { getRepository } from "@/lib/data";
-import type { ProgramPhase } from "@trainingai/shared/types/program";
-import { todayInTz, shiftDateStr, startOfWeekInTz, DEFAULT_TZ } from "@trainingai/shared/date-utils";
-import { buildAutomaticPhaseStatus } from "@trainingai/shared/phase-engine";
-import { getScheduledSessionsPerWeek } from "@trainingai/shared/schedule-utils";
+import { NO_PHASE_STATE } from "@/lib/data/repository";
+import { todayInTz, startOfWeekInTz, DEFAULT_TZ } from "@trainingai/shared/date-utils";
 import { prescriptionDrivesLoad } from "@trainingai/shared/ai-periodization/apply-prescription";
-import { reevaluatePrescriptionForToday, reevaluationKey, type ReevaluationSignals } from "@trainingai/shared/ai-periodization/reevaluate";
-import { rowNumbersMoved } from "@trainingai/shared/ai-periodization/prescription-figures";
-import { resolveSelfReportedSick, loadFigureSignals } from "@trainingai/shared/ai-periodization/signals";
+import { reevaluateStoredPlanForToday } from "@trainingai/shared/ai-periodization/reevaluate-for-today";
 import { normalizeStoredPrescription } from "@trainingai/shared/ai-periodization/reconcile-prescription";
-import { latestIllnessFromDerived } from "@trainingai/shared/health/illness-radar";
 import { isAiPrescriptionPending } from "@trainingai/shared/ai-periodization/prescription-pending";
 import { readProgramDeloadCheck } from "@trainingai/shared/ai-periodization/program-phase";
-import { moodMuscleMatches } from "@trainingai/shared/muscles";
 import type { AiPrescription, PeriodizationPhase } from "@trainingai/shared/types/ai-periodization";
 import {
   buildWorkoutExercises,
@@ -34,15 +27,11 @@ import { slotHoldsPlan } from "@trainingai/shared/ai-periodization/plan-status";
 import { regeneratePrescriptionInBackground as regeneratePrescriptionSingleFlight } from "@trainingai/shared/ai-periodization/regenerate-in-background";
 import { loadLiftPreferences } from "@trainingai/shared/ai-periodization/lift-preference-read";
 import { readSessionFromStoredState, resolveSessionPhase } from "@trainingai/shared/workout/read-session";
-import { rehold } from "@trainingai/shared/ai-periodization/checkin-plan-hold";
-import { resolveWorkingBasis } from "@trainingai/shared/1rm";
 
 // Re-exported so existing type imports (e.g. `import('@/app/api/workout-data/route').PhaseStatus`)
 // keep resolving after the interfaces moved to lib/workout/session-data.ts.
 export type { WorkoutExercise, PhaseStatus, PerSessionPhaseStatus };
 
-// What a program that is not `automatic` has for phases and counts (none are read).
-const NO_PHASE_STATE = { phases: [] as ProgramPhase[], sessionCounts: new Map<string, number>() };
 
 export async function GET(req: NextRequest) {
   try {
@@ -123,17 +112,14 @@ async function handleWorkoutData(req: NextRequest) {
       if (phases.length > 0) {
         const tz = session?.user?.timezone ?? DEFAULT_TZ
         const today = todayInTz(tz)
-        const totalPerWeek = getScheduledSessionsPerWeek(program)
-        const numSessions = Math.max(1, program.sessions.length)
-        const sessionPerWeek = totalPerWeek / numSessions
 
-        perSessionPhaseStatus = program.sessions.map(sess => {
-          const count = sessionCounts.get(sess.id) ?? 0
-          return {
-            sessionId: sess.id,
-            sessionName: sess.name,
-            phaseStatus: buildAutomaticPhaseStatus(phases, count, program, today, sessionPerWeek),
-          }
+        // Each session's status comes from the one resolver the screen, the card and the Coach call (#4114).
+        perSessionPhaseStatus = program.sessions.flatMap(sess => {
+          const status = resolveSessionPhase({
+            program, todayStr: today, allPhases: phases,
+            thisSessionCount: sessionCounts.get(sess.id) ?? 0, periodization: null,
+          }).phaseStatus
+          return status ? [{ sessionId: sess.id, sessionName: sess.name, phaseStatus: status }] : []
         })
 
         // Leader = session furthest through the program (most completedCycles)
@@ -363,124 +349,20 @@ async function handleWorkoutData(req: NextRequest) {
     && prescriptionDrivesLoad(aiPrescription.phaseAction, aiPeriodizationState.prescriptionStatus)
 
   if (aiDrivesLoad && aiPrescription && aiPeriodizationState) {
-    // Consumption-day re-evaluation (AI-2/AI-3) — re-derive per-exercise soreness/injury
-    // deloads against TODAY's signals without re-running the LLM.
-    //
-    // Two guards were removed here and replaced by one input fingerprint:
-    //  - "only if generated on an earlier day" made a prescription generated TODAY (what
-    //    the completion-time regeneration produces) never see soreness logged later the
-    //    same day — the case where a same-day check-in matters most;
-    //  - "only once per calendar date" was stamped by the FIRST read of the day, so a
-    //    check-in logged after that (the normal order: open the app, then log how you feel)
-    //    could never take effect either.
-    // The fingerprint below keeps the cheap skip on repeat fetches while re-running the
-    // moment the inputs actually change. All three reads here are cheap, indexed
-    // single-user lookups (injuries is a handful of rows at most); they buy skipping the
-    // three heavier queries below.
-    const [todayMoodLog, yesterdayMoodLog, todayMorningCheckin, injuries] = await Promise.all([
-      repo.getMoodLog(userId, todayStr),
-      repo.getMoodLog(userId, shiftDateStr(todayStr, -1)),
-      repo.getDayCheckin(userId, todayStr, 'morning'),
-      repo.listInjuries(userId),
-    ])
-    const inputsKey = reevaluationKey(todayStr, todayMoodLog ?? yesterdayMoodLog, todayMorningCheckin, injuries)
-    if (aiPrescription.reevaluatedInputsKey !== inputsKey) {
-      const [recentSessions, muscleAssignmentsMap, derivedRows] = await Promise.all([
-        repo.getRecentSessionsOfType(userId, programSession.id, 5),
-        repo.getExerciseMuscleAssignments(exerciseNames),
-        repo.getOuraDailyDerived(userId, shiftDateStr(todayStr, -1), todayStr),
-      ])
-
-      // Ignore a session that completed AFTER this prescription was generated — the same
-      // rule the generation path applies via excludeSessionId (W5 §4.2). Such a session is
-      // already baked into the prescription, and its ~0h gap would otherwise satisfy the
-      // emergency-deload "<36h and 3+ sore muscles" condition on the very next open. This
-      // matters now that same-day prescriptions re-evaluate at all (previously the
-      // generated-day guard made the case unreachable).
-      const generatedAt = aiPeriodizationState.prescriptionGeneratedAt
-      const lastCompleted = recentSessions.find(s =>
-        s.completedAt != null && (generatedAt == null || s.completedAt <= generatedAt))
-      const hoursSinceLastSession = lastCompleted?.completedAt
-        ? (Date.now() - lastCompleted.completedAt.getTime()) / 3_600_000
-        : null
-
-      const sessionMuscleGroups = programSession.exercises.flatMap(ex => ex.muscleGroups)
-      const activeInjuredMusclesInSession = [...new Set(
-        injuries
-          .filter(i => !i.resolvedDate)
-          .map(i => i.muscleName)
-          .filter(muscle => sessionMuscleGroups.some(mg => moodMuscleMatches(mg, muscle)))
-      )]
-      const moodLogToUse = todayMoodLog ?? yesterdayMoodLog
-      // #3764: the same split the full aggregation uses — an untouched suggestion changes no load.
-      const { soreMusclesInSession, recentlyTrainedMusclesInSession } = sessionSoreness(moodLogToUse, sessionMuscleGroups)
-
-      const reevalSignals: ReevaluationSignals = {
-          soreMusclesInSession,
-          recentlyTrainedMusclesInSession,
-          hoursSinceLastSession,
-          activeInjuredMusclesInSession,
-          trainingGoal: program.trainingGoal,
-          illnessFlag: latestIllnessFromDerived(derivedRows)?.flag ?? null,
-          selfReportedSick: resolveSelfReportedSick(todayMoodLog?.bodyState, todayMorningCheckin?.illnessContext),
-          exercises: programSession.exercises.map(ex => ({
-            sessionExerciseId: ex.id,
-            name: ex.exerciseName,
-            // Same library→muscleGroups fallback as generation time (signals.ts): without it a
-            // custom/non-library exercise re-evaluates with zero assignments, so its per-exercise
-            // deload silently reverts to full load while the muscle is still sore (E2-2).
-            muscleAssignments: muscleAssignmentsMap[ex.exerciseName]?.length
-              ? muscleAssignmentsMap[ex.exerciseName]
-              : ex.muscleGroups.map(mg => ({ muscle: mg, role: 'main' as const })),
-          })),
-      }
-      const reevalState = {
-        phase: aiPeriodizationState.phase,
-        prescription: aiPeriodizationState.prescription,
-        prescriptionStatus: aiPeriodizationState.prescriptionStatus,
-        prescriptionExpiresAt: aiPeriodizationState.prescriptionExpiresAt,
-        sessionsInPhase: aiPeriodizationState.sessionsInPhase,
-        programDeload,
-        underWay,
-      }
-      let reevalResult = reevaluatePrescriptionForToday(aiPrescription, reevalSignals, reevalState)
-
-      // Issue 2592: a deload or revert moved rows, so the stored minutes and volume pills describe
-      // the old rows. Re-cost them through `prescriptionFigures` — the inputs it needs are loaded
-      // only now, when a row actually moved, and a failed load keeps the stored figures (the rows
-      // are still right; only the header would lag).
-      if (!reevalResult.needsRegenerate && reevalResult.changed
-        && rowNumbersMoved(aiPrescription.exercises, reevalResult.prescription.exercises)) {
-        try {
-          const figureSignals = await loadFigureSignals(repo, userId, programSession)
-          reevalResult = reevaluatePrescriptionForToday(aiPrescription, reevalSignals, reevalState, new Date(), figureSignals)
-        } catch (err) {
-          reportServerError(err, { userId, url: '/api/workout-data#recost' })
-        }
-      }
-
-      if (reevalResult.needsRegenerate) {
-        regeneratePrescriptionInBackground(userId, programSession.id, repo, tz)
-      } else {
-        // #3890: the re-evaluation runs after the serve step held the plan, and its revert puts a
-        // deloaded row's pre-deload (unheld) load back. Hold the result again, from the preferences
-        // already read, so neither this response nor the cached plan carries a held lift above its bar.
-        const reheld = rehold(reevalResult.prescription, aiPeriodizationState.phase, startOfWeekInTz(tz), liftPreferences, name => {
-          const lib = libByName.get(name.toLowerCase())
-          return {
-            basisKg: resolveWorkingBasis({
-              lastNonDeload1rm: lastRealOneRm.get(name)?.estimated1rm,
-              seedEstimate: estimateMap.get(name),
-              allTimePr1rm: prMap.get(name),
-            }),
-            equipment: lib?.equipment ?? [],
-            bodyweight: lib?.exerciseType === 'bodyweight',
-          }
-        })
-        const stamped: AiPrescription = { ...reheld, reevaluatedInputsKey: inputsKey }
-        aiPrescription = stamped
-        repo.updatePrescriptionExercisesCache(userId, programSession.id, stamped).catch(() => {})
-      }
+    // Consumption-day re-evaluation (AI-2/AI-3): `reevaluateStoredPlanForToday` returns what to do and stores
+    // nothing. This read then stores what it returns and fires the regeneration a stale plan needs. The Next
+    // workout card deliberately does not run it: it previews a future session (#4019 item 2).
+    const reeval = await reevaluateStoredPlanForToday({
+      repo, userId, tz, todayStr, program, programSession,
+      state: aiPeriodizationState, prescription: aiPrescription, programDeload, underWay,
+      liftPreferences, libByName, lastRealOneRm, estimateMap, prMap,
+      onError: err => reportServerError(err, { userId, url: '/api/workout-data#recost' }),
+    })
+    if (reeval.kind === 'regenerate') {
+      regeneratePrescriptionInBackground(userId, programSession.id, repo, tz)
+    } else if (reeval.kind === 'reevaluated') {
+      aiPrescription = reeval.prescription
+      repo.updatePrescriptionExercisesCache(userId, programSession.id, reeval.prescription).catch(() => {})
     }
   }
 
