@@ -12,7 +12,7 @@ const BLANK = '​'
 
 function sourceFiles(dir: string, out: string[] = []): string[] {
   for (const name of readdirSync(dir)) {
-    if (name === 'node_modules') continue
+    if (name === 'node_modules' || name === '__check_fixture__') continue
     const p = join(dir, name)
     if (statSync(p).isDirectory()) sourceFiles(p, out)
     else if (/\.(ts|tsx)$/.test(name)) out.push(p)
