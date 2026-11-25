@@ -166,23 +166,10 @@ export function HistoryDay({
       {sessionIds.map((id) => (
         <Card key={id}>
           <Stack direction="row" justify="space-between">
-            <AppText variant="heading">
+            <AppText variant="heading" style={{ flexShrink: 1 }}>
               {entries.find((entry) => entry.workoutSessionId === id)?.sessionName}
             </AppText>
-            {readOnly?null:compact ? (
-              <IconButton
-                icon="delete"
-                label="Delete workout"
-                disabled={!queue.ready || awaitingUpload(id)}
-                onPress={() =>
-                  setRemove({
-                    workoutSessionId: id,
-                    name:
-                      entries.find((e) => e.workoutSessionId === id)?.sessionName ?? 'workout',
-                  })
-                }
-              />
-            ) : (
+            {readOnly ? null : (
               <AppButton
                 title="Delete workout"
                 variant="danger"
