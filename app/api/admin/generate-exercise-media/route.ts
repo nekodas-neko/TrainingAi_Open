@@ -11,6 +11,7 @@ import { uploadExerciseMedia, mediaKey, isStorageConfigured, downloadMedia, REFE
 import { eq, and } from 'drizzle-orm';
 import { StatusCodes } from 'http-status-codes';
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+import { safeErrorText } from '@/lib/observability/scrub-params'
 
 // Optional tuning flags; the body is normally absent.
 const MAX_BODY_BYTES = 8 * 1024
@@ -99,7 +100,7 @@ export async function POST(req: Request) {
     ));
   } catch (err) {
     return NextResponse.json(
-      { error: `Image generation failed: ${String(err)}` },
+      { error: `Image generation failed: ${safeErrorText(err)}` },
       { status: StatusCodes.INTERNAL_SERVER_ERROR },
     );
   }

@@ -103,3 +103,24 @@ export function scrubPgDetail(detail: string): string {
 export function scrubPgMessage(message: string): string {
   return message.replace(/: "[^\n]*"(?=\n|$)/g, `: "${SCRUBBED_VALUE}"`)
 }
+
+// ── One entry point for any free text an error leaves behind ──────────────────────────────────
+
+/**
+ * Everything a stored or returned error message needs: Drizzle's `params:` tail and the value
+ * Postgres quotes in its own message. Use this, not the two parts, wherever an error's text is
+ * written to a table or answered to a client (#3673).
+ */
+export function scrubErrorText(text: string): string {
+  return scrubPgMessage(scrubBoundParams(text))
+}
+
+/** The same for a stack: the frames stay, the values go. */
+export function scrubErrorStack(stack: string): string {
+  return scrubPgMessage(scrubBoundParamsInStack(stack))
+}
+
+/** `err` as text that is safe to store or return: never the raw message of a Drizzle or pg error. */
+export function safeErrorText(err: unknown): string {
+  return scrubErrorText(err instanceof Error ? err.message : String(err))
+}

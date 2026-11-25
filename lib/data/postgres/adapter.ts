@@ -2,7 +2,7 @@ import * as healthConnect from './slices/health-connect'
 import { stampNightHrvMethod } from './slices/night-hrv-method'
 import { chooseNightHrv, nightHrvMethodFromProvenance, type NightHrvMethod } from '@trainingai/shared/health/night-hrv-method'
 import { trackPendingWrite } from '@/lib/observability/pending-writes'
-import { scrubBoundParams } from '@/lib/observability/scrub-params'
+import { scrubErrorText, scrubErrorStack } from '@/lib/observability/scrub-params'
 import * as appleHealth from './slices/apple-health'
 import * as authData from './slices/auth'
 import * as mealLogging from './slices/meal-logging-statuses'
@@ -7096,7 +7096,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         errors.push({
           // #3673: `String(err)` of a Drizzle error ends with the mutation's bound values. This string
           // goes back to the device and, for a retryable one, into `error_events` via the route.
-          id: mut.id, domain: mut.domain, date: mut.date, error: scrubBoundParams(String(err)),
+          id: mut.id, domain: mut.domain, date: mut.date, error: scrubErrorText(String(err)),
           ...(isRetryableWriteError(err) ? { retryable: true } : {}),
         })
       }
@@ -7192,11 +7192,15 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   }
 
   async insertErrorEvent(event: { userId: string | null; source: 'client' | 'server'; message: string; stack?: string | null; url?: string | null; userAgent?: string | null }): Promise<void> {
+    // #3673: the one sink every repository caller shares. A server-side message can quote a Drizzle
+    // or pg error, so no row value reaches the table whichever caller built the text. (A client row
+    // is the device's own report and is stored as sent.)
+    const server = event.source === 'server'
     await this.db.insert(s.errorEvents).values({
       userId: event.userId,
       source: event.source,
-      message: event.message,
-      stack: event.stack ?? null,
+      message: server ? scrubErrorText(event.message) : event.message,
+      stack: event.stack == null ? null : server ? scrubErrorStack(event.stack) : event.stack,
       url: event.url ?? null,
       userAgent: event.userAgent ?? null,
     })

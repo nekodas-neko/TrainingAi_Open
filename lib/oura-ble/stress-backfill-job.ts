@@ -2,6 +2,7 @@ import type { WorkoutRepository } from '@/lib/data/repository'
 import type { RedecodeJob } from '@/lib/data/postgres/slices/oura'
 import { runStressBackfillOffLoop, type RedecodePhases } from '@/lib/oura-ble/rollup-worker'
 import { redecodeJobKind } from '@/lib/oura-ble/redecode-job-kind'
+import { safeErrorText } from '@/lib/observability/scrub-params'
 
 /**
  * Starting the daytime-stress bucket backfill (issue 2236) in the one-at-a-time job slot, and
@@ -36,8 +37,8 @@ export async function startStressBackfillJob(
       return phases
     })
     .catch(async err => {
-      console.error('[oura-ble] stress backfill job threw:', err instanceof Error ? err.message : String(err))
-      await repo.finishRedecodeJob(job.id, null, err instanceof Error ? err.message : String(err)).catch(() => {})
+      console.error('[oura-ble] stress backfill job threw:', safeErrorText(err))
+      await repo.finishRedecodeJob(job.id, null, safeErrorText(err)).catch(() => {})
       return null
     })
   return { state: 'started', job, done }

@@ -6,6 +6,7 @@ import { rateLimit } from '@/lib/rate-limit'
 import { DEFAULT_TZ, todayInTz, normalizeDateParamIso, shiftDateStr, daysBetweenDateStrs } from '@trainingai/shared/date-utils'
 import { buildDayAudit } from '@trainingai/shared/health/score-audit/build-day-audit'
 import { readinessPatchFromAudit } from '@/lib/health/night-readiness'
+import { safeErrorText } from '@/lib/observability/scrub-params'
 
 /**
  * Backfill the persisted Sleep and Readiness scores across history (audit finding F-2).
@@ -135,7 +136,7 @@ export async function POST(req: NextRequest) {
         date: d,
         sleep: { stored: null, recomputed: null, action: 'no-score' },
         readiness: { stored: null, recomputed: null, action: 'no-score' },
-        error: err instanceof Error ? err.message : String(err),
+        error: safeErrorText(err),
       })
     }
   }

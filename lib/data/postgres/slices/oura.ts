@@ -5,6 +5,7 @@ import { AsyncLocalStorage } from 'node:async_hooks'
 import type { getDb } from '../client'
 import { getPool } from '../client'
 import * as s from '../schema'
+import { scrubErrorText, scrubErrorStack } from '@/lib/observability/scrub-params'
 import { overnightHrvFromSeries, overnightRecoveryIndexHoursFromSeries, sleepShapeFromHypnogram, type OuraSleepShape } from '@trainingai/shared/health/oura-sleep-detail'
 import type { OuraCloudHeartrateWrite, OuraDailyRow, OuraSleepUpsertRow, OuraDailySummaryRow, OuraDailyDerivedRow, OuraDailyDerivedPatch, WorkoutHrStatsInput, WorkoutHrStatsRow, SetHrStatsRow, DaytimeHrvModelRow } from '../../repository'
 import type { SetHrRow, RichSetMarker } from '@trainingai/shared/workout/set-hr-stats'
@@ -79,10 +80,10 @@ type Db = ReturnType<typeof getDb>
  */
 export function recordPruneFailure(db: Db, table: string, err: unknown): void {
   console.error(`[prune] ${table} failed:`, err)
-  const message = `[prune] ${table} retention DELETE failed: ${err instanceof Error ? err.message : String(err)}`
+  const message = `[prune] ${table} retention DELETE failed: ${scrubErrorText(err instanceof Error ? err.message : String(err))}`
   trackPendingWrite(db.insert(s.errorEvents).values({
     userId: null, source: 'server', message: message.slice(0, 2000),
-    stack: err instanceof Error ? (err.stack ?? null)?.slice(0, 8000) ?? null : null,
+    stack: err instanceof Error && err.stack ? scrubErrorStack(err.stack).slice(0, 8000) : null,
     url: `prune:${table}`, userAgent: null,
   }).catch(e => console.error('[prune] could not record the failure either:', e)))
 }

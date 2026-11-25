@@ -7,6 +7,7 @@ import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 import { clientIp } from '@trainingai/shared/http/client-ip'
 import { isUuid } from '@trainingai/shared/validation/uuid'
 import { z } from 'zod'
+import { safeErrorText } from '@/lib/observability/scrub-params'
 
 // One SQL statement. The audit log truncates it at 20,000 characters, so 64 KB is generous past
 // anything that is meaningfully recorded.
@@ -227,7 +228,7 @@ export async function POST(req: NextRequest) {
       fields: result.fields?.map(f => f.name) ?? [],
     })
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err)
+    const message = safeErrorText(err)
     await record({ sql, rowCount: null, durationMs: Date.now() - started, truncated: false, ok: false, error: message, ip, scopedUserId })
     // The DB error text is the useful part (permission denied, syntax, timeout) and this route is
     // admin-only, so it is surfaced rather than swallowed.
@@ -264,7 +265,7 @@ export async function GET(req: NextRequest) {
     reportServerError(err, { url: '/api/admin/db-query' })
     console.error('[admin/db-query] schema read failed:', err)
     return NextResponse.json({
-      error: err instanceof Error ? err.message : String(err),
+      error: safeErrorText(err),
       // Which connection was actually attempted — no password, just the identity — so a bad
       // CLAUDE_DB_READONLY_URL is diagnosable without another deploy.
       connection: describeReadonlyConnection(),

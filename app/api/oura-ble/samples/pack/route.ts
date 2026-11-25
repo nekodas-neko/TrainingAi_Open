@@ -4,6 +4,7 @@ import { requireAdmin, adminErrorResponse } from '@/lib/admin'
 import { getRepositoryAsync } from '@/lib/data'
 import { rateLimit } from '@/lib/rate-limit'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+import { safeErrorText } from '@/lib/observability/scrub-params'
 
 // A single tuning number (or a short note). The body is optional on all of these.
 const MAX_BODY_BYTES = 4 * 1024
@@ -73,7 +74,7 @@ export async function POST(req: Request) {
     // to press again, and "nothing to do" and "it broke" are different answers.
     console.error('[oura-ble] pack failed:', err)
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'pack failed' },
+      { error: err instanceof Error ? safeErrorText(err) : 'pack failed' },
       { status: 500 },
     )
   }

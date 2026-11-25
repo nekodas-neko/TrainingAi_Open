@@ -219,3 +219,60 @@ describe('response bounds', () => {
     expect(r).toEqual({ ok: false, reason: 'dns_failed' })
   })
 })
+
+// #3673 item 3, the hostile spellings the first fix did not pin down. None of these needs a network:
+// the URL parser turns the numeric forms into a dotted quad before the guard sees them, and a name
+// goes to the injected resolver.
+describe('hostile spellings of a private destination (#3673)', () => {
+  const never = async () => { throw new Error('the fetch must not be reached') }
+
+  it('refuses a zone id and upper case on a literal the parser lets through', () => {
+    for (const addr of ['::ffff:7f00:1%eth0', '::FFFF:A9FE:A9FE%25eth0', 'FE80::1%en0']) {
+      expect(isPublicAddress(addr), addr).toBe(false)
+    }
+  })
+
+  it('refuses decimal, octal, hex and short IPv4 forms, with and without a trailing dot', async () => {
+    for (const url of ['https://2130706433/', 'https://0x7f.1/', 'https://017700000001/', 'https://127.1/', 'https://0/',
+                       'https://127.0.0.1./', 'https://0xa9fea9fe/', 'https://[::ffff:127.0.0.1]:443/']) {
+      const r = await fetchPublicUrl(url, { resolve: publicDns, fetchImpl: never })
+      expect(r, url).toEqual({ ok: false, reason: 'private_address' })
+    }
+  })
+
+  it('refuses a name that resolves to an IPv6 spelling of a private IPv4, in either form', async () => {
+    for (const address of ['::ffff:7f00:1', '::ffff:127.0.0.1', '::ffff:a9fe:a9fe', '64:ff9b::7f00:1', '::1']) {
+      const r = await fetchPublicUrl('https://evil.example/', { resolve: async () => [address], fetchImpl: never })
+      expect(r, address).toEqual({ ok: false, reason: 'private_address' })
+    }
+  })
+
+  it('refuses a redirect to a mapped literal, whichever way it is spelled', async () => {
+    for (const location of ['https://[::ffff:169.254.169.254]/', 'https://[::ffff:a9fe:a9fe]/', 'https://2130706433/']) {
+      let hops = 0
+      const r = await fetchPublicUrl('https://ok.example/', {
+        resolve: publicDns,
+        fetchImpl: async () => { hops++; return new Response(null, { status: 302, headers: { location } }) },
+      })
+      expect(r, location).toEqual({ ok: false, reason: 'private_address' })
+      expect(hops, location).toBe(1)
+    }
+  })
+
+  it('resolves a trailing-dot name and an IDN host by their ASCII form, and refuses them if they resolve privately', async () => {
+    const seen: string[] = []
+    for (const url of ['https://localhost./', 'https://münchen.example/']) {
+      const r = await fetchPublicUrl(url, { resolve: async (h) => { seen.push(h); return ['127.0.0.1'] }, fetchImpl: never })
+      expect(r, url).toEqual({ ok: false, reason: 'private_address' })
+    }
+    expect(seen).toEqual(['localhost.', 'xn--mnchen-3ya.example'])
+  })
+
+  it('refuses userinfo and any port but 443 before it resolves anything', async () => {
+    let resolved = false
+    const resolve = async () => { resolved = true; return ['93.184.216.34'] }
+    expect(await fetchPublicUrl('https://user:pw@example.com/', { resolve, fetchImpl: never })).toEqual({ ok: false, reason: 'has_credentials' })
+    expect(await fetchPublicUrl('https://example.com:8443/', { resolve, fetchImpl: never })).toEqual({ ok: false, reason: 'bad_port' })
+    expect(resolved).toBe(false)
+  })
+})
