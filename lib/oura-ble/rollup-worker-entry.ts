@@ -15,7 +15,7 @@ import { parentPort, workerData } from 'node:worker_threads'
 import { PostgresWorkoutRepository } from '@/lib/data/postgres/adapter'
 import type { OuraRawAggregateResult } from '@/lib/data/repository'
 import type { StressBackfillReport } from '@/lib/oura-ble/stress-backfill'
-import { safeErrorChainText } from '@/lib/observability/scrub-params'
+import { safeErrorChainText, scrubErrorStack } from '@/lib/observability/scrub-params'
 import { ensureServerOuraConstants } from '@/lib/oura-models/constants-inject'
 import { setUserReadMemosEnabled } from '@/lib/data/postgres/user-read-memo'
 
@@ -132,7 +132,7 @@ async function handle(job: WorkerJob): Promise<WorkerReply> {
     const result = await repo.aggregateOuraRawSamples(job.userId, job.timezone, job.opts)
     return { id: job.id, ok: true, result }
   } catch (err) {
-    return { id: job.id, ok: false, message: msg(err), stack: err instanceof Error ? err.stack : undefined }
+    return { id: job.id, ok: false, message: msg(err), stack: err instanceof Error && err.stack ? scrubErrorStack(err.stack, err) : undefined }
   }
 }
 
