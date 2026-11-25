@@ -234,6 +234,7 @@ function AppShell() {
             key={accountKey}
             onBack={back}
             openActivity={openActivity}
+            openPlanChoice={() => open({ screen: 'cardio-plan' })}
             startInSetup={'setup' in entry && entry.setup === true}
           />
         );

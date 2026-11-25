@@ -7,14 +7,17 @@ export function StableContent({
   loading = false,
   minHeight = 0,
   frameHeight,
+  releaseWhenLoaded = false,
   children,
 }: PropsWithChildren<{
   loading?: boolean;
   minHeight?: number;
   frameHeight?: number;
+  /** Hold `minHeight` only while loading, so a short loaded screen leaves no empty room under it. */
+  releaseWhenLoaded?: boolean;
 }>) {
   const { theme } = useTheme();
-  const [height, setHeight] = useState(minHeight);
+  const [height, setHeight] = useState(releaseWhenLoaded ? 0 : minHeight);
   const content = (
     <View
       accessibilityElementsHidden={loading}
@@ -35,7 +38,12 @@ export function StableContent({
   return (
     <View
       style={{
-        minHeight: frameHeight === undefined ? Math.max(height, minHeight) : undefined,
+        minHeight:
+          frameHeight !== undefined
+            ? undefined
+            : releaseWhenLoaded && !loading
+              ? 0
+              : Math.max(height, minHeight),
         height: frameHeight,
         overflow: loading || frameHeight !== undefined ? 'hidden' : 'visible',
       }}

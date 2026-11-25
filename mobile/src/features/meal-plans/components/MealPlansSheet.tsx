@@ -800,6 +800,7 @@ export function MealPlansSheet({
             {variant.meals.map((m) => (
               <Card key={m.id}>
                 <ListRow
+                  divider={false}
                   title={m.name}
                   subtitle={`${m.suggestedTime ?? ''} · ${formatCount(m.targetCalories)} kcal`}
                   onPress={() => {

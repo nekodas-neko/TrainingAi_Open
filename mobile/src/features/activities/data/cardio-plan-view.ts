@@ -1,5 +1,6 @@
 import type { z } from 'zod';
 import { shiftDateStr } from '@trainingai/shared/date-utils';
+import { STEPS_DAYS_TO_MEET_WEEK } from '@trainingai/shared/running/walking-plan';
 import { cardioPlanKind } from '@trainingai/shared/running/cardio-goals';
 import type { ActiveMinuteBasis } from '@trainingai/shared/running/walking-minutes';
 import type { Tone } from '../../../shared/theme/theme';
@@ -67,6 +68,10 @@ export interface WalkingWeekModel {
   steps: Bar;
   minutes: Bar;
   days: WalkDayCircle[];
+  /** What the day circles mean, one line under them. */
+  daysCaption: string;
+  /** Which half of the week is behind, said only when the badge says Behind. */
+  behindLine: string | null;
   /** Which rule counted the week's minutes, said only when it was not heart rate. */
   basisNote: string | null;
 }
@@ -89,13 +94,15 @@ export function dayLetter(date: string): string {
   return LETTERS[new Date(Date.UTC(y, m - 1, d)).getUTCDay()];
 }
 
-function weekDates(from: string, to: string): string[] {
+/** A walking plan has its own step target and shows today and the week; the profile-goal quota card would be a second one. */
+export function showStepsQuotaCard(walking: WalkingBlock | null | undefined): boolean {
+  return !walking;
+}
+
+/** The week's seven dates, Monday first, whether or not they have happened. */
+export function weekDates(from: string): string[] {
   const start = from.replace(/\//g, '-');
-  const out = [start];
-  while (out[out.length - 1] < to.replace(/\//g, '-') && out.length < 7) {
-    out.push(shiftDateStr(start, out.length));
-  }
-  return out;
+  return Array.from({ length: 7 }, (_, i) => shiftDateStr(start, i));
 }
 
 const BASIS_NOTE: Record<ActiveMinuteBasis, string | null> = {
@@ -111,6 +118,34 @@ const STATUS_TONE: Record<string, Tone> = { met: 'activity', on_track: 'brand', 
 export function walkingStatusChip(walking: WalkingBlock): WalkingWeekModel['status'] {
   const status = walking.week.status;
   return status ? { label: status.label, tone: STATUS_TONE[status.key] ?? 'neutral' } : null;
+}
+
+/**
+ * Under a "Behind" badge: which target is out of reach. Display only; the badge itself is the
+ * server's rule (`walkingWeekStatus`) and this repeats its two fit tests to name the half that
+ * failed. A day with no row on or before today is before the plan began, so it is not counted.
+ */
+export function walkingBehindLine(walking: WalkingBlock): string | null {
+  const { week, targets } = walking;
+  if (week.status?.key !== 'behind') return null;
+  const today = week.days.find((day) => day.isToday)?.date.replace(/\//g, '-') ?? week.to.replace(/\//g, '-');
+  const rows = new Map(week.days.map((day) => [day.date.replace(/\//g, '-'), day]));
+  const counted = weekDates(week.from).filter((date) => {
+    const row = rows.get(date);
+    return date > today ? true : !!row && !row.excluded;
+  });
+  const left = counted.filter((date) => date >= today);
+  const needed = Math.min(STEPS_DAYS_TO_MEET_WEEK, counted.length);
+  const stepDaysMet = counted.filter((date) => rows.get(date)?.stepsMet).length;
+  const chances = left.filter((date) => date > today || !rows.get(date)?.stepsMet).length;
+  const minutes = counted.reduce((sum, date) => sum + (rows.get(date)?.activeMinutes ?? 0), 0);
+  const parts: string[] = [];
+  if (stepDaysMet + chances < needed) parts.push(`${stepDaysMet} of ${needed} step days`);
+  if (targets.activeMinutesPerWeek - minutes > left.length * targets.activeMinutesPerDay) {
+    parts.push(`${commas(minutes)} of ${commas(targets.activeMinutesPerWeek)} active minutes`);
+  }
+  if (!parts.length) return null;
+  return `${parts.join(' and ')} so far; ${left.length} ${left.length === 1 ? 'day' : 'days'} left`;
 }
 
 /** What the week card shows. Every figure is the server's; this only lays them out. */
@@ -133,7 +168,7 @@ export function walkingWeekModel(walking: WalkingBlock): WalkingWeekModel {
     },
     // Seven circles, Monday to Sunday: the payload holds only the days it measured (none before the
     // plan began), so the rest of the week is drawn empty rather than left out of the row.
-    days: weekDates(week.from, week.to).map((date) => {
+    days: weekDates(week.from).map((date) => {
       const day = week.days.find((row) => row.date.replace(/\//g, '-') === date);
       return {
         date,
@@ -150,6 +185,8 @@ export function walkingWeekModel(walking: WalkingBlock): WalkingWeekModel {
                 : 'empty',
       } as WalkDayCircle;
     }),
+    daysCaption: 'A tick is a day you hit your steps or your minutes.',
+    behindLine: walkingBehindLine(walking),
     basisNote: week.activeMinutesBasis ? BASIS_NOTE[week.activeMinutesBasis] : null,
   };
 }

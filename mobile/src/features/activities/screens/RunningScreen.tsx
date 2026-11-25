@@ -34,6 +34,7 @@ import { useWorkoutAction } from '../../workouts/data/useWorkoutAction';
 import { useHealthData } from '../../health/data/HealthDataProvider';
 import { useActivities, useMeasuredRunCompletion } from '../data/ActivityProvider';
 import { cardioWeekSpec, runningPlanSpec } from '../data/models';
+import { cardioPlanMode } from '../data/cardio-plan-view';
 const label: Record<RunType, string> = {
   recovery: 'Recovery run',
   easy: 'Easy run',
@@ -84,10 +85,12 @@ const paths = ['/api/running-plan', '/api/cardio-week'];
 export function RunningScreen({
   onBack,
   openActivity,
+  openPlanChoice,
   startInSetup = false,
 }: {
   onBack: () => void;
   openActivity: () => void;
+  openPlanChoice?: () => void;
   startInSetup?: boolean;
 }) {
   const { today } = useHealthData(),
@@ -193,6 +196,14 @@ export function RunningScreen({
           />
         ) : (
           <>
+            {cardioPlanMode(data.plan) === 'walking' && (
+              <StateCard
+                title="You are on the walking plan"
+                message="Running cards appear when you switch to a running plan."
+                action={openPlanChoice ? 'Change plan' : undefined}
+                onAction={openPlanChoice}
+              />
+            )}
             {!!bests.data?.totalRuns && (
               <Card>
                 <AppText variant="eyebrow" tone="muted">
