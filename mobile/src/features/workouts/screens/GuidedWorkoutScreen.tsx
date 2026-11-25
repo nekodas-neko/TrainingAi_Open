@@ -1,4 +1,4 @@
-import { skipExerciseMessage } from '../logging/logger-copy';
+import { skipExerciseMessage, skipGoesTo } from '../logging/logger-copy';
 import { plural } from '@trainingai/shared/format/plural';
 import { formatDateDisplay } from '@trainingai/shared/date-utils';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
@@ -503,7 +503,7 @@ export function GuidedWorkoutScreen({
                 confirmation === 'discard'
                   ? 'Discard this unfinished workout? It cannot be resumed and will not upload.'
                   : confirmation === 'skip'
-                    ? skipExerciseMessage(exercise.name, !!workout.soloExerciseId)
+                    ? skipExerciseMessage(exercise.name, skipGoesTo(workout))
                     : confirmation === 'finish'
                     ? `${plural(count, 'set', 'sets')} recorded. Save these sets and finish?`
                     : 'Your recorded progress stays saved on this phone.'
