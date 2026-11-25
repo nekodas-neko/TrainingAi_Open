@@ -7,6 +7,7 @@ import {
   Disclosure,
   Stack,
   StatusIndicator,
+  DateField,
   TextField,
 } from '../../../shared/ui';
 import { WorkoutLayout } from '../../workouts/components/WorkoutLayout';
@@ -34,7 +35,7 @@ function ClinicalForm({
   kind: 'rmr' | 'dexa';
   onSaved: (record: Rmr | Dexa) => void;
 }) {
-  const { today } = useHealthData();
+  const { today, timezone } = useHealthData();
   const date = kind === 'rmr' ? 'measuredOn' : 'scannedOn';
   const draft = useWorkoutDraft(`clinical:${kind}`, clinicalDraftSchema, { [date]: today });
   const required = draft.value[kind === 'rmr' ? 'rmrKcal' : 'pctFat'] ?? '';
@@ -134,12 +135,13 @@ function ClinicalForm({
         </AppText>
         {status}
       </Stack>
-      <TextField
-        label={kind === 'rmr' ? 'Test date (YYYY-MM-DD)' : 'Scan date (YYYY-MM-DD)'}
+      <DateField
+        label={kind === 'rmr' ? 'Test date' : 'Scan date'}
         value={draft.value[date] ?? today}
-        onChangeText={(value) => set(date, value)}
+        onChange={(value) => set(date, value)}
+        timezone={timezone}
         error={issues[date]}
-        editable={draft.ready && !saving}
+        disabled={!draft.ready || saving}
       />
       {clinicalFields[kind][''].map(field)}
       {kind === 'rmr' && (

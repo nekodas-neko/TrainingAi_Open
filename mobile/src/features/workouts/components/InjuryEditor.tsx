@@ -10,6 +10,7 @@ import {
   Notice,
   Picker,
   Stack,
+  DateField,
   TextField,
   StableContent,
   StatusIndicator,
@@ -122,10 +123,11 @@ export function InjuryEditor({
               })
             }
           />
-          <TextField
-            label="Started date (YYYY-MM-DD)"
+          <DateField
+            label="Started date"
             value={draft.value.startedDate}
-            onChangeText={(startedDate) => draft.setValue({ ...draft.value, startedDate })}
+            onChange={(startedDate) => draft.setValue({ ...draft.value, startedDate })}
+            timezone={workouts.timezone}
           />
           <TextField
             label="Notes"

@@ -7,7 +7,7 @@ import {
   SegmentedControl,
   Stack,
   StatusIndicator,
-  TextField,
+  TimeField,
 } from '../../../shared/ui';
 import { Sheet } from '../../../shared/ui/Sheet';
 import { useActivities } from '../../activities/data/ActivityProvider';
@@ -99,13 +99,12 @@ export function DetectedWalkSheet({
       />
       <Stack direction="row">
         {(['start', 'end'] as const).map((key) => (
-          <TextField
+          <TimeField
             key={key}
-            label={key === 'start' ? 'Start (24 h, HH:MM)' : 'End (24 h, HH:MM)'}
+            label={key === 'start' ? 'Start' : 'End'}
             value={choice[key]}
-            keyboardType="numbers-and-punctuation"
-            maxLength={5}
-            onChangeText={(value) => setChoice((old) => ({ ...old, [key]: value }))}
+            timezone={timezone}
+            onChange={(value) => setChoice((old) => ({ ...old, [key]: value }))}
           />
         ))}
       </Stack>

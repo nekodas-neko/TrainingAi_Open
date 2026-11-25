@@ -8,7 +8,7 @@ import {
   ConfirmationCard,
   Notice,
   Stack,
-  TextField,
+  TimeField,
 } from '../../../shared/ui';
 import { useHealthData } from '../data/HealthDataProvider';
 import { manualNightWindow } from '../data/manual-night';
@@ -84,19 +84,17 @@ export function ManualNightCard() {
           <AppText variant="caption" tone="muted">
             Enter your bed time and wake time. Only the sleep window is recorded.
           </AppText>
-          <TextField
-            label="Went to bed (HH:MM)"
+          <TimeField
+            label="Went to bed"
             value={bed}
-            onChangeText={setBed}
-            placeholder="23:10"
-            keyboardType="numbers-and-punctuation"
+            onChange={setBed}
+            timezone={health.timezone}
           />
-          <TextField
-            label="Woke up (HH:MM)"
+          <TimeField
+            label="Woke up"
             value={wake}
-            onChangeText={setWake}
-            placeholder="06:40"
-            keyboardType="numbers-and-punctuation"
+            onChange={setWake}
+            timezone={health.timezone}
           />
           <AppButton
             title="Save night"

@@ -19,7 +19,9 @@ import {
   Stack,
   StatusIndicator,
   SwitchRow,
+  DateField,
   TextField,
+  TimeField,
 } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { scaleAlpha } from '../../../shared/theme/alpha';
@@ -300,6 +302,7 @@ function supplementPayload(s: Supplement, patch: Partial<Pick<Supplement, 'activ
 }
 function SupplementManager({ date, onClose }: { date: string; onClose: () => void }) {
   const n = useNutrition(date);
+  const timezone = n.timezone;
   const resources = useWorkoutResources();
   const [busy, setBusy] = useState(false);
   const [edit, setEdit] = useState<string | null>(null);
@@ -460,15 +463,18 @@ function SupplementManager({ date, onClose }: { date: string; onClose: () => voi
             value={f.dosePrompt}
             onValueChange={(dosePrompt) => draft.setValue({ ...f, dosePrompt })}
           />
-          <TextField
-            label="Started on (YYYY-MM-DD)"
+          <DateField
+            label="Started on"
             value={f.startedOn}
-            onChangeText={(startedOn) => draft.setValue({ ...f, startedOn })}
+            onChange={(startedOn) => draft.setValue({ ...f, startedOn })}
+            timezone={timezone}
           />
-          <TextField
+          <DateField
             label="Stopped on (optional)"
             value={f.stoppedOn}
-            onChangeText={(stoppedOn) => draft.setValue({ ...f, stoppedOn })}
+            optional
+            onChange={(stoppedOn) => draft.setValue({ ...f, stoppedOn })}
+            timezone={timezone}
           />
           <SwitchRow
             label="Active"
@@ -484,13 +490,11 @@ function SupplementManager({ date, onClose }: { date: string; onClose: () => voi
             Notify me if not logged by this time
           </AppText>
           {f.reminderEnabled && (
-            <TextField
-              label="Reminder time (24-hour)"
+            <TimeField
+              label="Reminder time"
               value={f.reminderTime}
-              placeholder="08:00"
-              maxLength={5}
-              keyboardType="numbers-and-punctuation"
-              onChangeText={(reminderTime) => draft.setValue({ ...f, reminderTime })}
+              timezone={timezone}
+              onChange={(reminderTime) => draft.setValue({ ...f, reminderTime })}
             />
           )}
           <AppButton
