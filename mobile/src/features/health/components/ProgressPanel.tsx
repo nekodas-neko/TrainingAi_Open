@@ -63,6 +63,7 @@ function TrendsCard() {
   const label = views.find((option) => option.value === view)?.label ?? 'Trend';
   const series = data?.series ?? [];
   const sufficient = data !== null && (data.hasSufficientData || series.length > 0);
+  const framed = data === null || sufficient;
   return (
     <Card accent={theme.progress.trends}>
       <HealthResourceHeader title={'Trends'} state={state} refresh={state.refresh} />
@@ -75,10 +76,15 @@ function TrendsCard() {
         value={view}
         onChange={(next) => next && setView(next)}
       />
+      {/* The frame is sized for a chart only while there is one (or while it is still unknown);
+          "Not enough data yet" takes its own height. Keyed so a view's earlier height is not kept. */}
       <StableContent
+        key={framed ? 'chart' : 'empty'}
         loading={data === null && state.loading}
         frameHeight={
-          theme.sizes.chartHeight + theme.sizes.touchTarget * 3 + theme.spacing.md * 3
+          framed
+            ? theme.sizes.chartHeight + theme.sizes.touchTarget * 3 + theme.spacing.md * 3
+            : undefined
         }
       >
         {data && !sufficient && (
