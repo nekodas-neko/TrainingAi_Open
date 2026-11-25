@@ -250,6 +250,3 @@ export function foodFields(food: Partial<Food>): NutritionFields {
     ].map((key) => [key, food[key] == null ? '' : String(food[key])]),
   );
 }
-export function foodAmount(log: FoodLog) {
-  return `${Math.round(log.quantityMultiplier * 100) / 100} servings · ${Math.round(log.foodItem.servingSizeG * log.quantityMultiplier)} g`;
-}

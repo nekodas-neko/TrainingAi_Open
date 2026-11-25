@@ -1,3 +1,5 @@
+import { plural } from '@trainingai/shared/format/plural';
+import { formatDateDisplay } from '@trainingai/shared/date-utils';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { View } from 'react-native';
 import {
@@ -354,7 +356,7 @@ export function GuidedWorkoutScreen({
                 <AppText variant="pageTitle">{exercise.name}</AppText>
                 {exercise.lastDate && (
                   <AppText variant="micro" tone="muted">
-                    Last: {exercise.lastReps.join(', ')} reps · {exercise.lastDate}
+                    Last: {exercise.lastReps.join(', ')} reps · {formatDateDisplay(exercise.lastDate, 'short')}
                   </AppText>
                 )}
                 <AppText variant="caption" tone="brand">
@@ -506,7 +508,7 @@ export function GuidedWorkoutScreen({
                 confirmation === 'discard'
                   ? 'Discard this unfinished workout? It cannot be resumed and will not upload.'
                   : confirmation === 'finish'
-                    ? `${count} sets recorded. Save these sets and finish?`
+                    ? `${plural(count, 'set', 'sets')} recorded. Save these sets and finish?`
                     : 'Your recorded progress stays saved on this phone.'
               }
               confirmLabel={

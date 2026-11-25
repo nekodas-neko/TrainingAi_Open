@@ -1,3 +1,5 @@
+import { plural } from '@trainingai/shared/format/plural';
+import { formatDateDisplay } from '@trainingai/shared/date-utils';
 import { displayOneRmSeries, oneRmLabel, oneRmText } from '@trainingai/shared/1rm';
 import { AppText, Card, LineChart, Stack } from '../../../shared/ui';
 import { useWorkoutResource } from '../data/WorkoutDataProvider';
@@ -55,7 +57,7 @@ export function ExerciseHistory({
                 <Stack direction="row" justify="space-between">
                   <AppText variant="label">{entry.sessionName}</AppText>
                   <AppText variant="caption" tone="muted">
-                    {entry.date}
+                    {formatDateDisplay(entry.date, 'short')}
                   </AppText>
                 </Stack>
                 {oneRmText(entry.estimated1rm, type) !== null && (
@@ -68,7 +70,7 @@ export function ExerciseHistory({
                     <AppText key={index} variant="caption" tone="muted">
                       Set {index + 1} ·{' '}
                       {entry.weightKg[index] === undefined
-                        ? `${reps} reps · load unavailable`
+                        ? `${plural(reps, 'rep', 'reps')} · load unavailable`
                         : formatSetLoad(
                             { exerciseType: type, weightUnit },
                             { weight: String(entry.weightKg[index]), reps: String(reps) },

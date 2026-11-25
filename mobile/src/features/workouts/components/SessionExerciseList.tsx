@@ -1,3 +1,5 @@
+import { plural } from '@trainingai/shared/format/plural';
+import { formatDateDisplay } from '@trainingai/shared/date-utils';
 import type { ReactNode } from 'react';
 import { View } from 'react-native';
 import { TouchSurface } from '../../../shared/ui/TouchSurface';
@@ -61,11 +63,11 @@ export function SessionExerciseList({
                     {onSelect ? (
                       <>
                         <AppText variant="micro" tone="brand">
-                          {exercise.setCount} sets{exercise.style ? ` · ${exercise.style}` : ''}
+                          {plural(exercise.setCount, 'set', 'sets')}{exercise.style ? ` · ${exercise.style}` : ''}
                         </AppText>
                         <AppText variant="micro" tone="muted">
                           {exercise.lastReps?.length
-                            ? `Last: ${exercise.lastReps.map((reps, index) => formatSetLoad({ ...exercise, weightUnit: weightUnitOf(units, exercise.id) }, { weight: String(exercise.lastWeights[index] ?? exercise.lastWeights.at(-1) ?? 0), reps: String(reps) })).join(', ')}${exercise.lastDate ? ` · ${exercise.lastDate}` : ''}`
+                            ? `Last: ${exercise.lastReps.map((reps, index) => formatSetLoad({ ...exercise, weightUnit: weightUnitOf(units, exercise.id) }, { weight: String(exercise.lastWeights[index] ?? exercise.lastWeights.at(-1) ?? 0), reps: String(reps) })).join(', ')}${exercise.lastDate ? ` · ${formatDateDisplay(exercise.lastDate, 'short')}` : ''}`
                             : 'No previous data'}
                         </AppText>
                       </>

@@ -1,3 +1,4 @@
+import { plural } from '@trainingai/shared/format/plural';
 import { formatVolumeKg } from '@trainingai/shared/format/number';
 import { useState } from 'react';
 import { Pressable } from '../../../shared/ui/Pressable';
@@ -265,7 +266,7 @@ export function HistoryDay({
                     <AppText key={index} variant="caption" tone="muted">
                       Set {index + 1} ·{' '}
                       {entry.setWeights[index] === undefined
-                        ? `${rep} reps · load unavailable`
+                        ? `${plural(rep, 'rep', 'reps')} · load unavailable`
                         : formatSetLoad(
                             {
                               exerciseType:
@@ -316,18 +317,23 @@ export function HistoryDay({
                 volume
               </AppText>
               <AppText variant="micro" tone="muted">
-                {entries.filter((e) => e.workoutSessionId === id).length} exercises
+                {plural(entries.filter((e) => e.workoutSessionId === id).length, 'exercise', 'exercises')}
               </AppText>
               <AppText variant="micro" tone="muted">
-                {entries
-                  .filter((e) => e.workoutSessionId === id)
-                  .reduce((n, e) => n + e.reps.length, 0)}{' '}
-                sets
+                {plural(
+                  entries
+                    .filter((e) => e.workoutSessionId === id)
+                    .reduce((n, e) => n + e.reps.length, 0),
+                  'set',
+                  'sets',
+                )}
               </AppText>
               {sessionEnergy?.find((e) => e.id === id && e.kcal > 0) && (
                 <AppText variant="micro" tone="muted">
-                  ~{Math.round(sessionEnergy.find((e) => e.id === id)!.kcal)} est.{' '}
-                  {sessionEnergy.find((e) => e.id === id)!.source.toUpperCase()} kcal
+                  ~{Math.round(sessionEnergy.find((e) => e.id === id)!.kcal)} kcal estimated{' '}
+                  {sessionEnergy.find((e) => e.id === id)!.source === 'hr'
+                    ? 'from heart rate'
+                    : 'from the exercises'}
                 </AppText>
               )}
             </Stack>

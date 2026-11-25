@@ -1,23 +1,16 @@
+import { formatDateDisplay } from '@trainingai/shared/date-utils';
 import { formatCount } from '@trainingai/shared/format/number';
 import { rankedContributors } from '@trainingai/shared/health/contributor-ranking';
 
 // Week in review wording and figures, kept out of the screen so they can be tested (#2935).
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-
-// "7 Jun": the web's `d MMM`. A fixed array, not a locale: en-AU spells June, July and September
-// out in full ("7 June", "7 Sept"), and Hermes' Intl differs again.
-function dayMonth(date: string) {
-  const [, month, day] = date.split(/[-/]/).map(Number);
-  return `${day} ${MONTHS[month - 1]}`;
-}
 
 // "5 Oct – 11 Oct 2026": both ends as day and month, the year once at the end. The week's own
 // date strings are calendar days already, so nothing here goes through an instant.
 export function weekRangeLabel(weekStart: string, weekEnd: string | undefined) {
-  if (!weekEnd) return `${dayMonth(weekStart)} ${weekStart.slice(0, 4)}`;
-  return `${dayMonth(weekStart)} – ${dayMonth(weekEnd)} ${weekEnd.slice(0, 4)}`;
+  if (!weekEnd) return `${formatDateDisplay(weekStart, 'short')} ${weekStart.slice(0, 4)}`;
+  return `${formatDateDisplay(weekStart, 'short')} – ${formatDateDisplay(weekEnd, 'short')} ${weekEnd.slice(0, 4)}`;
 }
 
 // M T W T F S S under the training bars, read from the date so a week that does not start on a

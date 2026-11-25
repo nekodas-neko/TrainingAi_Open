@@ -1,3 +1,4 @@
+import { plural } from '@trainingai/shared/format/plural';
 import { AppText, Badge, Card, Disclosure, Stack } from '../../../shared/ui';
 import type { ExercisePreview } from '../catalog';
 import { prescribedWeight } from '../logging/targets';
@@ -26,7 +27,7 @@ export function ExercisePreviewCard({
         </Stack>
       )}
       <AppText variant="label">
-        {exercise.setCount} sets{exercise.style ? ` · ${exercise.style}` : ''}
+        {plural(exercise.setCount, 'set', 'sets')}{exercise.style ? ` · ${exercise.style}` : ''}
       </AppText>
       {exercise.deloaded && <Badge label="Deload" />}
       {exercise.lastSetMode && (
@@ -36,7 +37,7 @@ export function ExercisePreviewCard({
         {exercise.sets.map((set) => (
           <Stack key={set.number} direction="row" justify="space-between" wrap>
             <AppText variant="caption">
-              Set {set.number}: {set.reps === 0 ? 'Reps unspecified' : `${set.reps} reps`}
+              Set {set.number}: {set.reps === 0 ? 'Reps unspecified' : plural(set.reps, 'rep', 'reps')}
               {exercise.exerciseType === 'weighted' && set.percent > 0
                 ? ` · ${set.percent}% 1RM`
                 : ''}

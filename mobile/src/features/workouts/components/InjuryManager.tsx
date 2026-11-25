@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { todayInTz } from '@trainingai/shared/date-utils';
+import { todayInTz, formatDateDisplay } from '@trainingai/shared/date-utils';
 import {
   AppButton,
   AppText,
@@ -49,7 +49,7 @@ export function InjuryManager({ showSync = true }: { showSync?: boolean }) {
         <Card key={injury.id}>
           <AppText variant="heading">{injury.muscleName}</AppText>
           <AppText variant="caption" tone="muted">
-            {injury.severity} · since {injury.startedDate}
+            {injury.severity} · since {formatDateDisplay(injury.startedDate, 'short')}
           </AppText>
           {injury.notes && <AppText>{injury.notes}</AppText>}
           <Stack direction="row" wrap>
@@ -82,7 +82,7 @@ export function InjuryManager({ showSync = true }: { showSync?: boolean }) {
             <Card key={injury.id}>
               <AppText variant="label">{injury.muscleName}</AppText>
               <AppText variant="caption" tone="muted">
-                Resolved {injury.resolvedDate}
+                Resolved {formatDateDisplay(injury.resolvedDate ?? '', 'short')}
               </AppText>
             </Card>
           ))}

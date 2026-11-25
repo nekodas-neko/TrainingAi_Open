@@ -1,3 +1,4 @@
+import { plural } from '@trainingai/shared/format/plural';
 import { useEffect, useState } from 'react';
 import {
   AppButton,
@@ -191,7 +192,7 @@ export function ProgramsScreen({
               <AppText variant="heading">{style.name}</AppText>
               <AppText variant="caption" tone="muted">
                 {style.sets
-                  .map((set) => `${set.reps} reps @ ${set.pct}% · ${set.restSec}s`)
+                  .map((set) => `${plural(set.reps, 'rep', 'reps')} @ ${set.pct}% · ${set.restSec}s`)
                   .join(' / ')}
               </AppText>
               <Stack direction="row">

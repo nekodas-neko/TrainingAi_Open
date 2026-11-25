@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { daysBetweenDateStrs } from '@trainingai/shared/date-utils';
+import { daysBetweenDateStrs, formatDateDisplay } from '@trainingai/shared/date-utils';
 import {
   AppButton,
   AppText,
@@ -129,7 +129,7 @@ export function MuscleStatusCard() {
           <Disclosure title={`Resolved (${resolved.length})`}>
             {resolved.map((injury) => (
               <AppText key={injury.id} variant="caption" tone="muted">
-                {titleCaseWords(injury.muscleName)} · Resolved {injury.resolvedDate}
+                {titleCaseWords(injury.muscleName)} · Resolved {formatDateDisplay(injury.resolvedDate ?? '', 'short')}
               </AppText>
             ))}
           </Disclosure>

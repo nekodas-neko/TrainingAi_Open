@@ -1,3 +1,4 @@
+import { formatDateDisplay } from '@trainingai/shared/date-utils';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -32,12 +33,14 @@ test('the week range reads "5 Oct – 11 Oct 2026"', () => {
   assert.equal(weekRangeLabel('2026-10-05', undefined), '5 Oct 2026');
 });
 
-test('the range prints the web\'s "d MMM" in every month', () => {
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  months.forEach((name, i) => {
-    const mm = String(i + 1).padStart(2, '0');
-    assert.equal(weekRangeLabel(`2026-${mm}-07`, `2026-${mm}-13`), `7 ${name} – 13 ${name} 2026`);
-  });
+test('the range names each month the way the rest of the app does, not by a private table', () => {
+  // The shared formatter is the one source of day-and-month text (#3757); en-AU spells some out.
+  for (let i = 1; i <= 12; i++) {
+    const mm = String(i).padStart(2, '0');
+    const start = formatDateDisplay(`2026-${mm}-07`, 'short');
+    const end = formatDateDisplay(`2026-${mm}-13`, 'short');
+    assert.equal(weekRangeLabel(`2026-${mm}-07`, `2026-${mm}-13`), `${start} – ${end} 2026`);
+  }
   assert.equal(weekRangeLabel('2026-12-28', '2027-01-03'), '28 Dec – 3 Jan 2027');
 });
 

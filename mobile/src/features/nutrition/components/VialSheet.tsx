@@ -1,3 +1,4 @@
+import { plural } from '@trainingai/shared/format/plural';
 import { daysBetweenDateStrs, isCalendarDate } from '@trainingai/shared/date-utils';
 import { useEffect, useMemo, useState } from 'react';
 import { z } from 'zod';
@@ -273,7 +274,7 @@ export function VialSheet({
             </AppText>
           )}
           {plan?.dosesInVial != null && (
-            <AppText variant="caption">{plan.dosesInVial} doses this size in the vial.</AppText>
+            <AppText variant="caption">{plural(plan.dosesInVial, 'dose', 'doses')} this size in the vial.</AppText>
           )}
         </Card>
         <VialResponses supplement={supplement} since={current?.openedOn ?? null} />

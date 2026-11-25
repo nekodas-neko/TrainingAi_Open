@@ -78,7 +78,7 @@ test("Home's recommendation states, in the card's order of precedence", () => {
   assert.equal(model.eyebrow, 'Recommended Today');
   assert.equal(model.name, 'Upper body');
   assert.equal(model.action, 'start');
-  assert.deepEqual(model.facts.map((fact) => fact.text).slice(-2), ['1 exercises', 'Last: —']);
+  assert.deepEqual(model.facts.map((fact) => fact.text).slice(-2), ['1 exercise', 'Last: —']);
 
   const done = homeRecommendationModel(recInput({ trained: ['Upper body'], restChoice: true }));
   assert.equal(done.kind === 'session' && [done.eyebrow, done.action].join(), 'Trained Today,completed');

@@ -1,3 +1,4 @@
+import { plural } from '@trainingai/shared/format/plural';
 import { formatCount } from '@trainingai/shared/format/number';
 import { formatHoursMinutes } from '@trainingai/shared/format/units';
 import { formatTimeOfDay, shiftDateStr } from '@trainingai/shared/date-utils';
@@ -95,8 +96,6 @@ export type TimelineCardContent = {
   metrics: TimelineCardMetric[];
 };
 
-const plural = (count: number, one: string, many: string) =>
-  `${formatCount(count)} ${count === 1 ? one : many}`;
 
 /**
  * What one timeline event's card says, per type, as components/home-day-timeline.tsx draws it:

@@ -65,7 +65,7 @@ export function BodyWeightCard({
       decimals={1}
       accent={bodyCardColors.weight}
       headingColor={bodyHeadingColors[theme.mode].weight}
-      caption={weightDate && weightDate !== today ? `Last logged ${weightDate}` : 'Last 7 days'}
+      caption={weightDate && weightDate !== today ? `Last logged ${formatDateDisplay(weightDate, 'short')}` : 'Last 7 days'}
       onLog={onLog}
       onOpen={onOpen}
       points={points}

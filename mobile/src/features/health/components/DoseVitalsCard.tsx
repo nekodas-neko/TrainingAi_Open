@@ -1,3 +1,4 @@
+import { formatDateDisplay } from '@trainingai/shared/date-utils';
 import { useState } from 'react';
 import { AppText, Card, LineChart, SegmentedControl } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
@@ -63,7 +64,7 @@ export function DoseVitalsCard() {
       </AppText>
       {latestDoses(data?.doses ?? []).map((dose, i) => (
         <AppText key={dose.date + i} variant="micro" tone="muted">
-          {dose.date} · {doseLabel(dose)}
+          {formatDateDisplay(dose.date, 'short')} · {doseLabel(dose)}
         </AppText>
       ))}
     </Card>
