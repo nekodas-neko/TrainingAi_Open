@@ -22,7 +22,7 @@ import { muscleVolumeCaption } from '../data/training-view';
 import { MuscleVolumeFigure } from '../components/MuscleVolumeFigure';
 import {
   fixedValue,
-  flowDigest,
+  digestLines,
   trainingHeadline,
   volumeTickLabel,
   prDetail,
@@ -62,7 +62,7 @@ export function HealthWeekScreen({ week, onBack }: { week: string; onBack: () =>
                 Your week
               </AppText>
             </Stack>
-            <MarkdownText bodyVariant="bodyRelaxed">{flowDigest(state.data.digest)}</MarkdownText>
+            <MarkdownText bodyVariant="bodyRelaxed">{digestLines(state.data.digest)}</MarkdownText>
           </Card>
         )}
         {m && training && (

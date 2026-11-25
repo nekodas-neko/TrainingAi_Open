@@ -68,16 +68,16 @@ export function volumeTickLabel(value: number) {
   return value === 0 ? '0' : value < 1000 ? String(value) : `${Math.round(value / 1000)}k`;
 }
 
-// "Your week" as the current app flows it: the digest's lines (bullets included) run together as one
-// paragraph rather than one line each. The shared builder writes every point as "• …"; the "•" stays
-// as the separator between points, so a list marker of any kind is normalised to it, not dropped.
-export function flowDigest(digest: string) {
+// "Your week", one line per point (#4143). The shared builder writes every point as "• …"; run
+// together they read as one paragraph with a "•" in the middle of lines. Headings are dropped and
+// a list marker of any kind is normalised to the "- " the markdown view draws as its own bullet row.
+export function digestLines(digest: string) {
   return digest
     .split(/\r?\n/)
     .filter((line) => !/^\s*#{1,6}\s/.test(line))
-    .map((line) => line.replace(/^\s*[-*•]\s+/, '• ').trim())
+    .map((line) => line.replace(/^\s*[-*•]\s+/, '- ').trim())
     .filter(Boolean)
-    .join(' ');
+    .join('\n');
 }
 
 /** `description` already opens with the exercise name, which the row shows on its left. */
