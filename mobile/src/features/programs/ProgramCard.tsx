@@ -1,5 +1,6 @@
 import { AppButton, AppText, Card, Disclosure, IconButton, Stack } from '../../shared/ui';
 import { useTheme } from '../../shared/theme/ThemeProvider';
+import { DELETE_PROGRAM_TITLE, deleteProgramLabel } from './delete-copy';
 import type { SavedProgram } from '../workouts/data/models';
 
 export function ProgramCard({
@@ -81,10 +82,10 @@ export function ProgramCard({
           ))}
           {/* Inside the opened row, away from Edit. The confirmation is in ProgramsScreen. */}
           <AppButton
-            title="Delete program"
+            title={DELETE_PROGRAM_TITLE}
             variant="danger"
             disabled={busy}
-            accessibilityLabel={`Delete ${program.name}`}
+            accessibilityLabel={deleteProgramLabel(program.name)}
             onPress={onDelete}
           />
         </Stack>

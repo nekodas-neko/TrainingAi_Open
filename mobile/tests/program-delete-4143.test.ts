@@ -20,7 +20,7 @@ test('the collapsed row has Set active and Edit only; Delete is a labelled butto
   const card = read('ProgramCard.tsx');
   const trailing = card.slice(card.indexOf('trailing='), card.indexOf('<Stack style={{ padding'));
   assert.doesNotMatch(trailing, /icon="delete"/);
-  assert.match(card, /title="Delete program"/);
+  assert.match(card, /title=\{DELETE_PROGRAM_TITLE\}/);
 });
 
 test('ProgramsScreen uses the program message for a program only', () => {

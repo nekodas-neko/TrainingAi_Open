@@ -1,4 +1,10 @@
-import { deleteItemMessage, deleteProgramMessage, injuriesSubtitle } from './delete-copy';
+import {
+  INJURIES_ROW_TITLE,
+  deleteItemMessage,
+  deleteProgramMessage,
+  injuriesRowLabel,
+  injuriesSubtitle,
+} from './delete-copy';
 import { plural } from '@trainingai/shared/format/plural';
 import { useEffect, useState } from 'react';
 import {
@@ -44,6 +50,7 @@ export function ProgramsScreen({
 }) {
   const injuries = useWorkoutResource(injurySpec);
   const programs = useWorkoutResource(programSpec);
+  const activeInjuries = injuries.data?.filter((injury) => !injury.resolvedDate).length;
   const styles = useWorkoutResource(stylesSpec);
   const phases = useWorkoutResource(phaseSetsSpec);
   const action = useWorkoutAction();
@@ -273,8 +280,9 @@ export function ProgramsScreen({
       {/* One place manages injuries: Health › Body (#4143). This row only points there. */}
       <Card padded={false}>
         <ListRow
-          title="Injuries"
-          subtitle={injuriesSubtitle(injuries.data?.filter((injury) => !injury.resolvedDate).length)}
+          title={INJURIES_ROW_TITLE}
+          subtitle={injuriesSubtitle(activeInjuries)}
+          accessibilityLabel={injuriesRowLabel(activeInjuries)}
           trailing={<Icon name="forward" tone="muted" />}
           onPress={openInjuries}
           divider={false}

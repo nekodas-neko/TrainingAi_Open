@@ -18,7 +18,7 @@ test('the Program row says how many injuries are active and where they are manag
 test('Program has no second editor, and the row opens Health › Body', () => {
   const screen = read('features/programs/ProgramsScreen.tsx');
   assert.doesNotMatch(screen, /InjuryManager|Recorded injuries/);
-  assert.match(screen, /title="Injuries"[\s\S]*onPress=\{openInjuries\}/);
+  assert.match(screen, /title=\{INJURIES_ROW_TITLE\}[\s\S]*onPress=\{openInjuries\}/);
   const app = read('app/App.tsx');
   assert.match(app, /openInjuries=\{\(\) => \{\s+selectTab\('Health'\);\s+setHealthPanel\('body'\);/);
 });

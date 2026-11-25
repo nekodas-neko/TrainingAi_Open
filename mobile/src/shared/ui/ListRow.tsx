@@ -13,6 +13,7 @@ export function ListRow({
   subtitle,
   subtitleColor,
   warning,
+  accessibilityLabel,
   trailing,
   onPress,
   onLongPress,
@@ -27,6 +28,8 @@ export function ListRow({
   titleTone?: 'danger';
   subtitle?: string;
   subtitleColor?: string;
+  /** Spoken name when it must carry more than the title (it should still contain the visible words). */
+  accessibilityLabel?: string;
   /** An amber caution line under the subtitle, with an icon so it is not colour alone. */
   warning?: string;
   trailing?: ReactNode;
@@ -84,8 +87,8 @@ export function ListRow({
   return (
     <Pressable
       accessibilityRole={checked === undefined ? 'button' : 'checkbox'}
-      accessibilityLabel={title}
-      accessibilityHint={disabled ? 'Coming soon' : [subtitle, warning].filter(Boolean).join('. ') || undefined}
+      accessibilityLabel={accessibilityLabel ?? title}
+      accessibilityHint={disabled ? 'Coming soon' : [accessibilityLabel ? undefined : subtitle, warning].filter(Boolean).join('. ') || undefined}
       accessibilityState={{ disabled, checked }}
       disabled={disabled}
       onPress={() => {

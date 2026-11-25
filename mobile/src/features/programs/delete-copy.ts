@@ -20,3 +20,15 @@ export function injuriesSubtitle(active: number | undefined): string {
   if (active === undefined) return where;
   return `${active === 0 ? 'No active injuries' : active === 1 ? '1 active injury' : `${active} active injuries`} · ${where}`;
 }
+
+/** The Delete button's spoken name: it starts with the visible "Delete program" so a voice command matches it. */
+export const DELETE_PROGRAM_TITLE = 'Delete program';
+export function deleteProgramLabel(programName: string): string {
+  return `${DELETE_PROGRAM_TITLE} ${programName}`;
+}
+
+/** The Injuries row's spoken name: the visible title and subtitle, in reading order. */
+export const INJURIES_ROW_TITLE = 'Injuries';
+export function injuriesRowLabel(active: number | undefined): string {
+  return `${INJURIES_ROW_TITLE}, ${injuriesSubtitle(active)}`;
+}
