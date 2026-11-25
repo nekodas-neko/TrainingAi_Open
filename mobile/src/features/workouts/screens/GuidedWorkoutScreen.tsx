@@ -271,19 +271,13 @@ export function GuidedWorkoutScreen({
   } else {
     screen = (
       <WorkoutLayout
-        title={
-          flow.stage === 'warmup'
-            ? `${workout.sessionName} — Warm Up`
-            : flow.stage === 'summary'
-              ? exercise.name
-              : workout.sessionName
-        }
+        title={flow.stage === 'summary' ? exercise.name : workout.sessionName}
         subtitleNode={summaryRecord ? <PersonalRecordBadge /> : undefined}
         subtitle={
           flow.stage === 'summary'
             ? 'Set summary'
             : flow.stage === 'warmup'
-              ? undefined
+              ? 'Warm up'
               : `${(workout.phaseDetail ?? workout.phase) ? `${workout.phaseDetail ?? workout.phase} · ` : ''}${workout.soloExerciseId ? 'Solo' : `Ex ${visibleIndex + 1}/${visibleExercises.length}`}`
         }
         workout={workout}
