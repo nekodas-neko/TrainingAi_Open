@@ -32,7 +32,7 @@ import { BusyError } from '@trainingai/shared/errors'
 import type { WorkoutRepository } from '@/lib/data/repository'
 import type { buildWorkoutExercises } from '@trainingai/shared/workout/session-data'
 import { readSessionFromStoredState } from '@trainingai/shared/workout/read-session'
-import { isEarlyDeloadWeek } from '@trainingai/shared/phase-engine'
+import { isEarlyDeloadWeek, earlyDeloadApplies } from '@trainingai/shared/phase-engine'
 import { loadTarget, type TargetRow } from './session-exercise'
 import { lockLiftWrites, withBoundedLockWait } from '../lock-wait'
 import type { Consequence, Db, DomainHandler, Drift, PreviewResult } from './types'
@@ -558,7 +558,9 @@ export async function staticNextExercise(
   // A deload (a phase's, or a confirmed early-deload week on any program kind), a baseline or a test:
   // a preference does not apply and the reps are not the person's working reps.
   const phaseType = read.phaseStatus?.phase.phaseType ?? 'normal'
-  const excluded = isEarlyDeloadWeek(program, today) || (read.phaseStatus?.isDeloadActive ?? false) || read.isBaselinePhase
+  // A manual program has no deload mechanism, so a leftover `earlyDeloadWeekStart` there changes
+  // nothing on the screen (`resolveSessionPhase`), and the Coach does not call the session excluded (#4114).
+  const excluded = (earlyDeloadApplies(program.phaseMode) && isEarlyDeloadWeek(program, today)) || (read.phaseStatus?.isDeloadActive ?? false) || read.isBaselinePhase
     || phaseType === 'deload' || phaseType === 'baseline' || phaseType === 'testing'
   if (excluded) return { exercise: null, excluded: true }
 

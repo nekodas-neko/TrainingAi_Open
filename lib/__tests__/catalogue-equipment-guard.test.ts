@@ -80,7 +80,7 @@ describe('POST /api/exercises refuses an unlabelled catalogue row', () => {
   })
 
   it('keeps every OTHER validation failure generic — only the equipment message is surfaced', async () => {
-    const res = await post({ name: '', muscles: [], equipment: ['barbell'] })
+    const res = await post({ name: 'Squat', muscles: 'not-a-list', equipment: ['barbell'] })
     expect(res.status).toBe(400)
     expect((await res.json()).error).toBe('Invalid body')
   })

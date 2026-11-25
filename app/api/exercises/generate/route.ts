@@ -12,13 +12,14 @@ import { getRepository } from '@/lib/data'
 import { buildExerciseNameResolver } from '@trainingai/shared/workout/exercise-name-resolver'
 import { equipmentLedByName } from '@trainingai/shared/workout/equipment'
 import { isAdminUser } from '@/lib/admin'
+import { visibleExerciseName } from '@trainingai/shared/validation/visible-name'
 import { ExerciseGenSchema } from '@trainingai/shared/workout/model-output-schemas'
 
 // One exercise name, capped at 120 characters by the schema below.
 const MAX_BODY_BYTES = 4 * 1024
 
 const RequestSchema = z.object({
-  name: z.string().min(1).max(120),
+  name: visibleExerciseName(z.string().min(1).max(120)),
   /**
    * #3840: skip the library lookup and ask the model, to refresh an existing entry's instructions
    * and muscles. Only the admin exercise editor sends it, and only an admin may: anyone else would
@@ -50,7 +51,11 @@ export async function POST(req: NextRequest) {
       : NextResponse.json({ error: 'Invalid input' }, { status: 400 })
   }
   const body = RequestSchema.safeParse(read.body)
-  if (!body.success) return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
+  if (!body.success) {
+    // #4129: a name with nothing visible in it is the one failure worth saying in words.
+    const nameIssue = body.error.issues.find(i => i.path[0] === 'name' && i.code === 'custom')
+    return NextResponse.json({ error: nameIssue?.message ?? 'Invalid body' }, { status: 400 })
+  }
 
   try {
     // Fails closed: a refresh from anyone but an active admin is refused, and a failed lookup is a 500.

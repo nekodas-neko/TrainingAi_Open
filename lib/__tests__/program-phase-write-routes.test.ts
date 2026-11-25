@@ -72,7 +72,7 @@ const sourceSet = (over: Row = {}) => ({
 
 beforeEach(() => {
   for (const m of [getActiveProgram, confirmEarlyDeload, listPhaseSets, createOwnedPhaseSetClone, reportServerError]) m.mockClear()
-  getActiveProgram.mockResolvedValue({ id: ACTIVE, name: 'Current' })
+  getActiveProgram.mockResolvedValue({ id: ACTIVE, name: 'Current', phaseMode: 'automatic' })
   listPhaseSets.mockResolvedValue([sourceSet()])
   createOwnedPhaseSetClone.mockResolvedValue({ id: 'new-1', name: 'My block' })
   sessionUser = { id: 'u-1' }

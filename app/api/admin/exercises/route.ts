@@ -10,13 +10,14 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 import type { MuscleAssignment } from "@trainingai/shared/types/program";
 import { invalidateExerciseMuscleMap } from "@/lib/data/exercise-muscle-map-cache";
+import { visibleExerciseName } from '@trainingai/shared/validation/visible-name'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 
 // One exercise: a name, muscles, equipment and 2,000 chars of instructions.
 const MAX_BODY_BYTES = 32 * 1024;
 
 const ExerciseBody = z.object({
-  name:         z.string().min(1).max(120),
+  name:         visibleExerciseName(z.string().min(1).max(120)),
   equipment:    z.array(z.string()).default([]),
   muscles:      z.array(z.object({ muscle: z.string(), role: z.enum(['main', 'secondary']) })).default([]),
   instructions: z.string().max(2000).optional(),
@@ -69,7 +70,11 @@ export async function POST(req: NextRequest) {
       : NextResponse.json({ error: 'Invalid body' }, { status: 400 });
   }
   const body = ExerciseBody.safeParse(read.body);
-  if (!body.success) return NextResponse.json({ error: "Invalid body" }, { status: 400 });
+  if (!body.success) {
+    // #4129: a name with nothing visible in it is the one failure worth saying in words.
+    const nameIssue = body.error.issues.find(i => i.path[0] === 'name' && i.code === 'custom');
+    return NextResponse.json({ error: nameIssue?.message ?? "Invalid body" }, { status: 400 });
+  }
 
   const repo = await getRepository();
   const entry = await repo.upsertExercise({
@@ -119,7 +124,10 @@ export async function PATCH(req: NextRequest) {
   if (badId) return badId;
 
   const body = ExerciseBody.safeParse(rest);
-  if (!body.success) return NextResponse.json({ error: "Invalid body" }, { status: 400 });
+  if (!body.success) {
+    const nameIssue = body.error.issues.find(i => i.path[0] === 'name' && i.code === 'custom');
+    return NextResponse.json({ error: nameIssue?.message ?? "Invalid body" }, { status: 400 });
+  }
 
   const repo = await getRepository();
   let entry;

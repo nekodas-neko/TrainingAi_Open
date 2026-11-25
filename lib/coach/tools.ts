@@ -7,6 +7,7 @@ import { COACH_SCOPES, pickTools, type CoachScope } from './scopes'
 import { ownTargetFromGoals } from '@trainingai/shared/nutrition/calorie-budget'
 import { injurySafeAlternatives } from '@trainingai/shared/workout/injury-substitution'
 import { DEFAULT_TZ } from '@trainingai/shared/date-utils'
+import { earlyDeloadApplies } from '@trainingai/shared/phase-engine'
 import { getDb, ensureSchema } from '@/lib/data/postgres/client'
 import { ExerciseContextSchema, readExerciseContext } from './context'
 
@@ -148,7 +149,7 @@ export function buildWidgetTools(
         ])
         return {
           /** The `from` side of an `early_deload` patch. */
-          deloadRunning: program?.earlyDeloadWeekStart != null,
+          deloadRunning: program?.earlyDeloadWeekStart != null && earlyDeloadApplies(program.phaseMode),
           goals: {
             stepsGoal: goals.stepsGoal,
             // Issue 2622. The user's OWN calorie target, or null when the worked-out budget rules.

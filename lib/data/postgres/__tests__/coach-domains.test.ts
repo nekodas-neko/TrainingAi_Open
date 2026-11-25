@@ -462,8 +462,9 @@ describe.skipIf(!canRun)('AI Coach — early_deload', () => {
     await pool.query(`DELETE FROM workout_sessions WHERE user_id = $1`, [OWNER4])
     await pool.query(`DELETE FROM programs WHERE id = $1`, [PROGRAM4])
     await pool.query(
-      `INSERT INTO programs (id, user_id, name, is_active, sessions_per_cycle, started_at)
-       VALUES ($1, $2, 'Deload Test', true, 4, '2026-01-01')`, [PROGRAM4, OWNER4])
+      // 'automatic': an early deload week applies to automatic and AI-planned programs only (#4114).
+      `INSERT INTO programs (id, user_id, name, is_active, sessions_per_cycle, started_at, phase_mode)
+       VALUES ($1, $2, 'Deload Test', true, 4, '2026-01-01', 'automatic')`, [PROGRAM4, OWNER4])
     // Two sessions logged on TODAY in Brisbane — 2026-03-05 local is 2026-03-04T14:00Z onward.
     for (const at of ['2026-03-05T01:00:00Z', '2026-03-05T03:00:00Z']) {
       await pool.query(
@@ -527,6 +528,84 @@ describe.skipIf(!canRun)('AI Coach — early_deload', () => {
     const result = await applyCoachPatch(db, OWNER4, deloadPatch(false, true), ['d1'], TODAY)
     expect(result.ok).toBe(false)
     expect(result.ok === false && result.reason).toBe('stale')
+  })
+
+  const weekAndFlags = async () => (await pool.query(
+    `SELECT (SELECT to_char(early_deload_week_start, 'YYYY-MM-DD') FROM programs WHERE id = $1) AS start,
+            (SELECT count(*)::int FROM workout_sessions WHERE user_id = $2 AND is_early_deload) AS flagged`,
+    [PROGRAM4, OWNER4])).rows[0]
+
+  // #4114: the session screen has never lightened a manual program, so the Coach does not confirm a week there.
+  describe('on a program run by hand (#4114)', () => {
+    beforeEach(async () => { await pool.query(`UPDATE programs SET phase_mode = 'manual' WHERE id = $1`, [PROGRAM4]) })
+
+    it('declines in plain words and offers no Apply', async () => {
+      const preview = await previewPatch(db, OWNER4, deloadPatch(false, true), TODAY)
+      expect(preview.refusal).toMatch(/automatic and AI-planned programs/)
+      expect(preview.refusal).toMatch(/by hand/)
+    })
+
+    it('refuses a direct apply and writes nothing', async () => {
+      const result = await applyCoachPatch(db, OWNER4, deloadPatch(false, true), ['d1'], TODAY)
+      expect(result.ok).toBe(false)
+      expect(result.ok === false && result.reason).toBe('invalid')
+      expect(await weekAndFlags()).toEqual({ start: null, flagged: 0 })
+      const { rows } = await pool.query(`SELECT count(*)::int AS n FROM coach_changes WHERE user_id = $1`, [OWNER4])
+      expect(rows[0].n).toBe(0)
+    })
+
+    it('still lets a leftover week from before be cancelled', async () => {
+      await pool.query(`UPDATE programs SET early_deload_week_start = $1 WHERE id = $2`, [TODAY, PROGRAM4])
+      const result = await applyCoachPatch(db, OWNER4, deloadPatch(true, false), ['d1'], TODAY)
+      expect(result.ok).toBe(true)
+      expect((await weekAndFlags()).start).toBeNull()
+    })
+
+    it('undoing a cancel after the switch to manual restores nothing, and says so', async () => {
+      await pool.query(`UPDATE programs SET phase_mode = 'automatic', early_deload_week_start = $1 WHERE id = $2`, [TODAY, PROGRAM4])
+      const cancelled = await applyCoachPatch(db, OWNER4, deloadPatch(true, false), ['d1'], TODAY)
+      if (!cancelled.ok) throw new Error('cancel failed')
+      await pool.query(`UPDATE programs SET phase_mode = 'manual' WHERE id = $1`, [PROGRAM4])
+      const undone = await undoCoachChange(db, OWNER4, cancelled.changeId)
+      expect(undone.ok).toBe(true)
+      expect(undone.ok && undone.summary).toMatch(/run by hand/)
+      expect(await weekAndFlags()).toEqual({ start: null, flagged: 0 })
+    })
+
+    it('on an automatic program the same undo puts the week back, as before', async () => {
+      await pool.query(`UPDATE programs SET phase_mode = 'automatic', early_deload_week_start = $1 WHERE id = $2`, [TODAY, PROGRAM4])
+      const cancelled = await applyCoachPatch(db, OWNER4, deloadPatch(true, false), ['d1'], TODAY)
+      if (!cancelled.ok) throw new Error('cancel failed')
+      const undone = await undoCoachChange(db, OWNER4, cancelled.changeId)
+      expect(undone.ok).toBe(true)
+      expect(undone.ok && undone.summary).not.toMatch(/run by hand/)
+      expect((await weekAndFlags()).start).toBe(TODAY)
+    })
+
+    it('undoing an earlier apply after the switch to manual still clears the week and the flags', async () => {
+      await pool.query(`UPDATE programs SET phase_mode = 'automatic' WHERE id = $1`, [PROGRAM4])
+      const applied = await applyCoachPatch(db, OWNER4, deloadPatch(false, true), ['d1'], TODAY)
+      if (!applied.ok) throw new Error('apply failed')
+      await pool.query(`UPDATE programs SET phase_mode = 'manual' WHERE id = $1`, [PROGRAM4])
+      expect((await undoCoachChange(db, OWNER4, applied.changeId)).ok).toBe(true)
+      expect(await weekAndFlags()).toEqual({ start: null, flagged: 0 })
+    })
+
+    it('a double apply is refused both times and leaves no history', async () => {
+      const first = await applyCoachPatch(db, OWNER4, deloadPatch(false, true), ['d1'], TODAY)
+      const second = await applyCoachPatch(db, OWNER4, deloadPatch(false, true), ['d1'], TODAY)
+      expect([first.ok, second.ok]).toEqual([false, false])
+      expect(await weekAndFlags()).toEqual({ start: null, flagged: 0 })
+      const { rows } = await pool.query(`SELECT count(*)::int AS n FROM coach_changes WHERE user_id = $1`, [OWNER4])
+      expect(rows[0].n).toBe(0)
+    })
+  })
+
+  it('an ai_dynamic program starts a week exactly as an automatic one does', async () => {
+    await pool.query(`UPDATE programs SET phase_mode = 'ai_dynamic' WHERE id = $1`, [PROGRAM4])
+    const applied = await applyCoachPatch(db, OWNER4, deloadPatch(false, true), ['d1'], TODAY)
+    expect(applied.ok).toBe(true)
+    expect(await weekAndFlags()).toEqual({ start: TODAY, flagged: 2 })
   })
 
   it('will not write a deload field onto another domain', async () => {
@@ -675,6 +754,38 @@ describe.skipIf(!canRun)('AI Coach — create-on-swap', () => {
     // undo is about the change that was made, not about erasing an exercise from the app.
     const { rows: lib } = await pool.query(`SELECT 1 FROM exercise_library WHERE name = $1`, [NEW_NAME])
     expect(lib).toHaveLength(1)
+  })
+
+  // #4129: a swap to a name with nothing visible would put a nameless lift in the plan.
+  it('refuses a swap to a name with no visible character, in the preview and the apply, and creates nothing', async () => {
+    const blank: CoachPatch = {
+      domain: 'session_exercise', targetId: adminExId,
+      changes: [
+        { id: 'c1', field: 'exerciseName', from: 'Coach Test Row', to: '\u200B' },
+        { id: 'c2', field: 'newExerciseMuscles', from: null, to: 'Hamstrings' },
+      ],
+    }
+    const preview = await previewPatch(db, ADMIN, blank)
+    expect(preview.refusal).toBe('Give the exercise a name')
+    const result = await applyCoachPatch(db, ADMIN, blank, ['c1', 'c2'])
+    expect(result.ok).toBe(false)
+    expect(result.ok === false && result.reason).toBe('invalid')
+    const { rows } = await pool.query(`SELECT 1 FROM exercise_library WHERE name = $1`, ['\u200B'])
+    expect(rows).toHaveLength(0)
+    const { rows: se } = await pool.query(`SELECT exercise_name FROM session_exercises WHERE id = $1`, [adminExId])
+    expect(se[0].exercise_name).toBe('Coach Test Row')
+  })
+
+  it('a lift already stored with a blank name can still be swapped to a real one', async () => {
+    await pool.query(`UPDATE session_exercises SET exercise_name = $1 WHERE id = $2`, ['\u200B', adminExId])
+    const real: CoachPatch = {
+      domain: 'session_exercise', targetId: adminExId,
+      changes: [{ id: 'c1', field: 'exerciseName', from: '\u200B', to: 'Coach Test Row' }],
+    }
+    const result = await applyCoachPatch(db, ADMIN, real, ['c1'])
+    expect(result.ok).toBe(true)
+    const { rows: se } = await pool.query(`SELECT exercise_name FROM session_exercises WHERE id = $1`, [adminExId])
+    expect(se[0].exercise_name).toBe('Coach Test Row')
   })
 
   it('still refuses a plain swap to an unknown name — a typo must not create anything', async () => {
