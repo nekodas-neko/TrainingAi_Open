@@ -101,6 +101,11 @@ describe.skipIf(!canRun)('error text is scrubbed at the writer (#3673)', () => {
   it('the in-process redecode and stress-backfill paths, into the job row', async () => {
     const err = await realError()
     vi.resetModules()
+    // A built worker bundle (`.rollup-worker/`) may exist in a full run; this test is the in-process path.
+    vi.doMock('fs', async (orig) => {
+      const actual = await orig<typeof import('fs')>()
+      return { ...actual, default: actual, existsSync: (f: unknown) => String(f).includes('.rollup-worker') ? false : actual.existsSync(f as string) }
+    })
     vi.doMock('@/lib/data', () => ({
       getRepositoryAsync: async () => ({
         redecodeOuraRawSamples: async () => { throw err },
@@ -112,6 +117,7 @@ describe.skipIf(!canRun)('error text is scrubbed at the writer (#3673)', () => {
     const phases = await w.runRedecodeOffLoop(USER, 'Australia/Brisbane', {}, true)
     const stress = await w.runStressBackfillOffLoop(USER, 'Australia/Brisbane', true)
     vi.doUnmock('@/lib/data')
+    vi.doUnmock('fs')
     clean(phases); clean(stress)
     expect(phases.redecodeError).toContain('[22P02]')
 
