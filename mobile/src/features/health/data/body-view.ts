@@ -112,6 +112,17 @@ export function weightSeriesOver<T extends { date: string; weightKg?: number | n
     .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
 }
 
+/**
+ * What a weight card draws and how it names it: the weigh-ins over `days`, from the 30-day series.
+ */
+export function weightWindow<T extends { date: string; weightKg?: number | null }>(
+  series: readonly T[],
+  today: string,
+  days: number,
+): { rows: T[]; days: number } {
+  return { rows: weightSeriesOver(series, today, days), days };
+}
+
 /** The weight card's pace line: "On track · -0.4 kg/wk over 14 days", or null at goal or without a trend. */
 export function weightPaceLine(
   weight: number | null,

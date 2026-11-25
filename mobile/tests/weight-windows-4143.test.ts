@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
-import { WEIGHT_PACE_WINDOW_DAYS, weightSeriesOver } from '../src/features/health/data/body-view.ts';
+import { WEIGHT_TREND_WINDOW_DAYS } from '@trainingai/shared/health/long-term-goal-progress';
+import { WEIGHT_PACE_WINDOW_DAYS, weightSeriesOver, weightWindow } from '../src/features/health/data/body-view.ts';
 
 // #4143 item 8: each weight rate names its window and its chart is drawn over that window.
 
@@ -31,14 +31,11 @@ test('a day with no weight is not drawn', () => {
   assert.deepEqual(weightSeriesOver(rows, '2026-11-30', 14).map((r) => r.date), ['2026-11-29']);
 });
 
-test('each card names its window and draws over it, not over the same seven days', () => {
-  const src = readFileSync(
-    new URL('../src/features/health/components/BodyWeightCards.tsx', import.meta.url),
-    'utf8',
-  );
-  assert.match(src, /weightSeriesOver<WeighIn>\(weightSeries \?\? rows, today, WEIGHT_PACE_WINDOW_DAYS\)/);
-  assert.match(src, /weightSeriesOver<WeighIn>\(weightSeries \?\? rows, today, WEIGHT_TREND_WINDOW_DAYS\)/);
-  assert.match(src, /`Last \$\{WEIGHT_PACE_WINDOW_DAYS\} days`/);
-  assert.match(src, /`Rate over \$\{WEIGHT_TREND_WINDOW_DAYS\} days`/);
-  assert.doesNotMatch(src, /'Last 7 days'/);
+test('each card draws its own window: 14 days for the pace, 30 for the trend', () => {
+  const pace = weightWindow(series, '2026-11-30', WEIGHT_PACE_WINDOW_DAYS);
+  const trend = weightWindow(series, '2026-11-30', WEIGHT_TREND_WINDOW_DAYS);
+  assert.equal(pace.days, 14);
+  assert.equal(pace.rows.length, 14);
+  assert.equal(trend.days, 30);
+  assert.equal(trend.rows.length, 30);
 });

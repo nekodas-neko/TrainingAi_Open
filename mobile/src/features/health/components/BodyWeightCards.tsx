@@ -14,7 +14,7 @@ import {
   readingCount,
   signedRate,
   weightPaceLine,
-  weightSeriesOver,
+  weightWindow,
 } from '../data/body-view';
 import { HealthMetricCard } from './HealthMetricCard';
 import { useCueColor } from './RangeBar';
@@ -64,8 +64,9 @@ export function BodyWeightCard({
   const { theme } = useTheme();
   const cueColor = useCueColor();
   // The pace is fitted over the last 14 days, so the line is drawn over those 14 days.
+  const drawn = weightWindow<WeighIn>(weightSeries ?? rows, today, WEIGHT_PACE_WINDOW_DAYS);
   const points = trendPoints(
-    weightSeriesOver<WeighIn>(weightSeries ?? rows, today, WEIGHT_PACE_WINDOW_DAYS),
+    drawn.rows,
     (row) => row.weightKg ?? null,
   );
   const gap =
@@ -79,7 +80,7 @@ export function BodyWeightCard({
       decimals={1}
       accent={bodyCardColors.weight}
       headingColor={bodyHeadingColors[theme.mode].weight}
-      caption={weightDate && weightDate !== today ? `Last logged ${formatDateDisplay(weightDate, 'short')}` : `Last ${WEIGHT_PACE_WINDOW_DAYS} days`}
+      caption={weightDate && weightDate !== today ? `Last logged ${formatDateDisplay(weightDate, 'short')}` : `Last ${drawn.days} days`}
       onLog={onLog}
       onOpen={onOpen}
       points={points}
@@ -125,8 +126,9 @@ export function WeightTrendCard({
 }) {
   const { theme } = useTheme();
   // The slope is fitted over the last 30 days, and the line is drawn over the same 30 days.
+  const drawn = weightWindow<WeighIn>(weightSeries ?? rows, today, WEIGHT_TREND_WINDOW_DAYS);
   const points = trendPoints(
-    weightSeriesOver<WeighIn>(weightSeries ?? rows, today, WEIGHT_TREND_WINDOW_DAYS),
+    drawn.rows,
     (row) => row.weightKg ?? null,
   );
   return (
@@ -136,7 +138,7 @@ export function WeightTrendCard({
       value={slope === null ? null : undefined}
       unit="kg/wk"
       tone="recovery"
-      caption={slope === null ? 'Need more data' : `Rate over ${WEIGHT_TREND_WINDOW_DAYS} days`}
+      caption={slope === null ? 'Need more data' : `Rate over ${drawn.days} days`}
       points={points.filter((p) => p.value !== null).length >= 2 ? points : undefined}
       chart={{ readable: true, gaps: 'connect', axisLabels: endLabels(points) }}
     >

@@ -18,6 +18,7 @@ import {
   StatusIndicator,
 } from '../../../shared/ui';
 import { useHome } from '../data/HomeProvider';
+import { readinessChips, readinessMarkCaption } from '../data/readiness-chips';
 import { useHealthData } from '../../health/data/HealthDataProvider';
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { recoverySpec } from '../../health/data/models';
@@ -77,6 +78,7 @@ export function ExerciseReadinessSheet({
     session?.muscleActivations?.map((row) => row.muscle) ??
     session?.exercises.flatMap((row) => row.muscles) ??
     [];
+  const markCaption = readinessMarkCaption(sessionMuscles);
   // #3764: only a tick the lifter put there lightens anything, so only those reach the preview.
   const lifterReported = soreTickProvenance(muscles, suggestions).lifterReported;
   const overlap = lifterReported.filter((muscle) =>
@@ -162,12 +164,7 @@ export function ExerciseReadinessSheet({
               key={group.label}
               label={group.label}
               value={muscles}
-              options={group.muscles.map((value) => ({
-                value,
-                marked: suggestions.includes(value),
-                flagged: sessionMuscles.some((target) => moodMuscleMatches(target, value)),
-                label: value,
-              }))}
+              options={readinessChips(group.muscles, suggestions, sessionMuscles)}
               flagLabel="in today’s session"
               onChange={(next) => {
                 setTouched(true);
@@ -177,9 +174,9 @@ export function ExerciseReadinessSheet({
           ))}
         </Stack>
       </Stack>
-      {sessionMuscles.length > 0 && (
+      {markCaption && (
         <AppText variant="caption" tone="muted">
-          Marked: in today’s session
+          {markCaption}
         </AppText>
       )}
       {suggestions.length > 0 && (

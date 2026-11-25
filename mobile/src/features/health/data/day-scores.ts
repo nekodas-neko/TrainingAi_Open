@@ -13,3 +13,21 @@ export function dayScoreTile(
   const text = metricValue(value);
   return text === '—' ? { text: missing, muted: true } : { text, muted: false };
 }
+
+/** The day screen's four tiles, in order, each already worded: a figure, or what is missing in its own words. */
+export function dayScoreRows(
+  data:
+    | {
+        scores?: { readiness?: unknown; sleep?: unknown; activity?: unknown } | null;
+        bodyMeta?: { restingHeartRate?: unknown } | null;
+      }
+    | null
+    | undefined,
+): { label: 'Readiness' | 'HR' | 'Sleep' | 'Move'; text: string; muted: boolean }[] {
+  return [
+    { label: 'Readiness' as const, ...dayScoreTile(data?.scores?.readiness, 'No score') },
+    { label: 'HR' as const, ...dayScoreTile(data?.bodyMeta?.restingHeartRate, 'No reading') },
+    { label: 'Sleep' as const, ...dayScoreTile(data?.scores?.sleep, 'No score') },
+    { label: 'Move' as const, ...dayScoreTile(data?.scores?.activity, 'No score') },
+  ];
+}

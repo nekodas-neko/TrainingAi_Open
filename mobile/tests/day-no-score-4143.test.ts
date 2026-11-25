@@ -1,8 +1,7 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
-import { dayScoreTile } from '../src/features/health/data/day-scores.ts';
+import { dayScoreRows, dayScoreTile } from '../src/features/health/data/day-scores.ts';
 
 // #4143 item 11: an unscored day says "No score" in muted text, not a coloured dash.
 
@@ -17,11 +16,20 @@ test('a score of zero is a score, and a real score keeps its figure and colour',
   assert.deepEqual(dayScoreTile(82, 'No score'), { text: '82', muted: false });
 });
 
-test('resting heart rate, a reading and not a score, says "No reading"', () => {
-  const src = readFileSync(
-    new URL('../src/features/health/screens/HealthDayScreen.tsx', import.meta.url),
-    'utf8',
+test('the day screen tiles: an empty day says "No score" for scores and "No reading" for resting heart rate', () => {
+  assert.deepEqual(dayScoreRows(null), [
+    { label: 'Readiness', text: 'No score', muted: true },
+    { label: 'HR', text: 'No reading', muted: true },
+    { label: 'Sleep', text: 'No score', muted: true },
+    { label: 'Move', text: 'No score', muted: true },
+  ]);
+  assert.deepEqual(
+    dayScoreRows({ scores: { readiness: 82, sleep: 0 }, bodyMeta: { restingHeartRate: 51 } }),
+    [
+      { label: 'Readiness', text: '82', muted: false },
+      { label: 'HR', text: '51', muted: false },
+      { label: 'Sleep', text: '0', muted: false },
+      { label: 'Move', text: 'No score', muted: true },
+    ],
   );
-  assert.match(src, /label: 'HR',[\s\S]*?missing: 'No reading'/);
-  assert.equal((src.match(/missing: 'No score'/g) ?? []).length, 3);
 });

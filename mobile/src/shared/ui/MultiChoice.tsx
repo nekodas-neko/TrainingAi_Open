@@ -1,4 +1,5 @@
 import { feedback } from '../../integrations/feedback/haptics';
+import { choiceSpokenLabel } from './choice-label';
 import { Pressable, View } from 'react-native';
 import { AppText } from './AppText';
 import { Icon } from './Icon';
@@ -38,15 +39,7 @@ export function MultiChoice({
             accessibilityRole="checkbox"
             accessibilityState={{ checked: value.includes(option.value) }}
             aria-checked={value.includes(option.value)}
-            accessibilityLabel={
-              option.marked || option.flagged
-                ? [
-                    option.label,
-                    ...(option.flagged && flagLabel ? [flagLabel] : []),
-                    ...(option.marked ? ['suggested'] : []),
-                  ].join(', ')
-                : undefined
-            }
+            accessibilityLabel={choiceSpokenLabel(option, flagLabel)}
             onPress={() => {
               feedback();
               onChange(
