@@ -70,6 +70,7 @@ export function BodyPanel({
       <GroupTitle>Body</GroupTitle>
       <BodyWeightCard
         rows={rows}
+        weightSeries={health.body?.weightTrend}
         today={health.today}
         weight={weight}
         weightDate={weightDate ?? undefined}
@@ -80,6 +81,8 @@ export function BodyPanel({
       />
       <WeightTrendCard
         rows={rows}
+        weightSeries={health.body?.weightTrend}
+        today={health.today}
         slope={slope}
         weight={weight}
         fat={fat}

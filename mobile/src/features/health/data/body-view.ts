@@ -1,5 +1,5 @@
 import { formatWaterMl } from '@trainingai/shared/format/number';
-import { formatDateDisplay, formatTimeOfDay } from '@trainingai/shared/date-utils';
+import { formatDateDisplay, formatTimeOfDay, shiftDateStr } from '@trainingai/shared/date-utils';
 import { formatHoursMinutes } from '@trainingai/shared/format/units';
 import { actualSleepWindow, wokeTime } from '@trainingai/shared/health/actual-sleep-window';
 import { evaluateWeightRateVsGoalBand } from '@trainingai/shared/health/long-term-goal-progress';
@@ -89,7 +89,30 @@ export function sleepChips(row: SleepRow): { stages: SleepChip[]; vitals: SleepC
   };
 }
 
-/** The weight card's pace line: "On track · -0.4 kg/wk", or null at goal or without a trend. */
+/**
+ * The days the progress summary's weekly rate is fitted over (`fourteenDaysAgo` in
+ * app/api/progress-summary/route.ts). The pace line names it and the weight card's chart is drawn
+ * over it. The Weight Trend card's own rate is `WEIGHT_TREND_WINDOW_DAYS` (30) long.
+ */
+export const WEIGHT_PACE_WINDOW_DAYS = 14;
+
+/**
+ * The weigh-ins of the last `days` local days ending `today`, newest first (the order the cards'
+ * chart helper expects). Rows without a weight are dropped. Only picks which points are drawn; it
+ * is not a rate calculation.
+ */
+export function weightSeriesOver<T extends { date: string; weightKg?: number | null }>(
+  series: readonly T[],
+  today: string,
+  days: number,
+): T[] {
+  const from = shiftDateStr(today, -(days - 1));
+  return series
+    .filter((row) => row.weightKg != null && row.date >= from && row.date <= today)
+    .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+}
+
+/** The weight card's pace line: "On track · -0.4 kg/wk over 14 days", or null at goal or without a trend. */
 export function weightPaceLine(
   weight: number | null,
   target: number | null,
@@ -111,7 +134,10 @@ export function weightPaceLine(
           ? 'Faster than ideal pace'
           : 'Trending away from goal';
   const cue: Cue = status === 'on_track' ? 'good' : status === 'wrong_direction' ? 'bad' : 'watch';
-  return { text: `${label} · ${signedRate(rate)} kg/wk`, cue };
+  return {
+    text: `${label} · ${signedRate(rate)} kg/wk over ${WEIGHT_PACE_WINDOW_DAYS} days`,
+    cue,
+  };
 }
 
 /** The HRV card cue: the band of the 7-day deviation from the 28-day baseline, as the current app maps it. */

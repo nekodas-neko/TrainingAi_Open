@@ -9,15 +9,22 @@ import { AppText, Badge, Disclosure, ProgressBar, Stack } from '../../../shared/
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { bodyCardColors, bodyHeadingColors } from '../../../shared/theme/tokens';
 import { displayFat, metricValue, type BodyRow } from '../data/models';
-import { readingCount, signedRate, weightPaceLine } from '../data/body-view';
+import {
+  WEIGHT_PACE_WINDOW_DAYS,
+  readingCount,
+  signedRate,
+  weightPaceLine,
+  weightSeriesOver,
+} from '../data/body-view';
 import { HealthMetricCard } from './HealthMetricCard';
 import { useCueColor } from './RangeBar';
 
+type WeighIn = { date: string; weightKg?: number | null };
 type Calibration = { offsetPct: number | null; pairCount: number | null } | null | undefined;
 
-// The weight and body-fat cards plot the last seven days of readings. They are oldest first, and
+// The body-fat card plots the last seven days of readings; the two weight cards each plot their own rate's window (14 and 30 days). They are oldest first, and
 // the axis names the first and last day (the cards are narrow, so a label per point would collide).
-function trendPoints(rows: readonly BodyRow[], value: (row: BodyRow) => number | null) {
+function trendPoints<T extends { date: string }>(rows: readonly T[], value: (row: T) => number | null) {
   return [...rows].reverse().map((row) => ({
     label: row.date,
     value: value(row),
@@ -33,6 +40,7 @@ function endLabels(points: readonly { label: string; value: number | null }[]) {
 
 export function BodyWeightCard({
   rows,
+  weightSeries,
   today,
   weight,
   weightDate,
@@ -42,6 +50,8 @@ export function BodyWeightCard({
   onOpen,
 }: {
   rows: readonly BodyRow[];
+  /** The 30-day weigh-ins (`weightTrend`), or none when that read failed: the chart falls back to `rows`. */
+  weightSeries?: readonly { date: string; weightKg: number }[] | null;
   today: string;
   weight: number | null;
   weightDate: string | undefined;
@@ -53,7 +63,11 @@ export function BodyWeightCard({
 }) {
   const { theme } = useTheme();
   const cueColor = useCueColor();
-  const points = trendPoints(rows, (row) => row.weightKg);
+  // The pace is fitted over the last 14 days, so the line is drawn over those 14 days.
+  const points = trendPoints(
+    weightSeriesOver<WeighIn>(weightSeries ?? rows, today, WEIGHT_PACE_WINDOW_DAYS),
+    (row) => row.weightKg ?? null,
+  );
   const gap =
     weight !== null && targetWeightKg !== null ? goalRemaining(weight, targetWeightKg) : null;
   const pace = weightPaceLine(weight, targetWeightKg, weightRateKgPerWeek);
@@ -65,7 +79,7 @@ export function BodyWeightCard({
       decimals={1}
       accent={bodyCardColors.weight}
       headingColor={bodyHeadingColors[theme.mode].weight}
-      caption={weightDate && weightDate !== today ? `Last logged ${formatDateDisplay(weightDate, 'short')}` : 'Last 7 days'}
+      caption={weightDate && weightDate !== today ? `Last logged ${formatDateDisplay(weightDate, 'short')}` : `Last ${WEIGHT_PACE_WINDOW_DAYS} days`}
       onLog={onLog}
       onOpen={onOpen}
       points={points}
@@ -87,6 +101,8 @@ export function BodyWeightCard({
 
 export function WeightTrendCard({
   rows,
+  weightSeries,
+  today,
   slope,
   weight,
   fat,
@@ -96,6 +112,9 @@ export function WeightTrendCard({
   targetBfPct,
 }: {
   rows: readonly BodyRow[];
+  /** The 30-day weigh-ins (`weightTrend`), or none when that read failed: the chart falls back to `rows`. */
+  weightSeries?: readonly { date: string; weightKg: number }[] | null;
+  today: string;
   slope: number | null;
   weight: number | null;
   fat: number | null;
@@ -105,7 +124,11 @@ export function WeightTrendCard({
   targetBfPct: number | null;
 }) {
   const { theme } = useTheme();
-  const points = trendPoints(rows, (row) => row.weightKg);
+  // The slope is fitted over the last 30 days, and the line is drawn over the same 30 days.
+  const points = trendPoints(
+    weightSeriesOver<WeighIn>(weightSeries ?? rows, today, WEIGHT_TREND_WINDOW_DAYS),
+    (row) => row.weightKg ?? null,
+  );
   return (
     <HealthMetricCard
       title="Weight Trend"
@@ -113,7 +136,7 @@ export function WeightTrendCard({
       value={slope === null ? null : undefined}
       unit="kg/wk"
       tone="recovery"
-      caption={slope === null ? 'Need more data' : `Last ${WEIGHT_TREND_WINDOW_DAYS} days`}
+      caption={slope === null ? 'Need more data' : `Rate over ${WEIGHT_TREND_WINDOW_DAYS} days`}
       points={points.filter((p) => p.value !== null).length >= 2 ? points : undefined}
       chart={{ readable: true, gaps: 'connect', axisLabels: endLabels(points) }}
     >
