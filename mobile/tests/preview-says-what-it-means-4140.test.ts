@@ -63,7 +63,6 @@ const DATE_SITES: [string, RegExp][] = [
   ['workouts/components/PreviousSession.tsx', /Source: \{formatDateDisplay\(/],
   ['workouts/screens/GuidedWorkoutScreen.tsx', /formatDateDisplay\(exercise\.lastDate/],
   ['workouts/components/ExerciseHistory.tsx', /formatDateDisplay\(entry\.date/],
-  ['workouts/components/InjuryManager.tsx', /since \{formatDateDisplay\(/],
   ['health/components/MuscleStatusCard.tsx', /Resolved \{formatDateDisplay\(/],
   ['health/components/MetricHistorySheet.tsx', /title=\{formatDateDisplay\(row\.date/],
   ['health/components/ActivityDetails.tsx', /\{formatDateDisplay\(log\.date/],

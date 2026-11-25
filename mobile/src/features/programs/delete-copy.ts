@@ -13,3 +13,10 @@ export function deleteProgramMessage(): string {
 export function deleteItemMessage(): string {
   return 'This removes the selected item from your account.';
 }
+
+/** The Program screen's injuries row: how many are active, and where they are managed. */
+export function injuriesSubtitle(active: number | undefined): string {
+  const where = 'Add or update them in Health › Body';
+  if (active === undefined) return where;
+  return `${active === 0 ? 'No active injuries' : active === 1 ? '1 active injury' : `${active} active injuries`} · ${where}`;
+}

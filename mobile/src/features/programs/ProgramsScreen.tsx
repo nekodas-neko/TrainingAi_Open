@@ -1,4 +1,4 @@
-import { deleteItemMessage, deleteProgramMessage } from './delete-copy';
+import { deleteItemMessage, deleteProgramMessage, injuriesSubtitle } from './delete-copy';
 import { plural } from '@trainingai/shared/format/plural';
 import { useEffect, useState } from 'react';
 import {
@@ -7,7 +7,9 @@ import {
   Card,
   ConfirmationCard,
   Disclosure,
+  Icon,
   IconButton,
+  ListRow,
   Notice,
   Sheet,
   Stack,
@@ -20,6 +22,7 @@ import {
   programSpec,
   stylesSpec,
   phaseSetsSpec,
+  injurySpec,
 } from '../workouts/data/models';
 import { useWorkoutAction } from '../workouts/data/useWorkoutAction';
 import { useWorkoutContext } from '../workouts/WorkoutProvider';
@@ -28,15 +31,18 @@ import { ProgramEditor } from './ProgramEditor';
 import { StyleEditor } from './StyleEditor';
 import { PhaseEditor } from './PhaseEditor';
 import { ProgramCard } from './ProgramCard';
-import { InjuryManager } from '../workouts/components/InjuryManager';
 
 export function ProgramsScreen({
   onBack,
   openBuilder,
+  openInjuries,
 }: {
   onBack: () => void;
   openBuilder: () => void;
+  /** Opens Health › Body, where injuries are added and resolved. */
+  openInjuries: () => void;
 }) {
+  const injuries = useWorkoutResource(injurySpec);
   const programs = useWorkoutResource(programSpec);
   const styles = useWorkoutResource(stylesSpec);
   const phases = useWorkoutResource(phaseSetsSpec);
@@ -264,9 +270,16 @@ export function ProgramsScreen({
           ))}
         </Disclosure>
       </Disclosure>
-      <Disclosure compact title="Recorded injuries">
-        <InjuryManager showSync={false} />
-      </Disclosure>
+      {/* One place manages injuries: Health › Body (#4143). This row only points there. */}
+      <Card padded={false}>
+        <ListRow
+          title="Injuries"
+          subtitle={injuriesSubtitle(injuries.data?.filter((injury) => !injury.resolvedDate).length)}
+          trailing={<Icon name="forward" tone="muted" />}
+          onPress={openInjuries}
+          divider={false}
+        />
+      </Card>
       {reviewId && (
         <WorkoutReviewSheet
           key={`${programs.resources?.connection.userId}:${reviewId}`}

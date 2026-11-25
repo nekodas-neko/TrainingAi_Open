@@ -87,7 +87,7 @@ export function MuscleStatusCard() {
             }}
           />
           <AppButton
-            title="+ Add injury"
+            title="Add injury"
             variant="ghost"
             onPress={() => {
               setEditing('new');
@@ -138,7 +138,7 @@ export function MuscleStatusCard() {
       </Card>
       <Sheet
         visible={editing !== null}
-        title={editing === 'new' ? 'Record Injury' : 'Edit Injury'}
+        title={editing === 'new' ? 'Add injury' : 'Edit Injury'}
         onClose={() => setEditing(null)}
       >
         {editing && (
