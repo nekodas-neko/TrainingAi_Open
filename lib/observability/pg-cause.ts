@@ -55,7 +55,7 @@ function isPgError(v: unknown): v is PgCause & { message: string } {
  */
 export function scrubOwnPgMessage(err: unknown, text: string): string {
   if (!isPgError(err) || err.message.length === 0) return text
-  const clean = scrubPgMessage(err.message)
+  const clean = scrubPgMessage(err.message, err.code)
   return clean === err.message ? text : text.split(err.message).join(clean)
 }
 
@@ -79,9 +79,9 @@ export function summariseCause(err: unknown): { prefix: string; block: string | 
   const code = str(cause.code)
   const rawMessage = str(cause.message)
   // A cause that is not a pg error can still be a Drizzle error whose message ends in `params:`.
-  const causeMessage = rawMessage && scrubPgMessage(scrubBoundParams(rawMessage))
+  const causeMessage = rawMessage && scrubPgMessage(scrubBoundParams(rawMessage, cause), isPgError(cause) ? code : undefined)
   const rawDetail = str(cause.detail)
-  const detail = rawDetail && scrubPgDetail(rawDetail)
+  const detail = rawDetail && scrubPgDetail(rawDetail, isPgError(cause) ? code : undefined)
   const prefix = code
     ? `[pg ${code}] `
     : causeMessage

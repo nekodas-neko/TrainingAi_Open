@@ -62,7 +62,7 @@ describe('safeErrorText / scrubErrorText / scrubErrorStack', () => {
 
 describe.skipIf(!canRun)('the shared sinks write no value (#3673)', () => {
   let pool: import('pg').Pool
-  const TAG = '/api/__3673b'
+  const TAG = '/api/__chaincause'
   const rowFor = async (url: string) =>
     (await pool.query(`SELECT message, stack FROM error_events WHERE url = $1 ORDER BY created_at DESC LIMIT 1`, [url])).rows[0] as { message: string; stack: string | null } | undefined
 

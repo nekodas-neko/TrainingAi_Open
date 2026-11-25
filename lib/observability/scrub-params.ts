@@ -13,26 +13,92 @@
 const MARKER = '\nparams:'
 export const SCRUBBED_PARAMS = 'params: [scrubbed]'
 
-/**
- * For a message: everything from the `params:` line to the end goes, since in a Drizzle message
- * the parameters are the tail and a value can itself contain a newline. A message that quotes
- * another error's message (`first: ${String(err)}`) is cut at the same point.
- */
-export function scrubBoundParams(message: string): string {
-  const cut = message.indexOf(MARKER)
-  return cut === -1 ? message : `${message.slice(0, cut)}\n${SCRUBBED_PARAMS}`
+// A real stack frame, strictly: `    at fn (file:1:2)`, `    at file:1:2`, `    at async fn (file:1:2)`,
+// `    at new Promise (<anonymous>)`. A bare `    at the gym` inside a parameter value is NOT one,
+// which is what the first version of this file got wrong (#3673 review).
+const FRAME_LINE = /^\s+at (?:[^\n]*\((?:[^\n()]*:\d+:\d+|<anonymous>|native|unknown location)\)|[^\n()\s]*:\d+:\d+|<anonymous>)$/
+
+/** Splits a stack into its text and the trailing run of strict frame lines. */
+function splitFrames(stack: string): { head: string; frames: string } {
+  const lines = stack.split('\n')
+  let i = lines.length
+  while (i > 0 && FRAME_LINE.test(lines[i - 1])) i--
+  // The first line is always message text, never a frame.
+  if (i === 0) i = 1
+  return { head: lines.slice(0, i).join('\n'), frames: lines.slice(i).map(l => `\n${l}`).join('') }
 }
 
 /**
- * For a stack: the same cut, but the stack frames that follow the message are kept, because they
- * say where the query came from. The parameters end at the first frame line (`\n    at `).
+ * The exact parameter text of a Drizzle query error, from `.params`, walking the cause chain:
+ * `${params}` as Drizzle itself writes it into the message, and every string parameter long enough
+ * to be a value rather than a SQL fragment. Parameters that cannot be read are skipped, never thrown on.
  */
-export function scrubBoundParamsInStack(stack: string): string {
-  const cut = stack.indexOf(MARKER)
-  if (cut === -1) return stack
-  const rest = stack.slice(cut + MARKER.length)
-  const frame = rest.search(/\n\s+at /)
-  return `${stack.slice(0, cut)}\n${SCRUBBED_PARAMS}${frame === -1 ? '' : rest.slice(frame)}`
+function paramsOf(err: unknown): { tail: string; values: string[] }[] {
+  const out: { tail: string; values: string[] }[] = []
+  const seen = new Set<unknown>()
+  let cur: unknown = err
+  for (let depth = 0; depth < 6 && cur && typeof cur === 'object' && !seen.has(cur); depth++) {
+    seen.add(cur)
+    const params = (cur as { params?: unknown }).params
+    if (Array.isArray(params)) {
+      let tail = ''
+      try { tail = String(params) } catch { tail = '' }
+      const query = typeof (cur as { query?: unknown }).query === 'string' ? (cur as { query: string }).query : ''
+      const values: string[] = []
+      for (const p of params) {
+        let t = ''
+        try { t = typeof p === 'object' && p !== null && !(p instanceof Date) ? (Buffer.isBuffer(p) ? p.toString() : JSON.stringify(p) ?? '') : String(p) } catch { t = '' }
+        if (t.length >= 8 && !query.includes(t)) values.push(t)
+      }
+      out.push({ tail, values })
+    }
+    cur = (cur as { cause?: unknown }).cause
+  }
+  return out
+}
+
+function removeExactParams(text: string, err: unknown): string {
+  let t = text
+  for (const { tail, values } of paramsOf(err)) {
+    if (tail.length > 0) t = t.split(tail).join('[scrubbed]')
+    for (const v of values) t = t.split(v).join('[scrubbed]')
+  }
+  return t
+}
+
+/**
+ * For a message: everything from the first `params:` line to the end goes, since in a Drizzle message
+ * the parameters are the tail and a value can itself contain a newline. A message that quotes
+ * another error's message (`first: ${String(err)}`) is cut at the same point. With `err`, the exact
+ * parameter text of that error (and of its causes) is removed first, wherever it appears.
+ */
+export function scrubBoundParams(message: string, err?: unknown): string {
+  const text = err === undefined ? message : removeExactParams(message, err)
+  const cut = text.indexOf(MARKER)
+  return cut === -1 ? text : `${text.slice(0, cut)}\n${SCRUBBED_PARAMS}`
+}
+
+/**
+ * For a stack: the stack frames after the message are kept, because they say where the query came
+ * from. With `err`, its exact parameters are removed first. Without it (or for what that leaves),
+ * every `params:` line starts a cut that runs to the next STRICT frame line (`at fn (file:1:2)`),
+ * and a later marker is cut the same way. A parameter that fakes a frame line can still end its own
+ * cut early, which is why the exact removal comes first and why this is only the fallback.
+ */
+export function scrubBoundParamsInStack(stack: string, err?: unknown): string {
+  const text = err === undefined ? stack : removeExactParams(stack, err)
+  if (!text.includes(MARKER) && !text.startsWith('params:')) return text
+  const out: string[] = []
+  let skipping = false
+  for (const line of text.split('\n')) {
+    if (skipping) {
+      if (FRAME_LINE.test(line)) { skipping = false; out.push(line) }
+      continue
+    }
+    if (line.startsWith('params:')) { out.push(SCRUBBED_PARAMS); skipping = true; continue }
+    out.push(line)
+  }
+  return out.join('\n')
 }
 
 // ── #3685: the values Postgres itself echoes back ─────────────────────────────────────────────
@@ -84,7 +150,10 @@ const DETAIL_TEMPLATES: { re: RegExp; out: (m: RegExpMatchArray) => string }[] =
  * A pg error's `detail`, with every value replaced by `(…)`. A detail in none of the known shapes
  * fails closed: anything after `=(` or `contains (`, and every double-quoted string, goes.
  */
-export function scrubPgDetail(detail: string): string {
+export function scrubPgDetail(detail: string, code?: unknown): string {
+  // Class 22 details that echo a value without quoting it (invalid XML: the offending line and a
+  // caret; untranslatable character: its bytes). Fail closed: the detail goes, the message stays.
+  if (typeof code === 'string' && /^22(00[MNST]|P05|021)$/.test(code)) return SCRUBBED_VALUE
   for (const { re, out } of DETAIL_TEMPLATES) {
     const m = detail.match(re)
     if (m) return out(m)
@@ -95,13 +164,33 @@ export function scrubPgDetail(detail: string): string {
     .replace(/"[^"]*"/g, `"${SCRUBBED_VALUE}"`)
 }
 
+const SQLSTATE_CLASS_22 = /^22[0-9A-Z]{3}$/
+
 /**
- * A pg error's `message`, with the quoted value after a colon replaced by `"…"`. Postgres does not
- * escape quotes inside that value, so everything from `: "` to the last `"` on the line goes.
+ * A pg error's `message`, with every echoed value replaced by `"…"`. Postgres does not escape quotes
+ * inside the value and the value can span lines, so a value is taken from its opening quote to the
+ * LAST quote in the text, never to the first closing one:
+ *   - after a colon:   `invalid input syntax for type uuid: "x"`  (22P02, 22007, enum, date, …)
+ *   - the other shapes: `value "x" is out of range for type integer`, `time zone "x" not recognized`,
+ *     `invalid value "x" for "YYYY"`, `"x" is out of range for type double precision`
+ *   - with `code` of class 22 (data exception), whatever the shape: first quote to last quote, and
+ *     any `0x..` byte run. Fail closed: a class 22 message with a shape not listed here still goes.
  * A message with no such value (`canceling statement due to statement timeout`) is unchanged.
  */
-export function scrubPgMessage(message: string): string {
-  return message.replace(/: "[^\n]*"(?=\n|$)/g, `: "${SCRUBBED_VALUE}"`)
+export function scrubPgMessage(message: string, code?: unknown): string {
+  let m = message
+  if (typeof code === 'string' && SQLSTATE_CLASS_22.test(code)) {
+    const first = m.indexOf('"')
+    const last = m.lastIndexOf('"')
+    if (first !== -1 && last > first) m = `${m.slice(0, first)}"${SCRUBBED_VALUE}"${m.slice(last + 1)}`
+    m = m.replace(/0x[0-9a-fA-F]{2}(?: 0x[0-9a-fA-F]{2})*/g, `0x${SCRUBBED_VALUE}`)
+  }
+  return m
+    .replace(/: "[\s\S]*"/, `: "${SCRUBBED_VALUE}"`)
+    .replace(/\bvalue "[\s\S]*" is out of range for type/, `value "${SCRUBBED_VALUE}" is out of range for type`)
+    .replace(/(^|\n)"[\s\S]*" is out of range for type/, `$1"${SCRUBBED_VALUE}" is out of range for type`)
+    .replace(/\btime zone "[\s\S]*" not recognized/, `time zone "${SCRUBBED_VALUE}" not recognized`)
+    .replace(/\binvalid value "[\s\S]*" for "[^"]*"/, `invalid value "${SCRUBBED_VALUE}" for "${SCRUBBED_VALUE}"`)
 }
 
 // ── One entry point for any free text an error leaves behind ──────────────────────────────────
@@ -109,18 +198,31 @@ export function scrubPgMessage(message: string): string {
 /**
  * Everything a stored or returned error message needs: Drizzle's `params:` tail and the value
  * Postgres quotes in its own message. Use this, not the two parts, wherever an error's text is
- * written to a table or answered to a client (#3673).
+ * written to a table or answered to a client (#3673). Pass the error itself when you have it: its
+ * exact parameters are then removed wherever they appear.
  */
-export function scrubErrorText(text: string): string {
-  return scrubPgMessage(scrubBoundParams(text))
+export function scrubErrorText(text: string, err?: unknown): string {
+  return scrubPgMessage(scrubBoundParams(text, err), pgCodeOf(err))
 }
 
 /** The same for a stack: the frames stay, the values go. */
-export function scrubErrorStack(stack: string): string {
-  return scrubPgMessage(scrubBoundParamsInStack(stack))
+export function scrubErrorStack(stack: string, err?: unknown): string {
+  const { head, frames } = splitFrames(scrubBoundParamsInStack(stack, err))
+  return scrubPgMessage(head, pgCodeOf(err)) + frames
+}
+
+/**
+ * The SQLSTATE of an error that IS a pg error (code and severity), so the class 22 rule applies to
+ * its own message. Not taken from a cause: a Drizzle wrapper's text is SQL with quoted identifiers,
+ * which the class rule would swallow; its cause's message is scrubbed on its own, with its code.
+ */
+function pgCodeOf(err: unknown): string | undefined {
+  if (!(err instanceof Error)) return undefined
+  const { code, severity } = err as { code?: unknown; severity?: unknown }
+  return typeof code === 'string' && /^[0-9A-Z]{5}$/.test(code) && typeof severity === 'string' ? code : undefined
 }
 
 /** `err` as text that is safe to store or return: never the raw message of a Drizzle or pg error. */
 export function safeErrorText(err: unknown): string {
-  return scrubErrorText(err instanceof Error ? err.message : String(err))
+  return scrubErrorText(err instanceof Error ? err.message : String(err), err)
 }
