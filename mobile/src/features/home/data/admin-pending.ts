@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { profileSpec } from '../../health/data/models';
-import { adminPendingTotal, adminSignupCount } from './admin-pending-counts';
+import { adminFeedbackCount, adminPendingTotal, adminSignupCount } from './admin-pending-counts';
 
 export const adminPendingSpec = {
   path: '/api/admin/pending-count',
@@ -18,6 +18,7 @@ export function useAdminPending() {
   const pending = useWorkoutResource(adminPendingSpec, admin);
   return {
     signups: admin ? adminSignupCount(pending.data) : 0,
+    feedback: admin ? adminFeedbackCount(pending.data) : 0,
     total: admin ? adminPendingTotal(pending.data) : 0,
   };
 }

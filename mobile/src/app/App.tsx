@@ -437,6 +437,7 @@ function AppShell() {
             openSession={openSession}
             openWorkout={openWorkout}
             openMore={() => selectTab('More')}
+            openAdmin={() => open({ screen: 'more-admin' })}
             openPrograms={openPrograms}
             openExplanation={(id) => open({ screen: 'session-explain', sessionId: id })}
             openStats={() => {

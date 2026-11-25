@@ -130,7 +130,7 @@ describe.skipIf(!canRun)('admin errors and feedback: an admin session must be th
       expect(other.count).toBeGreaterThanOrEqual(SEEDED.length)
 
       // One fixed count source, so the two roles must agree whatever other files do meanwhile.
-      const spy = vi.spyOn(repo, 'countInactiveUsers').mockResolvedValue(7)
+      const spy = vi.spyOn(repo, 'countPendingApprovalUsers').mockResolvedValue(7)
       try {
         asUser(OWNER)
         expect((await (await pending()).json() as { count: number }).count).toBe(7)

@@ -2,10 +2,12 @@ import { deviceHealthName } from '../../../integrations/device-health/platform';
 import { FriendsPanel } from '../../social/components/FriendsPanel';
 import { FriendCode } from '../../social/components/FriendCode';
 import { useState } from 'react';
+import { View } from 'react-native';
 import { z } from 'zod';
 import {
   AppButton,
   AppText,
+  AttentionDot,
   Card,
   ExpandableCard,
   FeatureRow,
@@ -20,6 +22,8 @@ import {
   StatusIndicator,
   TabPanel,
 } from '../../../shared/ui';
+import { useAdminPending } from '../../home/data/admin-pending';
+import { adminPendingSubtitle } from '../../home/data/admin-pending-counts';
 import { useAccountContext } from '../../account/AccountProvider';
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { useWorkoutContext } from '../../workouts/WorkoutProvider';
@@ -79,6 +83,7 @@ export function MoreScreen({
     history = useRewards(),
     seasons = useWorkoutResource(seasonsSpec);
   const user = profile.data?.user;
+  const adminPending = useAdminPending();
   const name =
     typeof user?.displayName === 'string'
       ? user.displayName
@@ -280,13 +285,25 @@ export function MoreScreen({
                   divider={false}
                 />
                 {user?.isAdmin === true && (
-                  <FeatureRow
-                    density="snug"
-                    title="Admin Console"
-                    onPress={openAdmin}
-                    leading={<Icon name="shieldPlain" tone="muted" size={theme.sizes.iconCompact} />}
-                    divider={false}
-                  />
+                  <View>
+                    <FeatureRow
+                      density="snug"
+                      title="Admin Console"
+                      subtitle={adminPendingSubtitle(adminPending.signups, adminPending.feedback)}
+                      onPress={openAdmin}
+                      leading={<Icon name="shieldPlain" tone="muted" size={theme.sizes.iconCompact} />}
+                      divider={false}
+                    />
+                    {adminPending.total > 0 && (
+                      // A zero-width anchor over the row's icon corner; the dot hangs left of it.
+                      <View
+                        pointerEvents="none"
+                        style={{ position: 'absolute', top: theme.spacing.sm, left: theme.spacing.xxxl }}
+                      >
+                        <AttentionDot count={adminPending.total} />
+                      </View>
+                    )}
+                  </View>
                 )}
               </Section>
               {/* The current app's direct actions (#2902). */}

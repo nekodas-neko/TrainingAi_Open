@@ -14,6 +14,9 @@ import {
 import {
   adminPendingTotal,
   adminSignupCount,
+  adminFeedbackCount,
+  adminPendingSubtitle,
+  profileDestination,
 } from '../src/features/home/data/admin-pending-counts.ts';
 import { shiftDateStr } from '@trainingai/shared/date-utils';
 import { setAsideShown, storeHeaderMessages } from '../src/features/home/data/set-aside-seen.ts';
@@ -1225,4 +1228,16 @@ test('a saved set-aside notice is not a live error on a store that opens with it
   assert.equal(state.ready, true);
   assert.match(state.setAside ?? '', /kept on this phone only/);
   assert.equal(state.error, null);
+});
+
+test('the Admin Console row says what is waiting, and the profile badge opens the console (#4141)', () => {
+  assert.equal(adminPendingSubtitle(2, 1), '2 accounts waiting · 1 new feedback');
+  assert.equal(adminPendingSubtitle(1, 0), '1 account waiting');
+  assert.equal(adminPendingSubtitle(0, 3), '3 new feedback');
+  assert.equal(adminPendingSubtitle(0, 0), undefined);
+  assert.equal(adminFeedbackCount({ count: 2, feedbackCount: 3 }), 3);
+  assert.equal(adminFeedbackCount(null), 0);
+  // With a count the avatar goes to the console; without one it is the plain More tab.
+  assert.equal(profileDestination(2), 'admin');
+  assert.equal(profileDestination(0), 'more');
 });
