@@ -330,6 +330,19 @@ function sessionStructureSql(programSessionId: string) {
     FROM program_sessions ps JOIN programs p ON p.id = ps.program_id WHERE ps.id = ${programSessionId})`
 }
 
+/** #4113: the session type's latest finished workout as the database wrote it (`PrescriptionGeneratedFor.finishMarker`):
+ *  text, so the microseconds survive the round trip into the store's comparison. Null when none is finished. */
+export async function getSessionFinishMarker(db: Db, userId: string, programSessionId: string): Promise<string | null> {
+  const rows = await db
+    .select({ marker: sql<string | null>`max(GREATEST(${s.workoutSessions.completedAt}, ${s.workoutSessions.updatedAt}))::text` })
+    .from(s.workoutSessions)
+    .where(and(
+      eq(s.workoutSessions.userId, userId), eq(s.workoutSessions.programSessionId, programSessionId),
+      sql`${s.workoutSessions.completedAt} IS NOT NULL`, isNull(s.workoutSessions.deletedAt),
+    ))
+  return rows[0]?.marker ?? null
+}
+
 /** The session's structure stamp (`sessionStructureSql`), null when the session is not the user's. */
 export async function getSessionStructureStamp(db: Db, userId: string, programSessionId: string): Promise<string | null> {
   const [row] = await db
@@ -774,6 +787,19 @@ function storePrescriptionRow(
         : []),
       ...(generatedFor?.structure != null
         ? [sql`${sessionStructureSql(programSessionId)} = ${generatedFor.structure}`]
+        : []),
+      // #4113: not stored when a workout of this session type was finished after the generation read its
+      // signals. The finish records its own server time (`updated_at`, set by the table's trigger in the
+      // statement that stamps `completed_at`), so a finish uploaded late with an old `completed_at` counts; a
+      // later edit of a finished workout counts too (conservative: the plan is remade, never kept stale).
+      // One read in the same statement, no lock: the finish takes none and spends the stored plan itself.
+      ...(generatedFor?.finishMarker !== undefined
+        ? [sql`NOT EXISTS (
+            SELECT 1 FROM workout_sessions ws
+            WHERE ws.user_id = ${userId} AND ws.session_id = ${programSessionId}
+              AND ws.completed_at IS NOT NULL AND ws.deleted_at IS NULL
+              AND GREATEST(ws.completed_at, ws.updated_at) > COALESCE(${generatedFor.finishMarker}::timestamptz, '-infinity'::timestamptz)
+          )`]
         : []),
     ))
     .returning({ id: s.sessionPeriodization.id })
