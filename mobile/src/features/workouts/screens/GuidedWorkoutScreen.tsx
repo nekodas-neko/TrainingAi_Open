@@ -1,3 +1,4 @@
+import { skipExerciseMessage } from '../logging/logger-copy';
 import { plural } from '@trainingai/shared/format/plural';
 import { formatDateDisplay } from '@trainingai/shared/date-utils';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
@@ -235,10 +236,10 @@ export function GuidedWorkoutScreen({
     ) : (
       <Stack direction="row" gap="md">
         <AppButton
-          title=""
+          title="Skip"
           icon="skip"
           variant="surface"
-          accessibilityLabel="Skip exercise"
+          accessibilityLabel={`Skip ${exercise.name}`}
           disabled={journal.busy}
           onPress={() => setPanel('skip')}
         />
@@ -507,7 +508,9 @@ export function GuidedWorkoutScreen({
               message={
                 confirmation === 'discard'
                   ? 'Discard this unfinished workout? It cannot be resumed and will not upload.'
-                  : confirmation === 'finish'
+                  : confirmation === 'skip'
+                    ? skipExerciseMessage(exercise.name, !!workout.soloExerciseId)
+                    : confirmation === 'finish'
                     ? `${plural(count, 'set', 'sets')} recorded. Save these sets and finish?`
                     : 'Your recorded progress stays saved on this phone.'
               }
