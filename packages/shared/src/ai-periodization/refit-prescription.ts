@@ -133,7 +133,9 @@ export async function refitPrescriptionToBudget(
     exercises: stored.exercises.map(ex => {
       const restSec = budget.restSec.get(ex.sessionExerciseId) ?? fullRest[ex.sessionExerciseId]
       // The re-fit can shorten a preferred rest too; the record must not claim it was used (#3896).
-      const { liftPreference: recorded, ...exRest } = ex
+      // #4126: a re-fit re-derives a lightened row's sets and rest, so what it had before the soreness would
+      // be stale; the row stays as the re-fit leaves it.
+      const { liftPreference: recorded, preSoreness: _stale, ...exRest } = ex
       const liftPreference = appliedAfterBudgetRest(recorded, restSec)
       return {
         ...exRest,

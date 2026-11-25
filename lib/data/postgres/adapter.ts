@@ -8725,7 +8725,9 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       const db = tx as unknown as typeof this.db
       const program = await prog.getActiveProgram(db, userId)
       const structure = await period.getSessionStructureStamp(db, userId, programSessionId)
-      return { program, structure }
+      // #4113: read here, before anything the plan is built from, so a finish after it is a finish the plan was made without.
+      const finishMarker = await period.getSessionFinishMarker(db, userId, programSessionId)
+      return { program, structure, finishMarker }
     }, { isolationLevel: 'repeatable read', accessMode: 'read only' })
   }
   async clearProgramPrescriptions(userId: string, programId: string) { return period.clearProgramPrescriptions(this.db, userId, programId) }
