@@ -1,4 +1,5 @@
 import { formatCount } from '@trainingai/shared/format/number';
+import { plural } from '@trainingai/shared/format/plural';
 import { View } from 'react-native';
 import { formatDayShort } from '@trainingai/shared/date-utils';
 import { acwrBandByKey } from '@trainingai/shared/ai-periodization/acwr';
@@ -345,7 +346,7 @@ export function TrainingLoadCard() {
           <AppText variant="caption" tone="muted">
             ACWR will be available once your program has 28 days of history
             {load.data?.baselineDaysRemaining != null
-              ? ` (${load.data.baselineDaysRemaining} days remaining)`
+              ? ` (${plural(load.data.baselineDaysRemaining, 'day', 'days')} remaining)`
               : ''}
           </AppText>
         )}

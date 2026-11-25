@@ -82,7 +82,7 @@ export function SessionExerciseList({
                     {exercise.deloaded && <Badge label="Deload" />}
                     {(injured || exercise.supersetGroup != null) && (
                       <Stack direction="row" wrap gap="xs">
-                        {injured && <Badge label="Recorded injury" tone="heart" />}
+                        {injured && <Badge label="Injury" tone="heart" />}
                         {exercise.supersetGroup != null && <Badge label="Superset" />}
                       </Stack>
                     )}

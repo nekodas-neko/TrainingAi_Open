@@ -461,7 +461,8 @@ function VialResponses({
         {result && (
           <AppText variant="caption" tone="muted">
             Your band is {result.bandLoKgPerWeek.toFixed(2)}–{result.bandHiKgPerWeek.toFixed(2)}{' '}
-            kg/wk. {result.weighIns} weigh-ins over {Math.round(result.spanDays)} days. A range
+            kg/wk. {plural(result.weighIns, 'weigh-in', 'weigh-ins')} over{' '}
+            {plural(Math.round(result.spanDays), 'day', 'days')}. A range
             crossing a boundary is not called either way.
           </AppText>
         )}
