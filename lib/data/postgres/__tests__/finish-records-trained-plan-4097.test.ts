@@ -381,10 +381,9 @@ describe.skipIf(!canRun)('a finished Preview workout is recorded against the pla
       const after = await afterFinish(ws)
       expect(after.sessionsInPhase).toBe(3) // once: not 4, not 2
       expect(after.ranPrescription).toBe(true)
-      // Not fixed here: the generation stores after the finish, with signals read before it, so a plan made
-      // without the finished workout is left applied. It is the stored plan at the finish that is spent, and
-      // this one was not stored yet. Pinned as it is today; the fix is #4113.
-      expect(after.status).toBe('auto_applied')
+      // #4113: the generation read its signals before the finish, so its plan is made without that workout
+      // and is not stored. The slot stays spent and the next open makes a new plan (main: 'auto_applied').
+      expect(after.status).toBe('consumed')
     })
 
     it('the plan the phone is served carries its identity while it drives the bar, and none otherwise', async () => {

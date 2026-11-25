@@ -454,7 +454,7 @@ export async function generatePrescriptionForSession(
   // #3927: the stamp and the program the plan is built from come from one snapshot, and the signals
   // reuse that program rather than reading it again. Read apart, a Coach apply landing between them and
   // undone before the store left the stamp matching, so a plan made for the swapped session was stored.
-  const { program: activeProgram, structure } = await repo.getActiveProgramWithStructureStamp(userId, programSessionId)
+  const { program: activeProgram, structure, finishMarker } = await repo.getActiveProgramWithStructureStamp(userId, programSessionId)
   const configuredBudget = activeProgram?.sessions.find(s => s.id === programSessionId)?.timeBudgetMinutes
   // #3890: a shorter session the weekly check-in asked for this week. Read before the dedup key, so a
   // plan made before the check-in was saved is not served for one made after it. Null for nearly
@@ -472,7 +472,7 @@ export async function generatePrescriptionForSession(
     // #4082 review: a program move that gave up waiting for a person's other write (a check-in, a Coach
     // apply) wrote nothing: answered as "busy, try again", never cached (`cacheable` is ok only) and never
     // a 500. The move's lock is taken inside the repository call, after the model call has returned.
-    () => runPrescriptionGeneration(userId, programSessionId, repo, tz, activeProgram, structure, excludeSessionId, durationPreset, checkinBudgetMin)
+    () => runPrescriptionGeneration(userId, programSessionId, repo, tz, activeProgram, structure, excludeSessionId, durationPreset, checkinBudgetMin, finishMarker)
       .catch((err): GeneratePrescriptionResult => {
         if (isBusyError(err)) return { ok: false, error: err.message, status: 409 }
         throw err
@@ -509,6 +509,8 @@ async function runPrescriptionGeneration(
   excludeSessionId?: string,
   durationPreset?: DurationPreset,
   checkinBudgetMin?: number | null,
+  // #4113: the session type's latest finished workout when this generation started; see `PrescriptionGeneratedFor`.
+  finishMarker?: string | null,
 ): Promise<GeneratePrescriptionResult> {
   // A one-day prescription ends at the midnight that closes the day it was asked for. Read from the
   // start, not the store: a generation that straddles midnight would otherwise live all of the next
@@ -651,7 +653,7 @@ async function runPrescriptionGeneration(
   // tap or auto-apply) voids this slot; the plan is then not stored (`storePrescription` checks the
   // slot is still in this phase and start), so the slot regenerates in the new phase.
   // #3895 review: and the session's structure as it was when this generation started.
-  const generatedFor: PrescriptionGeneratedFor = { phase: state.phase, phaseStartedAt: state.phaseStartedAt, structure }
+  const generatedFor: PrescriptionGeneratedFor = { phase: state.phase, phaseStartedAt: state.phaseStartedAt, structure, ...(finishMarker !== undefined && { finishMarker }) }
 
   if (state.phase === 'baseline' && !state.baselineComplete) {
     return { ok: false, error: 'Baseline not complete', status: 400 }
@@ -1352,7 +1354,7 @@ async function runPrescriptionGeneration(
     // With the phase it was planned from: a program another session moved meanwhile is left alone.
     try {
       const moved = await repo.advanceProgramPhase(userId, programSessionId, prescription.phase, generatedFor)
-      storeFor = { phase: prescription.phase, phaseStartedAt: moved?.phaseStartedAt ?? generatedFor.phaseStartedAt, structure }
+      storeFor = { phase: prescription.phase, phaseStartedAt: moved?.phaseStartedAt ?? generatedFor.phaseStartedAt, structure, ...(finishMarker !== undefined && { finishMarker }) }
     } catch (err) {
       // #4082 review 2: this runs AFTER the model call, which is paid for. The move gave up waiting for the
       // person's other write (a check-in, a Coach apply) and wrote nothing (`BusyError`); answering 409 here
