@@ -31,6 +31,7 @@ import { RestPrescriptionSummary } from './RestPrescriptionSummary';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { bandColor } from '../../../shared/theme/tokens';
 import {
+  STRENGTH_BAR_CAPTION,
   STRENGTH_BAR_LABELLED_MARKERS,
   STRENGTH_BAR_MARKERS,
   STRENGTH_BAR_WIDTH,
@@ -251,6 +252,11 @@ function StrengthWorkingCard() {
             </AppText>
           )}
         </Stack>
+      )}
+      {groups.length > 0 && (
+        <AppText variant="micro" tone="muted">
+          {STRENGTH_BAR_CAPTION}
+        </AppText>
       )}
       {/* strength-progress-card.tsx: groups space-y-5 (xl), heading mb-3 (md), rows space-y-4 (lg). */}
       <Stack gap="xl">
