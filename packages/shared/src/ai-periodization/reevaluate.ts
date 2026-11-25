@@ -259,6 +259,17 @@ export function reevaluatePrescriptionForToday(
         }),
       }
     }
+    if (!isDeloaded && wasDeloaded && ex.modelDeload && ex.preSoreness) {
+      // #4126: the signal that lightened this model-written row has cleared: its own numbers and note go
+      // back, exactly as the model wrote them (`preDeload` is untouched: it is what `Full` restores).
+      const { preSoreness, ...rest } = ex
+      const { deloadNote: wroteNote, ...numbers } = preSoreness
+      changed = true
+      const restored: AiPrescriptionExercise = { ...rest, ...numbers }
+      if (wroteNote === undefined) delete restored.deloadNote
+      else restored.deloadNote = wroteNote
+      return restored
+    }
     if (isDeloaded && wasDeloaded && ex.modelDeload) {
       // #4087: a row deloaded because the MODEL wrote the deload (not by this function) still answers a
       // soreness or illness signal as it did before the model's deload was flagged: it takes the
@@ -274,7 +285,9 @@ export function reevaluatePrescriptionForToday(
       if (next.sets !== ex.sets || next.reps !== ex.reps || next.pct !== ex.pct || next.restSec !== ex.restSec
         || (note && note !== ex.deloadNote)) {
         changed = true
-        return { ...ex, ...next, ...(note && { deloadNote: note }) }
+        // #4126: what the row was before the first lightening, kept so the clear can put it back.
+        const before = ex.preSoreness ?? { sets: ex.sets, reps: ex.reps, pct: ex.pct, restSec: ex.restSec, deloadNote: ex.deloadNote }
+        return { ...ex, ...next, preSoreness: before, ...(note && { deloadNote: note }) }
       }
       return ex
     }

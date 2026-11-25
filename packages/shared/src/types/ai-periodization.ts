@@ -53,6 +53,11 @@ export interface AiPrescriptionExercise {
    *  it so a soreness or illness signal can still lighten such a row to the engine's per-exercise
    *  numbers. Absent everywhere else, so no other plan changes. */
   modelDeload?: true
+  /** #4126: what a model-written deload row had before a soreness or illness signal lightened it to the
+   *  engine's override (`reevaluatePrescriptionForToday`): its own numbers and its note. Written on the first
+   *  lightening only and put back, then removed, when the signal clears. `preDeload` cannot carry it: on
+   *  these rows it is the program's full numbers, which `Full` restores. Absent everywhere else. */
+  preSoreness?: { sets: number; reps: number; pct: number; restSec: number; deloadNote?: string }
   /** #3896: what the lift's stored preference changed on this row (`ai-periodization/lift-preference.ts`).
    *  Only the fields that moved the plan are present; absent on a row no preference touched. Optional,
    *  so a reader that does not know it parses the row as before. */
