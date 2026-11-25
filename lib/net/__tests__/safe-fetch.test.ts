@@ -276,3 +276,54 @@ describe('hostile spellings of a private destination (#3673)', () => {
     expect(resolved).toBe(false)
   })
 })
+
+// #3673 review round. No host is contacted: DNS and fetch are injected.
+describe('a malformed redirect and a resolver that never answers (#3673 review)', () => {
+  it('a Location the URL parser refuses is bad_url, not a throw', async () => {
+    for (const location of ['https://', 'http://[', 'https://exa mple.com/', 'https://[::1', 'https://:443/']) {
+      let hops = 0
+      const r = await fetchPublicUrl('https://ok.example/', {
+        resolve: publicDns,
+        fetchImpl: async () => { hops++; return new Response(null, { status: 302, headers: { location } }) },
+      })
+      expect(r, location).toEqual({ ok: false, reason: 'bad_url' })
+      expect(hops, location).toBe(1)
+    }
+  })
+
+  it('a resolver that never answers ends in a refusal within the limit, and the fetch is never made', async () => {
+    let fetched = false
+    const started = Date.now()
+    const r = await fetchPublicUrl('https://silent.example/', {
+      timeoutMs: 80,
+      resolve: () => new Promise<string[]>(() => {}),
+      fetchImpl: async () => { fetched = true; return page('') },
+    })
+    expect(r).toEqual({ ok: false, reason: 'timeout' })
+    expect(fetched).toBe(false)
+    expect(Date.now() - started).toBeLessThan(1500)
+  })
+
+  it('a resolver that answers late, on a redirect hop, uses what is left of the same limit', async () => {
+    const started = Date.now()
+    const r = await fetchPublicUrl('https://ok.example/', {
+      timeoutMs: 120,
+      resolve: (host) => host === 'ok.example' ? Promise.resolve(['93.184.216.34']) : new Promise<string[]>(() => {}),
+      fetchImpl: async () => new Response(null, { status: 302, headers: { location: 'https://slow.example/' } }),
+    })
+    expect(r).toEqual({ ok: false, reason: 'timeout' })
+    expect(Date.now() - started).toBeLessThan(1500)
+  })
+
+  it('a resolver that fails is still dns_failed, and one that rejects after the limit is not an unhandled rejection', async () => {
+    expect(await fetchPublicUrl('https://x.example/', { resolve: async () => { throw new Error('nx') }, fetchImpl: async () => page('') }))
+      .toEqual({ ok: false, reason: 'dns_failed' })
+    const r = await fetchPublicUrl('https://x.example/', {
+      timeoutMs: 40,
+      resolve: () => new Promise<string[]>((_res, rej) => setTimeout(() => rej(new Error('late')), 120)),
+      fetchImpl: async () => page(''),
+    })
+    expect(r).toEqual({ ok: false, reason: 'timeout' })
+    await new Promise(res => setTimeout(res, 200))
+  })
+})
