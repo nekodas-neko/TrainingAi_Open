@@ -73,7 +73,7 @@ describe('the stack scrub (no database)', () => {
     expect(out.length).toBeLessThan(5000)
   })
   it('array, JSON, null, Date, bigint and Buffer parameters', () => {
-    const err = fake([['CANARY-arr1', 'CANARY-arr2\nx'], { k: 'CANARY-json-value' }, null, new Date(0), 12345678901234567890n, Buffer.from('CANARY-buffer\nbytes')])
+    const err = fake([['CANARY-arr1', 'CANARY-arr2\nx'], { k: 'CANARY-json-value' }, null, new Date(0), BigInt('12345678901234567890'), Buffer.from('CANARY-buffer\nbytes')])
     const out = scrubErrorStack(err.stack!, err) + scrubErrorText(err.message, err)
     expectClean(out, ['CANARY', 'bytes', '12345678901234567890', '1970'])
   })
@@ -158,7 +158,7 @@ describe.skipIf(!canRun)('real Postgres + Drizzle errors', () => {
       const pgErr = await rawFail(text, [value]) as Error & { code: string }
       expect(pgErr.code).toBe(code)
       const wrapped = new DrizzleQueryError(text, [value], pgErr)
-      const needle = name.startsWith('to_date') ? 'CANA' : value.replace(/\n.*/s, '')
+      const needle = name.startsWith('to_date') ? 'CANA' : value.split('\n')[0]
       const outs = [safeErrorText(pgErr), scrubErrorStack(pgErr.stack!, pgErr), summariseCause(wrapped).block ?? '', safeErrorText(wrapped), scrubErrorStack(wrapped.stack!, wrapped)]
       for (const o of outs) { expect(o).not.toContain(needle); expect(o).not.toContain('at the gym') }
       if (name.includes('out of range')) expect(outs[0]).toMatch(/out of range for type (smallint|bigint|double precision)|integer out of range/)
@@ -188,7 +188,7 @@ describe.skipIf(!canRun)('real Postgres + Drizzle errors', () => {
 
   it('a not-null and a unique violation keep what they kept', async () => {
     const err = await rawFail('insert into users (email, password_hash) values ($1, $2)', [null, 'CANARY-hash-value'])
-    expect((err as { code: string }).code).toBe('23502')
+    expect((err as unknown as { code: string }).code).toBe('23502')
     const { block } = summariseCause(new DrizzleQueryError('insert', [], err))
     expect(block).not.toContain('CANARY')
     expect(block).toContain('detail: Failing row contains (…).')
