@@ -1,4 +1,4 @@
-import { AppText, Card, Disclosure, IconButton, Stack } from '../../shared/ui';
+import { AppButton, AppText, Card, Disclosure, IconButton, Stack } from '../../shared/ui';
 import { useTheme } from '../../shared/theme/ThemeProvider';
 import type { SavedProgram } from '../workouts/data/models';
 
@@ -55,14 +55,6 @@ export function ProgramCard({
               disabled={busy}
               onPress={onEdit}
             />
-            {/* The delete is behind a confirmation in ProgramsScreen; this only asks for it. */}
-            <IconButton
-              icon="delete"
-              label={`Delete ${program.name}`}
-              tone="danger"
-              disabled={busy}
-              onPress={onDelete}
-            />
           </Stack>
         }
       >
@@ -87,6 +79,14 @@ export function ProgramCard({
               </AppText>
             </Stack>
           ))}
+          {/* Inside the opened row, away from Edit. The confirmation is in ProgramsScreen. */}
+          <AppButton
+            title="Delete program"
+            variant="danger"
+            disabled={busy}
+            accessibilityLabel={`Delete ${program.name}`}
+            onPress={onDelete}
+          />
         </Stack>
       </Disclosure>
     </Card>

@@ -1,3 +1,4 @@
+import { deleteItemMessage, deleteProgramMessage } from './delete-copy';
 import { plural } from '@trainingai/shared/format/plural';
 import { useEffect, useState } from 'react';
 import {
@@ -278,7 +279,9 @@ export function ProgramsScreen({
         {deleting && (
           <ConfirmationCard
             title={`Delete ${deleting.name}?`}
-            message="This removes the selected item from your account."
+            message={
+              deleting.kind === 'program' ? deleteProgramMessage() : deleteItemMessage()
+            }
             confirmLabel="Delete"
             cancelLabel="Cancel"
             danger
