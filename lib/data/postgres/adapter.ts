@@ -15,6 +15,7 @@ import { NotFoundError, UserFacingError, isBusyError } from '@trainingai/shared/
 import { eq, and, or, inArray, notInArray, gt, gte, lt, lte, asc, desc, sql, ne, isNotNull, isNull, getTableColumns } from 'drizzle-orm'
 import { getDb, getPool } from './client'
 import { repointStoredExerciseNames, lockCollidingLiftWrites } from './exercise-name-tables'
+import { lockProgramsUsingExerciseName } from './program-row-lock'
 import { withUserLock } from './user-lock'
 import { estWorkoutKcal, plausibleSessionActiveMin } from '@trainingai/shared/health/workout-energy'
 import { ouraIdForActivityType } from '@trainingai/shared/health/daily-energy'
@@ -314,8 +315,13 @@ async function touchExerciseLogTree(tx: SqlTx, userId: string, exerciseLogId: st
  * kept the old name until the program was next edited. The bump covers exactly the programs whose
  * rows this rewrite changed, whoever owns them, because the rewrite itself is by name across the
  * shared exercise library; a program that does not use the exercise is left alone.
+ *
+ * #4096: those programs are locked first, in id order, then the exercise rows are changed. The editor's
+ * save locks its program and then the exercise rows; this used to go the other way round and could end in
+ * a deadlock with it (and with a second rename over the same programs).
  */
 async function renameSessionExercises(tx: SqlTx, oldName: string, newName: string): Promise<void> {
+  await lockProgramsUsingExerciseName(tx, oldName)
   await tx.execute(sql`
     WITH renamed AS (
       UPDATE session_exercises SET exercise_name = ${newName}
