@@ -1,3 +1,4 @@
+import { dayScoreTile } from '../data/day-scores';
 import {
   TEMPERATURE_DEVIATION_LABEL,
   TEMPERATURE_DEVIATION_NOTE,
@@ -119,32 +120,49 @@ export function HealthDayScreen({
       <View style={{ paddingHorizontal: theme.spacing.lg }}>
         <Grid columns={4}>
           {[
-            { label: 'Readiness', value: data?.scores?.readiness, color: theme.colors.brand },
+            {
+              label: 'Readiness',
+              value: data?.scores?.readiness,
+              color: theme.colors.brand,
+              missing: 'No score',
+            },
             {
               label: 'HR',
               value: data?.bodyMeta?.restingHeartRate,
               color: theme.tones.heart.foreground,
+              missing: 'No reading',
             },
             {
               label: 'Sleep',
               value: data?.scores?.sleep,
               color: theme.tones.sleep.foreground,
+              missing: 'No score',
             },
             {
               label: 'Move',
               value: data?.scores?.activity,
               color: theme.tones.nutrition.foreground,
+              missing: 'No score',
             },
-          ].map((row) => (
+          ].map((row) => {
+            const tile = dayScoreTile(row.value, row.missing);
+            return (
             <Stack key={row.label} align="center">
-              <AppText variant="title" style={{ color: row.color }}>
-                {metricValue(row.value)}
-              </AppText>
+              {tile.muted ? (
+                <AppText variant="label" tone="muted" numberOfLines={1}>
+                  {tile.text}
+                </AppText>
+              ) : (
+                <AppText variant="title" style={{ color: row.color }}>
+                  {tile.text}
+                </AppText>
+              )}
               <AppText variant="micro" tone="muted">
                 {row.label}
               </AppText>
             </Stack>
-          ))}
+            );
+          })}
         </Grid>
       </View>
       <View style={{ flex: 1, paddingHorizontal: theme.spacing.lg }} {...swipe.panHandlers}>
