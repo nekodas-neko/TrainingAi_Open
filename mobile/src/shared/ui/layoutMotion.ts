@@ -1,8 +1,9 @@
 import { LayoutAnimation } from 'react-native';
+import { MOTION } from './motion';
 export function layoutMotion(reduced: boolean) {
   if (!reduced)
     LayoutAnimation.configureNext({
-      duration: 180,
+      duration: MOTION.layout.duration,
       update: { type: LayoutAnimation.Types.easeInEaseOut },
       create: {
         type: LayoutAnimation.Types.easeInEaseOut,

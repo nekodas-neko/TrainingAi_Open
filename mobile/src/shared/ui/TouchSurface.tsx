@@ -4,6 +4,7 @@ import { Pressable } from './Pressable';
 import { dimsOnPress, type PressFeedback } from './pressFeedback';
 import { resolveTouchSurfaceStyle } from './touchSurfaceLayout';
 import { useReducedMotion } from './useReducedMotion';
+import { MOTION } from './motion';
 
 /**
  * The stronger pressed look for a whole tappable card: it shrinks slightly as well as dimming.
@@ -31,7 +32,7 @@ export function TouchSurface({
     if (!reduced && (value === 1 || dimsOnPress(props)))
       Animated.spring(scale, {
         toValue: value,
-        speed: 35,
+        speed: MOTION.springs.press,
         bounciness: 0,
         useNativeDriver: Platform.OS !== 'web',
       }).start();

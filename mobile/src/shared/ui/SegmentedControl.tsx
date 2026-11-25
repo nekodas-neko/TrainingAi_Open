@@ -2,6 +2,7 @@ import { feedback } from '../../integrations/feedback/haptics';
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Platform, Pressable, View } from 'react-native';
 import { useReducedMotion } from './useReducedMotion';
+import { MOTION } from './motion';
 import { useTheme } from '../theme/ThemeProvider';
 import { AppText } from './AppText';
 
@@ -46,7 +47,7 @@ export function SegmentedControl<T extends string>({
     else
       Animated.spring(offset, {
         toValue: next,
-        speed: 25,
+        speed: MOTION.springs.segmentedControl,
         bounciness: 0,
         useNativeDriver: Platform.OS !== 'web',
       }).start();

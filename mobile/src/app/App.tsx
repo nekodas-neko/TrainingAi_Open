@@ -8,6 +8,7 @@ import type { CoachScope } from '../features/coach/data/models';
 import type { Destination } from '../features/coach/components/CoachWidget';
 import { FriendProfileScreen } from '../features/social/screens/FriendProfileScreen';
 import { useEffect, useState } from 'react';
+import { View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { AppProvider } from './providers/AppProvider';
@@ -24,7 +25,8 @@ import * as stack from './navigation/stack';
 import type { Entry, Route } from './navigation/stack';
 import { TabBar } from './navigation/TabBar';
 import { usePreviewControls } from '../integrations/web-preview/controls';
-import { RetainedView } from '../shared/ui/RetainedView';
+import { NavLayer, NavMotionProvider, useNavMotion } from './navigation/NavMotion';
+import { layerOfTab } from './navigation/transition';
 import { ScrollToTop } from '../shared/ui/ScrollToTop';
 import { useAndroidBack } from '../shared/ui/useAndroidBack';
 import { AccountProvider, useAccountContext } from '../features/account/AccountProvider';
@@ -93,6 +95,7 @@ function AppShell() {
   const [nav, setNav] = useState(stack.initialNavigation);
   const { tab } = nav;
   const current = stack.top(nav);
+  const motion = useNavMotion(nav);
   const healthDetail = current?.screen === 'health-detail' ? current.detail : null;
   const detail = current && current.screen !== 'health-detail' ? current.screen : null;
   const open = (route: Route) => setNav((value) => stack.push(value, route));
@@ -398,7 +401,9 @@ function AppShell() {
         detail={detail}
         healthDetail={healthDetail}
       />
-      <RetainedView key={`home:${accountKey}`} active={!current && tab === 'Home'}>
+      <NavMotionProvider value={motion.api}>
+      <View style={{ flex: 1, minHeight: 0 }}>
+      <NavLayer key={`home:${accountKey}`} id={layerOfTab('Home')} active={!current && tab === 'Home'}>
         <ScrollToTop.Provider value={scrollTop.Home ?? 0}>
           <HomeScreen
             openCoach={() => openCoach()}
@@ -446,8 +451,8 @@ function AppShell() {
             openCollection={() => open({ screen: 'collection' })}
           />
         </ScrollToTop.Provider>
-      </RetainedView>
-      <RetainedView key={`health:${accountKey}`} active={!current && tab === 'Health'}>
+      </NavLayer>
+      <NavLayer key={`health:${accountKey}`} id={layerOfTab('Health')} active={!current && tab === 'Health'}>
         <ScrollToTop.Provider value={scrollTop.Health ?? 0}>
           <HealthScreen
             sleepRequest={sleepRequest.scope === accountKey ? sleepRequest : undefined}
@@ -461,8 +466,8 @@ function AppShell() {
             openWeek={openWeek}
           />
         </ScrollToTop.Provider>
-      </RetainedView>
-      <RetainedView key={`workout:${accountKey}`} active={!current && tab === 'Workout'}>
+      </NavLayer>
+      <NavLayer key={`workout:${accountKey}`} id={layerOfTab('Workout')} active={!current && tab === 'Workout'}>
         <WorkoutScreen
           openCardio={() => open({ screen: 'cardio' })}
           openSettings={openSettings}
@@ -470,8 +475,8 @@ function AppShell() {
           openSession={openSession}
           openPrograms={openPrograms}
         />
-      </RetainedView>
-      <RetainedView key={`nutrition:${accountKey}`} active={!current && tab === 'Nutrition'}>
+      </NavLayer>
+      <NavLayer key={`nutrition:${accountKey}`} id={layerOfTab('Nutrition')} active={!current && tab === 'Nutrition'}>
         <ScrollToTop.Provider value={scrollTop.Nutrition ?? 0}>
           <NutritionScreen
             openCoach={() => openCoach('nutrition')}
@@ -487,8 +492,8 @@ function AppShell() {
             }
           />
         </ScrollToTop.Provider>
-      </RetainedView>
-      <RetainedView key={`more:${accountKey}`} active={!current && tab === 'More'}>
+      </NavLayer>
+      <NavLayer key={`more:${accountKey}`} id={layerOfTab('More')} active={!current && tab === 'More'}>
         <ScrollToTop.Provider value={scrollTop.More ?? 0}>
           <MoreScreen
             openFriendProfile={(id) => open({ screen: 'friend-profile', friendId: id })}
@@ -507,23 +512,26 @@ function AppShell() {
             openCollection={() => open({ screen: 'collection' })}
           />
         </ScrollToTop.Provider>
-      </RetainedView>
+      </NavLayer>
       {(['general', 'nutrition'] as const).map((scope) => (
-        <RetainedView
+        <NavLayer
           key={`coach:${accountKey}:${scope}`}
+          id={`coach:${scope}`}
           active={current?.screen === 'coach' && current.scope === scope}
         >
           <CoachScreen scope={scope} onBack={back} onNavigate={coachDestination} />
-        </RetainedView>
+        </NavLayer>
       ))}
       {/* Every open screen stays alive under the one on top, so Back finds it as it was left. */}
-      {nav.stack.map((entry) =>
+      {motion.entries.map((entry) =>
         entry.screen === 'coach' ? null : (
-          <RetainedView key={`${entry.key}:${accountKey}`} active={entry === current}>
+          <NavLayer key={`${entry.key}:${accountKey}`} id={`entry:${entry.key}`} active={entry === current}>
             {screenFor(entry)}
-          </RetainedView>
+          </NavLayer>
         ),
       )}
+      </View>
+      </NavMotionProvider>
       {!fullScreen && <ActiveWorkoutBar onResume={openWorkout} />}
       <AlertNavigation
         onMealEstimate={(request) => setMealEstimateRequest({ ...request, scope: accountKey })}

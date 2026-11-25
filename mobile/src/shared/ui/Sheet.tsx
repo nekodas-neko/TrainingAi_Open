@@ -11,7 +11,6 @@ import {
 } from 'react';
 import {
   Animated,
-  Easing,
   Keyboard,
   KeyboardAvoidingView,
   Modal,
@@ -28,6 +27,7 @@ import { IconButton } from './IconButton';
 import { Stack } from './Stack';
 import { sheetBack } from './sheetBack';
 import { useReducedMotion } from './useReducedMotion';
+import { MOTION } from './motion';
 import { useTheme } from '../theme/ThemeProvider';
 import { feedback } from '../../integrations/feedback/haptics';
 
@@ -139,7 +139,7 @@ export function Sheet({
     }
     animation.current = Animated.timing(progress, {
       toValue: 0,
-      duration: 180,
+      duration: MOTION.sheet.close.duration,
       useNativeDriver: Platform.OS !== 'web',
     });
     animation.current.start(({ finished }) => {
@@ -180,8 +180,8 @@ export function Sheet({
     }
     animation.current = Animated.timing(progress, {
       toValue: 1,
-      duration: 240,
-      easing: Easing.out(Easing.cubic),
+      duration: MOTION.sheet.open.duration,
+      easing: MOTION.sheet.open.easing,
       useNativeDriver: Platform.OS !== 'web',
     });
     animation.current.start();
@@ -219,7 +219,7 @@ export function Sheet({
           else
             Animated.spring(dragY, {
               toValue: 0,
-              speed: 25,
+              speed: MOTION.springs.sheetRelease,
               bounciness: 0,
               useNativeDriver: Platform.OS !== 'web',
             }).start();

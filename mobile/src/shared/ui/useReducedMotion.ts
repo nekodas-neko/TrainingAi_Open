@@ -1,20 +1,16 @@
-import { useEffect, useState } from 'react';
+import { useSyncExternalStore } from 'react';
 import { AccessibilityInfo } from 'react-native';
+import { createReducedMotionStore } from './reducedMotionStore';
+
+// Created when the app's code loads, so the phone has answered before most screens mount.
+const store = createReducedMotionStore({
+  read: () => AccessibilityInfo.isReduceMotionEnabled(),
+  watch: (onChange) => {
+    const subscription = AccessibilityInfo.addEventListener('reduceMotionChanged', onChange);
+    return () => subscription.remove();
+  },
+});
 
 export function useReducedMotion() {
-  const [reduced, setReduced] = useState(true);
-  useEffect(() => {
-    let active = true;
-    const subscription = AccessibilityInfo.addEventListener('reduceMotionChanged', setReduced);
-    void AccessibilityInfo.isReduceMotionEnabled()
-      .then((value) => {
-        if (active) setReduced(value);
-      })
-      .catch(() => {});
-    return () => {
-      active = false;
-      subscription.remove();
-    };
-  }, []);
-  return reduced;
+  return useSyncExternalStore(store.subscribe, store.get, store.get);
 }

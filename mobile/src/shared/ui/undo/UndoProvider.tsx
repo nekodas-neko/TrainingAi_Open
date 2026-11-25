@@ -10,6 +10,7 @@ import { AccessibilityInfo, Animated, Keyboard, Platform, View } from 'react-nat
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { UndoStore, type UndoAction } from './UndoStore';
 import { useReducedMotion } from '../useReducedMotion';
+import { MOTION } from '../motion';
 import { useTheme } from '../../theme/ThemeProvider';
 import { AppText } from '../AppText';
 import { AppButton } from '../AppButton';
@@ -71,7 +72,7 @@ export function UndoNotice() {
     else
       Animated.timing(entrance, {
         toValue: 1,
-        duration: 180,
+        duration: MOTION.undoNotice.duration,
         useNativeDriver: Platform.OS !== 'web',
       }).start();
     if (state.phase === 'ready')

@@ -4,7 +4,12 @@ import { BackdropFade } from '../../../shared/ui/BackdropFade';
 import { useReducedMotion } from '../../../shared/ui/useReducedMotion';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { useWeather } from '../WeatherProvider';
-import { backgroundScene, backgroundPhase, type BackgroundSection } from '../data/background';
+import {
+  backgroundScene,
+  backgroundPhase,
+  backgroundKey,
+  type BackgroundSection,
+} from '../data/background';
 import { BackgroundScene } from './BackgroundScene';
 import { WeatherEffects } from './WeatherEffects';
 
@@ -43,7 +48,7 @@ export function DynamicBackground({
   const phase = backgroundPhase(snapshot, now, theme.backgrounds.sky);
   const condition = snapshot?.condition ?? 'clear';
   const animate = settings.backgroundAnimated && !reduced && foreground;
-  const key = `${scene}:${theme.mode}:${condition}:${Math.floor(now / 60000)}:${width}:${height}`;
+  const key = backgroundKey({ scene, mode: theme.mode, condition, width, height });
   return (
     <View
       pointerEvents="none"

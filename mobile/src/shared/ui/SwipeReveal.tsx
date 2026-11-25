@@ -4,6 +4,7 @@ import { Animated, PanResponder, Platform, Pressable, View } from 'react-native'
 import { AppText } from './AppText';
 import { Icon, type IconName } from './Icon';
 import { useReducedMotion } from './useReducedMotion';
+import { MOTION } from './motion';
 import { useTheme } from '../theme/ThemeProvider';
 import { feedback } from '../../integrations/feedback/haptics';
 
@@ -56,7 +57,7 @@ export function SwipeReveal({
       else
         Animated.spring(x, {
           toValue: to,
-          speed: 25,
+          speed: MOTION.springs.swipeReveal,
           bounciness: 0,
           useNativeDriver: Platform.OS !== 'web',
         }).start();

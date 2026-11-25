@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { Animated, Platform, StyleSheet, View } from 'react-native';
+import { MOTION } from './motion';
 export function BackdropFade({
   contentKey,
   children,
@@ -27,7 +28,7 @@ export function BackdropFade({
     opacity.setValue(0);
     const transition = Animated.timing(opacity, {
       toValue: 1,
-      duration: 800,
+      duration: MOTION.backdropFade.duration,
       useNativeDriver: Platform.OS !== 'web',
     });
     transition.start(({ finished }) => {

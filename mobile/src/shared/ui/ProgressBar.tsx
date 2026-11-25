@@ -1,4 +1,5 @@
 import { useReducedMotion } from './useReducedMotion';
+import { MOTION } from './motion';
 import { useEffect, useId, useRef } from 'react';
 import { Animated, View } from 'react-native';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
@@ -38,7 +39,7 @@ export function ProgressBar({
     else
       Animated.timing(fill, {
         toValue: fraction,
-        duration: 240,
+        duration: MOTION.progressFill.duration,
         useNativeDriver: false,
       }).start();
     return () => fill.stopAnimation();
