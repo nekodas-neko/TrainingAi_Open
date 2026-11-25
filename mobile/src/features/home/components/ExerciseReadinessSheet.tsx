@@ -165,8 +165,10 @@ export function ExerciseReadinessSheet({
               options={group.muscles.map((value) => ({
                 value,
                 marked: suggestions.includes(value),
-                label: `${value}${sessionMuscles.some((target) => moodMuscleMatches(target, value)) ? ' •' : ''}`,
+                flagged: sessionMuscles.some((target) => moodMuscleMatches(target, value)),
+                label: value,
               }))}
+              flagLabel="in today’s session"
               onChange={(next) => {
                 setTouched(true);
                 setMuscles(next);
@@ -175,6 +177,11 @@ export function ExerciseReadinessSheet({
           ))}
         </Stack>
       </Stack>
+      {sessionMuscles.length > 0 && (
+        <AppText variant="caption" tone="muted">
+          Marked: in today’s session
+        </AppText>
+      )}
       {suggestions.length > 0 && (
         <AppText variant="caption" tone="muted">
           Suggested from recent training: {suggestions.join(', ')}. Change anything that doesn’t
