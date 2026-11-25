@@ -21,8 +21,8 @@ type SqlTx = { execute: (query: ReturnType<typeof sql>) => Promise<{ rows: unkno
 export const EXERCISE_NAME_TABLES = {
   session_exercises: { disposition: 'repointed', how: 'renameSessionExercises, which also bumps the programs it touched; cannot collide (unique only on live (session_id, position), the name is not in a key)' },
   exercise_logs: { disposition: 'repointed', how: 'adapter rename paths, stamped with clientEditedAt; cannot collide (no unique key on the name)' },
-  personal_records: { disposition: 'repointed', how: 'repointStoredExerciseNames; per person: a lone old-name row moves, on a collision the target row is raised to the better figure and the old-name row is then deleted (owner-approved, #4004), only if that person has no log left under the old name and the survivor holds at least its figure; the survivor takes the leftover\'s library id when it has none (only the renamed exercise\'s own) or ends on the renamed exercise\'s id when it held another\'s, and, on a tie, the earlier date; the only delete in a rename' },
-  exercise_estimates: { disposition: 'repointed', how: 'repointStoredExerciseNames; the target name\'s row wins a collision (as migration 164); the colliding old-name row is left in place (no tombstone column, a delete the owner was not asked about)' },
+  personal_records: { disposition: 'repointed', how: 'repointStoredExerciseNames; per person: a lone old-name row moves, on a collision the target row is raised to the better figure and the old-name row is then deleted (owner-approved, #4004), only if that person has no log left under the old name and the survivor holds at least its figure; the survivor takes the leftover\'s library id when it has none (only the renamed exercise\'s own) or ends on the renamed exercise\'s id when it held another\'s, and, on a tie, the earlier date; one of two deletes in a rename (the other is exercise_estimates)' },
+  exercise_estimates: { disposition: 'repointed', how: 'repointStoredExerciseNames; per person: a lone old-name row moves; on a collision the target name\'s row survives and the old-name row is then deleted (owner-approved, #4035 answer 1 A), in the same transaction. Every figure here is one the person typed (nothing recomputes it from logs), so the survivor takes the leftover\'s figure and updated_at when the leftover was typed strictly later, and takes its library id by the personal_records rule; a tie or an older leftover changes nothing on the survivor. The other delete in a rename is personal_records' },
   exercise_preferences: { disposition: 'repointed', how: 'repointStoredExerciseNames; the live row wins a collision, the other is tombstoned, and the library id is carried onto the survivor' },
   set_hr_stats: { disposition: 'repointed', how: 'repointStoredExerciseNames; cannot collide (keyed by set_log_id, no unique key on the name)' },
   weekly_checkin_exercises: { disposition: 'history', how: 'a past check-in\'s answer, kept as answered (#3890). Cannot collide: the name is unique only within one check-in. Readers match exercise_id first. Open for step 2 of #3890: the writer must fill exercise_id, or repoint these rows here, so a lift renamed without an id is not orphaned in history. The parent weekly_checkins also holds two lift names this registry\'s schema scan does not see (pain_exercise_name, swap_exercise_name: not named exercise_name): both are kept as answered too, so a still-open pain or swap offer can carry the old name after a rename and readers match pain_exercise_id / swap_exercise_id first' },
@@ -36,11 +36,20 @@ export const EXERCISE_NAME_TABLES = {
  * library name is global, so a user left on the old name would point at an exercise that no longer
  * exists.
  *
- * A user who already has a row under `newName` is a collision on the (user, name) unique key. The one
- * hard delete is the leftover `personal_records` row (below); nothing else is deleted:
- *  - `exercise_estimates`: the `newName` row stays, as migration 164 resolved it (the surviving
- *    name's figure wins). The `oldName` row is left where it is, inert, rather than deleted: the
- *    table has no tombstone column, and a typed figure is not ours to drop.
+ * A user who already has a row under `newName` is a collision on the (user, name) unique key. The
+ * only hard deletes are the leftover `personal_records` row and the leftover `exercise_estimates` row
+ * (both below); nothing else is deleted:
+ *  - `exercise_estimates`: the `newName` row survives and the `oldName` row is deleted in the same
+ *    transaction (#4035 answer 1 A, owner-approved 22 Nov). The table has no tombstone column and
+ *    the key is (user, name), so the old row cannot be hidden. It would stay readable by an
+ *    exercise created later under the old name. Unlike a personal record, an estimate is NEVER
+ *    derived from logs: it is the starting 1RM the person typed in the program builder, so a deleted
+ *    value cannot be recomputed. The survivor therefore takes the leftover's figure, with its
+ *    `updated_at`, when the leftover was typed strictly later (the person's latest entry is kept);
+ *    on a tie or an older leftover the survivor is unchanged, as migration 164 resolved it. Its
+ *    library id follows the personal_records rule. Only the old-name rows of people who collided in
+ *    THIS rename go: their rows are locked first (user, then name order) and a removed row of anyone
+ *    else throws and rolls the rename back. A person with only an old-name row has it moved.
  *  - `exercise_preferences`: the live row wins. If only the `oldName` row is live it is copied onto
  *    the (tombstoned) `newName` row. The `oldName` row is then tombstoned with `deleted_at`, and its
  *    `exercise_id` is cleared so the tombstone cannot hold the (user, exercise_id) unique slot.
@@ -63,7 +72,7 @@ export const EXERCISE_NAME_TABLES = {
  *    when it held a different one (#4021: a stale id would report another exercise's type), and on a tie the EARLIER `achieved_at`
  *    (a record's date is when its best was first reached, which is what a rebuild from logs gives;
  *    migration 164 and `upsertPersonalRecordIfBetter` keep the incumbent's date on a tie instead).
- *    This is the only delete in a rename. A device that has not synced still holds the row until its
+ *    The other delete in a rename is the leftover `exercise_estimates` row (below). A device that has not synced still holds the row until its
  *    next pull, which replaces its synced bests with the server's complete set.
  *
  *    CONCURRENT LOGGING. The rename first locks both rows of each colliding person (`FOR UPDATE`, in
@@ -202,6 +211,28 @@ export async function repointStoredExerciseNames(tx: SqlTx, oldName: string, new
     if (!colliders.has(r.user_id)) throw new Error('Rename would remove a record of a person who had no collision')
   }
 
+  // Estimates (#4035). Lock both rows of each colliding person first, in one fixed order (user, then
+  // name), after the personal_records locks above and before anything here moves. The only other
+  // writer, `upsertExerciseEstimate`, is a single `INSERT ... ON CONFLICT DO UPDATE` that takes the
+  // same row lock, so it serialises here: a write that lands first is seen by the carry below, one
+  // that waits re-checks the key after the rename commits.
+  await tx.execute(sql`
+    SELECT p.id FROM exercise_estimates p
+    WHERE p.exercise_name IN (${oldName}, ${newName})
+      AND p.user_id IN (
+        SELECT s.user_id FROM exercise_estimates s
+        WHERE s.exercise_name = ${oldName}
+          AND EXISTS (SELECT 1 FROM exercise_estimates t WHERE t.user_id = s.user_id AND t.exercise_name = ${newName}))
+    ORDER BY p.user_id, p.exercise_name
+    FOR UPDATE
+  `)
+  const estimateColliders = new Set(((await tx.execute(sql`
+    SELECT s.user_id FROM exercise_estimates s
+    WHERE s.exercise_name = ${oldName}
+      AND EXISTS (SELECT 1 FROM exercise_estimates t WHERE t.user_id = s.user_id AND t.exercise_name = ${newName})
+  `)).rows as { user_id: string }[]).map(r => r.user_id))
+
+  // A person with no estimate under the new name just has the old one moved.
   await tx.execute(sql`
     UPDATE exercise_estimates e SET exercise_name = ${newName}, updated_at = now()
     WHERE e.exercise_name = ${oldName}
@@ -209,6 +240,41 @@ export async function repointStoredExerciseNames(tx: SqlTx, oldName: string, new
         SELECT 1 FROM exercise_estimates t WHERE t.user_id = e.user_id AND t.exercise_name = ${newName}
       )
   `)
+  // Where both existed, the old-name row is a leftover (#4035, owner-approved 22 Nov). Its only
+  // condition is the collision itself: the person has a row under the new name. Nothing about logs
+  // applies, an estimate is typed and is not backed by them. What the leftover still owes the
+  // survivor goes across in the same statement, for exactly the rows removed: its figure and
+  // `updated_at` when it was typed strictly later than the survivor's, and its library id by the
+  // `personal_records` rule (#4021).
+  const removedEstimates = (await tx.execute(sql`
+    WITH gone AS (
+      DELETE FROM exercise_estimates s
+      WHERE s.exercise_name = ${oldName}
+        AND EXISTS (
+          SELECT 1 FROM exercise_estimates t
+          WHERE t.user_id = s.user_id AND t.exercise_name = ${newName}
+        )
+      RETURNING s.user_id, s.exercise_id, s.estimated_1rm, s.updated_at
+    ), carried AS (
+      UPDATE exercise_estimates t
+      SET exercise_id = CASE
+            WHEN t.exercise_id IS NULL
+              THEN CASE WHEN g.exercise_id = (SELECT l.id FROM exercise_library l WHERE l.name = ${oldName}) THEN g.exercise_id END
+            ELSE COALESCE((SELECT l.id FROM exercise_library l WHERE l.name = ${oldName}), t.exercise_id)
+          END,
+          estimated_1rm = CASE WHEN g.updated_at > t.updated_at THEN g.estimated_1rm ELSE t.estimated_1rm END,
+          updated_at = GREATEST(t.updated_at, g.updated_at)
+      FROM gone g
+      WHERE t.user_id = g.user_id AND t.exercise_name = ${newName}
+      RETURNING t.id
+    )
+    SELECT user_id FROM gone
+  `)).rows as { user_id: string }[]
+  // Affected-row check: only a person who collided in this rename may lose a row. Anything else
+  // throws, which rolls the whole rename back.
+  for (const r of removedEstimates) {
+    if (!estimateColliders.has(r.user_id)) throw new Error('Rename would remove an estimate of a person who had no collision')
+  }
 
   // Revive a tombstoned target with the live source's choices, so the user's live preference survives.
   // The revived row's own library id is cleared: a tombstone can still hold an id, possibly another
