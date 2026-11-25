@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { runRedecodeOffLoop } from '@/lib/oura-ble/rollup-worker'
 import { startStressBackfillJob, describeRedecodeJob } from '@/lib/oura-ble/stress-backfill-job'
 import { rateLimit } from '@/lib/rate-limit'
+import { safeErrorText, scrubErrorText, scrubStringsDeep } from '@/lib/observability/scrub-params'
 import { reportRollupStepErrors } from '@/lib/oura-ble/report-step-errors'
 import { DEFAULT_TZ } from '@trainingai/shared/date-utils'
 import { getRepositoryAsync } from '@/lib/data'
@@ -78,7 +79,7 @@ export async function POST(req: Request) {
   if (dumpOnly) {
     const { aggregated, aggregateError } = await runRedecodeOffLoop(userId, tz, { debugDate, dumpOnly: true }, false)
     if (aggregateError) console.error('[oura-ble] dump re-aggregate failed:', aggregateError)
-    return NextResponse.json({ scanned: 0, updated: 0, redecodeError: null, aggregated, aggregateError })
+    return NextResponse.json({ scanned: 0, updated: 0, redecodeError: null, aggregated: scrubStringsDeep(aggregated), aggregateError: aggregateError == null ? aggregateError : scrubErrorText(aggregateError) })
   }
 
   // The job's two phases are re-runnable over the archival body_hex, so neither 500s the request
@@ -175,8 +176,8 @@ export async function POST(req: Request) {
       await repo.finishRedecodeJob(job.id, phases as unknown as Record<string, unknown>, null)
     })
     .catch(async err => {
-      const message = err instanceof Error ? err.message : String(err)
-      console.error('[oura-ble] redecode job threw:', err)
+      const message = safeErrorText(err)
+      console.error('[oura-ble] redecode job threw:', message)
       await repo.finishRedecodeJob(job.id, null, message).catch(() => {})
     })
 

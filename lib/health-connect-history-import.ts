@@ -21,6 +21,7 @@ import {
 export {
   HISTORY_WINDOW_DAYS, HISTORY_MAX_DAYS, historyFloor, historyDayRejection, importPastToleranceStartMs,
 } from '@trainingai/shared/health/health-connect-sync-limits'
+import { safeErrorText } from '@/lib/observability/scrub-params'
 
 /** `/api/sync-health` allows 60 requests a minute. A dense window can use 40 of them (a daily post
  *  plus up to 20 heart-rate and 20 interval chunks), so back-to-back windows would trip a 429 on the
@@ -144,7 +145,7 @@ export async function runHistoryImport(deps: HistoryImportDeps): Promise<History
     try {
       result = await deps.importWindow({ fromDate, toDate })
     } catch (err) {
-      return out('failed', err instanceof Error ? err.message : String(err))
+      return out('failed', safeErrorText(err))
     }
     if (result.failed) return out('failed', result.note ?? 'a window did not finish importing')
     if (result.empty) return out('exhausted')
@@ -152,7 +153,7 @@ export async function runHistoryImport(deps: HistoryImportDeps): Promise<History
     try {
       await deps.saveOldest(fromDate)
     } catch (err) {
-      return out('failed', err instanceof Error ? err.message : String(err))
+      return out('failed', safeErrorText(err))
     }
     oldest = fromDate
     current = fromDate

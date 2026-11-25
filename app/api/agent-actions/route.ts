@@ -9,6 +9,7 @@ import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 import { DEFAULT_TZ } from '@trainingai/shared/date-utils'
 import { REDECODE_JOB_STALE_MS } from '@/lib/data/postgres/slices/oura'
 import { describeRedecodeJob } from '@/lib/oura-ble/stress-backfill-job'
+import { safeErrorText } from '@/lib/observability/scrub-params'
 import type { WorkoutRepository } from '@/lib/data/repository'
 import type { FinishAgentActionInput } from '@/lib/data/postgres/slices/agent-actions'
 
@@ -147,5 +148,5 @@ async function reapAbandonedRuns(repo: WorkoutRepository, job: string) {
 }
 
 function errorText(err: unknown): string {
-  return err instanceof Error ? err.message : String(err)
+  return safeErrorText(err)
 }

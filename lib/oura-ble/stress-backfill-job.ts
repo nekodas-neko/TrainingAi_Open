@@ -2,7 +2,7 @@ import type { WorkoutRepository } from '@/lib/data/repository'
 import type { RedecodeJob } from '@/lib/data/postgres/slices/oura'
 import { runStressBackfillOffLoop, type RedecodePhases } from '@/lib/oura-ble/rollup-worker'
 import { redecodeJobKind } from '@/lib/oura-ble/redecode-job-kind'
-import { safeErrorText } from '@/lib/observability/scrub-params'
+import { safeErrorText, scrubErrorText, scrubStringsDeep } from '@/lib/observability/scrub-params'
 
 /**
  * Starting the daytime-stress bucket backfill (issue 2236) in the one-at-a-time job slot, and
@@ -63,8 +63,9 @@ export function describeRedecodeJob(job: RedecodeJob) {
     startedAt: job.startedAt.toISOString(),
     finishedAt: job.finishedAt?.toISOString() ?? null,
     opts: job.opts,
-    error: job.error,
-    ...(job.result ?? {}),
+    // Rows written before #3673's writer-side scrub may hold raw text; the answer never repeats it.
+    error: job.error == null ? null : scrubErrorText(job.error),
+    ...(job.result ? scrubStringsDeep(job.result) : {}),
     // What this run was asked to write, read from the row rather than from the request that is
     // polling it. Placed after the spread so a result payload cannot shadow it.
     kind: redecodeJobKind(job.opts),

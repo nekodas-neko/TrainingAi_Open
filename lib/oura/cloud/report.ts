@@ -11,6 +11,9 @@
 // `instrumentation-node.ts`, and a static import would pull `@/lib/data` (and the Drizzle adapter's
 // native addon) into the boot bundle — the reason `instrumentation-node.ts` avoids it itself.
 
+// scrub-params imports nothing, so a static import cannot pull the Drizzle adapter into the boot bundle.
+import { scrubErrorText } from '@/lib/observability/scrub-params'
+
 export const OURA_REPORT_INTERVAL_MS = 60 * 60 * 1000
 
 const lastReported = new Map<string, number>()
@@ -30,7 +33,8 @@ export function reportOuraCloudIssue(
   const last = lastReported.get(kind)
   if (last !== undefined && now - last < (context.intervalMs ?? OURA_REPORT_INTERVAL_MS)) return false
   lastReported.set(kind, now)
-  const err = new Error(`oura_cloud ${kind}: ${message}`.slice(0, 500))
+  // #3673: scrubbed BEFORE the length cut, so a cut cannot leave half a quoted value behind.
+  const err = new Error(`oura_cloud ${kind}: ${scrubErrorText(message)}`.slice(0, 500))
   // One import promise for every report, so concurrent reports never race the module load; a failed
   // load is forgotten so the next report tries again.
   observability ??= import('@/lib/observability')

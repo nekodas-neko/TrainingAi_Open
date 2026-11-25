@@ -185,12 +185,14 @@ export function scrubPgMessage(message: string, code?: unknown): string {
     if (first !== -1 && last > first) m = `${m.slice(0, first)}"${SCRUBBED_VALUE}"${m.slice(last + 1)}`
     m = m.replace(/0x[0-9a-fA-F]{2}(?: 0x[0-9a-fA-F]{2})*/g, `0x${SCRUBBED_VALUE}`)
   }
+  // Each shape runs to the last quote, or to the end of the text when it has no closing quote (a
+  // message cut at a length limit by its caller): fail closed, never leave a half-quoted value.
   return m
-    .replace(/: "[\s\S]*"/, `: "${SCRUBBED_VALUE}"`)
-    .replace(/\bvalue "[\s\S]*" is out of range for type/, `value "${SCRUBBED_VALUE}" is out of range for type`)
-    .replace(/(^|\n)"[\s\S]*" is out of range for type/, `$1"${SCRUBBED_VALUE}" is out of range for type`)
-    .replace(/\btime zone "[\s\S]*" not recognized/, `time zone "${SCRUBBED_VALUE}" not recognized`)
-    .replace(/\binvalid value "[\s\S]*" for "[^"]*"/, `invalid value "${SCRUBBED_VALUE}" for "${SCRUBBED_VALUE}"`)
+    .replace(/: "(?:[\s\S]*"|[\s\S]*)/, `: "${SCRUBBED_VALUE}"`)
+    .replace(/\bvalue "(?:[\s\S]*" is out of range for type|[\s\S]*)/, `value "${SCRUBBED_VALUE}" is out of range for type`)
+    .replace(/^"(?:[\s\S]*" is out of range for type|[\s\S]*)/, `"${SCRUBBED_VALUE}" is out of range for type`)
+    .replace(/\btime zone "(?:[\s\S]*" not recognized|[\s\S]*)/, `time zone "${SCRUBBED_VALUE}" not recognized`)
+    .replace(/\binvalid value "(?:[\s\S]*" for "[^"]*"|[\s\S]*)/, `invalid value "${SCRUBBED_VALUE}" for "${SCRUBBED_VALUE}"`)
 }
 
 // ── One entry point for any free text an error leaves behind ──────────────────────────────────
@@ -225,4 +227,47 @@ function pgCodeOf(err: unknown): string | undefined {
 /** `err` as text that is safe to store or return: never the raw message of a Drizzle or pg error. */
 export function safeErrorText(err: unknown): string {
   return scrubErrorText(err instanceof Error ? err.message : String(err), err)
+}
+
+/**
+ * An error and its whole cause chain as one line of text, each link scrubbed on its own, so the pg
+ * code of a Drizzle failure survives (`… [22P02]`) and no parameter or echoed value does. This is
+ * what the worker thread flattens an error to, and what the in-process paths use so the two cannot
+ * disagree (#3673).
+ */
+export function safeErrorChainText(err: unknown): string {
+  const parts: string[] = []
+  const seen = new Set<unknown>()
+  let cur: unknown = err
+  while (cur != null && !seen.has(cur) && parts.length < 8) {
+    seen.add(cur)
+    if (cur instanceof Error) {
+      const code = (cur as { code?: unknown }).code
+      const text = scrubErrorText(cur.message, cur)
+      parts.push(code != null ? `${text} [${String(code)}]` : text)
+      cur = (cur as { cause?: unknown }).cause
+    } else {
+      parts.push(scrubErrorText(String(cur)))
+      break
+    }
+  }
+  return parts.length > 0 ? parts.join('\n  caused by: ') : scrubErrorText(String(err))
+}
+
+/**
+ * Every string inside a JSON-like value, scrubbed; shape, numbers and keys unchanged. For the
+ * `result` of a job row, whose phases carry error strings at depths a writer should not have to know.
+ * Depth-limited and cycle-safe; anything that is not a plain value is returned as it came.
+ */
+export function scrubStringsDeep<T>(value: T, depth = 0, seen = new WeakSet<object>()): T {
+  if (typeof value === 'string') return scrubErrorText(value) as unknown as T
+  if (value === null || typeof value !== 'object' || depth > 12) return value
+  if (seen.has(value as object)) return value
+  seen.add(value as object)
+  if (Array.isArray(value)) return value.map(v => scrubStringsDeep(v, depth + 1, seen)) as unknown as T
+  const proto = Object.getPrototypeOf(value)
+  if (proto !== Object.prototype && proto !== null) return value
+  const out: Record<string, unknown> = {}
+  for (const [k, v] of Object.entries(value as Record<string, unknown>)) out[k] = scrubStringsDeep(v, depth + 1, seen)
+  return out as T
 }
