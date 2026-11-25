@@ -14,7 +14,7 @@ import {
   TargetBars,
   TextField,
 } from '../../../shared/ui';
-import type { Food, FoodLog } from '../data/models';
+import type { Food } from '../data/models';
 import { useNutrition } from '../data/NutritionProvider';
 export const macroKeys = ['calories', 'proteinG', 'carbsG', 'fatG'] as const;
 export function MacroComparison({
