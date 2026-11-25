@@ -331,10 +331,14 @@ function sessionStructureSql(programSessionId: string) {
 }
 
 /** #4113: the session type's latest finished workout as the database wrote it (`PrescriptionGeneratedFor.finishMarker`):
- *  text, so the microseconds survive the round trip into the store's comparison. Null when none is finished. */
+ *  the greatest server `updated_at` among its completed workouts. Never `completed_at`: that is the phone's clock, and one
+ *  older workout dated ahead of the server would make the marker a future time that a real finish could not pass.
+ *  Read in the same snapshot as the program and the structure stamp (`getActiveProgramWithStructureStamp`); the signals the
+ *  model reads are read afterwards, on other connections. That order is safe: a finish between the two reads is already in
+ *  the plan, and the plan is still refused (one wasted model call), never the reverse. Text, so the microseconds survive the round trip into the store's comparison. Null when none is finished. */
 export async function getSessionFinishMarker(db: Db, userId: string, programSessionId: string): Promise<string | null> {
   const rows = await db
-    .select({ marker: sql<string | null>`max(GREATEST(${s.workoutSessions.completedAt}, ${s.workoutSessions.updatedAt}))::text` })
+    .select({ marker: sql<string | null>`max(${s.workoutSessions.updatedAt})::text` })
     .from(s.workoutSessions)
     .where(and(
       eq(s.workoutSessions.userId, userId), eq(s.workoutSessions.programSessionId, programSessionId),
@@ -790,7 +794,8 @@ function storePrescriptionRow(
         : []),
       // #4113: not stored when a workout of this session type was finished after the generation read its
       // signals. The finish records its own server time (`updated_at`, set by the table's trigger in the
-      // statement that stamps `completed_at`), so a finish uploaded late with an old `completed_at` counts; a
+      // statement that stamps `completed_at`; `completed_at` itself is the phone's clock and is not compared), so a
+      // finish uploaded late with an old `completed_at` counts; a
       // later edit of a finished workout counts too (conservative: the plan is remade, never kept stale).
       // One read in the same statement, no lock: the finish takes none and spends the stored plan itself.
       ...(generatedFor?.finishMarker !== undefined
@@ -798,7 +803,7 @@ function storePrescriptionRow(
             SELECT 1 FROM workout_sessions ws
             WHERE ws.user_id = ${userId} AND ws.session_id = ${programSessionId}
               AND ws.completed_at IS NOT NULL AND ws.deleted_at IS NULL
-              AND GREATEST(ws.completed_at, ws.updated_at) > COALESCE(${generatedFor.finishMarker}::timestamptz, '-infinity'::timestamptz)
+              AND ws.updated_at > COALESCE(${generatedFor.finishMarker}::timestamptz, '-infinity'::timestamptz)
           )`]
         : []),
     ))

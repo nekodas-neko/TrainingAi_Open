@@ -253,6 +253,9 @@ export function reevaluatePrescriptionForToday(
         deloaded: false,
         deloadNote: undefined,
         preDeload: undefined,
+        // #4126: a record of the model's own numbers belongs to the deload this row has just left; kept, a later
+        // phase change could restore it over the full-load numbers put back here.
+        preSoreness: undefined,
         // #3764: a plan deloaded for an untouched suggestion goes back to full load and says why.
         ...(perEx.recentNotes[ex.sessionExerciseId] && !ex.autoregNote?.includes(RECENTLY_TRAINED_NOTE_PREFIX) && {
           autoregNote: [ex.autoregNote, perEx.recentNotes[ex.sessionExerciseId]].filter(Boolean).join(' · '),

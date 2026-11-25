@@ -21,8 +21,8 @@ export interface PrescriptionGeneratedFor {
   phaseStartedAt: Date
   structure?: string | null
   /** #4113: the session type's latest finished workout as the server recorded it when the generation started
-   *  (`getActiveProgramWithStructureStamp`): the greatest of `completed_at` and `updated_at` over its completed
-   *  workouts, as the database's own text (microseconds kept), null when there was none. A workout finished
+   *  (`getActiveProgramWithStructureStamp`): the greatest server `updated_at` over its completed
+   *  workouts (never the phone's `completed_at`), as the database's own text (microseconds kept), null when there was none. A workout finished
    *  after it means the plan was made without that workout, and it is not stored. Absent: not checked. */
   finishMarker?: string | null
 }

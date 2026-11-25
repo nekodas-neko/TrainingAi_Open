@@ -1492,7 +1492,7 @@ export interface WorkoutRepository {
    *  from this program is then stored only while the session is still the one it was built from; read
    *  apart, a change and its undo landing between the two reads stored a plan made for the changed session. */
   getActiveProgramWithStructureStamp(userId: string, programSessionId: string): Promise<{ program: Program | null; structure: string | null
-    /** #4113: the session type's latest finished workout, from the same snapshot (`PrescriptionGeneratedFor.finishMarker`). Absent: not read. */
+    /** #4113: the session type's latest finished workout's server `updated_at`, from the program's and the structure stamp's snapshot; the signals the model reads come afterwards (`PrescriptionGeneratedFor.finishMarker`). Absent: not read. */
     finishMarker?: string | null }>
   /** BF-199 Phase 1. Evidence only: nothing reads it to decide anything. */
   recordPrescriptionShadow(userId: string, programSessionId: string, shadow: import('@trainingai/shared/ai-periodization/prescription-shadow').PrescriptionShadow): Promise<void>

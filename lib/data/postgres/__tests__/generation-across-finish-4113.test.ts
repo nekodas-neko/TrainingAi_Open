@@ -274,6 +274,47 @@ describe.skipIf(!canRun)('a finished Preview workout is recorded against the pla
       expect((await rowOf(push)).prescription_status).toBe('consumed')
     })
 
+    // The guard compares the server's `updated_at` only: `completed_at` is the phone's clock.
+    const olderFinished = (completedAtSql: string) => pool.query(
+      `INSERT INTO workout_sessions (user_id, session_id, session_name, started_at, completed_at)
+       VALUES ($1,$2,'Push 4113', now() - interval '9 days', ${completedAtSql}) RETURNING id`, [USER, push])
+
+    it('an older finished workout dated 2 days AHEAD of the server does not hide a real finish during the call', async () => {
+      const t1 = T1()
+      await expired(t1)
+      await olderFinished("now() + interval '2 days'")
+      model.answer = modelAnswer(80, 4, 3)
+      const g = await generationOnTheModel()
+      await upload(FULL, [5, 5, 4], t1)
+      g.release()
+      expect((await g.run).ok).toBe(false)
+      expect((await rowOf(push)).prescription_status).toBe('consumed') // main-with-GREATEST: 'auto_applied'
+      expect(model.calls).toBe(1)
+    })
+
+    it('an older finished workout dated 2 days in the PAST: a real finish during the call is refused', async () => {
+      const t1 = T1()
+      await expired(t1)
+      await olderFinished("now() - interval '2 days'")
+      model.answer = modelAnswer(80, 4, 3)
+      const g = await generationOnTheModel()
+      await upload(FULL, [5, 5, 4], t1)
+      g.release()
+      expect((await g.run).ok).toBe(false)
+      expect((await rowOf(push)).prescription_status).toBe('consumed')
+    })
+
+    it('a future-dated older workout and no finish during the call: the plan is stored', async () => {
+      const t1 = T1()
+      await expired(t1)
+      await olderFinished("now() + interval '2 days'")
+      model.answer = modelAnswer(80, 4, 3)
+      const g = await generationOnTheModel()
+      g.release()
+      expect((await g.run).ok).toBe(true)
+      expect((await rowOf(push)).prescription_status).toBe('auto_applied')
+    })
+
     it('a finish of ANOTHER session type does not stop this one\'s plan', async () => {
       const t1 = T1()
       await expired(t1)

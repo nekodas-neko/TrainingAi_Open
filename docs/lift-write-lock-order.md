@@ -167,11 +167,15 @@ type that read its signals before the finish and is waiting on the model would t
 refuses a moved phase and a changed structure (`storePrescriptionRow`, so both the locked store and the plain one):
 
 - **When the generation "read its signals".** `getActiveProgramWithStructureStamp` (the first read of a generation, one
-  repeatable-read snapshot) also returns the session type's latest finish: `max(GREATEST(completed_at, updated_at))` over its
-  completed, not-deleted workouts, as the database's own text (`finishMarker`, microseconds kept). It travels in
-  `generatedFor`. No clock of the phone or of the app server is compared: only two readings of the database's own columns.
-- **What the store checks.** `NOT EXISTS` a completed, not-deleted workout of this type whose `GREATEST(completed_at, updated_at)`
-  is greater than the marker. `updated_at` is stamped by the table's `set_updated_at` trigger in the statement that stamps
+  repeatable-read snapshot with the program and the structure stamp) also returns the session type's latest finish:
+  `max(updated_at)` over its completed, not-deleted workouts, as the database's own text (`finishMarker`, microseconds kept). It travels in
+  `generatedFor`. No clock of the phone or of the app server is compared: only two readings of the database's own `updated_at`.
+  The signals the model reads are read **afterwards, on other connections**, not in this snapshot. The order is safe: a finish
+  landing between the marker and the signals is already in the plan, and the store still refuses the plan (one wasted model
+  call); it can never pass a plan that lacks a finish.
+- **What the store checks.** `NOT EXISTS` a completed, not-deleted workout of this type whose `updated_at`
+  is greater than the marker. `completed_at` is the phone's clock and is not compared: an older workout dated ahead of the
+  server would otherwise make the marker a future time and hide a real finish. `updated_at` is stamped by the table's `set_updated_at` trigger in the statement that stamps
   `completed_at`, so a finish uploaded late with an old `completed_at` counts. A later edit of a finished workout (its RPE) also
   moves `updated_at`, so it also counts: conservative (the plan is remade at the next open, never kept stale). A finish of another
   session type, a deleted workout, and a finish before the read do not count.

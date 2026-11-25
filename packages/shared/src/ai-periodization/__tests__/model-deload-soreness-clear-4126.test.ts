@@ -163,3 +163,26 @@ describe('4126 — a plan stored before this change', () => {
     expect(bytes(c)).toBe(bytes(legacy))
   })
 })
+
+describe('4126 — a row that carries both records', () => {
+  it('the revert to the full numbers (`preDeload`) also removes `preSoreness`, so it cannot be restored later', () => {
+    const g = generated()
+    // A lightened model-deload row that also carries the full numbers the engine would revert to.
+    const both = {
+      ...g,
+      deload: false,
+      exercises: g.exercises.map(e => e.sessionExerciseId === 'p'
+        ? { ...e, sets: 2, pct: 50, deloaded: true, deloadNote: 'Deload — quads still sore',
+            preDeload: { sets: 3, reps: 6, pct: 75, restSec: 150 }, preSoreness: { sets: 3, reps: 6, pct: 55, restSec: 90, deloadNote: MODEL_DELOAD_NOTE } }
+        : e),
+    } as AiPrescription
+    const out = reevaluatePrescriptionForToday(both, quiet, {
+      phase: 'accumulation', prescription: both, prescriptionStatus: 'auto_applied',
+      prescriptionExpiresAt: new Date(NOW.getTime() + 5 * 86_400_000), sessionsInPhase: 2, underWay: false,
+    }, NOW, sig)
+    const r = row(out.prescription, 'p')
+    expect(r).toMatchObject({ sets: 3, reps: 6, pct: 75, restSec: 150, deloaded: false })
+    expect(r.preDeload).toBeUndefined()
+    expect('preSoreness' in r && r.preSoreness !== undefined).toBe(false)
+  })
+})
