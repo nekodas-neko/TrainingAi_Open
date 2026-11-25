@@ -20,6 +20,7 @@ import { intensityZoneForRole, phaseRestBounds } from '../prompt'
 import { clampPrescribedPct } from '../autoregulation'
 import { holdsOneDayDeload } from '../one-day-deload'
 import { reevaluatePrescriptionForToday } from '../reevaluate'
+import { holdStoredPrescription } from '../checkin-plan-hold'
 import { deloadOverrideForGoal } from '../deload-constants'
 import { rowUnderFull, prescriptionFigures } from '../prescription-figures'
 import { deloadOverrideOutcome, prescriptionRowAsTrained, prescriptionFiguresAsTrained } from '@/components/workout/utils'
@@ -36,7 +37,7 @@ vi.mock('ai', async importOriginal => ({
 vi.mock('@/lib/ai/instrument', () => ({
   loggedGenerateObject: async (_meta: unknown, run: (s: undefined, settings: object) => Promise<unknown>) => run(undefined, {}),
 }))
-const { generatePrescriptionForSession, buildProgramAsWrittenPrescription, buildWholeSessionDeloadPrescription, recordFullSessionOnModelDeload } = await import('../generate-prescription')
+const { generatePrescriptionForSession, buildProgramAsWrittenPrescription, buildWholeSessionDeloadPrescription, buildRulesPrescription, recordFullSessionOnModelDeload } = await import('../generate-prescription')
 
 const TZ = 'Australia/Brisbane'
 const NOW = new Date('2026-11-25T12:00:00+10:00') // Wednesday, Brisbane
@@ -555,4 +556,55 @@ describe('review 2 — a soreness or illness signal still lightens a model-writt
     }, NOW)
     expect(NUM(rowOf(out.prescription, 'p'))).toEqual({ sets: 1, reps: 6, pct: 40, restSec: 120 })
   })
+})
+
+
+// ── #4102 — re-verified against main, and pinned ───────────────────────────────────────────────────────
+
+describe('#4102 edge 1 — a weekly check-in saved after a deload was made: the bar Full trains is held', () => {
+  const sig = (phase: string) => sigFor('strength', phase, 90)
+  const deloads: [string, AiPrescription][] = [
+    ['an engine deload (whole session)', buildWholeSessionDeloadPrescription(sig('accumulation'), 'r')],
+    ['a model-written deload', recordFullSessionOnModelDeload(modelDeloadPlan('strength'), sig('accumulation'), 'accumulation')],
+    ['a rules deload (the deload week, the model unreachable)', buildRulesPrescription(sig('deload'), 'r')!],
+  ]
+  for (const [name, plan] of deloads) {
+    it(`${name}: stored preDeload is the program's 75 %, and the session read serves Full at or under the 40 kg bar (basis 100)`, () => {
+      expect(plan.deload).toBe(true)
+      expect(rowOf(plan, 'p').preDeload!.pct).toBe(75) // stored: not lowered by a check-in saved later (the hold skips deload plans)
+      const served = screenWithPref(plan, HOLD)
+      expect(fullOf(served as never).pct).toBeLessThanOrEqual(40)
+      // The screen's other numbers are the deload's, unchanged by the hold.
+      expect(served.deloaded).toBe(true)
+      const none = screenWithPref(plan, { ...HOLD, checkinHold: null })
+      expect(fullOf(none as never).pct).toBe(75)
+    })
+    it(`${name}: the hold writes nothing onto the stored plan (stored versus served only)`, () => {
+      const held = holdStoredPrescription(plan, '2026-11-23', () => ({ preference: HOLD as never, basisKg: 100, equipment: ['barbell'], bodyweight: false }))
+      expect(held).toBe(plan)
+    })
+  }
+})
+
+describe('#4102 edge 2 — a `stay` in the planned deload week is a deload Full can revert (fixed since #4101\'s review, pinned here)', () => {
+  for (const goal of ['strength', 'hypertrophy', 'power'] as const) {
+    it(`${goal}: the stored rows are flagged, carry the program's numbers, and the screen offers Full`, async () => {
+      mocks.signals = sigFor(goal, 'deload', 90)
+      mocks.answer = { ...deloadAnswer(52.5), phase_action: 'stay', phase: 'deload', deload: true }
+      const h = program('ai_dynamic', 'deload')
+      const r = ok(await h.run())
+      expect(r.prescription.phaseAction).toBe('stay')
+      const stored = h.db.get('push')!.prescription!
+      expect(stored.deload).toBe(true)
+      const asWritten = buildProgramAsWrittenPrescription(mocks.signals as PrescriptionSignals, 'x')!
+      for (const row of stored.exercises) {
+        expect(row.deloaded, goal).toBe(true)
+        expect(row.preDeload, goal).toBeDefined()
+        expect(row.preDeload).toEqual(NUM(asWritten.exercises.find(e => e.sessionExerciseId === row.sessionExerciseId)!))
+      }
+      expect(stored.fullSession).toBeDefined()
+      const rows = screenRows(stored, goal)
+      expect(deloadOverrideOutcome(rows, true, { periodization: { prescription: stored, prescriptionStatus: 'auto_applied' }, deloadWeek: false })).toBe('all')
+    })
+  }
 })
