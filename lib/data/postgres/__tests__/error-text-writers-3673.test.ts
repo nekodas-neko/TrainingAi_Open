@@ -101,11 +101,13 @@ describe.skipIf(!canRun)('error text is scrubbed at the writer (#3673)', () => {
   it('the in-process redecode and stress-backfill paths, into the job row', async () => {
     const err = await realError()
     vi.resetModules()
-    // A built worker bundle (`.rollup-worker/`) may exist in a full run; this test is the in-process path.
-    vi.doMock('fs', async (orig) => {
-      const actual = await orig<typeof import('fs')>()
-      return { ...actual, default: actual, existsSync: (f: unknown) => String(f).includes('.rollup-worker') ? false : actual.existsSync(f as string) }
-    })
+    // `getWorker()` spawns the bundled worker whenever `.rollup-worker/rollup-worker.cjs` exists (any
+    // machine that has run `pnpm dev` or a build, and CI), and the worker would not see this mock.
+    // A constructor that throws is the module's own fallback to the in-process path.
+    vi.doMock('node:worker_threads', async (orig) => ({
+      ...(await orig<typeof import('node:worker_threads')>()),
+      Worker: class { constructor() { throw new Error('no worker in this test') } },
+    }))
     vi.doMock('@/lib/data', () => ({
       getRepositoryAsync: async () => ({
         redecodeOuraRawSamples: async () => { throw err },
@@ -117,7 +119,7 @@ describe.skipIf(!canRun)('error text is scrubbed at the writer (#3673)', () => {
     const phases = await w.runRedecodeOffLoop(USER, 'Australia/Brisbane', {}, true)
     const stress = await w.runStressBackfillOffLoop(USER, 'Australia/Brisbane', true)
     vi.doUnmock('@/lib/data')
-    vi.doUnmock('fs')
+    vi.doUnmock('node:worker_threads')
     clean(phases); clean(stress)
     expect(phases.redecodeError).toContain('[22P02]')
 
