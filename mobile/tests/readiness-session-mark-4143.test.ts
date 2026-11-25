@@ -16,8 +16,13 @@ test('a chip is the muscle name alone; the mark and the flag travel as fields', 
   assert.ok(chips.every((chip) => !chip.label.includes('•')));
 });
 
-test('the caption says what the mark means', () => {
-  assert.equal(readinessMarkCaption(['Chest']), 'Marked: in today’s session');
+test('the caption shows only when a chip carries the mark', () => {
+  const marked = readinessChips(['Chest', 'Quads'], [], ['Chest']);
+  assert.equal(readinessMarkCaption(marked), 'Marked: in today’s session');
+  // A session that works muscles with no chip (e.g. Calves is not offered): nothing is marked.
+  const none = readinessChips(['Chest', 'Quads'], ['Quads'], ['Calves']);
+  assert.equal(readinessMarkCaption(none), null);
+  assert.equal(readinessMarkCaption(readinessChips(['Chest'], [], [])), null);
 });
 
 test('a screen reader hears the flag, and the suggestion beside it when both apply', () => {

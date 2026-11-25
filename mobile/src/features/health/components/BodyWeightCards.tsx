@@ -64,7 +64,7 @@ export function BodyWeightCard({
   const { theme } = useTheme();
   const cueColor = useCueColor();
   // The pace is fitted over the last 14 days, so the line is drawn over those 14 days.
-  const drawn = weightWindow<WeighIn>(weightSeries ?? rows, today, WEIGHT_PACE_WINDOW_DAYS);
+  const drawn = weightWindow<WeighIn>(weightSeries, rows, today, WEIGHT_PACE_WINDOW_DAYS);
   const points = trendPoints(
     drawn.rows,
     (row) => row.weightKg ?? null,
@@ -126,7 +126,7 @@ export function WeightTrendCard({
 }) {
   const { theme } = useTheme();
   // The slope is fitted over the last 30 days, and the line is drawn over the same 30 days.
-  const drawn = weightWindow<WeighIn>(weightSeries ?? rows, today, WEIGHT_TREND_WINDOW_DAYS);
+  const drawn = weightWindow<WeighIn>(weightSeries, rows, today, WEIGHT_TREND_WINDOW_DAYS);
   const points = trendPoints(
     drawn.rows,
     (row) => row.weightKg ?? null,
@@ -138,7 +138,7 @@ export function WeightTrendCard({
       value={slope === null ? null : undefined}
       unit="kg/wk"
       tone="recovery"
-      caption={slope === null ? 'Need more data' : `Rate over ${drawn.days} days`}
+      caption={slope === null ? 'Need more data' : (drawn.fallback ? `Chart shows the last ${drawn.days} days` : `Rate over ${drawn.days} days`)}
       points={points.filter((p) => p.value !== null).length >= 2 ? points : undefined}
       chart={{ readable: true, gaps: 'connect', axisLabels: endLabels(points) }}
     >

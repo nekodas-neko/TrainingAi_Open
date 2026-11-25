@@ -32,10 +32,19 @@ test('a day with no weight is not drawn', () => {
 });
 
 test('each card draws its own window: 14 days for the pace, 30 for the trend', () => {
-  const pace = weightWindow(series, '2026-11-30', WEIGHT_PACE_WINDOW_DAYS);
-  const trend = weightWindow(series, '2026-11-30', WEIGHT_TREND_WINDOW_DAYS);
-  assert.equal(pace.days, 14);
-  assert.equal(pace.rows.length, 14);
-  assert.equal(trend.days, 30);
-  assert.equal(trend.rows.length, 30);
+  const pace = weightWindow(series, [], '2026-11-30', WEIGHT_PACE_WINDOW_DAYS);
+  const trend = weightWindow(series, [], '2026-11-30', WEIGHT_TREND_WINDOW_DAYS);
+  assert.deepEqual([pace.days, pace.rows.length, pace.fallback], [14, 14, false]);
+  assert.deepEqual([trend.days, trend.rows.length, trend.fallback], [30, 30, false]);
+});
+
+test('without the 30-day series the card names the seven days it can draw, not 14 or 30', () => {
+  const sevenRows = series.slice(0, 7);
+  for (const days of [WEIGHT_PACE_WINDOW_DAYS, WEIGHT_TREND_WINDOW_DAYS]) {
+    const fallback = weightWindow(undefined, sevenRows, '2026-11-30', days);
+    assert.equal(fallback.days, 7);
+    assert.equal(fallback.fallback, true);
+    assert.equal(fallback.rows.length, 7);
+    assert.ok(fallback.rows.length <= fallback.days, 'never more rows than days named');
+  }
 });

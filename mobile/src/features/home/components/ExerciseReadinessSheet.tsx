@@ -78,7 +78,13 @@ export function ExerciseReadinessSheet({
     session?.muscleActivations?.map((row) => row.muscle) ??
     session?.exercises.flatMap((row) => row.muscles) ??
     [];
-  const markCaption = readinessMarkCaption(sessionMuscles);
+  const markCaption = readinessMarkCaption(
+    readinessChips(
+      groups.flatMap((group) => group.muscles),
+      suggestions,
+      sessionMuscles,
+    ),
+  );
   // #3764: only a tick the lifter put there lightens anything, so only those reach the preview.
   const lifterReported = soreTickProvenance(muscles, suggestions).lifterReported;
   const overlap = lifterReported.filter((muscle) =>

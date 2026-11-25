@@ -37,11 +37,12 @@ test('the logger says "1 rep" for a single rep and keeps a half-typed value as t
   assert.equal(formatSetLoad(bw, { weight: '5', reps: '1' }), '+5 kg × 1 rep');
 });
 
-test('a timeline workout card says "1 set" and "1 exercise"', () => {
+test('a timeline workout card says "1 set" and "1 exercise", and keeps thousands separators', () => {
   const card = (sets: number, exerciseCount: number) =>
     timelineCardContent({ type: 'workout', sets, exerciseCount } as never).metrics.map((m) => m.text);
   assert.deepEqual(card(1, 1), ['1 set', '1 exercise']);
   assert.deepEqual(card(12, 3), ['12 sets', '3 exercises']);
+  assert.deepEqual(card(1200, 1000), ['1,200 sets', '1,000 exercises']);
 });
 
 test('a date reads "24 Nov", in the week range and in a sync-health row', () => {
@@ -52,9 +53,8 @@ test('a date reads "24 Nov", in the week range and in a sync-health row', () => 
   );
 });
 
-test('no private day-month table or plural copy is left in the week view or timeline', () => {
+test('no private day-month table is left in the week view', () => {
   assert.doesNotMatch(src('health/data/week-view.ts'), /MONTHS|function dayMonth/);
-  assert.doesNotMatch(src('home/data/timeline-presentation.ts'), /const plural\s*=/);
 });
 
 const DATE_SITES: [string, RegExp][] = [

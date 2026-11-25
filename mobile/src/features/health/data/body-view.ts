@@ -112,15 +112,26 @@ export function weightSeriesOver<T extends { date: string; weightKg?: number | n
     .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
 }
 
+/** The body rows the fallback chart draws are the last seven days; nothing longer exists to draw. */
+export const WEIGHT_FALLBACK_DAYS = 7;
+
 /**
- * What a weight card draws and how it names it: the weigh-ins over `days`, from the 30-day series.
+ * What a weight card draws and the window it names. With the 30-day series the window is the
+ * rate's own (`days`); when that read failed the chart falls back to the seven-day body rows, and
+ * the card says seven days, since 14 or 30 would claim more than it shows.
  */
 export function weightWindow<T extends { date: string; weightKg?: number | null }>(
-  series: readonly T[],
+  series: readonly T[] | null | undefined,
+  fallbackRows: readonly T[],
   today: string,
   days: number,
-): { rows: T[]; days: number } {
-  return { rows: weightSeriesOver(series, today, days), days };
+): { rows: T[]; days: number; fallback: boolean } {
+  if (series) return { rows: weightSeriesOver(series, today, days), days, fallback: false };
+  return {
+    rows: weightSeriesOver(fallbackRows, today, WEIGHT_FALLBACK_DAYS),
+    days: WEIGHT_FALLBACK_DAYS,
+    fallback: true,
+  };
 }
 
 /** The weight card's pace line: "On track · -0.4 kg/wk over 14 days", or null at goal or without a trend. */

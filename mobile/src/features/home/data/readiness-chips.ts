@@ -20,7 +20,7 @@ export function readinessChips(
   }));
 }
 
-/** The one caption line under the chips: shown when today's session has muscles to mark. */
-export function readinessMarkCaption(sessionMuscles: readonly string[]): string | null {
-  return sessionMuscles.length > 0 ? 'Marked: in today’s session' : null;
+/** The one caption line under the chips: shown only when a chip actually carries the mark. */
+export function readinessMarkCaption(chips: readonly { flagged: boolean }[]): string | null {
+  return chips.some((chip) => chip.flagged) ? 'Marked: in today’s session' : null;
 }
