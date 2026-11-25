@@ -42,6 +42,25 @@ percentages on #2354 every tick, because the tiers follow them.
    ([`canonical-runtime-android.md`](../../canonical-runtime-android.md#trainingai-dev--unreleased-code-on-the-phone-2367)).
 5. **Close out.** When a thread's PR is merged, confirm every issue in it is closed with a comment,
    remove its worktree (`git worktree remove`), and drop it from your list.
+6. **Phone backlog: you close what you check.** Every open issue labelled `needs: device` carries a
+   comment headed **"Phone check: what is left to close this"**: the steps, what must be seen, and
+   the pass rule. That comment is the test; the running order is in the newest LONG RUN post on
+   #2354. With the phone on USB and no device pass waiting from step 4, work down that order.
+   - **Report on the issue itself**, not only on #2354: each step ✅ or ❌ and what was on screen,
+     the build number, words only (no health values, no screenshots).
+   - **Every step ✅:** remove `needs: device` and close the issue. Do not leave it for the
+     Orchestrator.
+   - **Any ❌:** leave it open, remove `needs: device`, add `agent: bugfix`, and say exactly what was
+     seen, so a builder can pick it up without asking.
+   - **A step you could not run:** say why in one line; the label stays. "Not reached" is not a
+     reason: finish the issue you started before moving to the next.
+   - **A step that writes to the owner's account** (a test workout, a food log, a check-in) runs
+     only when its card says the write is allowed, and the row is removed in the same sitting; say
+     in the report what was written and that it is gone. Never write anything the card does not
+     name.
+   - On #2354 post one line per sitting: issues closed, issues sent back to a builder, issues still
+     waiting and on what. From 8 to 23 Nov results went only to #2354 by checklist item number, and
+     70 of 93 issues never received theirs: the checks were done and the issues stayed open.
 
 ### A. Claim, before starting a thread
 Add the **`in progress`** label to every issue in the batch. If you abandon it, remove the label.
