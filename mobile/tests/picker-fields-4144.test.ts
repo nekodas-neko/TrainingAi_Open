@@ -26,12 +26,20 @@ test('a date round-trips: stored YYYY-MM-DD shows as "24 Nov 2026" and is stored
 });
 
 test('a date that is not a real day, or is empty, is not read as one', () => {
-  for (const bad of ['', '  ', '2026-02-30', '2026-13-01', '2026-11-3', '24/11/2026', 'soon', '1999-12-31', '2101-01-01']) {
+  for (const bad of ['', '  ', '2026-02-30', '2026-13-01', '2026-11-3', '24/11/2026', 'soon']) {
     assert.equal(parseDateValue(bad), null, bad);
     assert.equal(formatDateField(bad), null, bad);
   }
   assert.equal(parseDateValue(null), null);
   assert.equal(parseDateValue(undefined), null);
+});
+
+test('a real date the calendar cannot reach is not selectable but still shows formatted', () => {
+  for (const [stored, shown] of [['1999-12-31', '31 Dec 1999'], ['2101-01-01', '1 Jan 2101']]) {
+    assert.equal(parseDateValue(stored), null, stored);
+    assert.equal(formatDateField(stored), shown, stored);
+  }
+  assert.equal(formatDateField('1999-02-30'), null);
 });
 
 test('bounds are inclusive, and a missing bound is open', () => {

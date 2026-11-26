@@ -14,27 +14,31 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 export const FIRST_YEAR = 2000;
 export const LAST_YEAR = 2100;
 
-/** A real calendar date as `YYYY-MM-DD` (a `/` is read too), or null. Component-wise, so no zone can shift the day. */
-export function parseDateValue(value: string | null | undefined): string | null {
+/** The parts of a real calendar date (`YYYY-MM-DD`, a `/` is read too) in any year, or null. Component-wise, so no zone can shift the day. */
+function dateParts(value: string | null | undefined) {
   const m = /^(\d{4})[-/](\d{2})[-/](\d{2})$/.exec((value ?? '').trim());
   if (!m) return null;
   const year = Number(m[1]);
   const month = Number(m[2]);
   const day = Number(m[3]);
-  if (year < FIRST_YEAR || year > LAST_YEAR) return null;
   const probe = new Date(Date.UTC(year, month - 1, day));
   if (probe.getUTCFullYear() !== year || probe.getUTCMonth() !== month - 1 || probe.getUTCDate() !== day) {
     return null;
   }
-  return `${m[1]}-${m[2]}-${m[3]}`;
+  return { year, month, day, text: `${m[1]}-${m[2]}-${m[3]}` };
+}
+
+/** A real calendar date inside the calendar's years as `YYYY-MM-DD`, or null. */
+export function parseDateValue(value: string | null | undefined): string | null {
+  const parts = dateParts(value);
+  return parts && parts.year >= FIRST_YEAR && parts.year <= LAST_YEAR ? parts.text : null;
 }
 
 /** "24 Nov 2026", or null when the value is not a date. */
 export function formatDateField(value: string | null | undefined): string | null {
-  const date = parseDateValue(value);
-  if (!date) return null;
-  const [year, month, day] = date.split('-').map(Number);
-  return `${day} ${MONTHS[month - 1]} ${year}`;
+  // Any real date reads formatted, also one the calendar cannot reach (a stored 1998 start).
+  const parts = dateParts(value);
+  return parts ? `${parts.day} ${MONTHS[parts.month - 1]} ${parts.year}` : null;
 }
 
 /** The month the calendar opens on: the value's, else today's. */

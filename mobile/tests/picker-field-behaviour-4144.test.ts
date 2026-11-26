@@ -124,6 +124,33 @@ test('a date field: a stored day outside the bounds shows the message and Set st
   await close();
 });
 
+test('a date field: a stored day in the "/" form is left as it was unless a different day is picked', async () => {
+  const { stored } = await show(DateField, {}, '2026/11/24');
+  assert.ok(button('Set 24 Nov 2026'), 'the same day is chosen when the sheet opens');
+  await click('Set 24 Nov 2026');
+  await settle();
+  assert.deepEqual(stored, [], 'Set without a change writes nothing');
+  assert.equal(button(/^Set /) === undefined, true, 'and the sheet closes');
+  await act(async () => {
+    button(/24 Nov 2026/)!.click();
+    await wait(0);
+  });
+  await settle();
+  await click('day 2026-11-12');
+  await click('Set 12 Nov 2026');
+  await settle();
+  assert.deepEqual(stored, ['2026-11-12'], 'a different day is stored in the YYYY-MM-DD form');
+  await close();
+});
+
+test('a date field: a stored date outside 2000 to 2100 shows formatted, not as raw text', async () => {
+  const mounted = mount(DateField, {}, '1998-03-07');
+  await act(async () => root.render(h(mounted.Host)));
+  assert.ok(button('7 Mar 1998'));
+  assert.doesNotMatch(page(), /1998-03-07/);
+  await close();
+});
+
 test('a time field: Clear on an optional field empties it; a required field has none', async () => {
   const optional = await show(TimeField, { optional: true, label: 'Training time' }, '17:30');
   assert.ok(button('Clear'));

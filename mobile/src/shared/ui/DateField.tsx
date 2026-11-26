@@ -87,7 +87,13 @@ export function DateField({
             <AppButton
               title={draft ? `Set ${formatDateField(draft)}` : 'Choose a day'}
               disabled={!draft || outOfBounds}
-              onPress={() => draft && commit(draft)}
+              onPress={() => {
+                if (!draft) return;
+                // The sheet reads a stored `2026/11/24` as the same day: unless a different
+                // day is picked, what is stored stays as it was.
+                if (draft === parseDateValue(value)) setOpen(false);
+                else commit(draft);
+              }}
             />
             <Stack direction="row" gap="sm">
               <AppButton
