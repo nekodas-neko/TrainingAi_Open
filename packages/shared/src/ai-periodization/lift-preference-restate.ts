@@ -51,8 +51,13 @@ export function restatePlanRow<R extends RestatableRow>(row: R, pref: LiftPrefer
   const prev = row.liftPreference
   let base = { ...row }
 
+  // #4128: start from what the generator made for the lift, never from an already-restated row, so a range
+  // changed twice gives what the final range chosen once gives, and a range taken away gives the generated
+  // row back. That load predates the one-shot step too, so there is no step to take back.
+  const generated = prev?.generated
+  if (generated) base = { ...base, reps: generated.reps, pct: generated.pct }
   // Take back what the row's previous one-shot did, so the new state is applied to the plan as written.
-  if (prev?.loadStep && !ctx.bodyweight) {
+  else if (prev?.loadStep && !ctx.bodyweight) {
     const back = prev.loadStep === 'lighter' ? 'heavier' : 'lighter'
     const pct = pctOnePlateStep(base.pct, ctx.basisKg, ctx.equipment, back, back === 'heavier' ? roleLoadCapPct(ctx.trainingGoal, ctx.phase, ctx.role) : Infinity)
     if (pct != null) base = { ...base, pct }
@@ -66,12 +71,18 @@ export function restatePlanRow<R extends RestatableRow>(row: R, pref: LiftPrefer
 
   const { row: out, applied } = applyLiftPreferenceToPlanRow(
     { sets: base.sets, reps: base.reps, pct: base.pct, restSec: base.restSec }, pref, ctx,
+    // Recorded only where the start is known to be what the generator made: from its own record, or a row no
+    // range had touched. A row an earlier range already moved, with no record, is not "generated".
+    { recordGenerated: !!generated || !prev?.repRange },
   )
   const restSec = ctx.budgetHeldRest ? base.restSec : out.restSec
   const sets = applyPlanSetsDelta(out.sets, pref, ctx) ?? out.sets
 
   const record: AppliedLiftPreference = {}
-  if (pref.repRange && (applied.repRange || prev?.repRange)) record.repRange = pref.repRange
+  // With the generated row as the start, `applied` is the whole truth about the range: it moved the row or it did
+  // not, exactly as for a range chosen once. Without it (a row stored before #4128) the row's own record stands in.
+  if (pref.repRange && (applied.repRange || (!generated && prev?.repRange))) record.repRange = pref.repRange
+  if (applied.generated) record.generated = applied.generated
   if (pref.restSec != null && restSec === pref.restSec && (applied.restSec != null || prev?.restSec != null)) record.restSec = pref.restSec
   if (applied.loadStep) record.loadStep = applied.loadStep
   if (sets !== out.sets) record.setsDelta = pref.oneShot!.setsDelta!

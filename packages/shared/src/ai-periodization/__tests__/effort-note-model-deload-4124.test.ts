@@ -499,7 +499,15 @@ async function runCase(c: GridCase): Promise<GridOut> {
       // The row's name is compared on its own (`names`), not inside the hash: it is the one field this
       // review changes on purpose (a row carries the lift's own name, not the model's echo).
       names[e.sessionExerciseId] = e.name
-      const { autoregNote, deloadNote, name: _name, ...rest } = e
+      const { autoregNote, deloadNote, name: _name, ...restWithRecord } = e
+      // #4128: `liftPreference.generated` is new and written on purpose (the reps and load before a rep range);
+      // the golden `main` recorded has no such field, so it is left out of the hash.
+      // Assigned in place so the key order the hash reads is unchanged.
+      const rest = { ...restWithRecord }
+      if (rest.liftPreference?.generated) {
+        const { generated: _generated, ...record } = rest.liftPreference
+        rest.liftPreference = record
+      }
       // `m` (a deload the model wrote) is read from the plan, not part of the golden `main` recorded.
       if (autoregNote !== undefined || deloadNote !== undefined) notes[e.sessionExerciseId] = { ...(autoregNote !== undefined && { a: autoregNote }), ...(deloadNote !== undefined && { d: deloadNote }), ...(e.modelDeload && { m: true as const }) }
       return rest

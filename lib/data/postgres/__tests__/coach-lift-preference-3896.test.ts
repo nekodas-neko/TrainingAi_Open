@@ -565,7 +565,7 @@ describe.skipIf(!canRun)('Coach lift_preference domain (#3896 step 5)', () => {
       await doApply([{ ...lighter, id: 'l2' }])
       const stamp = (await stepOf(ids.lower)).liftPreference.oneShotSetAt as string
       await log('Upper', stamp)
-      expect((await stepOf(ids.lower)).liftPreference).toEqual({ repRange: { min: 12, max: 15 } })
+      expect((await stepOf(ids.lower)).liftPreference).toEqual({ repRange: { min: 12, max: 15 }, generated: { reps: 8, pct: 70 } })
       expect((await stepOf(ids.lower)).reps).toBe(12)
     })
 

@@ -77,6 +77,10 @@ export interface AppliedLiftPreference {
   setsDelta?: -1 | 1
   /** ISO time of the one-shot this plan applied, so a later writer can tell which one it was. */
   oneShotSetAt?: string
+  /** #4128: the reps and load the generator made for this lift, before its rep range was applied. Written
+   *  with `repRange` on a row the range moved, so a restate starts from what the generator made and not
+   *  from the last restated row. Absent on rows stored before it; a restate then starts from the row. */
+  generated?: { reps: number; pct: number }
 }
 
 export interface PendingTransition {

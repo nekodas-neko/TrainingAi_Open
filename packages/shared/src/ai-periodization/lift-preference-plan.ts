@@ -76,14 +76,19 @@ export interface PlanPreferenceCtx {
  * them. The caller never passes a deloaded row, a deload plan or a baseline.
  */
 export function applyLiftPreferenceToPlanRow<R extends PlanRow>(
-  row: R, pref: LiftPreference, ctx: PlanPreferenceCtx,
+  row: R, pref: LiftPreference, ctx: PlanPreferenceCtx, opts: { recordGenerated?: boolean } = {},
 ): { row: R; applied: AppliedLiftPreference } {
   const applied: AppliedLiftPreference = {}
   let out = { ...row }
   if (pref.repRange) {
     const reps = clampReps(out.reps, pref.repRange)
     const pct = ctx.bodyweight ? out.pct : preferredPct(ctx.trainingGoal, ctx.phase, ctx.role, reps)
-    if (reps !== out.reps || pct !== out.pct) applied.repRange = pref.repRange
+    if (reps !== out.reps || pct !== out.pct) {
+      applied.repRange = pref.repRange
+      // #4128: what the generator made, kept so a later restate starts from it. Opt-in: only the AI plan's
+      // post-model step and the restate write it, so the rules fallback's rows stay byte for byte as they were.
+      if (opts.recordGenerated) applied.generated = { reps: out.reps, pct: out.pct }
+    }
     out = { ...out, reps, pct }
   }
   if (pref.restSec != null && pref.restSec !== out.restSec) {
