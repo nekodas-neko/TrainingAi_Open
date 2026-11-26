@@ -3,23 +3,23 @@ import { Client } from 'pg'
 import { SEED_EMAIL, settleRouteBoundary } from './fixtures'
 
 /**
- * The card says what Start Workout will do without Accept (BF-156).
+ * What the person sees on the prescription card of an AI-dynamic program (BF-156, rewritten for
+ * #3900 / #4088 / #4104).
  *
- * Owner: *"what happens if I dont select to apply the session? Its pretty easy to miss that
- * button."* There are two answers and they are opposite. `prescriptionDrivesLoad` splits the five
- * phase actions: a pending `stay` or `transition_recommended` already drives today's loads, so
- * ignoring the button costs only the phase decision; a pending `deload_recommended`,
- * `session_swap_recommended` or `rest_day_recommended` does not, so ignoring it trains the
- * program's base progression style instead of what is on screen.
+ * BF-156 was the owner's question — *"what happens if I dont select to apply the session? Its
+ * pretty easy to miss that button."* — and the card answered it with one sentence per kind of
+ * plan. **#3900 removed the question for most plans:** since #4088 every plan generated on the AI
+ * program is stored applied (`auto_applied`), and a plan left `pending` from before is promoted
+ * the first time it is served (`adoptPendingAiPlan`). A stay or a session swap therefore shows
+ * "Auto-applied" and has no Accept to miss; #4104 made the native screen the same (one Start).
+ * The cases below assert that.
  *
- * **The button shapes were never the signal, which is the part worth guarding.** The card's two
- * action blocks split on a different axis than the rule: `transition_recommended` and
- * `deload_recommended` share the "Move to …" block while having OPPOSITE load consequences, and
- * `stay` shares "Accept" with `session_swap_recommended`. So the two cases below are deliberately
- * both from the Accept block — same buttons, opposite sentence.
- *
- * The two are asserted against each other, not just for their own string: a line that appeared in
- * both states would be worse than none, because it would read as a fact about the card.
+ * The consequence sentences still exist for the two pending plans the rule leaves alone, and the
+ * spec keeps both covered through them: a phase move on a program waiting for its switch-over
+ * (`transition_recommended` with `typeOnlyMove`: today's numbers are already loaded) and a
+ * deload that is not a one-day deload (not applied by itself: the program's normal loads train).
+ * They are asserted against each other, because a line that appeared in both states would read
+ * as a fact about the card.
  */
 
 const BASE = {
@@ -45,7 +45,7 @@ async function withDb<T>(fn: (db: Client) => Promise<T>): Promise<T> {
 }
 
 /** Replaces the pending prescription in place, so each case is the same card in a different state. */
-async function seedPending(phaseAction: string) {
+async function seedPending(phaseAction: string, extra: Record<string, unknown> = {}) {
   await withDb(db => db.query(
     `INSERT INTO session_periodization
        (user_id, program_session_id, phase, sessions_in_phase, baseline_complete,
@@ -55,7 +55,7 @@ async function seedPending(phaseAction: string) {
        prescription = EXCLUDED.prescription, prescription_status = EXCLUDED.prescription_status,
        prescription_generated_at = EXCLUDED.prescription_generated_at,
        prescription_expires_at = EXCLUDED.prescription_expires_at`,
-    [userId, programSessionId, JSON.stringify({ ...BASE, phaseAction })]))
+    [userId, programSessionId, JSON.stringify({ ...BASE, ...extra, phaseAction })]))
 }
 
 test.beforeAll(async () => {
@@ -92,29 +92,56 @@ test.afterAll(async () => {
 const ALREADY_LOADED = /numbers are already loaded/
 const WILL_BE_IGNORED = /train the program.s normal loads/
 
-test('a pending `stay` says the numbers are already loaded', async ({ page }) => {
-  await seedPending('stay')
+/** The card's header line reads "AI Prescription · <phase> · Auto-applied" once the plan is applied. */
+const APPLIED_HEADER = /AI Prescription · .* · Auto-applied/
+
+async function open(page: import('@playwright/test').Page) {
   await page.goto(`/workout?session=${programSessionId}`)
   await settleRouteBoundary(page)
+}
 
-  await expect(page.getByRole('button', { name: 'Accept' }), 'the prescription card never rendered')
+for (const [phaseAction, what] of [
+  ['stay', 'a stay left pending'],
+  ['session_swap_recommended', 'a session swap left pending'],
+] as const) {
+  test(`${what} is applied when the workout opens, with no Accept to miss`, async ({ page }) => {
+    await seedPending(phaseAction)
+    await open(page)
+
+    await expect(page.getByText(APPLIED_HEADER), 'the prescription card never rendered as applied')
+      .toBeVisible({ timeout: 60_000 })
+    await expect(page.getByRole('button', { name: 'Accept' })).toHaveCount(0)
+    // Nothing is waiting on the person, so neither consequence sentence has a reason to show.
+    await expect(page.getByText(ALREADY_LOADED)).toHaveCount(0)
+    await expect(page.getByText(WILL_BE_IGNORED)).toHaveCount(0)
+
+    // And the store agrees with the screen: the plan was promoted, not just painted.
+    const status = await withDb(db => db.query<{ prescription_status: string }>(
+      'SELECT prescription_status FROM session_periodization WHERE user_id = $1 AND program_session_id = $2',
+      [userId, programSessionId]))
+    expect(status.rows[0]?.prescription_status).toBe('auto_applied')
+  })
+}
+
+test('a pending phase move on a waiting program says the numbers are already loaded', async ({ page }) => {
+  // `typeOnlyMove` is the program waiting for its switch-over: adoption leaves it pending (#3877).
+  await seedPending('transition_recommended', { phase: 'intensification', typeOnlyMove: true })
+  await open(page)
+
+  await expect(page.getByRole('button', { name: /^Move to /i }), 'the pending move never rendered')
     .toBeVisible({ timeout: 60_000 })
-
   await expect(page.getByText(ALREADY_LOADED)).toBeVisible({ timeout: 15_000 })
-  // And NOT the other sentence. `stay` drives load, so warning about losing it would be false.
+  // And NOT the other sentence. A move drives load, so warning about losing it would be false.
   await expect(page.getByText(WILL_BE_IGNORED)).toHaveCount(0)
 })
 
-test('a pending `session_swap_recommended` warns the numbers will be ignored', async ({ page }) => {
-  await seedPending('session_swap_recommended')
-  await page.goto(`/workout?session=${programSessionId}`)
-  await settleRouteBoundary(page)
+test('a pending deload that is not a one-day deload warns the numbers will be ignored', async ({ page }) => {
+  // `deload: false` is not a one-day deload (`isOneDayDeload`), so it is not applied by itself.
+  await seedPending('deload_recommended', { deload: false })
+  await open(page)
 
-  // Same block, same two buttons as the case above — which is exactly why the sentence has to
-  // carry the difference.
-  await expect(page.getByRole('button', { name: 'Accept' }), 'the prescription card never rendered')
+  await expect(page.getByRole('button', { name: /^Move to /i }), 'the pending deload never rendered')
     .toBeVisible({ timeout: 60_000 })
-
   await expect(page.getByText(WILL_BE_IGNORED)).toBeVisible({ timeout: 15_000 })
   await expect(page.getByText(ALREADY_LOADED)).toHaveCount(0)
 })
