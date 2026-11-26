@@ -67,6 +67,22 @@ const ROOT = path.resolve(__dirname, '..');
 // finds them. Add one here when a new convention-named browser entry point appears.
 const CONVENTION_CLIENT_ROOTS = ['instrumentation-client.ts'];
 
+// Server paths whose OUTPUT a browser spec asserts. `app/api/**` and the engine reach no browser
+// by import (LA-63), but a change to what they decide changes what Playwright sees: #4088 changed
+// which plan the AI program applies and #4134 changed when an early deload is confirmed, both in
+// files listed here, and both broke a spec while the shards were skipped (#4153). A prefix ends in
+// `/`; anything else is one file. THIS LIST IS HAND-KEPT and will drift like the one it sits
+// beside: add a path when a spec starts asserting what a server module decides. The unit test
+// checks that every entry names a real file or directory, so a rename fails there.
+const SERVER_PATHS_BROWSER_SPECS_ASSERT = [
+  'app/api/ai-periodization/',
+  'app/api/confirm-early-deload/',
+  'packages/shared/src/ai-periodization/',
+  'packages/shared/src/phase-engine.ts',
+  'lib/data/postgres/slices/periodization.ts',
+  'lib/data/postgres/slices/programs.ts',
+];
+
 /** Files that declare themselves client components — the roots of everything a browser loads. */
 function clientRoots() {
   // grep exits 1 on no match. That would throw here and fail the step — which is the SAFE
@@ -137,15 +153,20 @@ function uiTouched(files, reachable = clientReachable()) {
     if (!f) continue;
     // `app/api/**` reaches no browser (LA-63); a vitest file under app/ or components/ is not
     // loaded by one either, and one such file bought four ~34-minute runs (PR #1405).
-    if (f.startsWith('app/api/')) continue;
     if (/(^|\/)__tests__\//.test(f)) continue;
+    const named = SERVER_PATHS_BROWSER_SPECS_ASSERT.find((p) => (p.endsWith('/') ? f.startsWith(p) : f === p));
+    if (named) {
+      why.push(`${f} (a server path a browser spec asserts)`);
+      continue;
+    }
+    if (f.startsWith('app/api/')) continue;
     if (/^(app|components|e2e)\//.test(f) || f === 'playwright.config.ts') why.push(f);
     else if (reachable.has(f)) why.push(`${f} (reached from a client module)`);
   }
   return { touched: why.length > 0, why };
 }
 
-module.exports = { uiTouched, clientReachable, clientRoots };
+module.exports = { uiTouched, clientReachable, clientRoots, SERVER_PATHS_BROWSER_SPECS_ASSERT };
 
 if (require.main === module) {
   const files = fs.readFileSync(0, 'utf8').split('\n').map((l) => l.trim()).filter(Boolean);

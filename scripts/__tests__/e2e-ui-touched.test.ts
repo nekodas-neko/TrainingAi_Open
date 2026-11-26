@@ -1,7 +1,9 @@
+import { existsSync } from 'node:fs';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { uiTouched, clientReachable, clientRoots } = require('../e2e-ui-touched');
+const { uiTouched, clientReachable, clientRoots, SERVER_PATHS_BROWSER_SPECS_ASSERT } = require('../e2e-ui-touched');
 
 /** A fixed reachable set, so these cases do not move when the import graph does. */
 const reachable = new Set(['lib/resume-repaint.ts', 'lib/sqlite/cache.ts', 'lib/hooks/use-x.ts']);
@@ -96,3 +98,30 @@ describe('OR-158 — roots outside lib/, and type-only edges', () => {
     expect(uiTouched(['app/api/oura/route.ts', 'docs/x.md']).touched).toBe(false)
   })
 })
+
+describe('server paths a browser spec asserts (#4153)', () => {
+  it('runs for the files of the two PRs that broke specs while the shards were skipped', () => {
+    for (const f of [
+      'app/api/ai-periodization/prescribe/route.ts',
+      'packages/shared/src/ai-periodization/pending-plan-adoption.ts',
+      'app/api/confirm-early-deload/route.ts',
+      'packages/shared/src/phase-engine.ts',
+      'lib/data/postgres/slices/periodization.ts',
+      'lib/data/postgres/slices/programs.ts',
+    ]) {
+      expect(uiTouched([f], reachable).touched, f).toBe(true);
+    }
+  });
+
+  it('still skips other API routes and test files under a listed path', () => {
+    expect(uiTouched(['app/api/version/route.ts'], reachable).touched).toBe(false);
+    expect(uiTouched(['packages/shared/src/ai-periodization/__tests__/a.test.ts'], reachable).touched).toBe(false);
+  });
+
+  it('names only paths that exist, so a rename fails here instead of silently dropping the rule', () => {
+    const root = path.resolve(__dirname, '..', '..');
+    for (const p of SERVER_PATHS_BROWSER_SPECS_ASSERT as string[]) {
+      expect(existsSync(path.join(root, p)), p).toBe(true);
+    }
+  });
+});
