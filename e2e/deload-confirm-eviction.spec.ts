@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test'
-import { STORAGE_STATE, settleRouteBoundary, suppressMorningCheckin, tolerateTestEnd } from './fixtures'
+import { Client } from 'pg'
+import { SEED_EMAIL, STORAGE_STATE, settleRouteBoundary, suppressMorningCheckin, tolerateTestEnd } from './fixtures'
 
 /**
  * RV-49 — confirming a deload on Home must evict the caches the visible screen reads.
@@ -22,6 +23,12 @@ import { STORAGE_STATE, settleRouteBoundary, suppressMorningCheckin, tolerateTes
  * needs the server to return a deloaded prescription, which needs `earlyDeloadRecommended` to arise
  * from real data — automatic phase mode, a phase list, a baseline HRV and an ACWR over threshold,
  * across several tables. See the journal entry for what that leaves owed.
+ *
+ * **The program runs `automatic` (#4134, closes #4129).** The confirm route answers 400 on a
+ * `manual` program, because an early deload does nothing there, and the readiness payload only
+ * recommends one on an automatic or AI-dynamic program (`lib/health/readiness-payload.ts`), so the
+ * button never shows on a manual one. The seeded program is manual; the spec switches it to
+ * automatic for its run and puts the old mode back, since every other spec shares the program.
  */
 
 const SS_PREFIX = 'ta_sscache:'
@@ -30,6 +37,25 @@ const LS_PREFIX = 'ta_cache:'
 // The service worker re-issues every /api/ request, so a stubbed route is a race unless the worker
 // is blocked outright (scripts/check-e2e-api-stub-sw.js explains the measurement).
 test.use({ storageState: STORAGE_STATE, serviceWorkers: 'block' })
+
+async function setPhaseMode(mode: string | null): Promise<string> {
+  const connectionString = process.env.DATABASE_URL
+  expect(connectionString, 'DATABASE_URL must be set — see e2e/README.md').toBeTruthy()
+  const db = new Client({ connectionString })
+  await db.connect()
+  try {
+    const { rows } = await db.query<{ id: string; phase_mode: string }>(
+      `SELECT p.id, p.phase_mode FROM programs p JOIN users u ON u.id = p.user_id
+        WHERE u.email = $1 ORDER BY p.is_active DESC, p.created_at LIMIT 1`, [SEED_EMAIL])
+    expect(rows[0], 'the seeded user has no program').toBeTruthy()
+    if (mode != null) await db.query('UPDATE programs SET phase_mode = $1 WHERE id = $2', [mode, rows[0].id])
+    return rows[0].phase_mode
+  } finally { await db.end() }
+}
+
+let previousPhaseMode = 'manual'
+test.beforeAll(async () => { previousPhaseMode = await setPhaseMode('automatic') })
+test.afterAll(async () => { await setPhaseMode(previousPhaseMode) })
 
 /** Cache keys present in either mirror, from inside the page. */
 const cachedKeys = (page: import('@playwright/test').Page) =>
