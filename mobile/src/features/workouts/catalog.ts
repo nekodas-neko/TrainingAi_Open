@@ -214,9 +214,11 @@ export function sessionTrainingStatus(
     lastTrained:
       days === null
         ? 'Never trained'
-        : days === 1
-          ? 'Last done yesterday'
-          : `Last done ${days} days ago`,
+        : days === 0
+          ? 'Last done today'
+          : days === 1
+            ? 'Last done yesterday'
+            : `Last done ${days} days ago`,
   };
 }
 function count(value: unknown): number {

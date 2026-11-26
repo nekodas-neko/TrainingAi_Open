@@ -1,3 +1,4 @@
+import { formatDateDisplay } from '@trainingai/shared/date-utils';
 import { useState } from 'react';
 import { AppText, Badge, Card, LineChart, ListRow, Sheet, Stack } from '../../../shared/ui';
 import { useHealthData } from '../data/HealthDataProvider';
@@ -44,7 +45,7 @@ export function MetricHistorySheet({
         .map((row) => (
           <ListRow
             key={row.date}
-            title={row.date}
+            title={formatDateDisplay(row.date, 'short')}
             subtitle={metricValue(value(row), definition.unit, definition.decimals)}
             onPress={() => setSelected(row)}
           />
@@ -52,7 +53,7 @@ export function MetricHistorySheet({
       {selected && (
         <Card>
           <Stack direction="row" justify="space-between">
-            <AppText variant="heading">{selected.date}</AppText>
+            <AppText variant="heading">{formatDateDisplay(selected.date, 'short')}</AppText>
             {field === 'bodyFat' && selected.bodyFatIsCorrected && (
               <Badge label="DEXA corrected" />
             )}

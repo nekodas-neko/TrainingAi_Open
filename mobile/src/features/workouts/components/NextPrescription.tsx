@@ -1,3 +1,4 @@
+import { plural } from '@trainingai/shared/format/plural';
 import { AppText, Badge, Stack } from '../../../shared/ui';
 import { nextPrescriptionSpec } from '../data/models';
 import { ResourceCard } from './ResourceCard';
@@ -45,7 +46,7 @@ export function NextPrescription() {
                       label={
                         set.weightKg === null ||
                         (exercise.exerciseType === 'bodyweight' && set.weightKg === 0)
-                          ? `${set.reps} reps`
+                          ? plural(set.reps, 'rep', 'reps')
                           : `${loadLabel(set.weightKg, weightUnitOf(units, exercise.sessionExerciseId))} × ${set.reps}`
                       }
                     />

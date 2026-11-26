@@ -152,7 +152,7 @@ export function SyncHealthCard() {
         <ConfirmationCard
           danger
           title="Discard this change?"
-          message="It is removed from this phone's upload queue and will not be sent. Anything already on the server is left as it is."
+          message="It is removed from the list waiting to upload and will not be sent. Anything already on the server is left as it is."
           confirmLabel="Discard"
           cancelLabel="Keep it"
           onConfirm={() => void discard(discarding)}

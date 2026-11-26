@@ -36,7 +36,7 @@ test('only dead-lettered pending rows are listed, with the server text and a lab
       ['runs', 'r', 'Prescribed run', '2026-10-21'],
     ],
   );
-  assert.equal(itemTitle(items[0]), 'Activity — 2026-10-20');
+  assert.equal(itemTitle(items[0]), 'Activity — 20 Oct');
   assert.equal(itemDetail(items[0]), 'Bad payload (5 attempts)');
   assert.equal(failedHeading(1), '1 change failed to sync');
   assert.equal(failedHeading(3), '3 changes failed to sync');

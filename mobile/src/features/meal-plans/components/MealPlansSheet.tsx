@@ -1,3 +1,4 @@
+import { plural } from '@trainingai/shared/format/plural';
 import { formatCount } from '@trainingai/shared/format/number';
 import {
   CARB_STAPLES,
@@ -511,7 +512,7 @@ export function MealPlansSheet({
                   }}
                 />
                 <AppText variant="caption" tone="muted">
-                  Keep at most {Math.max(0, Number(f.mealCount) - 1)} meals, leaving a slot for
+                  Keep at most {plural(Math.max(0, Number(f.mealCount) - 1), 'meal', 'meals')}, leaving a slot for
                   a suggestion.
                 </AppText>
                 <TextField
@@ -762,7 +763,7 @@ export function MealPlansSheet({
                 )}
                 <AppText>Review your choices and generate a draft.</AppText>
                 <AppText variant="caption" tone="muted">
-                  {f.mealCount} meals · {f.stores.join(', ') || 'Any store'} ·{' '}
+                  {plural(Number(f.mealCount), 'meal', 'meals')} · {f.stores.join(', ') || 'Any store'} ·{' '}
                   {f.splitDays ? 'Training/rest split' : 'Same plan each day'}
                 </AppText>
               </>
@@ -866,7 +867,7 @@ export function MealPlansSheet({
               <ListRow
                 key={plan.id}
                 title={plan.name}
-                subtitle={`${plan.isActive ? 'Active · ' : ''}${plan.mealsPerDay} meals · ${formatCount(plan.targetCalories)} kcal`}
+                subtitle={`${plan.isActive ? 'Active · ' : ''}${plural(plan.mealsPerDay, 'meal', 'meals')} · ${formatCount(plan.targetCalories)} kcal`}
                 onPress={() => {
                   setSelected(plan);
                   setDay(plan.variants[0]?.dayType ?? 'all');
@@ -1007,7 +1008,7 @@ export function MealPlansSheet({
         {reduction && (
           <>
             <AppText>
-              Keep at most {Math.max(0, reduction.count - 1)} meals, leaving room for a
+              Keep at most {plural(Math.max(0, reduction.count - 1), 'meal', 'meals')}, leaving room for a
               suggestion.
             </AppText>
             <MultiChoice

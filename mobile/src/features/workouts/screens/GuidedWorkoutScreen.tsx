@@ -1,3 +1,6 @@
+import { skipExerciseMessage, skipGoesTo } from '../logging/logger-copy';
+import { plural } from '@trainingai/shared/format/plural';
+import { formatDateDisplay } from '@trainingai/shared/date-utils';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { View } from 'react-native';
 import {
@@ -233,10 +236,10 @@ export function GuidedWorkoutScreen({
     ) : (
       <Stack direction="row" gap="md">
         <AppButton
-          title=""
+          title="Skip"
           icon="skip"
           variant="surface"
-          accessibilityLabel="Skip exercise"
+          accessibilityLabel={`Skip ${exercise.name}`}
           disabled={journal.busy}
           onPress={() => setPanel('skip')}
         />
@@ -268,19 +271,13 @@ export function GuidedWorkoutScreen({
   } else {
     screen = (
       <WorkoutLayout
-        title={
-          flow.stage === 'warmup'
-            ? `${workout.sessionName} — Warm Up`
-            : flow.stage === 'summary'
-              ? exercise.name
-              : workout.sessionName
-        }
+        title={flow.stage === 'summary' ? exercise.name : workout.sessionName}
         subtitleNode={summaryRecord ? <PersonalRecordBadge /> : undefined}
         subtitle={
           flow.stage === 'summary'
             ? 'Set summary'
             : flow.stage === 'warmup'
-              ? undefined
+              ? 'Warm up'
               : `${(workout.phaseDetail ?? workout.phase) ? `${workout.phaseDetail ?? workout.phase} · ` : ''}${workout.soloExerciseId ? 'Solo' : `Ex ${visibleIndex + 1}/${visibleExercises.length}`}`
         }
         workout={workout}
@@ -354,7 +351,7 @@ export function GuidedWorkoutScreen({
                 <AppText variant="pageTitle">{exercise.name}</AppText>
                 {exercise.lastDate && (
                   <AppText variant="micro" tone="muted">
-                    Last: {exercise.lastReps.join(', ')} reps · {exercise.lastDate}
+                    Last: {exercise.lastReps.join(', ')} reps · {formatDateDisplay(exercise.lastDate, 'short')}
                   </AppText>
                 )}
                 <AppText variant="caption" tone="brand">
@@ -505,8 +502,10 @@ export function GuidedWorkoutScreen({
               message={
                 confirmation === 'discard'
                   ? 'Discard this unfinished workout? It cannot be resumed and will not upload.'
-                  : confirmation === 'finish'
-                    ? `${count} sets recorded. Save these sets and finish?`
+                  : confirmation === 'skip'
+                    ? skipExerciseMessage(exercise.name, skipGoesTo(workout))
+                    : confirmation === 'finish'
+                    ? `${plural(count, 'set', 'sets')} recorded. Save these sets and finish?`
                     : 'Your recorded progress stays saved on this phone.'
               }
               confirmLabel={

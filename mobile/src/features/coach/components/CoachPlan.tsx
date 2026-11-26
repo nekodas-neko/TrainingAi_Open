@@ -1,3 +1,4 @@
+import { plural } from '@trainingai/shared/format/plural';
 import { formatCount } from '@trainingai/shared/format/number';
 import { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
@@ -58,7 +59,7 @@ export function PlanCard({
       });
     } catch (failure) {
       setError(failureNotice(
-        `Saved ${saved} of ${unsaved.length} meals. Retry to save the rest.`,
+        `Saved ${saved} of ${plural(unsaved.length, 'meal', 'meals')}. Retry to save the rest.`,
         failure,
       ));
     } finally {

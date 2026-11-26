@@ -70,6 +70,7 @@ export function BodyPanel({
       <GroupTitle>Body</GroupTitle>
       <BodyWeightCard
         rows={rows}
+        weightSeries={health.body?.weightTrend}
         today={health.today}
         weight={weight}
         weightDate={weightDate ?? undefined}
@@ -80,6 +81,8 @@ export function BodyPanel({
       />
       <WeightTrendCard
         rows={rows}
+        weightSeries={health.body?.weightTrend}
+        today={health.today}
         slope={slope}
         weight={weight}
         fat={fat}
@@ -146,7 +149,7 @@ export function BodyPanel({
           Measure heart rate
         </AppText>
         <AppText variant="caption" tone="muted">
-          Live device measurement is deferred. Recorded heart-rate history is available below.
+          You cannot measure heart rate live here yet. Recorded heart-rate history is below.
         </AppText>
       </Card>
       <HrDayCard />
@@ -186,7 +189,7 @@ export function BodyPanel({
       <ActivityTrendCharts />
       <RingCards openDetail={openDetail} />
       <FeatureRow
-        title="Devices & integrations"
+        title="Connected devices"
         subtitle="Oura account, heart-rate strap"
         onPress={openDevices}
       />

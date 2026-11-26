@@ -80,7 +80,7 @@ export function PlanStartCard({
                 {(row.deloaded || row.injured || row.superset) && (
                   <Stack direction="row" wrap gap="xs">
                     {row.deloaded && <Badge label="Deload" />}
-                    {row.injured && <Badge label="Recorded injury" tone="heart" />}
+                    {row.injured && <Badge label="Injury" tone="heart" />}
                     {row.superset && <Badge label="Superset" />}
                   </Stack>
                 )}

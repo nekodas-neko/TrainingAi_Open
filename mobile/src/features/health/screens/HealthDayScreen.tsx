@@ -1,3 +1,4 @@
+import { dayScoreRows } from '../data/day-scores';
 import {
   TEMPERATURE_DEVIATION_LABEL,
   TEMPERATURE_DEVIATION_NOTE,
@@ -53,6 +54,12 @@ export function HealthDayScreen({
   onBack: () => void;
 }) {
   const { theme } = useTheme();
+  const dayScoreColors = {
+    Readiness: theme.colors.brand,
+    HR: theme.tones.heart.foreground,
+    Sleep: theme.tones.sleep.foreground,
+    Move: theme.tones.nutrition.foreground,
+  };
   const { today } = useHealthData();
   const [date, setDate] = useState(initialDate);
   const state = useWorkoutResource(healthDaySpec(date));
@@ -118,33 +125,24 @@ export function HealthDayScreen({
       </Stack>
       <View style={{ paddingHorizontal: theme.spacing.lg }}>
         <Grid columns={4}>
-          {[
-            { label: 'Readiness', value: data?.scores?.readiness, color: theme.colors.brand },
-            {
-              label: 'HR',
-              value: data?.bodyMeta?.restingHeartRate,
-              color: theme.tones.heart.foreground,
-            },
-            {
-              label: 'Sleep',
-              value: data?.scores?.sleep,
-              color: theme.tones.sleep.foreground,
-            },
-            {
-              label: 'Move',
-              value: data?.scores?.activity,
-              color: theme.tones.nutrition.foreground,
-            },
-          ].map((row) => (
-            <Stack key={row.label} align="center">
-              <AppText variant="title" style={{ color: row.color }}>
-                {metricValue(row.value)}
-              </AppText>
+          {dayScoreRows(data).map((tile) => {
+            return (
+            <Stack key={tile.label} align="center">
+              {tile.muted ? (
+                <AppText variant="label" tone="muted" numberOfLines={1}>
+                  {tile.text}
+                </AppText>
+              ) : (
+                <AppText variant="title" style={{ color: dayScoreColors[tile.label] }}>
+                  {tile.text}
+                </AppText>
+              )}
               <AppText variant="micro" tone="muted">
-                {row.label}
+                {tile.label}
               </AppText>
             </Stack>
-          ))}
+            );
+          })}
         </Grid>
       </View>
       <View style={{ flex: 1, paddingHorizontal: theme.spacing.lg }} {...swipe.panHandlers}>

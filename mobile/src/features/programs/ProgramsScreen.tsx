@@ -1,3 +1,11 @@
+import {
+  INJURIES_ROW_TITLE,
+  deleteItemMessage,
+  deleteProgramMessage,
+  injuriesRowLabel,
+  injuriesSubtitle,
+} from './delete-copy';
+import { plural } from '@trainingai/shared/format/plural';
 import { useEffect, useState } from 'react';
 import {
   AppButton,
@@ -5,7 +13,9 @@ import {
   Card,
   ConfirmationCard,
   Disclosure,
+  Icon,
   IconButton,
+  ListRow,
   Notice,
   Sheet,
   Stack,
@@ -18,6 +28,7 @@ import {
   programSpec,
   stylesSpec,
   phaseSetsSpec,
+  injurySpec,
 } from '../workouts/data/models';
 import { useWorkoutAction } from '../workouts/data/useWorkoutAction';
 import { useWorkoutContext } from '../workouts/WorkoutProvider';
@@ -26,16 +37,20 @@ import { ProgramEditor } from './ProgramEditor';
 import { StyleEditor } from './StyleEditor';
 import { PhaseEditor } from './PhaseEditor';
 import { ProgramCard } from './ProgramCard';
-import { InjuryManager } from '../workouts/components/InjuryManager';
 
 export function ProgramsScreen({
   onBack,
   openBuilder,
+  openInjuries,
 }: {
   onBack: () => void;
   openBuilder: () => void;
+  /** Opens Health › Body, where injuries are added and resolved. */
+  openInjuries: () => void;
 }) {
+  const injuries = useWorkoutResource(injurySpec);
   const programs = useWorkoutResource(programSpec);
+  const activeInjuries = injuries.data?.filter((injury) => !injury.resolvedDate).length;
   const styles = useWorkoutResource(stylesSpec);
   const phases = useWorkoutResource(phaseSetsSpec);
   const action = useWorkoutAction();
@@ -191,7 +206,7 @@ export function ProgramsScreen({
               <AppText variant="heading">{style.name}</AppText>
               <AppText variant="caption" tone="muted">
                 {style.sets
-                  .map((set) => `${set.reps} reps @ ${set.pct}% · ${set.restSec}s`)
+                  .map((set) => `${plural(set.reps, 'rep', 'reps')} @ ${set.pct}% · ${set.restSec}s`)
                   .join(' / ')}
               </AppText>
               <Stack direction="row">
@@ -262,9 +277,17 @@ export function ProgramsScreen({
           ))}
         </Disclosure>
       </Disclosure>
-      <Disclosure compact title="Recorded injuries">
-        <InjuryManager showSync={false} />
-      </Disclosure>
+      {/* One place manages injuries: Health › Body (#4143). This row only points there. */}
+      <Card padded={false}>
+        <ListRow
+          title={INJURIES_ROW_TITLE}
+          subtitle={injuriesSubtitle(activeInjuries)}
+          accessibilityLabel={injuriesRowLabel(activeInjuries)}
+          trailing={<Icon name="forward" tone="muted" />}
+          onPress={openInjuries}
+          divider={false}
+        />
+      </Card>
       {reviewId && (
         <WorkoutReviewSheet
           key={`${programs.resources?.connection.userId}:${reviewId}`}
@@ -277,7 +300,9 @@ export function ProgramsScreen({
         {deleting && (
           <ConfirmationCard
             title={`Delete ${deleting.name}?`}
-            message="This removes the selected item from your account."
+            message={
+              deleting.kind === 'program' ? deleteProgramMessage() : deleteItemMessage()
+            }
             confirmLabel="Delete"
             cancelLabel="Cancel"
             danger
