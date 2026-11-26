@@ -1,5 +1,14 @@
 import { useEffect, useState } from 'react';
-import { AppButton, AppText, Card, ChoiceTiles, HubCard, Sheet, Stack } from '../../../shared/ui';
+import {
+  AppButton,
+  AppText,
+  Card,
+  ChoiceTiles,
+  HubCard,
+  Notice,
+  Sheet,
+  Stack,
+} from '../../../shared/ui';
 import {
   START_ROOT_ROWS,
   TREADMILL_KINDS,
@@ -65,6 +74,7 @@ export function StartActivitySheet({
         ) : undefined
       }
     >
+      {error && <Notice error title="Could not start the activity" message={error} />}
       {back && (
         <AppButton
           title="Back"
@@ -102,11 +112,6 @@ export function StartActivitySheet({
             onChange={setKind}
             disabled={busy}
           />
-          {error && (
-            <AppText variant="caption" tone="muted">
-              {error}
-            </AppText>
-          )}
           <Card>
             <AppText variant="label">Already done? Log it</AppText>
             <Stack direction="row">
@@ -128,7 +133,6 @@ export function StartActivitySheet({
         <ActivityTypeTiles
           visible={visible}
           busy={busy}
-          error={error}
           filter={somethingElseTypes}
           onSelect={onType}
         />
