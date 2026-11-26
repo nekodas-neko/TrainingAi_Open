@@ -1,6 +1,11 @@
 import { shiftDateStr, weekStartForDay } from '@trainingai/shared/date-utils';
 import type { HeartHealthActivity } from '@trainingai/shared/running/heart-health';
-import type { HeartHealthDay } from './cardio-view';
+import {
+  OUTCOME_LABEL,
+  activityLine,
+  shownActivity,
+} from '@trainingai/shared/running/heart-health-copy';
+import { weekDayOutcome, type HeartHealthDay } from './cardio-view';
 
 // The Cardio Hub's "This week" list and the words under each row (#4100, #4158). The server sends
 // only the days that have a cardio prescription row, and a row is made on a day the hub is opened,
@@ -57,4 +62,26 @@ export function floorLine(floorBpm: number | null | undefined): string | null {
   return floorBpm != null && Number.isFinite(floorBpm) && floorBpm > 0
     ? `Moderate starts at ${Math.round(floorBpm)} bpm for you`
     : null;
+}
+
+/**
+ * What one row of the week list says. A day with no activity reads "No activity logged" and
+ * nothing more: the outcome label would repeat it. Today keeps its marker.
+ */
+export function weekRowView(
+  { date, day }: WeekRow,
+  today: string,
+): { line: string; sub: string; label: string | null; outcome: ReturnType<typeof weekDayOutcome> } {
+  const outcome = day
+    ? weekDayOutcome(day, today)
+    : date === iso(today)
+      ? 'today'
+      : 'nothing-logged';
+  const shown = day ? shownActivity(day.activities, day.creditedId) : null;
+  return {
+    line: shown ? activityLine(shown) : 'No activity logged',
+    sub: day ? dayWhy(day) : '',
+    label: !shown && outcome === 'nothing-logged' ? null : OUTCOME_LABEL[outcome],
+    outcome,
+  };
 }

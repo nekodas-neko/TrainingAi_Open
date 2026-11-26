@@ -94,3 +94,31 @@ test('the card line and the floor line', () => {
   assert.equal(floorLine(null), null);
   assert.equal(floorLine(undefined), null);
 });
+
+// #4100 N1: a day with nothing logged reads one thing, not "No activity logged" and "Nothing logged".
+test('a past day with no activity says "No activity logged" once, with no outcome label beside it', async () => {
+  const { weekRowView } = await import('../src/features/activities/data/cardio-week-view.ts');
+  const missing = weekRowView({ date: '2026-12-01', day: null }, '2026-12-03');
+  assert.equal(missing.line, 'No activity logged');
+  assert.equal(missing.label, null);
+  const emptyRow = weekRowView({ date: '2026-12-01', day: day('2026-12-01') }, '2026-12-03');
+  assert.equal(emptyRow.line, 'No activity logged');
+  assert.equal(emptyRow.label, null);
+  // Today keeps its marker, and a day with an activity keeps its outcome.
+  assert.equal(weekRowView({ date: '2026-12-03', day: null }, '2026-12-03').label, 'Today');
+  const counted = weekRowView(
+    {
+      date: '2026-12-02',
+      day: day('2026-12-02', {
+        met: true,
+        countedMin: 30,
+        targetMin: 20,
+        status: 'completed',
+        activities: [{ id: 'a', title: 'Run', durationMin: 30, effortMin: 30 }] as never,
+      }),
+    },
+    '2026-12-03',
+  );
+  assert.notEqual(counted.line, 'No activity logged');
+  assert.ok(counted.label);
+});

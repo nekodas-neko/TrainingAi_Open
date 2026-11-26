@@ -9,11 +9,6 @@ import {
   restingHrSourceNote,
 } from '@trainingai/shared/health/hr-source-copy';
 import { formatDateDisplay } from '@trainingai/shared/date-utils';
-import {
-  OUTCOME_LABEL,
-  activityLine,
-  shownActivity,
-} from '@trainingai/shared/running/heart-health-copy';
 import { deviceHealthName } from '../../../integrations/device-health/platform';
 import {
   AppText,
@@ -28,8 +23,8 @@ import {
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import type { z } from 'zod';
 import { cardioWeekSpec } from '../data/models';
-import { dayWhy, weekRows } from '../data/cardio-week-view';
-import { weekDayOutcome, type FitnessTest, type HeartHealthDay } from '../data/cardio-view';
+import { weekRowView, weekRows } from '../data/cardio-week-view';
+import type { FitnessTest, HeartHealthDay } from '../data/cardio-view';
 type CardioWeek = z.infer<ReturnType<typeof cardioWeekSpec>['schema']>;
 export function HeartProfileCard({
   heart,
@@ -275,14 +270,9 @@ export function WeekList({ days, today }: { days: readonly HeartHealthDay[]; tod
       <AppText variant="eyebrow" tone="muted">
         This week
       </AppText>
-      {weekRows(days, today).map(({ date, day }) => {
-        const outcome = day
-          ? weekDayOutcome(day, today)
-          : date === today.replace(/\//g, '-')
-            ? 'today'
-            : 'nothing-logged';
-        const shown = day ? shownActivity(day.activities, day.creditedId) : null;
-        const sub = day ? dayWhy(day) : '';
+      {weekRows(days, today).map((row) => {
+        const { line, sub, label, outcome } = weekRowView(row, today);
+        const { date } = row;
         const color =
           outcome === 'counted'
             ? theme.progress.trendUp
@@ -297,7 +287,7 @@ export function WeekList({ days, today }: { days: readonly HeartHealthDay[]; tod
               </AppText>
               <View style={{ flex: 1 }}>
                 <AppText variant="caption" numberOfLines={1}>
-                  {shown ? activityLine(shown) : 'No activity logged'}
+                  {line}
                 </AppText>
                 {sub !== '' && (
                   <AppText variant="micro" tone="muted">
@@ -305,9 +295,11 @@ export function WeekList({ days, today }: { days: readonly HeartHealthDay[]; tod
                   </AppText>
                 )}
               </View>
-              <AppText variant="caption" style={{ color, fontWeight: '600' }}>
-                {OUTCOME_LABEL[outcome]}
-              </AppText>
+              {label && (
+                <AppText variant="caption" style={{ color, fontWeight: '600' }}>
+                  {label}
+                </AppText>
+              )}
             </Stack>
           </Card>
         );
