@@ -1456,8 +1456,9 @@ export interface WorkoutRepository {
    *  `deloadStartedAt`; leaves the slot 'consumed'. False when another call moved it first. */
   exitDeload(userId: string, programSessionId: string, newPhase: PeriodizationPhase, deloadStartedAt: Date): Promise<boolean>
   /** #3766: move the whole program the session belongs to (every session type, one start). */
-  /** With `expected`, a program that has moved since the caller read it is left as it is. */
-  advanceProgramPhase(userId: string, programSessionId: string, newPhase: PeriodizationPhase, expected?: { phase: PeriodizationPhase; phaseStartedAt: Date }): Promise<SessionPeriodization>
+  /** With `expected`, a program that has moved since the caller read it is left as it is. With `expected.finishMarker`
+   *  (#4137), also when a workout of this session type finished after it. */
+  advanceProgramPhase(userId: string, programSessionId: string, newPhase: PeriodizationPhase, expected?: { phase: PeriodizationPhase; phaseStartedAt: Date; finishMarker?: string | null }): Promise<SessionPeriodization>
   /** #3766: put every phased row of the program on one phase and start (the switch-over, and moves).
    *  False when `opts.expect` no longer held and nothing was written. */
   setProgramPhase(userId: string, programId: string, phase: PeriodizationPhase, startedAt: Date, pendingTransition: PendingTransition | null, opts?: import('@trainingai/shared/ai-periodization/program-phase').ProgramMoveOptions): Promise<boolean>

@@ -486,6 +486,9 @@ export interface ProgramMoveOptions {
   /** Session types whose plans are voided even when they hold a one-day deload. */
   voidAll?: string[]
   expect?: ProgramMoveExpectation
+  /** #4137: nothing is written when a workout of this session type finished after `marker` (the generation's
+   *  `finishMarker`, #4113): the move was decided from signals read before that finish. */
+  unlessFinishedAfter?: { programSessionId: string; marker: string | null }
   /** #4098: a repair made on a READ path. It skips (`BusyError`) when the person's lift lock is not free,
    *  instead of waiting the write's 4 s. */
   read?: boolean

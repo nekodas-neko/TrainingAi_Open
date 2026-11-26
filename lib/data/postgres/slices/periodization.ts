@@ -526,6 +526,17 @@ export async function setProgramPhase(
         ))
       if (off > 0) return false
     }
+    // #4137: a finish of this session type after the generation read its signals (#4113). A read inside this
+    // transaction on its own connection: it takes no lock and no second row, and the finish takes none.
+    const finished = opts.unlessFinishedAfter
+    if (finished) {
+      const [{ n }] = (await tx.execute(sql`
+        SELECT count(*)::int AS n FROM workout_sessions ws
+         WHERE ws.user_id = ${userId} AND ws.session_id = ${finished.programSessionId}
+           AND ws.completed_at IS NOT NULL AND ws.deleted_at IS NULL
+           AND ws.updated_at > COALESCE(${finished.marker}::timestamptz, '-infinity'::timestamptz)`)).rows as { n: number }[]
+      if (n > 0) return false
+    }
     const voidAll = new Set(opts.voidAll ?? [])
     const spared = await underWaySlots(tx, userId, programId, phased)
     const toVoid = phased.filter(r => voidAll.has(r.programSessionId) || (!holdsOneDayDeload(r) && !spared.has(r.id))).map(r => r.id)
@@ -607,11 +618,16 @@ export async function setProgramPendingTransition(db: Db, userId: string, progra
  *  caller planned from), a program that has moved since is left as it is. */
 export async function advanceProgramPhase(
   db: Db, userId: string, programSessionId: string, newPhase: PeriodizationPhase,
-  expected?: { phase: PeriodizationPhase; phaseStartedAt: Date },
+  expected?: { phase: PeriodizationPhase; phaseStartedAt: Date; finishMarker?: string | null },
 ): Promise<SessionPeriodization> {
   const programId = await programIdOf(db, programSessionId)
   if (!programId) throw new NotFoundError('Program session')
-  await setProgramPhase(db, userId, programId, newPhase, new Date(), null, { voidAll: [programSessionId], expect: expected })
+  await setProgramPhase(db, userId, programId, newPhase, new Date(), null, {
+    voidAll: [programSessionId],
+    // #4137: with a marker (a generation's), the move is refused when a workout of this type finished after it.
+    expect: expected && { phase: expected.phase, phaseStartedAt: expected.phaseStartedAt },
+    ...(expected?.finishMarker !== undefined && { unlessFinishedAfter: { programSessionId, marker: expected.finishMarker } }),
+  })
   const row = await getSessionPeriodization(db, userId, programSessionId)
   if (!row) throw new NotFoundError('Session periodization')
   return row

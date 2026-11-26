@@ -27,7 +27,7 @@ Code: `lib/coach/lock-wait.ts` (`lockLiftWrites`, `tryLiftWrites`, `withDomainLo
 |---|---|---|
 | Coach apply and undo, lift preference | lift lock → name/lift locks → preference row → plan rows → history | takes the lift lock first |
 | Weekly check-in save, offer, undo | lift lock (whole transaction) → check-in row → each nested apply/undo (lift lock again, free) | same |
-| `setProgramPhase`, `realignProgramPhase`, `setProgramPendingTransition` | program lock → program's plan rows, id order | same |
+| `setProgramPhase`, `realignProgramPhase`, `setProgramPendingTransition` | program lock → program's plan rows, id order (`setProgramPhase` with `unlessFinishedAfter`, #4137, then reads `workout_sessions` once, a plain select with no row lock, on the transaction's connection) | same |
 | `clearProgramPrescriptions` | program lock → one update | same |
 | `setBaselineComplete`, `recordBaselineAnchors` (complete) | program lock → program's plan rows, id order → own row | same |
 | `recordBaselineAnchors` (partial), `revertAutoAdoptedBaseline` | none | one row, one statement |
@@ -198,8 +198,14 @@ refuses a moved phase and a changed structure (`storePrescriptionRow`, so both t
   checked, all end `consumed`).
 - **Dev snapshot restore.** The dev snapshot restore (`scripts/local-db/snapshot.js`) runs with the trigger off; nothing in
   production does.
-- **Not covered.** An auto-applied phase move (`advanceProgramPhase`) made from signals read before a finish still moves the
-  phase; only the plan is refused.
+- **The phase move (#4137).** The auto-applied move that runs just before the store (`advanceProgramPhase`, from a window cap, an
+  earned transition or a forced one) carries the same marker: `generatedFor.finishMarker` becomes
+  `opts.unlessFinishedAfter` of `setProgramPhase`, which counts a finish of this session type after the marker INSIDE the move's
+  own transaction, after the program lock and the row locks it already takes, on that transaction's connection, and writes
+  nothing when there is one. No lock is added and no statement runs on another pooled connection. The plan is then refused as it
+  already was when the program moved meanwhile (the store's phase check fails: the generation answers its 409 and the next open
+  plans afresh). Before, the program moved on signals read before the finish and only the plan was refused. A caller that passes
+  no marker (the deload exits, the switch-over, the Coach's early deload) is unchanged.
 
 ## What a read may write
 

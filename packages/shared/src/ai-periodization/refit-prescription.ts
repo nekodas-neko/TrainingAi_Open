@@ -135,14 +135,18 @@ export async function refitPrescriptionToBudget(
     exercises: stored.exercises.map(ex => {
       const restSec = budget.restSec.get(ex.sessionExerciseId) ?? fullRest[ex.sessionExerciseId]
       // The re-fit can shorten a preferred rest too; the record must not claim it was used (#3896).
-      // #4126: a re-fit re-derives a lightened row's sets and rest, so what it had before the soreness would
-      // be stale; the row stays as the re-fit leaves it.
-      const { liftPreference: recorded, preSoreness: _stale, ...exRest } = ex
+      const { liftPreference: recorded, ...exRest } = ex
       const liftPreference = appliedAfterBudgetRest(recorded, restSec)
+      const sets = budget.sets.get(ex.sessionExerciseId) ?? ex.sets
       return {
         ...exRest,
-        sets: budget.sets.get(ex.sessionExerciseId) ?? ex.sets,
+        sets,
         restSec,
+        // #4137: a re-fit re-derives a lightened row's sets and rest, but the record of what the row had before the
+        // soreness (#4126) is kept, so clearing the soreness still puts the row's reps, load and note back (the
+        // symptom was a row left lightened with its "still sore" note after the soreness cleared). Its sets and rest
+        // are the re-fit's own, so the clear does not bring back a shape the picked length no longer allows.
+        ...(ex.preSoreness && { preSoreness: { ...ex.preSoreness, sets, restSec } }),
         ...(liftPreference && { liftPreference }),
       }
     }),
