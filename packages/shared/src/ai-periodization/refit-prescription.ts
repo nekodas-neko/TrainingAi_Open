@@ -49,7 +49,9 @@ export async function refitPrescriptionToBudget(
 ): Promise<RefitResult> {
   // #3927: the program and the session's structure stamp from one snapshot, so the re-fit stores only
   // while the session is still the one this program describes (the guard generation uses, #3895).
-  const { program: activeProgram, structure } = await repo.getActiveProgramWithStructureStamp(userId, programSessionId)
+  // #4147: the same snapshot also gives the session type's latest finish, read BEFORE the plan below, as generation
+  // reads it before its signals (#4113): a workout finished after it is one this re-fit was made without.
+  const { program: activeProgram, structure, finishMarker } = await repo.getActiveProgramWithStructureStamp(userId, programSessionId)
   const validSession = activeProgram?.sessions.find(s => s.id === programSessionId)
   if (!validSession || !activeProgram) return { ok: false, reason: 'no_session' }
 
@@ -172,7 +174,7 @@ export async function refitPrescriptionToBudget(
     prescription,
     state.prescriptionExpiresAt ?? new Date(Date.now() + 7 * 86_400_000),
     state.prescriptionStatus,
-    { phase: state.phase, phaseStartedAt: state.phaseStartedAt, structure },
+    { phase: state.phase, phaseStartedAt: state.phaseStartedAt, structure, ...(finishMarker !== undefined && { finishMarker }) },
     // #4098 review: the weekly check-in's fit is made by a READ (`fitStoredPlanToCheckinBudget`): its store waits
     // for a row at most `readLockWait` and a miss serves the plan as stored (`session_changed`).
     checkin ? { read: true } : undefined,

@@ -62,7 +62,11 @@ export async function POST(
   }
 
   const repo = await getRepository()
-  const reviewed = (await repo.getActiveProgram(userId))?.sessions.find(s => s.id === programSessionId)
+  // #4147: the finish marker is read here, BEFORE the plan this apply starts from (`state` below), as generation reads
+  // it before its signals (#4113): a workout finished after it is one the overlay was made without, and the store
+  // refuses it. The program comes from the same snapshot read that gives the marker.
+  const { program: firstRead, finishMarker } = await repo.getActiveProgramWithStructureStamp(userId, programSessionId)
+  const reviewed = firstRead?.sessions.find(s => s.id === programSessionId)
   if (!reviewed) return NextResponse.json({ error: 'Session not found' }, { status: 404 })
 
   const state = await repo.getSessionPeriodization(userId, programSessionId)
@@ -160,7 +164,7 @@ export async function POST(
     }
     const stored = await repo.storePrescription(
       userId, programSessionId, prescription, new Date(Date.now() + 7 * 86_400_000), 'pending',
-      { phase: state.phase, phaseStartedAt: state.phaseStartedAt, structure },
+      { phase: state.phase, phaseStartedAt: state.phaseStartedAt, structure, ...(finishMarker !== undefined && { finishMarker }) },
     )
     if (!stored) {
       return NextResponse.json({ error: 'The session changed while this review was applied. Review it again.' }, { status: 409 })
