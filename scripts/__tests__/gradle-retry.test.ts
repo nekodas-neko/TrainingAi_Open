@@ -157,4 +157,65 @@ exit \${codes[$c]}
     const r = run(['FAILURE: Build failed with an exception.\n* What went wrong:\nSomething else\n'], [3], { GRADLE_RETRY_WAITS: '60 180 300' })
     expect(r).toMatchObject({ code: 3, attempts: 1, sleeps: [] })
   })
+
+  // #4157: four logs that look like a download to a loose pattern and are not.
+  const waits3 = { GRADLE_RETRY_WAITS: '60 180 300' }
+  const notDownload = (r: ReturnType<typeof run>, why: string) => {
+    expect(r).toMatchObject({ code: 1, attempts: 1, sleeps: [] })
+    expect(r.out).toContain(`::error::The build failed on ${why}, not on a dependency download; it was not retried.`)
+    expect(r.out).not.toContain('This is the download')
+    expect(r.out).not.toContain('::warning::')
+  }
+
+  it('a test that prints an HTTP status is a failing test, not a download', () => {
+    const r = run([`> Task :app:testDebugUnitTest FAILED
+
+ApiClientTest > surfaces the server error FAILED
+    java.lang.AssertionError: expected message but was: Server returned HTTP response code: 500 for the made-up call
+
+* What went wrong:
+Execution failed for task ':app:testDebugUnitTest'.
+> There were failing tests. See the report at: file:///work/build/reports/tests/testDebugUnitTest/index.html
+`], [1], waits3)
+    notDownload(r, 'a failing test')
+  })
+
+  it('a Robolectric 429 next to a real assertion failure is a failing test, not a download', () => {
+    const r = run([`> Task :workout-status:testDebugUnitTest
+
+WorkoutNotificationTest > builds the ongoing notification FAILED
+    java.lang.AssertionError: Failed to fetch maven artifact org.robolectric:android-all-instrumented:14-robolectric-1-i7
+        Caused by: java.io.IOException: Server returned HTTP response code: 429 for URL: https://repo1.maven.org/maven2/org/robolectric/x.jar
+
+TimerTest > counts down FAILED
+    java.lang.AssertionError: expected:<3> but was:<4>
+
+* What went wrong:
+Execution failed for task ':workout-status:testDebugUnitTest'.
+> There were failing tests. See the report at: file:///work/build/reports/tests/testDebugUnitTest/index.html
+`], [1], waits3)
+    notDownload(r, 'a failing test')
+  })
+
+  it('a project that cannot be resolved is a configuration error, not a download', () => {
+    const r = run([`* What went wrong:
+Could not determine the dependencies of task ':app:compileDebugKotlin'.
+> Could not resolve all dependencies for configuration ':app:debugCompileClasspath'.
+   > Could not resolve project :missing-module.
+     Required by:
+         project :app
+`], [1], waits3)
+    notDownload(r, 'a project that could not be resolved')
+  })
+
+  it('Robolectric text next to a compile error is a compile error, not a download', () => {
+    const r = run([`e: file:///work/WorkoutNotification.kt:12:5 Unresolved reference: notifyy
+> Task :workout-status:compileDebugKotlin FAILED
+
+WorkoutNotificationTest > builds the ongoing notification FAILED
+    java.lang.AssertionError: Failed to fetch maven artifact org.robolectric:android-all-instrumented:14-robolectric-1-i7
+        Caused by: java.io.IOException: Server returned HTTP response code: 429 for URL: https://repo1.maven.org/maven2/org/robolectric/x.jar
+`], [1], waits3)
+    notDownload(r, 'a compile error')
+  })
 })
