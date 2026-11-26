@@ -75,8 +75,8 @@ const CARRIERS: Record<string, Carrier> = {
     lines: [
       'import { ExerciseEffortSchema, SetEffortSchema } from \'./effort-vs-plan\';',
       'effort:               ExerciseEffortSchema.optional(),',
-      'setEfforts:           z.array(SetEffortSchema.nullable()).min(1).max(20).optional(),',
-      'if (p.setEfforts && p.setEfforts.length !== p.weights.length) {',
+      'setEfforts:           z.array(SetEffortSchema.nullable()).max(20).optional(),',
+      'if (p.setEfforts && p.setEfforts.length > 0 && p.setEfforts.length !== p.weights.length) {',
       "ctx.addIssue({ code: 'custom', path: ['setEfforts'], message: 'setEfforts must have one entry per set' });",
     ],
   },
@@ -123,6 +123,10 @@ const CARRIERS: Record<string, Carrier> = {
     lines: [
       "getLatestExerciseEfforts?(userId: string, workoutSessionIds: string[], exerciseNames: string[]): Promise<Map<string, import('@trainingai/shared/ai-periodization/autoregulation').LatestEffortAnswer>>",
     ],
+  },
+  'lib/workout/exercise-log-edits-core.ts': {
+    why: 'an edit keeps a live set\'s answer and clears it when the set is removed or brought back (#4159); writes NULL or its own value, reads nothing',
+    lines: 3,
   },
   'lib/data/postgres/slices/session-read.ts': {
     why: 'selects it, the lift\'s and each set\'s (#4159), for the session read (#3893), read only',
