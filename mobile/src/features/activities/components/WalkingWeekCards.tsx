@@ -66,6 +66,11 @@ export function WalkingWeekCard({ walking }: { walking: WalkingBlock }) {
         </AppText>
         {model.status && <Badge label={model.status.label} tone={model.status.tone} />}
       </Stack>
+      {model.behindLine && (
+        <AppText variant="caption" tone="muted">
+          {model.behindLine}
+        </AppText>
+      )}
       <BarBlock bar={model.steps} />
       <BarBlock bar={model.minutes} />
       <Stack direction="row" justify="space-between">
@@ -73,6 +78,9 @@ export function WalkingWeekCard({ walking }: { walking: WalkingBlock }) {
           <DayCircle key={day.date} day={day} />
         ))}
       </Stack>
+      <AppText variant="micro" tone="muted">
+        {model.daysCaption}
+      </AppText>
       {model.basisNote && (
         <AppText variant="micro" tone="muted">
           {model.basisNote}

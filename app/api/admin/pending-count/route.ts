@@ -25,7 +25,7 @@ export async function GET() {
   const isOwner = owner.ok
   const repo = await getRepository()
   const [count, feedbackCount] = await Promise.all([
-    repo.countInactiveUsers(),
+    repo.countPendingApprovalUsers(),
     isOwner ? repo.countFeedback() : 0,
   ])
   return NextResponse.json({ count, feedbackCount }, {

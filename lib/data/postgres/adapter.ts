@@ -896,9 +896,10 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     return rows.map(r => this.rowToUser(r))
   }
 
-  async countInactiveUsers(): Promise<number> {
-    const result = await this.db.execute<{ count: string }>(sql`SELECT COUNT(*) AS count FROM users WHERE is_active = false`)
-    return Number(result.rows[0]?.count ?? 0)
+  // #4141: the badge counts what waits for a decision. An inactive account with data was in and was
+  // deactivated; only one with none is a sign-up. Same `usersWithData` split the console lists by.
+  async countPendingApprovalUsers(): Promise<number> {
+    return accountDeletion.countPendingApprovalUsers(this.db)
   }
 
   // RV-48: `.returning()` so the caller can tell an activation from a no-op. The predicate is

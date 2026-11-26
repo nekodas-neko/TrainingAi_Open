@@ -130,6 +130,7 @@ export function NutritionSettings({ onClose }: { onClose: () => void }) {
           {n.view.mealTypes.map((mt, index) => (
             <Card key={mt.id}>
               <ListRow
+                divider={false}
                 title={mt.name}
                 leading={<Icon name={mealTypeIconName(mt.emoji)} tone="brand" />}
                 subtitle={`${mt.timeStartHour}:00–${mt.timeEndHour}:00 · ${mt.required ? 'Required' : 'Optional'}`}

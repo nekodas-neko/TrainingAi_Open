@@ -7,6 +7,9 @@ import {
   walkingTodayModel,
   walkingStatusChip,
   walkingWeekModel,
+  walkingBehindLine,
+  weekDates,
+  showStepsQuotaCard,
   type WalkingBlock,
 } from '../src/features/activities/data/cardio-plan-view.ts';
 
@@ -126,4 +129,53 @@ test('the status chip is the server\'s label with a theme tone, and is hidden wh
   assert.equal(walkingStatusChip(block()), null);
   assert.equal(walkingStatusChip(withStatus(null)), null);
   assert.equal(walkingWeekModel(block()).status, null);
+});
+
+// #4142: the payload holds only the days measured, Monday to today.
+function partWeek(todayIdx: number, stepsMet: boolean[], minutesPerDay: number[], status = 'behind'): WalkingBlock {
+  const b = block();
+  b.week.to = week[todayIdx];
+  b.week.status = { key: status, label: 'Behind' };
+  b.week.days = week.slice(0, todayIdx + 1).map((date, i) => ({
+    date,
+    steps: stepsMet[i] ? 9000 : 1000,
+    stepsMet: stepsMet[i],
+    activeMinutes: minutesPerDay[i],
+    minutesMet: false,
+    done: false,
+    excluded: null,
+    isToday: i === todayIdx,
+  })) as WalkingBlock['week']['days'];
+  return b;
+}
+
+test('the week row is always seven dates, Monday to Sunday, even on a Wednesday', () => {
+  assert.deepEqual(weekDates('2026-11-16'), week);
+  assert.deepEqual(weekDates('2026/11/16'), week);
+  const m = walkingWeekModel(partWeek(2, [true, false, false], [10, 10, 10]));
+  assert.equal(m.days.length, 7);
+  assert.equal(m.days.map((d) => d.letter).join(''), 'MTWTFSS');
+  assert.deepEqual(m.days.slice(3).map((d) => d.state), ['empty', 'empty', 'empty', 'empty']);
+  assert.match(m.daysCaption, /hit your steps or your minutes/);
+});
+
+test('the Behind line names the half that is out of reach: steps, minutes, or both', () => {
+  // Saturday. Two step days met, two chances left (today, Sunday): 4 of 5 is out of reach. Minutes are fine.
+  const steps = partWeek(5, [true, true, false, false, false, false], [30, 30, 30, 30, 30, 30]);
+  assert.equal(walkingBehindLine(steps), '2 of 5 step days so far; 2 days left');
+  // Four step days met so five is reachable; 20 of 140 minutes with 40 possible is not.
+  const minutes = partWeek(5, [true, true, true, true, false, false], [5, 5, 5, 5, 0, 0]);
+  assert.equal(walkingBehindLine(minutes), '20 of 140 active minutes so far; 2 days left');
+  const both = partWeek(5, [true, true, false, false, false, false], [5, 5, 0, 0, 0, 0]);
+  assert.equal(walkingBehindLine(both), '2 of 5 step days and 10 of 140 active minutes so far; 2 days left');
+  // The model carries it, and a week that is not behind says nothing.
+  assert.equal(walkingWeekModel(steps).behindLine, '2 of 5 step days so far; 2 days left');
+  assert.equal(walkingBehindLine(partWeek(5, [true, true, false, false, false, false], [30, 30, 30, 30, 30, 30], 'on_track')), null);
+  assert.equal(walkingBehindLine(block()), null);
+});
+
+test('under a walking plan the profile-goal steps card is not drawn, so one step target shows (#4142)', () => {
+  assert.equal(showStepsQuotaCard(block()), false);
+  assert.equal(showStepsQuotaCard(null), true);
+  assert.equal(showStepsQuotaCard(undefined), true);
 });

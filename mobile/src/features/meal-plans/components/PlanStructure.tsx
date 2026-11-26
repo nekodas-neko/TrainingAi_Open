@@ -9,11 +9,12 @@ import {
   Stack,
   StatusIndicator,
   SwitchRow,
-  TextField,
+  TimeField,
 } from '../../../shared/ui';
 import type { MealPlan } from '../../nutrition/data/models';
 import { useWorkoutDraft } from '../../workouts/data/useWorkoutDraft';
 import { useWorkoutResources } from '../../workouts/data/WorkoutDataProvider';
+import { useWorkoutContext } from '../../workouts/WorkoutProvider';
 import { failureNotice } from '../../../core/reporting/index.ts';
 const schema = z.object({
   mealCount: z.string(),
@@ -31,6 +32,7 @@ export function PlanStructure({
   onSaved: () => void;
 }) {
   const resources = useWorkoutResources();
+  const { timezone } = useWorkoutContext();
   const draft = useWorkoutDraft('plan-structure:' + plan.id, schema, {
     mealCount: String(plan.mealsPerDay),
     trainingTime: plan.trainingTime ?? '',
@@ -101,10 +103,12 @@ export function PlanStructure({
         max={6}
         onChange={(mealCount) => draft.setValue({ ...f, mealCount })}
       />
-      <TextField
-        label="Training time (HH:MM, optional)"
+      <TimeField
+        label="Training time (optional)"
         value={f.trainingTime}
-        onChangeText={(trainingTime) => draft.setValue({ ...f, trainingTime })}
+        optional
+        timezone={timezone}
+        onChange={(trainingTime) => draft.setValue({ ...f, trainingTime })}
       />
       <SwitchRow
         label="Update to current targets"

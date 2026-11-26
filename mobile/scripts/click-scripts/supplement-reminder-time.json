@@ -1,0 +1,35 @@
+[
+  {
+    "open": "nutrition"
+  },
+  {
+    "tapLabel": "Manage supplements"
+  },
+  {
+    "wait": 800
+  },
+  {
+    "tap": "Add supplement"
+  },
+  {
+    "wait": 800
+  },
+  {
+    "tapLabel": "Daily reminder"
+  },
+  {
+    "wait": 500
+  },
+  {
+    "capture": "supplement-editor"
+  },
+  {
+    "tapLabel": "Reminder time: 8:00 am"
+  },
+  {
+    "wait": 1200
+  },
+  {
+    "capture": "supplement-reminder-time-sheet"
+  }
+]

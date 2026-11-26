@@ -28,7 +28,7 @@ type Row = Record<string, unknown>
 
 const getUserById = vi.fn(async (_id: string) => ({ isActive: true, isAdmin: true }) as Row | null)
 const listErrorEvents = vi.fn(async (_n: number) => [] as Row[])
-const countInactiveUsers = vi.fn(async () => 0)
+const countPendingApprovalUsers = vi.fn(async () => 0)
 const countFeedback = vi.fn(async () => 0)
 const getAiCallUsageSummary = vi.fn(async (..._a: unknown[]) => ({}) as Row)
 const getTimingAuditData = vi.fn(async (..._a: unknown[]) => ({ sets: [], exercises: [], sessions: [] }) as Row)
@@ -44,7 +44,7 @@ vi.mock('@/lib/rate-limit', () => ({ rateLimit: (...a: unknown[]) => rateLimit(.
 vi.mock('@/lib/data', () => {
   // One repo for both accessors — the admin gate is real here, not stubbed.
   const repo = async () => ({
-    getUserById, listErrorEvents, countInactiveUsers, countFeedback,
+    getUserById, listErrorEvents, countPendingApprovalUsers, countFeedback,
     getAiCallUsageSummary, getTimingAuditData,
   })
   return { getRepository: repo, getRepositoryAsync: repo }
@@ -65,12 +65,12 @@ const ALL: [string, () => Promise<Response>][] = [
 ]
 
 beforeEach(() => {
-  for (const m of [getUserById, listErrorEvents, countInactiveUsers, countFeedback,
+  for (const m of [getUserById, listErrorEvents, countPendingApprovalUsers, countFeedback,
                    getAiCallUsageSummary, getTimingAuditData, rateLimit]) m.mockClear()
   rateLimit.mockReturnValue(true)
   getUserById.mockResolvedValue({ isActive: true, isAdmin: true })
   listErrorEvents.mockResolvedValue([])
-  countInactiveUsers.mockResolvedValue(0)
+  countPendingApprovalUsers.mockResolvedValue(0)
   countFeedback.mockResolvedValue(0)
   getAiCallUsageSummary.mockResolvedValue({ sections: [] })
   getTimingAuditData.mockResolvedValue({ sets: [], exercises: [], sessions: [] })
@@ -119,7 +119,7 @@ describe('the admin gate on the reports', () => {
     listErrorEvents.mockRejectedValue(new Error('statement timeout'))
     await expect(getErrors()).rejects.toThrow('statement timeout')
 
-    countInactiveUsers.mockRejectedValue(new Error('statement timeout'))
+    countPendingApprovalUsers.mockRejectedValue(new Error('statement timeout'))
     await expect(getPending()).rejects.toThrow('statement timeout')
   })
 })
@@ -137,7 +137,7 @@ describe('GET /api/admin/errors', () => {
 
 describe('GET /api/admin/pending-count', () => {
   it('reports both queues, and asks for them together', async () => {
-    countInactiveUsers.mockResolvedValue(3)
+    countPendingApprovalUsers.mockResolvedValue(3)
     countFeedback.mockResolvedValue(7)
     // Different numbers on purpose: equal counts would let the two reads be swapped and the
     // response still look right.

@@ -13,10 +13,12 @@ import {
   Stack,
   SwitchRow,
   TextField,
+  TimeField,
 } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { usePlatformIntegrations } from '../PlatformProvider';
 import { useWorkoutJournal } from '../../workouts/logging/WorkoutJournalProvider';
+import { useWorkoutContext } from '../../workouts/WorkoutProvider';
 import { calendars } from '../../../integrations/calendar/platform';
 import { notificationsBlocked, notificationsRow, restAlarmRow } from '../data/alert-plan';
 import { reminderKinds, reminderLabels, reminderSchema, type Reminder } from '../data/models';
@@ -283,6 +285,7 @@ export function ReminderEditor({
   onSave: (value: Reminder) => Promise<void>;
   embedded?: boolean;
 }) {
+  const { timezone } = useWorkoutContext();
   const [value, setValue] = useState(reminder),
     [busy, setBusy] = useState(false),
     [error, setError] = useState<string | null>(null);
@@ -308,13 +311,11 @@ export function ReminderEditor({
         onChangeText={(title) => setValue((row) => ({ ...row, title }))}
         maxLength={100}
       />
-      <TextField
-        label="Time (24-hour)"
+      <TimeField
+        label="Time"
         value={value.time}
-        placeholder="17:00"
-        maxLength={5}
-        onChangeText={(time) => setValue((row) => ({ ...row, time }))}
-        keyboardType="numbers-and-punctuation"
+        timezone={timezone}
+        onChange={(time) => setValue((row) => ({ ...row, time }))}
       />
       <AppText variant="label">Repeat on</AppText>
       <Stack direction="row" gap="xxs">

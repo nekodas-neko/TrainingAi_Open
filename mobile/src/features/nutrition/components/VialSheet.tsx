@@ -17,6 +17,7 @@ import {
   Stack,
   NumericStepper,
   StatusIndicator,
+  DateField,
   TextField,
 } from '../../../shared/ui';
 import { useHealthData } from '../../health/data/HealthDataProvider';
@@ -233,10 +234,11 @@ export function VialSheet({
           keyboardType="decimal-pad"
           onChangeText={(syringeUnitsPerMl) => draft.setValue({ ...d, syringeUnitsPerMl })}
         />
-        <TextField
-          label="Opened on (YYYY-MM-DD)"
+        <DateField
+          label="Opened on"
           value={d.openedOn}
-          onChangeText={(openedOn) => draft.setValue({ ...d, openedOn })}
+          onChange={(openedOn) => draft.setValue({ ...d, openedOn })}
+          timezone={n.timezone}
         />
         <AppText variant="caption" tone={problem ? 'danger' : 'muted'}>
           {problem ??

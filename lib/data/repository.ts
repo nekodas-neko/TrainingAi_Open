@@ -619,7 +619,8 @@ export interface WorkoutRepository {
   // ── Users ──────────────────────────────────────────────────────────────────
   upsertUser(user: Omit<User, 'id' | 'createdAt' | 'isActive' | 'isAdmin'>, forceActive?: boolean): Promise<User>
   listUsers(limit?: number, offset?: number): Promise<User[]>
-  countInactiveUsers(): Promise<number>
+  /** Inactive accounts with no data under them: the console's "Pending approval" group. */
+  countPendingApprovalUsers(): Promise<number>
   /** True when a user row matched. RV-48 — false is a no-op the route answers 404 for. */
   activateUser(userId: string): Promise<boolean>
   deactivateUser(userId: string): Promise<boolean>

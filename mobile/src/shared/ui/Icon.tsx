@@ -117,6 +117,7 @@ const icons = {
   coach: Sparkles,
   external: ExternalLink,
   history: Clock,
+  clock: Clock,
   home: Home,
   health: Heart,
   workout: Dumbbell,

@@ -55,13 +55,14 @@ export function BaselinesScreen({
       }
     >
       <AppText tone="muted">Measure your cardio fitness. Repeat later to see progress.</AppText>
-      <StableContent minHeight={340} loading={!state.data && state.loading}>
+      <StableContent minHeight={340} releaseWhenLoaded loading={!state.data && state.loading}>
         {FITNESS_TEST_PROTOCOLS.map((protocol) => {
           const last = records.find((row) => row.testType === protocol.id),
             value = protocol.vo2Equation ? last?.vo2maxEst : last?.hrr1Bpm;
           return (
             <Card key={protocol.id}>
               <ListRow
+                divider={false}
                 title={protocol.name}
                 subtitle={protocol.description}
                 disabled={!activity.ready || action.busy}

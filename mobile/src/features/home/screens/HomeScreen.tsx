@@ -46,6 +46,7 @@ import { HomeTimeline } from '../components/HomeTimeline';
 import { ExerciseReadinessSheet } from '../components/ExerciseReadinessSheet';
 import { HomeLayoutSheet } from '../components/HomeLayoutSheet';
 import { useAdminPending } from '../data/admin-pending';
+import { profileDestination } from '../data/admin-pending-counts';
 import { HomeBanners } from '../components/HomeBanners';
 import { useAppleImport } from '../../health/HealthProvider';
 import { CoachFab } from '../../coach/components/CoachFab';
@@ -62,6 +63,7 @@ export type HomeNavigation = {
   openSession: (id: string, fullOverride?: boolean) => void;
   openWorkout: (id: string) => void;
   openMore: () => void;
+  openAdmin: () => void;
   openPrograms: () => void;
   openStats: () => void;
   openCollection: () => void;
@@ -203,7 +205,7 @@ export function HomeScreen(navigation: HomeNavigation) {
               onRefresh={() => void refresh()}
               onLayout={() => setEditing((value) => !value)}
               editing={editing}
-              onProfile={navigation.openMore}
+              onProfile={profileDestination(adminSignups) === 'admin' ? navigation.openAdmin : navigation.openMore}
               onDetailsSeen={acknowledgeSetAside}
               badge={adminSignups}
             />

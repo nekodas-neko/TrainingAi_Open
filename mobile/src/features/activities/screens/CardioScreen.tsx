@@ -52,7 +52,7 @@ import {
 import { latestBaselines } from '../data/cardio-view';
 import { CardioTrends } from '../components/CardioTrends';
 import { WalkingTodayCard, WalkingWeekCard } from '../components/WalkingWeekCards';
-import { cardioPlanMode } from '../data/cardio-plan-view';
+import { cardioPlanMode, showStepsQuotaCard } from '../data/cardio-plan-view';
 
 export function CardioScreen({
   onBack,
@@ -254,7 +254,7 @@ export function CardioScreen({
         />
       ) : (
         <>
-          <StableContent minHeight={540} loading={!data && week.loading}>
+          <StableContent minHeight={540} releaseWhenLoaded loading={!data && week.loading}>
             {data ? (
               <>
                 {walking && (
@@ -319,7 +319,7 @@ export function CardioScreen({
                     }
                   />
                 )}
-                <StepsQuotaCard steps={data.steps} />
+                {showStepsQuotaCard(walking) && <StepsQuotaCard steps={data.steps} />}
                 {plan?.run && (
                   <Card>
                     <Stack direction="row" align="center">

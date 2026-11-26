@@ -234,6 +234,7 @@ function AppShell() {
             key={accountKey}
             onBack={back}
             openActivity={openActivity}
+            openPlanChoice={() => open({ screen: 'cardio-plan' })}
             startInSetup={'setup' in entry && entry.setup === true}
           />
         );
@@ -444,6 +445,7 @@ function AppShell() {
             openSession={openSession}
             openWorkout={openWorkout}
             openMore={() => selectTab('More')}
+            openAdmin={() => open({ screen: 'more-admin' })}
             openPrograms={openPrograms}
             openExplanation={(id) => open({ screen: 'session-explain', sessionId: id })}
             openStats={() => {

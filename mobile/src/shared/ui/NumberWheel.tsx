@@ -19,6 +19,7 @@ export const NumberWheel = memo(function NumberWheel({
   rowHeight,
   gesturePaddingStart = 0,
   gesturePaddingEnd = 0,
+  pad = 0,
 }: {
   label: string;
   value: string;
@@ -30,6 +31,8 @@ export const NumberWheel = memo(function NumberWheel({
   rowHeight?: number;
   gesturePaddingStart?: number;
   gesturePaddingEnd?: number;
+  /** Show each value with leading zeros up to this many digits (a clock's minutes: 05). */
+  pad?: number;
 }) {
   const { theme } = useTheme();
   const parentScroll = useNestedScrollGesture();
@@ -369,7 +372,7 @@ export const NumberWheel = memo(function NumberWheel({
                     includeFontPadding: false,
                   }}
                 >
-                  {current && !Number.isFinite(selected) ? '—' : number}
+                  {current && !Number.isFinite(selected) ? '—' : String(number).padStart(pad, '0')}
                 </AppText>
               </Pressable>
             );

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { formatTimeOfDay, msToHHMMInTz } from '@trainingai/shared/date-utils';
-import { AppButton, AppText, Card, Notice, Stack, TextField } from '../../../shared/ui';
+import { AppButton, AppText, Card, Notice, Stack, TimeField } from '../../../shared/ui';
 import { useHealthData } from '../data/HealthDataProvider';
 import { bedtimeInstant } from '../data/manual-night';
 import type { SleepRow } from '../data/models';
@@ -46,12 +46,11 @@ export function RememberedBedtimeCard({ night }: { night: SleepRow }) {
       )}
       {!night.manualSleepStart || editing ? (
         <>
-          <TextField
-            label="Bedtime (HH:MM)"
+          <TimeField
+            label="Bedtime"
             value={clock}
-            onChangeText={setClock}
-            placeholder="23:15"
-            keyboardType="numbers-and-punctuation"
+            onChange={setClock}
+            timezone={health.timezone}
           />
           <AppButton
             title="Save bedtime"

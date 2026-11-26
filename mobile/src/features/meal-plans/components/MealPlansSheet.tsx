@@ -30,6 +30,7 @@ import {
   StatusIndicator,
   SwitchRow,
   TextField,
+  TimeField,
 } from '../../../shared/ui';
 import { MacroComparison, MacroLine } from '../../nutrition/components/NutritionElements';
 import { useNutrition } from '../../nutrition/data/NutritionProvider';
@@ -563,10 +564,12 @@ export function MealPlansSheet({
               </>
             ) : f.step === 5 ? (
               <>
-                <TextField
-                  label="Usual training time (HH:MM, optional)"
+                <TimeField
+                  label="Usual training time (optional)"
                   value={f.trainingTime}
-                  onChangeText={(trainingTime) => set({ trainingTime })}
+                  optional
+                  timezone={n.timezone}
+                  onChange={(trainingTime) => set({ trainingTime })}
                 />
                 <SwitchRow
                   label="Separate training and rest days"
@@ -801,6 +804,7 @@ export function MealPlansSheet({
             {variant.meals.map((m) => (
               <Card key={m.id}>
                 <ListRow
+                  divider={false}
                   title={m.name}
                   subtitle={`${m.suggestedTime ?? ''} · ${formatCount(m.targetCalories)} kcal`}
                   onPress={() => {
@@ -1078,10 +1082,12 @@ export function MealPlansSheet({
                 setEdit({ ...edit, meal: { ...edit.meal, mealTypeId: mealTypeId || null } })
               }
             />
-            <TextField
-              label="Suggested time (HH:MM)"
+            <TimeField
+              label="Suggested time"
               value={edit.meal.suggestedTime ?? ''}
-              onChangeText={(suggestedTime) =>
+              optional
+              timezone={n.timezone}
+              onChange={(suggestedTime) =>
                 setEdit({
                   ...edit,
                   meal: { ...edit.meal, suggestedTime: suggestedTime || null },
