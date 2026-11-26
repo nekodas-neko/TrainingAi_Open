@@ -8,6 +8,7 @@ import { buildBatteryRecoveryCalibration } from '@trainingai/shared/health/batte
 import { reportServerError } from '@/lib/observability'
 import { answeredMorningScales } from '@trainingai/shared/health/self-report'
 import { generationCensus, modelGeneration } from '@trainingai/shared/health/model-generation'
+import { safeErrorText } from '@/lib/observability/scrub-params'
 
 /**
  * Admin Body-Battery calibration: each day's end-of-day battery next to the recovery rating the
@@ -130,7 +131,7 @@ export async function GET(req: NextRequest) {
     reportServerError(err, { userId, url: '/api/admin/battery-recovery-calibration' })
     console.error('[admin/battery-recovery-calibration] failed:', err)
     return NextResponse.json(
-      { error: 'Failed to build the calibration', detail: err instanceof Error ? err.message : String(err) },
+      { error: 'Failed to build the calibration', detail: safeErrorText(err) },
       { status: 500 },
     )
   }

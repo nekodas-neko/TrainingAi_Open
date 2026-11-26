@@ -22,6 +22,7 @@
 import type { WorkoutRepository, BodyBatteryDailyRow } from '@/lib/data/repository'
 import { shiftDateStr, dateStrMidnightInTz } from '@trainingai/shared/date-utils'
 import { computeBodyBatteryDay, type BodyBatteryDay } from '@/lib/health/body-battery-day'
+import { safeErrorText } from '@/lib/observability/scrub-params'
 
 /** Every read `computeBodyBatteryDay` makes when `computeReadinessIfMissing` is false. */
 export const BODY_BATTERY_DAY_READS = [
@@ -106,7 +107,7 @@ export function recordingRepository(repo: WorkoutRepository, userId: string, tz:
           if (!seen.has(key)) { seen.add(key); recording.calls.push({ key, result }) }
           return result
         } catch (err) {
-          if (!seen.has(key)) { seen.add(key); recording.calls.push({ key, threw: err instanceof Error ? err.message : String(err) }) }
+          if (!seen.has(key)) { seen.add(key); recording.calls.push({ key, threw: safeErrorText(err) }) }
           throw err
         }
       }
@@ -185,7 +186,7 @@ export async function replayFinishedDays(recording: ReplayRecording, dates: read
       const { snapshot } = await finishedBodyBatteryDay(repo, recording.userId, recording.tz, date)
       out.push({ date, stored, recomputed: snapshot })
     } catch (err) {
-      out.push({ date, stored, recomputed: null, error: err instanceof Error ? err.message : String(err) })
+      out.push({ date, stored, recomputed: null, error: safeErrorText(err) })
     }
   }
   return out

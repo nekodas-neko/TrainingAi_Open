@@ -5,6 +5,7 @@ import { getRepositoryAsync } from '@/lib/data'
 import { rateLimit } from '@/lib/rate-limit'
 import { VACUUM_FULL_TABLES, type VacuumFullTable } from '@/lib/data/postgres/slices/oura'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+import { safeErrorText } from '@/lib/observability/scrub-params'
 
 // One table name. 4 KB is generous.
 const MAX_BODY_BYTES = 4 * 1024
@@ -74,7 +75,7 @@ export async function POST(req: Request) {
     // nothing to reclaim" are very different answers and must not both read as a 200.
     console.error('[admin] vacuum full failed:', err)
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'vacuum failed' },
+      { error: err instanceof Error ? safeErrorText(err) : 'vacuum failed' },
       { status: 500 },
     )
   }

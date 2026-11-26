@@ -5,6 +5,7 @@
 // `lib/health/__tests__/data-layer-readiness-cycle.test.ts` fails if one comes back.
 import type { WorkoutRepository } from '@/lib/data/repository'
 import { computeWorkoutHr } from '@trainingai/shared/workout/compute-workout-hr'
+import { safeErrorText } from '@/lib/observability/scrub-params'
 
 // Everything the app does with heart rate the moment a workout is completed: attribute what is
 // already ingested to the workout and its individual sets.
@@ -81,7 +82,7 @@ export async function reattributeWorkoutsHrInWindow(
     try {
       if ((await attributeSessionHr(repo, userId, ws, tz)).attributed) attributed++
     } catch (err) {
-      failures.push(err instanceof Error ? err.message : 'unknown')
+      failures.push(err instanceof Error ? safeErrorText(err) : 'unknown')
     }
   }
   if (failures.length > 0) {

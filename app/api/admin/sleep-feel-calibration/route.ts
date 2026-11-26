@@ -9,6 +9,7 @@ import { nightSessions } from '@trainingai/shared/health/sleep-night'
 import { buildSleepFeelCalibration } from '@trainingai/shared/health/sleep-feel-calibration'
 import { reportServerError } from '@/lib/observability'
 import { answeredMorningScales } from '@trainingai/shared/health/self-report'
+import { safeErrorText } from '@/lib/observability/scrub-params'
 
 /**
  * Admin sleep-feel calibration: the model's Sleep Score for each night next to the rating the owner
@@ -101,7 +102,7 @@ export async function GET(req: NextRequest) {
     reportServerError(err, { userId, url: '/api/admin/sleep-feel-calibration' })
     console.error('[admin/sleep-feel-calibration] failed:', err)
     return NextResponse.json(
-      { error: 'Failed to build the calibration', detail: err instanceof Error ? err.message : String(err) },
+      { error: 'Failed to build the calibration', detail: safeErrorText(err) },
       { status: 500 },
     )
   }

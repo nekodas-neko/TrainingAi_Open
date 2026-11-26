@@ -15,6 +15,7 @@ import { parentPort, workerData } from 'node:worker_threads'
 import { PostgresWorkoutRepository } from '@/lib/data/postgres/adapter'
 import type { OuraRawAggregateResult } from '@/lib/data/repository'
 import type { StressBackfillReport } from '@/lib/oura-ble/stress-backfill'
+import { safeErrorChainText, scrubErrorStack } from '@/lib/observability/scrub-params'
 import { ensureServerOuraConstants } from '@/lib/oura-models/constants-inject'
 import { setUserReadMemosEnabled } from '@/lib/data/postgres/user-read-memo'
 
@@ -84,21 +85,9 @@ const repo = new PostgresWorkoutRepository()
  * permissions error and a constraint violation were all indistinguishable.
  */
 export function msg(err: unknown): string {
-  const parts: string[] = []
-  let cur: unknown = err
-  const seen = new Set<unknown>()
-  while (cur != null && !seen.has(cur)) {
-    seen.add(cur)
-    if (cur instanceof Error) {
-      const code = (cur as { code?: unknown }).code
-      parts.push(code != null ? `${cur.message} [${String(code)}]` : cur.message)
-      cur = (cur as { cause?: unknown }).cause
-    } else {
-      parts.push(String(cur))
-      break
-    }
-  }
-  return parts.length > 0 ? parts.join('\n  caused by: ') : String(err)
+  // #3673: each link of the chain is scrubbed on its own (`safeErrorChainText`), so the code of the
+  // pg error under a Drizzle wrapper stays and the wrapper's bound parameters do not.
+  return safeErrorChainText(err)
 }
 
 async function handle(job: WorkerJob): Promise<WorkerReply> {
@@ -143,7 +132,7 @@ async function handle(job: WorkerJob): Promise<WorkerReply> {
     const result = await repo.aggregateOuraRawSamples(job.userId, job.timezone, job.opts)
     return { id: job.id, ok: true, result }
   } catch (err) {
-    return { id: job.id, ok: false, message: msg(err), stack: err instanceof Error ? err.stack : undefined }
+    return { id: job.id, ok: false, message: msg(err), stack: err instanceof Error && err.stack ? scrubErrorStack(err.stack, err) : undefined }
   }
 }
 

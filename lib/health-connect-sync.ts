@@ -20,6 +20,7 @@ export {
   SYNC_DAYS_COLD, HR_UPLOAD_CHUNK, INTERVAL_UPLOAD_CHUNK,
   type ActivityInterval, type ActivityIntervalKind,
 } from '@trainingai/shared/health/health-connect-sync-limits';
+import { safeErrorText } from '@/lib/observability/scrub-params'
 
 // Verified against the pinned plugin source (RecordConverter.kt:390-400, v1.1.0) — those seven
 // strings are the complete set it can emit. SLEEPING and UNKNOWN are deliberately absent: they
@@ -221,7 +222,7 @@ async function uploadSeries<T>(
       })
       if (!res.ok) return { sent, requests, failed: true, note: `${label} stopped at sync-health ${res.status}` }
     } catch (err) {
-      return { sent, requests, failed: true, note: `${label} stopped: ${err instanceof Error ? err.message : String(err)}` }
+      return { sent, requests, failed: true, note: `${label} stopped: ${safeErrorText(err)}` }
     }
     sent += chunk.length
   }

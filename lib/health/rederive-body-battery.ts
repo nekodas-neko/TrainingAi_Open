@@ -3,6 +3,7 @@ import { todayInTz, shiftDateStr, daysBetweenDateStrs } from '@trainingai/shared
 import { BODY_BATTERY_MODEL_VERSION } from '@/lib/health/body-battery-day'
 import { finishedBodyBatteryDay } from '@/lib/health/body-battery-replay'
 import { isMeasuredBatteryDay } from '@/lib/data/postgres/slices/body-battery'
+import { safeErrorText } from '@/lib/observability/scrub-params'
 
 /**
  * Re-derive stored Body Battery days under the current model (TN-72, owner-approved 2026-09-27).
@@ -118,7 +119,7 @@ async function buildReport(input: RederiveBodyBatteryInput, start: string, end: 
     } catch (err) {
       // One day that cannot be computed must never abort the range.
       console.error(`[rederive-body-battery] ${d} failed:`, err)
-      days.push({ date: d, action: 'no-row', error: err instanceof Error ? err.message : String(err) })
+      days.push({ date: d, action: 'no-row', error: safeErrorText(err) })
     }
   }
 

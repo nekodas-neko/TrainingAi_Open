@@ -15,6 +15,7 @@ import { existsSync } from 'fs'
 import { Worker } from 'node:worker_threads'
 import type { OuraRawAggregateResult } from '@/lib/data/repository'
 import type { StressBackfillReport } from '@/lib/oura-ble/stress-backfill'
+import { safeErrorChainText } from '@/lib/observability/scrub-params'
 
 type RollupOpts = {
   sinceDs?: number
@@ -186,7 +187,7 @@ async function runStressBackfillInProcess(userId: string, timezone: string, dryR
     const stressBackfill = await repo.backfillDaytimeStressBuckets(userId, timezone, { dryRun })
     return { redecoded: null, redecodeError: null, aggregated: null, aggregateError: null, stressBackfill }
   } catch (err) {
-    return { redecoded: null, redecodeError: null, aggregated: null, aggregateError: err instanceof Error ? err.message : String(err), stressBackfill: null }
+    return { redecoded: null, redecodeError: null, aggregated: null, aggregateError: safeErrorChainText(err), stressBackfill: null }
   }
 }
 
@@ -198,7 +199,7 @@ async function runRedecodeInProcess(
 ): Promise<RedecodePhases> {
   const { getRepositoryAsync } = await import('@/lib/data')
   const repo = await getRepositoryAsync()
-  const msg = (err: unknown) => (err instanceof Error ? err.message : String(err))
+  const msg = safeErrorChainText
 
   let redecoded: RedecodeCounts | null = null
   let redecodeError: string | null = null

@@ -33,6 +33,7 @@ import { planLookAlikeMerge, type GroupKind, type MergeFood, type PlannedGroup, 
 import { QUANTITY_MULTIPLIER_MAX, QUANTITY_MULTIPLIER_MIN } from '@trainingai/shared/nutrition/quantity-bounds'
 import type { getDb } from '@/lib/data/postgres/client'
 import * as s from '@/lib/data/postgres/schema'
+import { safeErrorText } from '@/lib/observability/scrub-params'
 
 type Db = ReturnType<typeof getDb>
 
@@ -221,7 +222,7 @@ export async function mergeLookAlikeFoods(
       out.result = { logsMoved: done.logsMoved, mealItemsMoved: done.mealItemsMoved, tombstoned: done.tombstoned }
     } catch (err) {
       report.failedGroups++
-      out.result = { failed: err instanceof Error ? err.message : String(err) }
+      out.result = { failed: safeErrorText(err) }
     }
   }
   report.datesTouched = [...dates].sort()

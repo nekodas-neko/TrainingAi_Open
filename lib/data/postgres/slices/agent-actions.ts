@@ -12,6 +12,7 @@ import { and, desc, eq, gte, sql } from 'drizzle-orm'
 import type { getDb } from '../client'
 import * as s from '../schema'
 import { redactActionParameters } from '@/lib/agent-actions/redact'
+import { scrubErrorText } from '@/lib/observability/scrub-params'
 
 type Db = ReturnType<typeof getDb>
 
@@ -73,7 +74,9 @@ const LIST_MAX = 500
 /** First line only, then capped: the column holds a reason, never a stack. */
 export function shortActionError(error: string | null | undefined): string | null {
   if (error == null) return null
-  const firstLine = error.split(/\r?\n/, 1)[0].trim()
+  // #3673: scrubbed BEFORE the first line is taken, so a value with a line break cannot leave its
+  // first line behind; this is the only writer of the column.
+  const firstLine = scrubErrorText(error).split(/\r?\n/, 1)[0].trim()
   if (firstLine.length === 0) return null
   return firstLine.slice(0, AGENT_ACTION_ERROR_MAX)
 }
