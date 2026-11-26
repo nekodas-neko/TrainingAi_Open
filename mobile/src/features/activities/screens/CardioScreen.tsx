@@ -46,7 +46,7 @@ import {
   type StartStep,
   type TreadmillKind,
 } from '../data/cardio-start';
-import { ANY_ACTIVITY_COUNTS, floorLine } from '../data/cardio-week-view';
+import { ANY_ACTIVITY_COUNTS, floorLine, showWeekList } from '../data/cardio-week-view';
 import { InProgressSheet } from '../components/InProgressSheet';
 import {
   BaselinesRow,
@@ -401,7 +401,9 @@ export function CardioScreen({
                     />
                   </Card>
                 )}
-                <WeekList days={plan?.heartHealth?.days ?? []} today={today} />
+                {showWeekList(plan) && (
+                  <WeekList days={plan?.heartHealth?.days ?? []} today={today} />
+                )}
               </>
             ) : (
               <StateCard

@@ -122,3 +122,16 @@ test('a past day with no activity says "No activity logged" once, with no outcom
   assert.notEqual(counted.line, 'No activity logged');
   assert.ok(counted.label);
 });
+// #4100 N2: the seven-day list shows whenever the Heart-health card does, even with no days sent.
+test('the week list shows with the Heart-health card, even when the server sent no days', async () => {
+  const { showWeekList } = await import('../src/features/activities/data/cardio-week-view.ts');
+  assert.equal(showWeekList({ run: { status: 'pending' }, heartHealth: { days: [] } }), true);
+  assert.equal(showWeekList({ run: { status: 'pending' } }), true);
+  assert.equal(showWeekList({ run: null, heartHealth: { days: [day('2026-12-01')] } }), false);
+  assert.equal(showWeekList(undefined), false);
+  assert.deepEqual(
+    weekRows([], '2026-12-03').map((row) => row.day),
+    [null, null, null, null],
+    'Monday to Thursday filled from nothing',
+  );
+});

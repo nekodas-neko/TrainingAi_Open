@@ -263,8 +263,6 @@ export function LazyDayCreditCard({ zone1Min }: { zone1Min: number }) {
 /** Every day from Monday to today, oldest first: what each counted and why (#4100, #4158). */
 export function WeekList({ days, today }: { days: readonly HeartHealthDay[]; today: string }) {
   const { theme } = useTheme();
-  // No prescription rows at all (a walking plan keeps its own week): nothing to list.
-  if (!days.length) return null;
   return (
     <Stack gap="xs">
       <AppText variant="eyebrow" tone="muted">

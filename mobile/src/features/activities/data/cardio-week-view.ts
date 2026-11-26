@@ -85,3 +85,11 @@ export function weekRowView(
     outcome,
   };
 }
+
+/**
+ * The Heart-health card, and with it the week list, shows when the server sent a run. The list
+ * fills its own days (see `weekRows`), so it does not depend on the server sending any.
+ */
+export function showWeekList(plan: { run?: unknown; heartHealth?: unknown } | null | undefined): boolean {
+  return !!plan?.run;
+}
