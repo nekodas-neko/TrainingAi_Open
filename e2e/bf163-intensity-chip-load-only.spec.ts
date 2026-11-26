@@ -14,6 +14,10 @@ import { SEED_EMAIL, settleRouteBoundary } from './fixtures'
  * beside it matches source, and a source match is exactly the shape that passes when the edit never
  * reached the render. The fixture is the owner's own row — 72.5% × 6 — not a situation built to make
  * a test go green.
+ *
+ * #3900 / #4088 / #4104: the stored `stay` is now applied when the workout opens (no Accept), and
+ * an applied card starts collapsed, so the spec opens it by its header instead of waiting for the
+ * Accept button the card used to show. The chip and its tooltip are unchanged.
  */
 
 const OWNER_PCT = 72.5
@@ -101,8 +105,11 @@ test('the intensity chip names its input and does not assert a rep range', async
   await page.goto(`/workout?session=${programSessionId}`)
   await settleRouteBoundary(page)
 
-  await expect(page.getByRole('button', { name: 'Accept' }), 'the prescription card never rendered')
-    .toBeVisible({ timeout: 60_000 })
+  const header = page.getByText(/AI Prescription · .* · Auto-applied/)
+  await expect(header, 'the prescription card never rendered as applied').toBeVisible({ timeout: 60_000 })
+  await expect(page.getByRole('button', { name: 'Accept' })).toHaveCount(0)
+  // An applied card starts collapsed; the chip is inside it.
+  await header.click()
 
   const chip = page.getByText('Hypertrophy · 65–75%').first()
   await expect(chip, `72.5% must still band as Hypertrophy — the label was never the bug`)
