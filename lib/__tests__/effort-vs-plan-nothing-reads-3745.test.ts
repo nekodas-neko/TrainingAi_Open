@@ -112,6 +112,9 @@ const CARRIERS: Record<string, Carrier> = {
       'effortSource: sql`CASE WHEN EXCLUDED.effort_vs_plan IS NULL THEN ${s.setLogs.effortSource} ELSE EXCLUDED.effort_source END`,',
       'effortVsPlan:         s.exerciseLogs.effortVsPlan,',
       'effortSource:         s.exerciseLogs.effortSource,',
+      // #4166: the set's pair rides the sync pull, carried only.
+      'effortVsPlan:  s.setLogs.effortVsPlan,',
+      'effortSource:  s.setLogs.effortSource,',
       'async getLatestExerciseEfforts(userId: string, workoutSessionIds: string[], exerciseNames: string[]) { return period.getLatestExerciseEfforts(this.db, userId, workoutSessionIds, exerciseNames) }',
     ],
   },
