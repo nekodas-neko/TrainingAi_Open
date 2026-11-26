@@ -465,6 +465,7 @@ function SupplementManager({ date, onClose }: { date: string; onClose: () => voi
           />
           <DateField
             label="Started on"
+            optional
             value={f.startedOn}
             onChange={(startedOn) => draft.setValue({ ...f, startedOn })}
             timezone={timezone}
