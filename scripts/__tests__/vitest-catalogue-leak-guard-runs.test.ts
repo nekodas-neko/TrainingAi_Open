@@ -69,13 +69,17 @@ function run(filter: string, env: Record<string, string> = {}): Promise<{ code: 
 }
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
 
+// Each describe that writes fixtures registers this: the fixtures and the rows the leaking runs keep are removed.
+async function cleanup() {
+  for (const f of files) fs.rmSync(path.join(DIR, f), { force: true })
+  if (!canRun || names.length === 0) return
+  const c = new Client({ connectionString: process.env.DATABASE_URL })
+  await c.connect()
+  try { await c.query('DELETE FROM exercise_library WHERE name = ANY($1)', [names]) } finally { await c.end() }
+}
+
 describe.skipIf(!canRun)('the catalogue leak guard, in real runs (#4109)', () => {
-  afterAll(async () => {
-    const c = new Client({ connectionString: process.env.DATABASE_URL })
-    await c.connect()
-    try { await c.query('DELETE FROM exercise_library WHERE name = ANY($1)', [names]) } finally { await c.end() }
-    for (const f of files) fs.rmSync(path.join(DIR, f), { force: true })
-  })
+  afterAll(cleanup)
 
   it('a run that leaves nothing passes', async () => {
     const r = await run(writeFixture(false, 300).file)
@@ -136,6 +140,7 @@ describe.skipIf(!canRun)('the catalogue leak guard, in real runs (#4109)', () =>
 })
 
 describe.skipIf(!canRun)('a leak by a connection that carries no run tag (#4157)', () => {
+  afterAll(cleanup)
   // Registered runs here are the alone-vs-beside cases; the outer `pnpm test` run may be live too, so each case
   // starts its inner runs and reads only their own output.
   it('is caught when it is the only run registered (a clean-env child, or a connection that resets its tags)', async () => {
