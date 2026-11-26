@@ -1,3 +1,4 @@
+import { plural } from '@trainingai/shared/format/plural';
 import { AppText, Disclosure, LineChart, Stack } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { formatDuration } from '../../../shared/hooks/useClock';
@@ -106,7 +107,7 @@ export function WorkoutHrRecovery({ workout }: { workout: WorkoutRecord }) {
             {aggregateHrRecoveryByExercise(data.setStats).map((x) => (
               <AppText key={x.exerciseName} variant="caption">
                 {x.exerciseName} · {formatRecoveryRate(x.medianHrr1)} · {x.sampleCount}/
-                {x.totalSets} sets measured
+                {plural(x.totalSets, 'set', 'sets')} measured
               </AppText>
             ))}
             {(sparse ? [] : exercisesWithoutRest(data.setStats)).map((name) => (

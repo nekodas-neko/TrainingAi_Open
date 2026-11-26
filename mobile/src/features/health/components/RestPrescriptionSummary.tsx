@@ -22,7 +22,7 @@ export function RestPrescriptionSummary({ sets }: { sets: readonly RestSet[] | u
           Your rest vs the plan
         </AppText>
         <AppText variant="micro" tone="muted" style={cell}>
-          {formatCount(summary.totalSets)} sets · 90 days
+          {formatCount(summary.totalSets)} {summary.totalSets === 1 ? 'set' : 'sets'} · 90 days
         </AppText>
       </Stack>
       <Stack direction="row" gap="sm">

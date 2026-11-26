@@ -1,3 +1,4 @@
+import { formatDateDisplay } from '@trainingai/shared/date-utils';
 import { useMemo, useState } from 'react';
 import { ActivityEditor } from '../../activities/components/ActivityEditor';
 import { useActivities, useActivityLogs } from '../../activities/data/ActivityProvider';
@@ -121,7 +122,7 @@ export function ActivityDetails({ log: original }: { log: HealthActivity }) {
   return (
     <HealthViewReady view="day" requests={[hrProfileSpec, ...(enabled ? [windowSpec] : [])]}>
       <AppText variant="caption" tone="muted">
-        {log.date} · {log.startTime ?? ''}
+        {formatDateDisplay(log.date, 'short')} · {log.startTime ?? ''}
         {log.endTime ? ` → ${log.endTime}` : ''}
       </AppText>
       <Grid columns={3}>

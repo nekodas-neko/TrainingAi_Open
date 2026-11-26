@@ -59,6 +59,8 @@ const FIXED: Record<string, Record<string, unknown>> = {
   day_checkins: { vs_question: 1 },
   // #3892: effort_vs_plan is -1, 0 or 1; the generic number (3) would break its CHECK.
   exercise_logs: { effort_vs_plan: 1 },
+  // #4154: the same three-way answer per set, and it is stored with its source or not at all.
+  set_logs: { effort_vs_plan: 1, effort_source: 'tapped' },
 }
 
 describe.skipIf(!canRun)('a sync pull drops no column applyDelta writes (LA-137)', () => {

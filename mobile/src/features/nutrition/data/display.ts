@@ -3,6 +3,14 @@ import { plural } from "@trainingai/shared/format/plural";
 import { budgetEnergyModel } from "./energy-model";
 
 
+// "1 serving", "1.5 servings", "2 servings": only exactly 1 is singular.
+export function foodAmount(log: {
+  quantityMultiplier: number;
+  foodItem: { servingSizeG: number };
+}) {
+  return `${plural(Math.round(log.quantityMultiplier * 100) / 100, 'serving', 'servings')} · ${Math.round(log.foodItem.servingSizeG * log.quantityMultiplier)} g`;
+}
+
 // A food with no brand has no leading dot: "125 g · 80 kcal", not " · 125 g · 80 kcal".
 export function foodLine(
   brand: string | null | undefined,

@@ -1,3 +1,4 @@
+import { plural } from '@trainingai/shared/format/plural';
 import { View } from 'react-native';
 import {
   AppText,
@@ -80,7 +81,7 @@ export function SessionSelectionCard({
         <Stack direction="row" align="center" gap="xs">
           <Icon name="workout" tone="muted" size={theme.sizes.iconSmall} />
           <AppText variant="caption" tone="muted">
-            {session.exercises.length} exercises
+            {plural(session.exercises.length, 'exercise', 'exercises')}
           </AppText>
         </Stack>
         {session.durationMinutes !== null && (

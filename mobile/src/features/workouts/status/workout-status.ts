@@ -1,3 +1,4 @@
+import { plural } from '@trainingai/shared/format/plural';
 import type {
   WorkoutStatusModule,
   WorkoutStatusPayload,
@@ -26,7 +27,7 @@ export function knownLoad(exercise: WorkoutExercise, set: WorkoutSet | undefined
   const reps = typed !== null && Number.isInteger(typed) ? typed : (set.planned?.reps ?? null);
   const weightText = weight === null ? null : loadLabel(weight, exercise.weightUnit);
   if (weightText && reps !== null) return `${weightText} × ${reps}`;
-  return weightText ?? (reps !== null ? `${reps} reps` : null);
+  return weightText ?? (reps !== null ? plural(reps, 'rep', 'reps') : null);
 }
 
 /**

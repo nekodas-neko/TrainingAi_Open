@@ -22,10 +22,12 @@ import {
   AppButton,
   AppText,
   Card,
+  Disclosure,
   PageLayout,
   Stack,
   TabPanel,
 } from '../../../shared/ui';
+import { changelogPreview } from '../data/changelog-preview';
 import { FeedbackSheet } from '../components/FeedbackSheet';
 import { DeleteAccountSheet } from '../components/DeleteAccountSheet';
 import { SignOutSheet } from '../components/SignOutSheet';
@@ -52,6 +54,7 @@ export function AboutScreen({ onBack }: { onBack: () => void }) {
       active = false;
     };
   }, []);
+  const changelog = changelogPreview(CHANGELOG[0].changes);
   const notice = releaseBuildNotice(
     nativeApplicationId,
     { version: nativeAppVersion, buildCode: nativeBuildCode },
@@ -109,11 +112,20 @@ export function AboutScreen({ onBack }: { onBack: () => void }) {
           </Card>
           <Card>
             <AppText variant="heading">What’s new in v{CHANGELOG[0].version}</AppText>
-            {CHANGELOG[0].changes.map((change) => (
+            {changelog.first.map((change) => (
               <AppText key={change} variant="caption" tone="muted">
                 · {change}
               </AppText>
             ))}
+            {changelog.rest.length > 0 && (
+              <Disclosure title="Show all">
+                {changelog.rest.map((change) => (
+                  <AppText key={change} variant="caption" tone="muted">
+                    · {change}
+                  </AppText>
+                ))}
+              </Disclosure>
+            )}
           </Card>
           <AppHandoffDebugCard />
           <Card>

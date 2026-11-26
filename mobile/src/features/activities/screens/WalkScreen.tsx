@@ -197,8 +197,8 @@ export function WalkScreen({
           />
         </Grid>
         <AppText variant="micro" tone="muted">
-          Targets guide the intervals. Live step-rate, speed and heart-rate pacing need the
-          deferred device integrations.
+          Targets guide the intervals. Pacing by live step rate, speed or heart rate is not
+          available yet.
         </AppText>
       </Card>
       <SwitchRow

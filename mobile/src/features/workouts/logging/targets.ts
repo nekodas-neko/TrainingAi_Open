@@ -1,3 +1,4 @@
+import { plural } from '@trainingai/shared/format/plural';
 import {
   expectedRpePrefill,
   expectedRpe as expectedSetRpe,
@@ -66,16 +67,22 @@ export function isUnloadedSet(
   return exercise.exerciseType === 'bodyweight' && Number(set.weight) === 0;
 }
 
+// "1 rep", "8 reps". A rep count still being typed (blank) keeps the old "<text> reps".
+function repsLabel(reps: string | number) {
+  const n = Number(reps);
+  return String(reps).trim() !== '' && Number.isFinite(n) ? plural(n, 'rep', 'reps') : `${reps} reps`;
+}
+
 export function formatSetLoad(
   exercise: Pick<WorkoutExercise, 'exerciseType'> & Partial<Pick<WorkoutExercise, 'weightUnit'>>,
   set: Pick<WorkoutSet, 'weight' | 'reps'>,
 ) {
   if (isUnloadedSet(exercise, set)) {
-    return `${set.reps} reps`;
+    return repsLabel(set.reps);
   }
   const prefix =
     exercise.exerciseType === 'bodyweight' && Number(set.weight) > 0 ? '+' : '';
-  return `${prefix}${loadLabel(set.weight, exercise.weightUnit)} × ${set.reps} reps`;
+  return `${prefix}${loadLabel(set.weight, exercise.weightUnit)} × ${repsLabel(set.reps)}`;
 }
 
 // #4061: this only fires after a rated set. Preview's set card no longer has an RPE row, so for new

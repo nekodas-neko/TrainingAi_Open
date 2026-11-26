@@ -1,3 +1,4 @@
+import { plural } from '@trainingai/shared/format/plural';
 import { bodyweightRepMax, isEstimatedOneRm, oneRmLabel, oneRmText } from '@trainingai/shared/1rm';
 import { View } from 'react-native';
 import { Pressable } from '../../../shared/ui/Pressable';
@@ -159,7 +160,7 @@ export function ExerciseSummary({
             <AppText variant="micro" style={{ color }}>
               {difference > 0 ? '+' : ''}
               {exercise.exerciseType === 'bodyweight'
-                ? `${difference} reps`
+                ? plural(difference, 'rep', 'reps')
                 : `${difference.toFixed(2)} kg`}
             </AppText>
           )}

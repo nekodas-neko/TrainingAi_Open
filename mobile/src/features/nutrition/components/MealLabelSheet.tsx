@@ -1,3 +1,4 @@
+import { plural } from '@trainingai/shared/format/plural';
 import { useMemo, useRef, useState } from 'react';
 import type Svg from 'react-native-svg';
 import { SvgXml } from 'react-native-svg';
@@ -150,7 +151,7 @@ export function MealLabelSheet({ meal, onClose }: { meal: SavedMeal; onClose: ()
       </AppText>
       {payload.rolled > 0 && (
         <AppText tone="muted">
-          {payload.rolled} ingredients are combined in the code to keep it scannable. The totals
+          {plural(payload.rolled, 'ingredient', 'ingredients')} {payload.rolled === 1 ? 'is' : 'are'} combined in the code to keep it scannable. The totals
           are preserved.
         </AppText>
       )}
