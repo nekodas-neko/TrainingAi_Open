@@ -6,6 +6,21 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.534.0",
+    date: "2026-11-26",
+    changes: [
+      "TrainingAi Preview: the screens say what they mean. Dates read 24 Nov instead of 2026-11-24, counts read 1 serving and 1 exercise, and wording written for the builders is gone. The button beside Start Set says Skip and its question names the exercise, a day's workout has one Delete workout button, a program's Delete sits inside its row with a confirmation that says your logged workouts stay, injuries are kept in one place, each weight trend names its window, and a day without a score says No score. This needs the new Preview build.",
+      "TrainingAi Preview: dates and times are picked, not typed. Twelve fields that asked for YYYY-MM-DD or HH:MM, such as a scan date, a night entered by hand or a supplement reminder, open a calendar or a time wheel. What is saved is unchanged. This needs the new Preview build.",
+      "TrainingAi Preview: the Cardio Hub agrees with itself. With a walking plan on it shows the plan's step target only, says what a Behind badge is behind on, draws all seven days of the week, and the Running screen says when you are on the walking plan. This needs the new Preview build.",
+      "TrainingAi Preview: the moving background no longer flashes. It redrew itself every minute; it now changes only when the sky or the weather does. This needs the new Preview build.",
+      "Both apps: a deload the AI wrote goes back to its own numbers once soreness clears. Before, it stayed lightened for the rest of the day. A plan made while you were finishing a workout of the same session is no longer saved over the slot that workout used; the next open plans afresh.",
+      "Both apps: renaming an exercise, the Coach removing or restoring one, and deleting an account can no longer block a program save. A rename that has to wait says the server is busy and changes nothing.",
+      "Both apps: the Coach declines an early deload on a manually run program, where it would change nothing, and a lift's name must contain a visible character.",
+      "Admins: the red dot on More and the count on Home's profile button show accounts waiting for approval, and open the Admin Console, which shows the same count.",
+      "Behind the scenes: the text of a server error that is stored or sent back can no longer carry the values of the query that failed, such as a food or a weight. Each set can now hold how it felt; nothing writes it yet.",
+    ],
+  },
+  {
     version: "1.533.0",
     date: "2026-11-24",
     changes: [
