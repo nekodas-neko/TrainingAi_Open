@@ -8,8 +8,10 @@ import { reportServerError } from "@/lib/observability";
 import { DEFAULT_TZ } from "@trainingai/shared/date-utils";
 import { readJsonLimited } from "@trainingai/shared/http/request-guards";
 
-// Measured against LogExercisePayloadSchema at its own limits — every array caps at 20 and every
-// string at 200 — a maximal payload is 6,010 bytes. 64 KB is ten times that.
+// Measured against LogExerciseUploadSchema at its own limits — every array at 20 entries, every
+// string at 200 characters, every number at its largest — a maximal payload is 18,450 bytes, of
+// which setEfforts (#4159) is 676. 64 KB is 3.5 times that. The figure is pinned by
+// __tests__/body-cap-comment-4159.test.ts: re-measure before adding a field.
 const MAX_BODY_BYTES = 64 * 1024;
 
 export async function POST(req: NextRequest) {
