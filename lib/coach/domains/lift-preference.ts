@@ -46,7 +46,7 @@ import {
 } from '@trainingai/shared/ai-periodization/lift-preference'
 import { planExcluded, restatePlan, repRangeForRequest } from '@trainingai/shared/ai-periodization/lift-preference-restate'
 import { recostRestated, type FigureSignals } from '@trainingai/shared/ai-periodization/prescription-figures'
-import { loadFigureSignals } from '@trainingai/shared/ai-periodization/signals'
+import { loadLiftFigureSignals } from '@trainingai/shared/ai-periodization/signals'
 import { normalizeStoredPrescription } from '@trainingai/shared/ai-periodization/reconcile-prescription'
 import { prescriptionDrivesLoad } from '@trainingai/shared/ai-periodization/apply-prescription'
 import { isAiPrescriptionPending } from '@trainingai/shared/ai-periodization/prescription-pending'
@@ -57,18 +57,20 @@ import { resolveWorkingBasisWithSource } from '@trainingai/shared/1rm'
 import type { AiPrescription, PeriodizationPhase, PrescriptionStatus } from '@trainingai/shared/types/ai-periodization'
 
 export type BasisReads = Pick<WorkoutRepository, 'getLastRealOneRmBatch' | 'getExerciseEstimates' | 'listPersonalRecords'>
-/** The four pool reads a stored plan is re-costed from (`loadFigureSignals`, #4007). */
-export type FigureReads = Pick<WorkoutRepository, 'getSetTimingRows' | 'getExerciseMuscleAssignments' | 'getExerciseEquipment' | 'getTimingAuditData'>
-/** What a restated plan's minutes and volume are costed with, for the sessions named; null when the reads are not there or fail
- *  (the restate is then stored as before, its figures as generated; the failure is logged once). Pool reads: never call it inside a
- *  transaction that holds a connection. */
-async function readFigureSignals(db: Db, reads: Partial<FigureReads>, userId: string, programSessionIds: string[]): Promise<FigureSignals | null> {
-  if (programSessionIds.length === 0 || !reads.getSetTimingRows || !reads.getExerciseMuscleAssignments || !reads.getExerciseEquipment || !reads.getTimingAuditData) return null
+/** The two pool reads the lift's changed rows are priced from (`loadLiftFigureSignals`, #4007). */
+export type FigureReads = Pick<WorkoutRepository, 'getSetTimingRows' | 'getExerciseMuscleAssignments'>
+/** What a restated plan's minutes and volume are costed with, for this lift's slots in the sessions named; null when the reads are
+ *  not there or fail (the restate is then stored as before, its figures as generated; the failure is logged once). Pool reads: never
+ *  call it inside a transaction that holds a connection. */
+async function readFigureSignals(
+  db: Db, reads: Partial<FigureReads>, userId: string, exerciseName: string, programSessionIds: string[],
+): Promise<FigureSignals | null> {
+  if (programSessionIds.length === 0 || !reads.getSetTimingRows || !reads.getExerciseMuscleAssignments) return null
   try {
-    const exercises = await db.select({ id: s.sessionExercises.id, exerciseName: s.sessionExercises.exerciseName, muscleGroups: s.sessionExercises.muscleGroups })
+    const slots = await db.select({ id: s.sessionExercises.id, muscleGroups: s.sessionExercises.muscleGroups })
       .from(s.sessionExercises)
-      .where(and(inArray(s.sessionExercises.sessionId, programSessionIds), isNull(s.sessionExercises.deletedAt)))
-    return await loadFigureSignals(reads as FigureReads as WorkoutRepository, userId, { exercises: exercises.map(e => ({ id: e.id, exerciseName: e.exerciseName, muscleGroups: e.muscleGroups ?? [] })) })
+      .where(and(inArray(s.sessionExercises.sessionId, programSessionIds), eq(s.sessionExercises.exerciseName, exerciseName), isNull(s.sessionExercises.deletedAt)))
+    return await loadLiftFigureSignals(reads as FigureReads, userId, exerciseName, slots.map(r => ({ id: r.id, muscleGroups: r.muscleGroups ?? [] })))
   } catch (err) {
     console.error('[lift-preference] reading what a restated plan is re-costed from failed; its minutes stay as stored:', err)
     return null
@@ -654,7 +656,7 @@ export async function restateSpentOneShot(
   const pref = toPreference(liveColumns(row))
   const basisKg = basisKgOf(await readBasisInputs(reads, userId, exerciseName), exerciseName)
   // #4007: the restated plan is re-costed. Read once for every plan, here on the pool and before any plan's write.
-  const figures = await readFigureSignals(db, reads, userId, plans.map(p => p.programSessionId))
+  const figures = await readFigureSignals(db, reads, userId, exerciseName, plans.map(p => p.programSessionId))
 
   let rewritten = 0
   for (const p of plans) {
@@ -697,6 +699,11 @@ export async function restateSpentOneShot(
     }
   }
   return rewritten
+}
+
+/** A change that can move a row's minutes: a rep range (work time), a rest, or ±1 set. A plate step alone moves the load only. */
+function changesMoveMinutes(changes: unknown): boolean {
+  return liftChanges(changes as never).some(c => c.field !== 'nextLoadStep')
 }
 
 // ── The handler ──────────────────────────────────────────────────────────────
@@ -767,7 +774,7 @@ export function liftPreferenceHandler(
         ))
       const prepared: PreparedBasis = {
         exerciseName: target.exerciseName, basis,
-        figures: target.phaseMode === 'ai_dynamic' ? await readFigureSignals(db, reads as Partial<FigureReads>, userId, holding.map(r => r.id)) : null,
+        figures: target.phaseMode === 'ai_dynamic' && changesMoveMinutes(patch.changes) ? await readFigureSignals(db, reads as Partial<FigureReads>, userId, target.exerciseName, holding.map(r => r.id)) : null,
       }
       return prepared
     },

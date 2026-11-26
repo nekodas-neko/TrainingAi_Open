@@ -207,6 +207,35 @@ export async function loadFigureSignals(
   }
 }
 
+/**
+ * #4007: what `recostRestated` needs to price the rows ONE lift's restate changed, and nothing more: the lift's own measured
+ * time profile and its muscle credit, from two indexed reads (`getSetTimingRows`, `getExerciseMuscleAssignments`) instead of
+ * `loadFigureSignals`' four. The transition between exercises is left at the model's default: `recostRestated` shifts the stored
+ * figures by the changed rows' cost after minus before, and a row's transition is the same on both sides, so it cancels. Do not use
+ * these signals to cost a whole session.
+ */
+export async function loadLiftFigureSignals(
+  repo: Pick<WorkoutRepository, 'getSetTimingRows' | 'getExerciseMuscleAssignments'>,
+  userId: string,
+  exerciseName: string,
+  slots: ReadonlyArray<{ id: string; muscleGroups: string[] }>,
+): Promise<FigureSignals> {
+  const [timingRows, muscleAssignmentsMap] = await Promise.all([
+    repo.getSetTimingRows(userId, [exerciseName]),
+    repo.getExerciseMuscleAssignments([exerciseName]),
+  ])
+  const timeProfile = buildTimeProfiles(timingRows)[exerciseName] ?? null
+  const library = muscleAssignmentsMap[exerciseName]
+  return {
+    exercises: slots.map(slot => ({
+      sessionExerciseId: slot.id,
+      muscleAssignments: library && library.length > 0 ? library : slot.muscleGroups.map(mg => ({ muscle: mg, role: 'main' as const })),
+      timeProfile,
+      transitionSec: 240,
+    })),
+  }
+}
+
 // The subset of per-exercise signal the AI-prescription CARD renders — identity, role, and the
 // PR-derived strength trend. Extracted so the light read path
 // (GET /api/ai-periodization/session/[id]) and the full aggregation below derive it from exactly

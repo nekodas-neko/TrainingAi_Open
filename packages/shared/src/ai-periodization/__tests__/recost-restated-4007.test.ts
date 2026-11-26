@@ -74,6 +74,18 @@ describe('recostRestated', () => {
     expect(out.exercises[1]).toBe(deloaded) // a deloaded row is never touched by the restate
   })
 
+  it('the transition between exercises cancels: the light signals (default transitions) give the same figures as the full ones (200 seeded cases)', () => {
+    const light: FigureSignals = { exercises: signals.exercises.map(e => ({ ...e, transitionSec: 240 })) }
+    for (let seed = 1; seed <= 200; seed++) {
+      const r = rng(seed * 31)
+      const before = ['a', 'b', 'c', 'd'].map(id => row(id, 2 + Math.floor(r() * 4), 3 + Math.floor(r() * 12), 45 + Math.floor(r() * 150)))
+      const after = before.map((e, i) => i === Math.floor(r() * 4) ? { ...e, sets: e.sets + 1, restSec: 45 + Math.floor(r() * 150) } : e)
+      const p = plan(before)
+      const restated = { ...p, exercises: after }
+      expect(recostRestated(p, restated, light), `seed ${seed}`).toEqual(recostRestated(p, restated, signals))
+    }
+  })
+
   it('never stores a figure that is not a real number', () => {
     const p = plan([row('a', 3, 8, 120)], { estimatedSessionDurationMin: 1 })
     const restated = { ...p, exercises: [row('a', 1, 1, 30)] }

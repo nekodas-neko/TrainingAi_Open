@@ -158,9 +158,13 @@ inside one locked transaction, so the loop was deleted rather than patched: one 
   `weeklyVolumeContribution` and its `fullSession` figures by the cost of the rows it changed (`recostRestated`, through
   `prescriptionFigures`' own inputs): a pure function, shifted by the changed rows' cost after and before, so a budget-shortened rest or
   a dropped row that the stored minutes include is not re-priced. It adds no lock and no statement inside a lock: the store costs the
-  rows with the `signals` the generation already built (no read); the Coach's apply reads the four figure inputs in `prepare`,
-  before its transaction opens, with the basis reads (a pool read never runs inside it); `restateSpentOneShot` reads them once on the
-  pool before it writes any plan. A failed figure read stores the restate as before (its minutes as stored) and logs one line.
+  rows with the `signals` the generation already built (no read); the Coach's apply reads the lift's two figure inputs
+  (`loadLiftFigureSignals`: its measured time profile and its muscle credit) in `prepare`, before its transaction opens, with the basis
+  reads (a pool read never runs inside it), and only for a change that can move minutes (not a plate step alone); `restateSpentOneShot`
+  reads them once on the pool before it writes any plan. The transition between exercises is not read: it is the same before and
+  after, so it cancels in the shift. A first version read all four of `loadFigureSignals`' inputs for every apply and the #4082 stress
+  test (50 rounds of 20 parallel writers) failed with pool connect timeouts; two reads passes it. A failed figure read stores the restate
+  as before (its minutes as stored) and logs one line.
 - **Not taken.** Plans for `automatic` and `manual` programs, a plan the model wrote as a whole deload (`deload: true`, its rows
   carry `modelDeload`), a deload phase, a baseline, and a session with no lifts store as before, with the plain store: they carry no
   preference the Coach restates (counted: 0 of them reach the check). A plan with some rows deloaded for soreness
