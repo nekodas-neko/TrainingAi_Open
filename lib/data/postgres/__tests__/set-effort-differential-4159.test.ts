@@ -46,7 +46,7 @@ describe.skipIf(!canRun)('the upload differential (#4159)', () => {
   let pool: import('pg').Pool
   let repo: WorkoutRepository
   let generate: typeof import('@trainingai/shared/ai-periodization/generate-prescription').generatePrescriptionForSession
-  let libIds: string[] = []
+  const libIds: string[] = []
 
   async function scenario(withAnswers: boolean): Promise<Dump> {
     await pool.query(`DELETE FROM users WHERE id = $1`, [USER])
@@ -72,7 +72,7 @@ describe.skipIf(!canRun)('the upload differential (#4159)', () => {
     for (const [w, back] of [9, 6, 3].entries()) {
       const day = shiftDateStr(today, -back)
       const wsId = uid(++n)
-      const muts: { id: string; domain: string; date: string; payload: Record<string, unknown> }[] = []
+      const muts: import('@/lib/data/repository').IncomingMutation[] = []
       for (const [li, name] of LIFTS.entries()) {
         const setCount = 3 + (li === 1 ? 1 : 0)
         const reps = Array.from({ length: setCount }, (_, i) => (w === 2 && li === 0 && i === setCount - 1 ? 8 : 10))
