@@ -24,6 +24,9 @@ export interface SetLog {
   plannedWeightKg?: number
   /** #2450: whether `rpe` was tapped or left at the pre-fill (`set_logs.rpe_source`). */
   rpeSource?: RpeSource
+  /** #4159: how this set felt against the plan, and who chose it. Both or neither; stored, read by no decision. */
+  effortVsPlan?: EffortVsPlan | null
+  effortSource?: EffortSource | null
 }
 
 export interface ExerciseLog {

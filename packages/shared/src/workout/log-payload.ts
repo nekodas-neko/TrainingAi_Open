@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { RPE_SOURCES } from './rpe-source';
-import { ExerciseEffortSchema } from './effort-vs-plan';
+import { ExerciseEffortSchema, SetEffortSchema } from './effort-vs-plan';
 import { PushedEditedAtSchema } from '../sync/edited-at';
 
 export const LogExercisePayloadSchema = z.object({
@@ -48,12 +48,21 @@ export const LogExercisePayloadSchema = z.object({
   // #3745: "how did this exercise feel?", answered after its last set. Optional: an older build
   // sends none, and the server then keeps whatever answer the row already holds.
   effort:               ExerciseEffortSchema.optional(),
+  // #4159: "how did that set feel?", one entry per set (`null` where it was not asked). Stored with
+  // the set; the server does not derive the exercise's answer from it and nothing reads it to decide.
+  // Optional: every build in the field sends none, and the server then keeps any answer a set holds.
+  setEfforts:           z.array(SetEffortSchema.nullable()).min(1).max(20).optional(),
   estimated1rm:         z.number().optional(),
   target80:             z.number().optional(),
   // Issue 2721: when the phone made this log (epoch ms), for the outbox push. A stale copy older than
   // the server's last decided edit is skipped. Optional: an old client, or a stamp from a broken
   // clock, is applied as before, and the direct POST route ignores it and stamps server time.
   editedAt:             PushedEditedAtSchema,
+}).superRefine((p, ctx) => {
+  // Index-aligned with `weights`: a shorter or longer list would put an answer on the wrong set.
+  if (p.setEfforts && p.setEfforts.length !== p.weights.length) {
+    ctx.addIssue({ code: 'custom', path: ['setEfforts'], message: 'setEfforts must have one entry per set' });
+  }
 });
 
 export type LogExercisePayload = z.infer<typeof LogExercisePayloadSchema>;

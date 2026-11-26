@@ -72,6 +72,9 @@ export interface SessionReadSet {
   plannedRestSec: number | null
   rpe: number | null
   rpeSource: string | null
+  /** #4159: how this set felt (−1 / 0 / +1) and who chose it. Carried as evidence beside the reps and weight; no rule here reads it. */
+  setEffortVsPlan?: number | null
+  setEffortSource?: string | null
   /** `set_hr_stats` for the rest after this set; read only when the workout's heart rate was dense. */
   hr?: { recoveredPreset: boolean | null; restAdequate: boolean | null; coverageOk: boolean } | null
 }

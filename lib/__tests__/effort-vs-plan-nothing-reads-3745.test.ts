@@ -6,6 +6,9 @@
 // it: the plan's effort signal, where a tapped Easier or Harder on a lift's latest log stands in for
 // that lift's rated RPE (`effortRpeDelta`), and the prompt line that tells the model so. The session
 // read (#3889) still reads it in shadow. Nothing else may: no score, no progression, no Coach prompt.
+// Since #4159 each SET also carries an answer (`set_logs.effort_vs_plan` / `effort_source`, written by the
+// upload and carried to the session read). It is evidence only: no plan, score or note reads it, and the
+// server does not derive the lift's answer from the sets. The fourth test pins which files name it.
 // This pins that: every source file that names the answer is listed here with what it does with it.
 // On the server and in shared code, next to the prescription, scoring and Coach code, each line that
 // names it is pinned exactly; elsewhere, how many lines do. Any new mention, in a listed file or not,
@@ -14,7 +17,7 @@ import { describe, it, expect } from 'vitest'
 import { execSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 
-const NAMES = /effortVsPlan|effort_vs_plan|effortSource|effort_source|EffortVsPlan|ExerciseEffort|effort-vs-plan|answerEffort|effortAsk|effortUntil|effortAnswer|effortQuestion|effortShown|showEffort|vsPlan/
+const NAMES = /effortVsPlan|effort_vs_plan|effortSource|effort_source|EffortVsPlan|ExerciseEffort|effort-vs-plan|answerEffort|effortAsk|effortUntil|effortAnswer|effortQuestion|effortShown|showEffort|vsPlan|[sS]etEffort/
 
 /** A carrier: why it only carries the answer, and its lines that name it (exactly, or how many). */
 type Carrier = { why: string; lines: string[] | number }
@@ -22,7 +25,7 @@ type Carrier = { why: string; lines: string[] | number }
 /** Every non-test source file allowed to name the answer. Regenerate a pin only with a reason. */
 const CARRIERS: Record<string, Carrier> = {
   'packages/shared/src/workout/effort-vs-plan.ts': {
-    why: 'the values, their schema and labels',
+    why: 'the values, their schema (the exercise\'s answer and, strict, one set\'s, #4159) and labels',
     lines: [
       '* last set. Stored as the answer itself on `exercise_logs.effort_vs_plan` / `effort_source`',
       'export type EffortVsPlan = (typeof EFFORT_VS_PLAN_VALUES)[number];',
@@ -31,6 +34,7 @@ const CARRIERS: Record<string, Carrier> = {
       'export const ExerciseEffortSchema = z.object({',
       'vsPlan: EffortVsPlanSchema,',
       'export type ExerciseEffort = z.infer<typeof ExerciseEffortSchema>;',
+      'export const SetEffortSchema = ExerciseEffortSchema.strict();',
       'export const EFFORT_VS_PLAN_LABELS: Record<EffortVsPlan, string> = {',
     ],
   },
@@ -57,34 +61,47 @@ const CARRIERS: Record<string, Carrier> = {
     ],
   },
   'packages/shared/src/types/log.ts': {
-    why: 'the write shape of an exercise log',
+    why: 'the write shape of an exercise log and of a set (#4159)',
     lines: [
       'import type { EffortSource, EffortVsPlan } from \'../workout/effort-vs-plan\'',
+      'effortVsPlan?: EffortVsPlan | null',
+      'effortSource?: EffortSource | null',
       'effortVsPlan?: EffortVsPlan | null',
       'effortSource?: EffortSource | null',
     ],
   },
   'packages/shared/src/workout/log-payload.ts': {
-    why: 'the upload schema accepts it',
+    why: 'the upload schema accepts it, the exercise\'s and each set\'s (#4159)',
     lines: [
-      'import { ExerciseEffortSchema } from \'./effort-vs-plan\';',
+      'import { ExerciseEffortSchema, SetEffortSchema } from \'./effort-vs-plan\';',
       'effort:               ExerciseEffortSchema.optional(),',
+      'setEfforts:           z.array(SetEffortSchema.nullable()).min(1).max(20).optional(),',
+      'if (p.setEfforts && p.setEfforts.length !== p.weights.length) {',
+      "ctx.addIssue({ code: 'custom', path: ['setEfforts'], message: 'setEfforts must have one entry per set' });",
     ],
   },
   'packages/shared/src/workout/log-exercise-core.ts': {
-    why: 'passes it to the write',
+    why: 'passes it to the write: the exercise\'s answer and each set\'s (#4159), as sent, one never derived from the other',
     lines: [
+      'rpeValues, rpeSources, intensityMode, wasOverride, exerciseDeloaded, effort, setEfforts,',
+      'effortVsPlan: setEfforts?.[i]?.vsPlan,',
+      'effortSource: setEfforts?.[i]?.source,',
       'effortVsPlan: effort?.vsPlan ?? null,',
       'effortSource: effort?.source ?? null,',
     ],
   },
   'lib/data/postgres/adapter.ts': {
-    why: 'writes it (insert / keep-on-replay upsert), selects it into the sync pull, and routes the plan\'s read (#4061)',
+    why: 'writes it (insert / keep-on-replay upsert, the exercise\'s and each set\'s), selects it into the sync pull, and routes the plan\'s read (#4061)',
     lines: [
       'effortVsPlan: log.effortVsPlan ?? null,',
       'effortSource: log.effortSource ?? null,',
       'effortVsPlan: sql`CASE WHEN EXCLUDED.effort_vs_plan IS NULL THEN ${s.exerciseLogs.effortVsPlan} ELSE EXCLUDED.effort_vs_plan END`,',
       'effortSource: sql`CASE WHEN EXCLUDED.effort_vs_plan IS NULL THEN ${s.exerciseLogs.effortSource} ELSE EXCLUDED.effort_source END`,',
+      // #4159: the per-set pair, written in the set's own insert and keep-on-NULL upsert.
+      'effortVsPlan: set.effortVsPlan != null && set.effortSource != null ? set.effortVsPlan : null,',
+      'effortSource: set.effortVsPlan != null && set.effortSource != null ? set.effortSource : null,',
+      'effortVsPlan: sql`CASE WHEN EXCLUDED.effort_vs_plan IS NULL THEN ${s.setLogs.effortVsPlan} ELSE EXCLUDED.effort_vs_plan END`,',
+      'effortSource: sql`CASE WHEN EXCLUDED.effort_vs_plan IS NULL THEN ${s.setLogs.effortSource} ELSE EXCLUDED.effort_source END`,',
       'effortVsPlan:         s.exerciseLogs.effortVsPlan,',
       'effortSource:         s.exerciseLogs.effortSource,',
       'async getLatestExerciseEfforts(userId: string, workoutSessionIds: string[], exerciseNames: string[]) { return period.getLatestExerciseEfforts(this.db, userId, workoutSessionIds, exerciseNames) }',
@@ -108,10 +125,15 @@ const CARRIERS: Record<string, Carrier> = {
     ],
   },
   'lib/data/postgres/slices/session-read.ts': {
-    why: 'selects it for the session read (#3893), read only',
+    why: 'selects it, the lift\'s and each set\'s (#4159), for the session read (#3893), read only',
     lines: [
       'effortVsPlan: s.exerciseLogs.effortVsPlan,',
       'effortSource: s.exerciseLogs.effortSource,',
+      // #4159: each set's answer, selected beside its reps and weight as evidence; nothing decides on it.
+      'setEffortVsPlan: s.setLogs.effortVsPlan,',
+      'setEffortSource: s.setLogs.effortSource,',
+      'setEffortVsPlan: row.setEffortVsPlan,',
+      'setEffortSource: row.setEffortSource,',
       'effortVsPlan: l.effortVsPlan,',
       'effortSource: l.effortSource,',
     ],
@@ -139,6 +161,9 @@ const SHADOW_READERS: Record<string, Carrier> = {
   'packages/shared/src/ai-periodization/session-read.ts': {
     why: 'the session read: a tapped answer moves its band (#3889, 20 Nov)',
     lines: [
+      // #4159: each set's answer rides on the set (a type, no rule reads it: the third test pins that).
+      'setEffortVsPlan?: number | null',
+      'setEffortSource?: string | null',
       'effort: { vsPlan: number | null; source: string | null } | null',
       'return effort.vsPlan === -1 || effort.vsPlan === 0 || effort.vsPlan === 1 ? effort.vsPlan : null',
       "// Effort per set counts only when the lifter gave it (`'asked'` never reached `set_logs`: #3889 step 2 stored `effort_vs_plan`).",
@@ -251,6 +276,24 @@ describe('exactly these read the effort answer (#3745; live in the plan since #4
     expect(readers.length).toBeGreaterThan(20)
     expect(readers.filter(path => named.has(path)).sort()).toEqual([...Object.keys(LIVE_READERS), ...Object.keys(SHADOW_READERS)].sort())
     expect(Object.keys(CARRIERS).filter(path => READERS.test(path))).toEqual([])
+  })
+
+  it('a set\'s own answer (#4159) is written by the upload and carried by the session read; no decision names it', () => {
+    // Every file that names a set's answer, by any of its names: the schema and write path, and the
+    // session read's loader and type. None of them is a prescription, score, progression or Coach file
+    // except the session read's type, which is shadow and only holds the field.
+    const setNames = /[sS]etEffort/
+    const setFiles = files.filter(path => setNames.test(readFileSync(path, 'utf8'))).sort()
+    expect(setFiles).toEqual([
+      'lib/data/postgres/slices/session-read.ts',
+      'packages/shared/src/ai-periodization/session-read.ts',
+      'packages/shared/src/workout/effort-vs-plan.ts',
+      'packages/shared/src/workout/log-exercise-core.ts',
+      'packages/shared/src/workout/log-payload.ts',
+    ])
+    // The session read's own rules never touch the field: the type declares it and nothing else in the file uses it.
+    const read = readFileSync('packages/shared/src/ai-periodization/session-read.ts', 'utf8')
+    expect(read.match(/setEffort/g)).toHaveLength(2)
   })
 
   it('the shadow reader feeds no prescription: only the plan store, the replay and their types import it (#3893)', () => {

@@ -29,6 +29,14 @@ export const ExerciseEffortSchema = z.object({
 });
 export type ExerciseEffort = z.infer<typeof ExerciseEffortSchema>;
 
+/**
+ * #4159: one set's answer, in the log payload's per-set list (index-aligned with `weights`). The same
+ * two halves as the exercise's own answer, both or neither (a `null` entry is a set the question was
+ * not shown for), and nothing else: an unknown key is refused rather than dropped, so a future field
+ * is a decision and not a silent loss.
+ */
+export const SetEffortSchema = ExerciseEffortSchema.strict();
+
 export const EFFORT_VS_PLAN_LABELS: Record<EffortVsPlan, string> = {
   [-1]: 'Easier than expected',
   0: 'As expected',
