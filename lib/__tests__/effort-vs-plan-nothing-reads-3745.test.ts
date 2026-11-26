@@ -90,6 +90,14 @@ const CARRIERS: Record<string, Carrier> = {
       'effortSource: effort?.source ?? null,',
     ],
   },
+  'lib/workout/exercise-log-edits-core.ts': {
+    why: 'clears a set\'s answer when an edit removes the set or brings it back (#4159); never reads or sets one',
+    lines: [
+      'effort_vs_plan = CASE WHEN set_logs.deleted_at IS NULL THEN set_logs.effort_vs_plan END,',
+      'effort_source = CASE WHEN set_logs.deleted_at IS NULL THEN set_logs.effort_source END,',
+      '`UPDATE set_logs SET deleted_at = now(), effort_vs_plan = NULL, effort_source = NULL',
+    ],
+  },
   'lib/data/postgres/adapter.ts': {
     why: 'writes it (insert / keep-on-replay upsert, the exercise\'s and each set\'s), selects it into the sync pull, and routes the plan\'s read (#4061)',
     lines: [
