@@ -114,6 +114,24 @@ describe.skipIf(!canRun)('set_logs effort_vs_plan through the upload (#4159)', (
     expect(after.map(r => [r.effort_vs_plan, r.effort_source])).toEqual([[-1, 'tapped'], [0, 'default'], [1, 'tapped']])
   })
 
+  it('a set removed by an edit and added back by a later edit does not bring its old answer back', async () => {
+    const id = ids()
+    await logExerciseFromPayload(USER, payload(id, { setEfforts: [tapped(-1), dflt, tapped(1)] }), TZ)
+    const { editExerciseLogWithRepo } = await import('@/lib/workout/exercise-log-edits-core')
+    await editExerciseLogWithRepo(repo, USER, { exerciseLogId: id.exerciseLogId, weights: [60, 60], reps: [8, 8] })
+    // Shortened: the tombstoned tail set no longer holds an answer.
+    const tomb = (await pool.query(
+      `SELECT effort_vs_plan, effort_source, deleted_at IS NOT NULL AS gone FROM set_logs WHERE exercise_log_id = $1 AND set_number = 3`,
+      [id.exerciseLogId])).rows[0]
+    expect(tomb).toEqual({ effort_vs_plan: null, effort_source: null, gone: true })
+    // Lengthened again: set 3 returns with no answer, the others keep theirs.
+    await editExerciseLogWithRepo(repo, USER, { exerciseLogId: id.exerciseLogId, weights: [60, 60, 60], reps: [8, 8, 8] })
+    expect(await answers(id.exerciseLogId)).toEqual([[-1, 'tapped'], [0, 'default'], [null, null]])
+    // A later upload that does send an answer for it is stored as sent.
+    await logExerciseFromPayload(USER, payload(id, { setEfforts: [null, null, tapped(-1)] }), TZ)
+    expect(await answers(id.exerciseLogId)).toEqual([[-1, 'tapped'], [0, 'default'], [-1, 'tapped']])
+  })
+
   it('the lift\'s answer is not derived from the sets: both are stored as sent, agreeing or not', async () => {
     const disagree = ids()
     await logExerciseFromPayload(USER, payload(disagree, { effort: tapped(1), setEfforts: [tapped(-1), tapped(-1), dflt] }), TZ)
