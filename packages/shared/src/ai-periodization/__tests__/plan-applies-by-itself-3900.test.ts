@@ -591,16 +591,7 @@ describe('every rule after the model still bounds a plan applied by itself', () 
     const a = ok(await ai.run()), m = ok(await auto.run())
     expect(a.prescriptionStatus).toBe('auto_applied')
     expect(m.prescriptionStatus).toBe('pending')
-    // #4128: the AI plan also records what the generator made before a rep range (`liftPreference.generated`), so a
-    // later restate starts from it; the automatic program's plan does not. Nothing else may differ.
-    const withoutGenerated = (p: AiPrescription): AiPrescription => ({
-      ...p, exercises: p.exercises.map(e => {
-        if (!e.liftPreference?.generated) return e
-        const { generated: _g, ...rec } = e.liftPreference
-        return { ...e, liftPreference: rec }
-      }),
-    })
-    expect(withoutGenerated(a.prescription)).toEqual(m.prescription)
+    expect(a.prescription).toEqual(m.prescription)
     return a.prescription
   }
 

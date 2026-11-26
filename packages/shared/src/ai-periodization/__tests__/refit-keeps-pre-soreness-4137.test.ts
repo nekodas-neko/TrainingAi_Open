@@ -65,7 +65,8 @@ describe('a re-fit keeps the record a soreness-lightened model deload row clears
     it(`${preset}: the record stays, its sets and rest are the re-fit's, and the clear puts the row's reps, load and note back`, async () => {
       const fitted = await refit(lightened(), preset)
       const p = row(fitted, P)
-      expect(p.preSoreness).toEqual({ sets: p.sets, reps: 6, pct: 55, restSec: p.restSec, deloadNote: WROTE })
+      // The rest the clear restores is the model's own (90), not the lightened row's.
+      expect(p.preSoreness).toEqual({ sets: p.sets, reps: 6, pct: 55, restSec: 90, deloadNote: WROTE })
       // The soreness clears on a later read.
       const out = reevaluatePrescriptionForToday(fitted, quiet, {
         phase: 'accumulation', prescription: fitted, prescriptionStatus: 'accepted',
@@ -73,7 +74,7 @@ describe('a re-fit keeps the record a soreness-lightened model deload row clears
       }, NOW, signals)
       expect(out.needsRegenerate).toBe(false)
       const cleared = row(out.prescription, P)
-      expect(cleared).toMatchObject({ reps: 6, pct: 55, deloadNote: WROTE, sets: p.sets, restSec: p.restSec })
+      expect(cleared).toMatchObject({ reps: 6, pct: 55, deloadNote: WROTE, sets: p.sets, restSec: 90 })
       expect(cleared.preSoreness).toBeUndefined()
     })
   }

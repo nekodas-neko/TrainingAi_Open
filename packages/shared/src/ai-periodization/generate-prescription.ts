@@ -1105,7 +1105,6 @@ async function runPrescriptionGeneration(
           trainingGoal: signals.trainingGoal, phase: loadPhase, role,
           bodyweight: sig.exerciseType === 'bodyweight', basisKg: lp.basisKg, equipment: sig.equipment,
         },
-        { recordGenerated: aiPlan }, // #4128: the AI plan keeps what it made, so a later restate starts from it; other programs stay byte for byte
       )
       ex.reps = row.reps
       ex.pct = row.pct

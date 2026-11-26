@@ -85,8 +85,9 @@ export function applyLiftPreferenceToPlanRow<R extends PlanRow>(
     const pct = ctx.bodyweight ? out.pct : preferredPct(ctx.trainingGoal, ctx.phase, ctx.role, reps)
     if (reps !== out.reps || pct !== out.pct) {
       applied.repRange = pref.repRange
-      // #4128: what the generator made, kept so a later restate starts from it. Opt-in: only the AI plan's
-      // post-model step and the restate write it, so the rules fallback's rows stay byte for byte as they were.
+      // #4128: the row before the range, kept so a later restate starts from it. Opt-in, and only the restate opts in:
+      // it is written from a row no range had touched. Generation does not: its reps are clamped into the range
+      // before this step and its load belongs to other reps, so what it would record is not "before the range".
       if (opts.recordGenerated) applied.generated = { reps: out.reps, pct: out.pct }
     }
     out = { ...out, reps, pct }

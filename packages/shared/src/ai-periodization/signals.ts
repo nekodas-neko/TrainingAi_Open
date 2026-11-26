@@ -224,14 +224,13 @@ export async function loadLiftFigureSignals(
     repo.getSetTimingRows(userId, [exerciseName]),
     repo.getExerciseMuscleAssignments([exerciseName]),
   ])
-  const timeProfile = buildTimeProfiles(timingRows)[exerciseName] ?? null
-  const library = muscleAssignmentsMap[exerciseName]
+  const timeProfiles = buildTimeProfiles(timingRows)
+  const measuredTimeBudget = buildMeasuredTimeBudget([], [], [])
   return {
     exercises: slots.map(slot => ({
       sessionExerciseId: slot.id,
-      muscleAssignments: library && library.length > 0 ? library : slot.muscleGroups.map(mg => ({ muscle: mg, role: 'main' as const })),
-      timeProfile,
-      transitionSec: 240,
+      // The one derivation `loadFigureSignals` uses; its transition (no equipment, no audit) is the default and cancels.
+      ...figureInputsFor({ exerciseName, muscleGroups: slot.muscleGroups }, { muscleAssignmentsMap, equipmentMap: {}, timeProfiles, measuredTimeBudget }),
     })),
   }
 }

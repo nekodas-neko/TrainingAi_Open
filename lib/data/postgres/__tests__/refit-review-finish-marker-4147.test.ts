@@ -117,7 +117,7 @@ describe.skipIf(!canRun)('a re-fit and a review apply carry the finish marker to
       expect(res).toEqual({ ok: false, reason: 'session_changed' })
       expect(strip(await row(push))).toBe(strip(before))
     })
-    it('a finish of the other session type, or before the read: stored', async () => {
+    it('a finish of the other session type: stored', async () => {
       const { refitPrescriptionToBudget } = await import('@trainingai/shared/ai-periodization/refit-prescription')
       await put(push)
       await finish(legs)

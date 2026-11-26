@@ -130,6 +130,12 @@ export async function refitPrescriptionToBudget(
   )
   const restShortened = stored.exercises.some(ex =>
     (budget.restSec.get(ex.sessionExerciseId) ?? fullRest[ex.sessionExerciseId]) !== fullRest[ex.sessionExerciseId])
+  // #4137: the rest a soreness-lightened row goes back to: the budget's when it shortened this row, else the model's own
+  // (the baseline's, else the record's). Never the lightened row's rest, which is not what the clear should restore.
+  const shortenedRest = (id: string) => {
+    const r = budget.restSec.get(id)
+    return r != null && r !== fullRest[id] ? r : undefined
+  }
   const prescription: AiPrescription = {
     ...carried,
     exercises: stored.exercises.map(ex => {
@@ -146,7 +152,7 @@ export async function refitPrescriptionToBudget(
         // soreness (#4126) is kept, so clearing the soreness still puts the row's reps, load and note back (the
         // symptom was a row left lightened with its "still sore" note after the soreness cleared). Its sets and rest
         // are the re-fit's own, so the clear does not bring back a shape the picked length no longer allows.
-        ...(ex.preSoreness && { preSoreness: { ...ex.preSoreness, sets, restSec } }),
+        ...(ex.preSoreness && { preSoreness: { ...ex.preSoreness, sets, restSec: shortenedRest(ex.sessionExerciseId) ?? baseline.restSec?.[ex.sessionExerciseId] ?? ex.preSoreness.restSec } }),
         ...(liftPreference && { liftPreference }),
       }
     }),

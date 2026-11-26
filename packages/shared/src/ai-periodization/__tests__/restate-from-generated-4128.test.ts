@@ -3,7 +3,6 @@
 // generated row back. Pure functions, no model (0 real calls); made-up lifts and numbers.
 import { describe, it, expect } from 'vitest'
 import { restatePlanRow, restatePlan, type RestatableRow } from '../lift-preference-restate'
-import { applyLiftPreferenceToPlanRow } from '../lift-preference-plan'
 import type { LiftPreference } from '../lift-preference'
 import type { AiPrescription } from '../../types/ai-periodization'
 
@@ -17,13 +16,6 @@ const RANGES = [
   { min: 8, max: 12 }, { min: 10, max: 12 }, { min: 12, max: 15 }, { min: 15, max: 20 },
 ]
 const withRange = (r: { min: number; max: number }, extra: Partial<LiftPreference> = {}) => pref({ repRange: r, ...extra })
-
-/** What generation stores for the row with a range: the generated numbers plus the record the plan writes. */
-function generate(r: { min: number; max: number } | null, row: Row = generatedRow): Row {
-  if (!r) return row
-  const { row: out, applied } = applyLiftPreferenceToPlanRow(row, withRange(r), ctx, { recordGenerated: true })
-  return Object.keys(applied).length > 0 ? { ...out, liftPreference: applied } : out
-}
 
 describe('restate from what the generator made (#4128)', () => {
   it('every ordered pair of the 8 ranges: A then B is exactly B chosen once', () => {
@@ -52,11 +44,12 @@ describe('restate from what the generator made (#4128)', () => {
     }
   })
 
-  it('a row generation stored with a range restates the same as one the Coach restated', () => {
-    for (const a of RANGES) for (const b of RANGES) {
-      const viaGeneration = restatePlanRow(generate(a), withRange(b), ctx)
-      expect(viaGeneration, `${a.min}-${a.max} then ${b.min}-${b.max}`).toEqual(restatePlanRow(generatedRow, withRange(b), ctx))
-    }
+  it('a row generation stored with a range has no record, so it restates from the row as before and records nothing', () => {
+    // Generation clamps reps into the range before the preference step, so it cannot say what the row was before the range.
+    const stored = { ...generatedRow, reps: 12, pct: 61.5, liftPreference: { repRange: { min: 12, max: 15 } } }
+    const out = restatePlanRow(stored, withRange({ min: 8, max: 10 }), ctx)
+    expect(out.reps).toBe(10)
+    expect(out.liftPreference).not.toHaveProperty('generated')
   })
 
   it('a range with a plate step and ±1 set on top still lands on the once-chosen row', () => {
