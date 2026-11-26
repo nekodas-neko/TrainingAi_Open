@@ -251,6 +251,46 @@ describe.skipIf(!canRun)('rename, swap and program save lock in one order (#4096
     expectBoth(wr, sr)
   })
 
+  it('a rename behind a program lock held from another connection ends as a bounded busy, with nothing written (#4157)', async () => {
+    const { lockWait } = await import('@/lib/coach/lock-wait')
+    const { isBoundedLockTimeout } = await import('@/lib/api/route-errors')
+    const oldName = `Q4096 Old ${TAG} w`
+    const newName = `Q4096 New ${TAG} w`
+    const entryId = await lib(oldName)
+    const p = await seedProgram(U1, [oldName, oldName])
+    const before = lockWait.ms
+    lockWait.ms = 300 // the real bound is 4 s; the object exists so a test can shorten it
+    const holder = await pool.connect()
+    try {
+      await holder.query('BEGIN')
+      await holder.query(`SELECT id FROM programs WHERE id = $1 FOR NO KEY UPDATE`, [p.programId])
+      for (const attempt of [
+        () => repo.renameExercise(OWNER, entryId, newName),
+        () => repo.adminUpdateExercise({ id: entryId, name: newName, muscles: [], equipment: [] }),
+      ]) {
+        const started = Date.now()
+        const err = await attempt().then(() => null, e => e as Error)
+        const took = Date.now() - started
+        expect(err, 'the rename should not have succeeded behind the lock').not.toBeNull()
+        expect(code(err), `${err?.message}`).toBe('55P03') // the bounded wait, not 57014 (statement timeout) or 40P01
+        expect(isBoundedLockTimeout(err)).toBe(true)
+        expect(took).toBeGreaterThanOrEqual(250)
+        expect(took).toBeLessThan(3_000)
+      }
+    } finally {
+      lockWait.ms = before
+      await holder.query('ROLLBACK').catch(() => undefined)
+      holder.release()
+    }
+    // Nothing half-written: the exercise rows and the library row keep the old name.
+    const names = (await pool.query(`SELECT exercise_name FROM session_exercises WHERE id = ANY($1::uuid[])`, [p.exercises])).rows.map(r => r.exercise_name)
+    expect(names).toEqual([oldName, oldName])
+    expect((await pool.query(`SELECT name FROM exercise_library WHERE id = $1`, [entryId])).rows[0].name).toBe(oldName)
+    // Free again, the same rename goes through.
+    await repo.renameExercise(OWNER, entryId, newName)
+    expect((await pool.query(`SELECT exercise_name FROM session_exercises WHERE id = $1`, [p.exercises[0]])).rows[0].exercise_name).toBe(newName)
+  })
+
   it('two renames that share programs lock them in id order before touching an exercise row', async () => {
     // Two programs of two different people; the LOWER id is locked first, whoever owns it.
     const [lowId, highId] = [randomUUID(), randomUUID()].sort()
