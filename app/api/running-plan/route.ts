@@ -5,6 +5,8 @@ import { rateLimit } from '@/lib/rate-limit'
 import { z } from 'zod'
 import { DEFAULT_TZ, todayInTz, normalizeDateParamIso, startOfWeekInTz } from '@trainingai/shared/date-utils'
 import { heartHealthDays, type HeartHealthDay } from '@/lib/health/heart-health-service'
+import { heartHealthFloorBpm } from '@trainingai/shared/running/heart-health'
+import { resolveHrProfile } from '@trainingai/shared/health/hr-profile'
 import { prescribeNextRun, OVERRIDE_RATIONALE_PREFIX } from '@trainingai/shared/running/prescription'
 import { defaultFrameworkForGoal, CARDIO_GOALS, cardioPlanKind, WALKING_FRAMEWORK_KEY } from '@trainingai/shared/running/cardio-goals'
 import { settleWalkingPlan } from '@/lib/health/walking-plan-service'
@@ -32,9 +34,12 @@ const NO_STORE = 'private, no-store'
  * its minutes at moderate effort or above. Measured after today's row exists, so today is in it. Fail-soft: the card
  * still paints the prescription when the heart-rate reads fail, just without the history.
  */
-async function weekHeartHealth(repo: Awaited<ReturnType<typeof getRepository>>, userId: string, tz: string): Promise<{ days: HeartHealthDay[] }> {
-  const days = await heartHealthDays(repo, userId, tz, startOfWeekInTz(tz), todayInTz(tz)).catch(() => [])
-  return { days }
+async function weekHeartHealth(repo: Awaited<ReturnType<typeof getRepository>>, userId: string, tz: string): Promise<{ days: HeartHealthDay[]; floorBpm: number | null }> {
+  // #4158: the bpm where a minute starts to count, the same floor `heartHealthDays` measures with,
+  // so the card can say it once. Null when the profile cannot be read; the days then resolve their own.
+  const profile = await resolveHrProfile(repo, userId, tz).catch(() => null)
+  const days = await heartHealthDays(repo, userId, tz, startOfWeekInTz(tz), todayInTz(tz), profile ?? undefined).catch(() => [])
+  return { days, floorBpm: profile ? heartHealthFloorBpm(profile) : null }
 }
 
 /**
