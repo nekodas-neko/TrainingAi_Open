@@ -213,6 +213,8 @@ export const runningPlanSpec = (today: string) => ({
     isPushSession: z.boolean().optional(),
     heartHealth: z
       .object({
+        // The bpm where a minute starts to count (#4158); absent on an older payload.
+        floorBpm: number.nullish(),
         days: z.array(
           z
             .object({

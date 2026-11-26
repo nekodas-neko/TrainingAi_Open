@@ -1,0 +1,16 @@
+[
+  { "open": "cardio" },
+  { "wait": 1500 },
+  { "tap": "Start an activity" },
+  { "wait": 800 },
+  { "capture": "start-1-first-step" },
+  { "tap": "Walk or run" },
+  { "wait": 600 },
+  { "capture": "start-2-walk-or-run" },
+  { "tap": "Treadmill" },
+  { "wait": 600 },
+  { "capture": "start-3-treadmill" },
+  { "tapLabel": "Back" },
+  { "wait": 600 },
+  { "capture": "start-4-back-to-walk-or-run" }
+]
