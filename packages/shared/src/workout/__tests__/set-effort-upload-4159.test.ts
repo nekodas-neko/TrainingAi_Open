@@ -28,7 +28,7 @@ vi.mock('@/lib/data', () => ({
   }),
 }))
 
-import { logExerciseFromPayload, LogExercisePayloadSchema } from '../log-exercise'
+import { logExerciseFromPayload, LogExerciseUploadSchema as LogExercisePayloadSchema } from '../log-exercise'
 
 const TZ = 'Australia/Brisbane'
 const base = { sessionName: 'Push', exercise: 'Bench Press', weights: [60, 60, 60], sets: 3, reps: [8, 8, 8] }
@@ -78,6 +78,11 @@ describe('the upload schema takes each set\'s answer, and only that (#4159)', ()
     for (const [label, setEfforts] of bad) {
       expect(LogExercisePayloadSchema.safeParse({ ...base, setEfforts }).success, label).toBe(false)
     }
+  })
+
+  it('the plain payload schema still supports .pick (the native client picks weights and reps from it)', async () => {
+    const { LogExercisePayloadSchema: plain } = await import('../log-payload')
+    expect(plain.pick({ weights: true, reps: true }).safeParse({ weights: [60], reps: [8] }).success).toBe(true)
   })
 
   it('the exercise\'s own answer keeps its own schema (not made strict by this change)', () => {

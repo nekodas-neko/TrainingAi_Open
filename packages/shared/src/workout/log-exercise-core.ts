@@ -16,7 +16,7 @@ import type { EditStamp } from '@trainingai/shared/sync/edited-at';
 import type { WorkoutRepository } from '@/lib/data/repository';
 import { logMayConsumeOneShot } from '@trainingai/shared/ai-periodization/lift-preference';
 
-export { LogExercisePayloadSchema } from './log-payload';
+export { LogExercisePayloadSchema, LogExerciseUploadSchema } from './log-payload';
 import type { LogExercisePayload } from './log-payload';
 export type { LogExercisePayload } from './log-payload';
 

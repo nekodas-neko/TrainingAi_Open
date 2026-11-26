@@ -58,8 +58,14 @@ export const LogExercisePayloadSchema = z.object({
   // the server's last decided edit is skipped. Optional: an old client, or a stamp from a broken
   // clock, is applied as before, and the direct POST route ignores it and stamps server time.
   editedAt:             PushedEditedAtSchema,
-}).superRefine((p, ctx) => {
-  // Index-aligned with `weights`: a shorter or longer list would put an answer on the wrong set.
+});
+
+/**
+ * What the server accepts: the payload above plus the cross-field rule. Kept apart because a refined
+ * zod object cannot be `.pick`ed, and the native client picks `weights` and `reps` from the plain one.
+ * Index-aligned with `weights`: a shorter or longer list would put an answer on the wrong set.
+ */
+export const LogExerciseUploadSchema = LogExercisePayloadSchema.superRefine((p, ctx) => {
   if (p.setEfforts && p.setEfforts.length !== p.weights.length) {
     ctx.addIssue({ code: 'custom', path: ['setEfforts'], message: 'setEfforts must have one entry per set' });
   }

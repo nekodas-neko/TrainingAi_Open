@@ -4,7 +4,7 @@ import type { EditStamp } from '@trainingai/shared/sync/edited-at';
 import type { LogExercisePayload } from './log-payload';
 import { logExerciseWithRepo } from './log-exercise-core';
 
-export { LogExercisePayloadSchema } from './log-payload';
+export { LogExercisePayloadSchema, LogExerciseUploadSchema } from './log-payload';
 export type { LogExercisePayload } from './log-payload';
 export { shouldCountTowardPr, logExerciseWithRepo } from './log-exercise-core';
 

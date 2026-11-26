@@ -6669,8 +6669,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
           // #3916: the `*-core` modules take this repository and never import `@/lib/data`, so the
           // data layer does not reach back into itself (the guard is data-layer-readiness-cycle.test.ts).
           const { logExerciseWithRepo } = await import('@trainingai/shared/workout/log-exercise-core')
-          const { LogExercisePayloadSchema } = await import('@trainingai/shared/workout/log-payload')
-          const parsed = LogExercisePayloadSchema.safeParse(mut.payload)
+          const { LogExerciseUploadSchema } = await import('@trainingai/shared/workout/log-payload')
+          const parsed = LogExerciseUploadSchema.safeParse(mut.payload)
           if (!parsed.success) {
             console.error('[pushMutations] workout_log safeParse failed:', JSON.stringify(parsed.error.flatten()))
             errors.push({ id: mut.id, domain: mut.domain, date: mut.date, error: 'Invalid workout_log payload' })

@@ -3,7 +3,7 @@ import { isNotFoundError } from '@trainingai/shared/errors';
 import { routeErrorResponse } from '@/lib/api/route-errors';
 import { auth } from "@/auth";
 import { rateLimit } from "@/lib/rate-limit";
-import { LogExercisePayloadSchema, logExerciseFromPayload } from "@trainingai/shared/workout/log-exercise";
+import { LogExerciseUploadSchema, logExerciseFromPayload } from "@trainingai/shared/workout/log-exercise";
 import { reportServerError } from "@/lib/observability";
 import { DEFAULT_TZ } from "@trainingai/shared/date-utils";
 import { readJsonLimited } from "@trainingai/shared/http/request-guards";
@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
       : NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const parsed = LogExercisePayloadSchema.safeParse(read.body);
+  const parsed = LogExerciseUploadSchema.safeParse(read.body);
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid request", details: parsed.error.flatten() }, { status: 400 });
   }
