@@ -64,3 +64,17 @@ describe('item 3: the stored stack is built from the scrubbed message', () => {
   })
 })
 
+describe('item 4: a long detail is cut before it is matched', () => {
+  it('a 200 kB value full of )=( is handled in under 50 ms and leaks nothing', () => {
+    const detail = `Key (name)=(${'CANARY)=('.repeat(25000)}) already exists.`
+    const t0 = performance.now()
+    const out = scrubPgDetail(detail, '23505')
+    expect(performance.now() - t0).toBeLessThan(50)
+    expect(out).not.toContain('CANARY')
+    expect(out.length).toBeLessThan(2100)
+  })
+  it('an ordinary detail is unchanged in shape', () => {
+    expect(scrubPgDetail('Key (email)=(a@b.c) already exists.', '23505')).toBe('Key (email)=(…) already exists.')
+  })
+})
+

@@ -131,6 +131,7 @@ export function scrubBoundParamsInStack(stack: string, err?: unknown): string {
 // constraint and table fields alongside, that is what makes a row diagnosable. Dropped: every value.
 
 export const SCRUBBED_VALUE = '…'
+const MAX_DETAIL_LENGTH = 2000
 
 // The column list is matched lazily up to the first `)=(` (a key can be an expression such as
 // `lower(email)`), the value greedily up to the fixed sentence end, so a value that itself contains
@@ -164,7 +165,10 @@ const DETAIL_TEMPLATES: { re: RegExp; out: (m: RegExpMatchArray) => string }[] =
  * A pg error's `detail`, with every value replaced by `(…)`. A detail in none of the known shapes
  * fails closed: anything after `=(` or `contains (`, and every double-quoted string, goes.
  */
-export function scrubPgDetail(detail: string, code?: unknown): string {
+export function scrubPgDetail(rawDetail: string, code?: unknown): string {
+  // A value can be as long as a text column; the matching below is not linear in it. A detail is a
+  // sentence, so 2,000 characters is far more than any real one, and what is cut is a value.
+  const detail = rawDetail.length > MAX_DETAIL_LENGTH ? rawDetail.slice(0, MAX_DETAIL_LENGTH) : rawDetail
   // Class 22 details that echo a value without quoting it (invalid XML: the offending line and a
   // caret; untranslatable character: its bytes). Fail closed: the detail goes, the message stays.
   if (typeof code === 'string' && /^22(00[MNST]|P05|021)$/.test(code)) return SCRUBBED_VALUE
