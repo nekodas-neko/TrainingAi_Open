@@ -5798,6 +5798,9 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         plannedRestSec: s.setLogs.plannedRestSec,
         plannedWeightKg: s.setLogs.plannedWeightKg,
         rpeSource:     s.setLogs.rpeSource,
+        // #4166: the set's "how did it feel" answer rides the pull, so a device that rebuilds from it keeps it.
+        effortVsPlan:  s.setLogs.effortVsPlan,
+        effortSource:  s.setLogs.effortSource,
         updatedAt:     s.setLogs.updatedAt,
         deletedAt:     s.setLogs.deletedAt,
       }).from(s.setLogs)
