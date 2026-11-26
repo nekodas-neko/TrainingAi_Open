@@ -78,3 +78,9 @@ describe('item 4: a long detail is cut before it is matched', () => {
   })
 })
 
+describe('item 5: the two flattened-text shapes', () => {
+  it('unit and source encoding name', () => {
+    expect(scrubPgMessage('unit "CANARY\nx" not recognized for type timestamp with time zone')).toBe('unit "…" not recognized for type timestamp with time zone')
+    expect(scrubPgMessage('invalid source encoding name "CANARY\nx"')).toBe('invalid source encoding name "…"')
+  })
+})

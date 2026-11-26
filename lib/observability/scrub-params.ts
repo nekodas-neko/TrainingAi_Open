@@ -212,6 +212,8 @@ export function scrubPgMessage(message: string, code?: unknown): string {
     .replace(/\btime zone "(?:[\s\S]*" not recognized|[\s\S]*)/, `time zone "${SCRUBBED_VALUE}" not recognized`)
     .replace(/\binvalid value "(?:[\s\S]*" for "[^"]*"|[\s\S]*)/, `invalid value "${SCRUBBED_VALUE}" for "${SCRUBBED_VALUE}"`)
     .replace(/\b(relation|type|function|schema|role) "[\s\S]*" does not exist/, `$1 "${SCRUBBED_VALUE}" does not exist`)
+    .replace(/\bunit "(?:[\s\S]*" not recognized|[\s\S]*)/, `unit "${SCRUBBED_VALUE}" not recognized`)
+    .replace(/\binvalid source encoding name "(?:[\s\S]*"|[\s\S]*)/, `invalid source encoding name "${SCRUBBED_VALUE}"`)
 }
 
 // ── One entry point for any free text an error leaves behind ──────────────────────────────────
