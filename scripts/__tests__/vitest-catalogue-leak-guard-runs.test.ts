@@ -29,7 +29,7 @@ const DIR = path.join(ROOT, 'scripts/__fixtures__/leak-guard')
 const files: string[] = []
 
 /** A one-test fixture that inserts one library row, holds it `holdMs`, and removes it unless it is to leak. */
-function writeFixture(leak: boolean, holdMs: number, ownAppName = false): { file: string; name: string } {
+function writeFixture(leak: boolean, holdMs: number, ownAppName = false, resetTags = false): { file: string; name: string } {
   const name = `Guard Probe ${TAG} ${names.length}`
   names.push(name)
   const file = `leak-${TAG}-${names.length}.fixture.ts`
@@ -38,7 +38,7 @@ import { Client } from 'pg'
 
 it('makes a library row and holds it', async () => {
   ${ownAppName ? "process.env.PGAPPNAME = 'a-test-that-names-its-own-connections'" : ''}
-  const c = new Client({ connectionString: process.env.DATABASE_URL })
+  const c = new Client({ connectionString: process.env.DATABASE_URL${resetTags ? ", application_name: 'resets-its-own-tags', options: '-c vitest.run_tag=somebody-else'" : ''} })
   await c.connect()
   try {
     const { rows } = await c.query("INSERT INTO exercise_library (name, equipment, muscles) VALUES ('${name}', ARRAY['barbell'], '[]'::jsonb) RETURNING id")
@@ -132,6 +132,31 @@ describe.skipIf(!canRun)('the catalogue leak guard, in real runs (#4109)', () =>
     expect(ra.out).not.toContain(JSON.stringify(b.name))
     expect(rb.out).toContain(JSON.stringify(b.name))
     expect(rb.out).not.toContain(JSON.stringify(a.name))
+  }, 60_000)
+})
+
+describe.skipIf(!canRun)('a leak by a connection that carries no run tag (#4157)', () => {
+  // Registered runs here are the alone-vs-beside cases; the outer `pnpm test` run may be live too, so each case
+  // starts its inner runs and reads only their own output.
+  it('is caught when it is the only run registered (a clean-env child, or a connection that resets its tags)', async () => {
+    const leak = writeFixture(true, 300, false, true)
+    // Its own scope: the outer test run is registered under the shared keys, and this case needs a run that is alone.
+    const r = await run(leak.file, { LEAK_GUARD_SCOPE: `alone${TAG}` })
+    expect(r.code).toBe(1)
+    expect(r.out).toContain(JSON.stringify(leak.name))
+    expect(r.out).toContain(leak.file)
+  }, 60_000)
+
+  it('beside another run it is nobody\'s, and the run that ends alone still reports it', async () => {
+    const scope = { LEAK_GUARD_SCOPE: `beside${TAG}` }
+    const other = run('idle', { IDLE_MS: '4000', ...scope })
+    await sleep(1500)
+    const leak = writeFixture(true, 300, false, true)
+    const leaking = await run(leak.file, scope)
+    const last = await other
+    expect(leaking.code).toBe(0) // two runs alive: attribution applies, and an untagged row is nobody's (the documented gap)
+    expect(last.code).toBe(1) // ...but it is not lost: the run that ends alone flags every surviving new row
+    expect(last.out).toContain(JSON.stringify(leak.name))
   }, 60_000)
 })
 

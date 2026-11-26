@@ -40,6 +40,14 @@
  * (the function is replaced in place), and the last run alive drops it. Until then it only sends
  * notifications nobody reads.
  *
+ * WHAT THE PER-RUN ATTRIBUTION CAN MISS, and how that is bounded. The tag travels in the process environment,
+ * so a connection that does not carry it is attributed to no run: a child process started with a clean `env`,
+ * a URL that sets its own `application_name` AND `options`, a connection that resets its own tags. To keep
+ * those from hiding a leak, attribution is used only when two or more runs are alive at the end (the case it
+ * exists for). With one run registered nobody else can own a surviving row, so every row that was not in the
+ * start snapshot is flagged, tagged or not: the old behaviour, with no false positive left to avoid.
+ * Remaining gaps: with two or more runs alive, an untagged connection's leak is nobody's; and a run that
+ * started and ended entirely inside this one, leaving a row, is blamed on this one (the snapshot cannot tell).
  *
  * Silent (nothing watched, no failure) when DATABASE_URL is unset, the database is unreachable, or the
  * table is absent, and in watch mode, where "after" has no end.
@@ -120,11 +128,17 @@ export function mayInstallHook(url: string): boolean {
   return local || /test/.test(dbName)
 }
 
-const CHANNEL = 'catalogue_leak_guard'
-const TRIGGER = 'zz_catalogue_leak_guard'
+/**
+ * `LEAK_GUARD_SCOPE` gives a run its own trigger, channel and run count, so the guard's own test can start a run that
+ * is the only one registered while the outer `pnpm test` run is live. Never set in a real run.
+ */
+const SCOPE = (process.env.LEAK_GUARD_SCOPE ?? '').replace(/[^a-z0-9]/gi, '').slice(0, 24)
+const CHANNEL = `catalogue_leak_guard${SCOPE ? `_${SCOPE}` : ''}`
+const TRIGGER = `zz_catalogue_leak_guard${SCOPE ? `_${SCOPE}` : ''}`
 /** Advisory keys: one serialises installing and removing the trigger, one counts the runs that are alive. */
-const SETUP_KEY = 41090001
-const RUNS_KEY = 41090002
+const KEY_OFFSET = SCOPE ? 100 + [...SCOPE].reduce((n, c) => (n * 31 + c.charCodeAt(0)) % 1_000_000, 7) * 2 : 0
+const SETUP_KEY = 41090001 + KEY_OFFSET
+const RUNS_KEY = 41090002 + KEY_OFFSET
 
 /** The hook the tag and the row ids travel through; see the header. */
 const INSTALL_SQL = `
@@ -178,6 +192,15 @@ async function startWatch(url: string): Promise<Watch | null> {
     await listener.end().catch(() => {})
     return null
   }
+}
+
+/** How many runs are registered as alive right now (this one included): the shared holders of RUNS_KEY. */
+async function liveRuns(w: Watch): Promise<number> {
+  const r = await w.listener.query<{ n: string }>(
+    `SELECT count(*) AS n FROM pg_locks WHERE locktype = 'advisory' AND mode = 'ShareLock' AND granted AND classid = $1 AND objid = $2 AND objsubid = 1`,
+    [Math.floor(RUNS_KEY / 2 ** 32), RUNS_KEY % 2 ** 32],
+  )
+  return Number(r.rows[0]?.n ?? 0)
 }
 
 /** Unregisters; the last run alive drops the trigger (best effort: a leftover trigger only sends notifications nobody reads). */
@@ -247,7 +270,17 @@ export default async function setup(project?: { vitest?: { config?: { watch?: bo
       const present = ids.length
         ? (await watch.listener.query<LibraryRow>('SELECT id, name FROM exercise_library WHERE id = ANY($1::uuid[])', [ids])).rows
         : []
-      const leftover = ownLeftovers(ids, present)
+      // One run registered: nobody else can own a surviving row, so flag every new row, tagged or not. Two or
+      // more: only this run's own (see the header for what that can miss).
+      const alone = (await liveRuns(watch)) <= 1
+      let leftover = ownLeftovers(ids, present)
+      if (alone) {
+        const after = await snapshot(url)
+        if (after) {
+          const seen = new Set(leftover.map(r => r.id))
+          leftover = [...leftover, ...leftoverRows(before, after).filter(r => !seen.has(r.id))].sort((a, b) => a.name.localeCompare(b.name))
+        }
+      }
       if (leftover.length > 0) report(leftover)
     } catch {
       // The check could not run (the connection dropped): say so rather than pass silently.
