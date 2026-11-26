@@ -10,7 +10,7 @@ import { readJsonLimited } from "@trainingai/shared/http/request-guards";
 
 // Measured against LogExerciseUploadSchema at its own limits — every array at 20 entries, every
 // string at 200 characters, every number at its largest — a maximal payload is 18,450 bytes, of
-// which setEfforts (#4159) is 676. 64 KB is 3.5 times that. The figure is pinned by
+// which the per-set answers (#4159) are 676. 64 KB is 3.5 times that. The figure is pinned by
 // __tests__/body-cap-comment-4159.test.ts: re-measure before adding a field.
 const MAX_BODY_BYTES = 64 * 1024;
 

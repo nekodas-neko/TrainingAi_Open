@@ -75,8 +75,8 @@ const CARRIERS: Record<string, Carrier> = {
     lines: [
       'import { ExerciseEffortSchema, SetEffortSchema } from \'./effort-vs-plan\';',
       'effort:               ExerciseEffortSchema.optional(),',
-      'setEfforts:           z.array(SetEffortSchema.nullable()).min(1).max(20).optional(),',
-      'if (p.setEfforts && p.setEfforts.length !== p.weights.length) {',
+      'setEfforts:           z.array(SetEffortSchema.nullable()).max(20).optional(),',
+      'if (p.setEfforts && p.setEfforts.length > 0 && p.setEfforts.length !== p.weights.length) {',
       "ctx.addIssue({ code: 'custom', path: ['setEfforts'], message: 'setEfforts must have one entry per set' });",
     ],
   },
@@ -88,6 +88,14 @@ const CARRIERS: Record<string, Carrier> = {
       'effortSource: setEfforts?.[i]?.source,',
       'effortVsPlan: effort?.vsPlan ?? null,',
       'effortSource: effort?.source ?? null,',
+    ],
+  },
+  'lib/workout/exercise-log-edits-core.ts': {
+    why: 'clears a set\'s answer when an edit removes the set or brings it back (#4159); never reads or sets one',
+    lines: [
+      'effort_vs_plan = CASE WHEN set_logs.deleted_at IS NULL THEN set_logs.effort_vs_plan END,',
+      'effort_source = CASE WHEN set_logs.deleted_at IS NULL THEN set_logs.effort_source END,',
+      '`UPDATE set_logs SET deleted_at = now(), effort_vs_plan = NULL, effort_source = NULL',
     ],
   },
   'lib/data/postgres/adapter.ts': {
