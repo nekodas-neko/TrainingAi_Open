@@ -27,8 +27,19 @@
  * A row inserted by a connection that carries no run tag (the dev server, a psql session) is no run's leak
  * and is not blamed on any run.
  *
+ * THE HOOK IS DDL, SO IT IS INSTALLED ONLY WHERE THAT IS SAFE. The trigger and its function are created on
+ * whatever `DATABASE_URL` names, so the guard installs them only when the URL is a local host (`localhost`,
+ * `127.0.0.1`, `::1`, or a socket path as the host) or the database name marks a test database (it contains
+ * "test"). Anything else gets the old read-only comparison against a snapshot and one warning line; the
+ * guard never writes to a database it cannot show is disposable. See `mayInstallHook`.
+ *
  * If the trigger cannot be installed (no permission, the table is locked for seconds) the run falls back to
  * the old comparison against a snapshot, with its old false positives, and says so on stderr.
+ *
+ * A run killed with SIGKILL leaves the trigger behind. That is harmless: the next run finds it, reuses it
+ * (the function is replaced in place), and the last run alive drops it. Until then it only sends
+ * notifications nobody reads.
+ *
  *
  * Silent (nothing watched, no failure) when DATABASE_URL is unset, the database is unreachable, or the
  * table is absent, and in watch mode, where "after" has no end.
@@ -89,6 +100,24 @@ async function snapshot(url: string): Promise<LibraryRow[] | null> {
   } finally {
     await client.end().catch(() => {})
   }
+}
+
+/**
+ * True when it is safe to run DDL (the insert hook) against this URL: a local host, a socket path, or a database
+ * whose name marks it a test database. Anything unparseable is not safe: fail closed.
+ */
+export function mayInstallHook(url: string): boolean {
+  // `postgresql://u:p@/db?host=/tmp` (an empty host before a socket path) is not a valid WHATWG URL: parse it with a
+  // placeholder host and remember that the host was empty.
+  const emptyHost = /^(postgres(?:ql)?:\/\/[^/@]*@)\//i.test(url)
+  let u: URL
+  try { u = new URL(emptyHost ? url.replace('@/', '@placeholder/') : url) } catch { return false }
+  if (u.protocol !== 'postgres:' && u.protocol !== 'postgresql:') return false
+  const hostPart = emptyHost ? '' : decodeURIComponent(u.hostname)
+  const host = (u.searchParams.get('host') ?? hostPart).replace(/^\[|\]$/g, '').toLowerCase()
+  const local = host === '' || host === 'localhost' || host === '127.0.0.1' || host === '::1' || host.startsWith('/')
+  const dbName = decodeURIComponent(u.pathname.replace(/^\//, '')).toLowerCase()
+  return local || /test/.test(dbName)
 }
 
 const CHANNEL = 'catalogue_leak_guard'
@@ -162,6 +191,7 @@ async function stopWatch(w: Watch): Promise<void> {
         try {
           await w.listener.query(`SET lock_timeout = '3s'`)
           await w.listener.query(`DROP TRIGGER IF EXISTS ${TRIGGER} ON exercise_library`)
+          await w.listener.query(`DROP FUNCTION IF EXISTS ${TRIGGER}()`)
         } catch { /* left in place */ }
         await w.listener.query('SELECT pg_advisory_unlock($1)', [RUNS_KEY]).catch(() => {})
       }
@@ -184,9 +214,13 @@ export default async function setup(project?: { vitest?: { config?: { watch?: bo
   const before = await snapshot(url)
   if (!before) return
 
-  const watch = await startWatch(url)
+  const safe = mayInstallHook(url)
+  if (!safe) {
+    process.stderr.write('[catalogue leak guard] DATABASE_URL is not a local or test database: not installing the insert hook (it is DDL); comparing against a snapshot instead (#4109).\n')
+  }
+  const watch = safe ? await startWatch(url) : null
   if (!watch) {
-    process.stderr.write('[catalogue leak guard] could not install its insert hook: comparing against a snapshot, which blames this run for rows another run on the same database inserts (#4109).\n')
+    if (safe) process.stderr.write('[catalogue leak guard] could not install its insert hook: comparing against a snapshot, which blames this run for rows another run on the same database inserts (#4109).\n')
     return async () => {
       const after = await snapshot(url)
       if (!after) return

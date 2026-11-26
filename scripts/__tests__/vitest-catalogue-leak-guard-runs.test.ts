@@ -12,12 +12,13 @@
  * Real Postgres only (DATABASE_URL). Each fixture file and row name is fresh per run of this file; the files
  * are removed, and the rows the leaking runs keep are removed by name, in `afterAll`.
  */
-import { describe, it, expect, afterAll } from 'vitest'
+import { describe, it, expect, afterAll, vi } from 'vitest'
 import { spawn } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
 import { Client } from 'pg'
+import guardSetup, { mayInstallHook } from '../vitest-catalogue-leak-guard'
 
 const canRun = !!process.env.DATABASE_URL
 const ROOT = path.resolve(__dirname, '../..')
@@ -132,4 +133,66 @@ describe.skipIf(!canRun)('the catalogue leak guard, in real runs (#4109)', () =>
     expect(rb.out).toContain(JSON.stringify(b.name))
     expect(rb.out).not.toContain(JSON.stringify(a.name))
   }, 60_000)
+})
+
+describe('mayInstallHook: the guard runs DDL only on a local or test database (#4157)', () => {
+  const yes = [
+    'postgresql://u:p@localhost:5432/app',
+    'postgresql://u:p@127.0.0.1:5433/app',
+    'postgresql://u:p@[::1]:5432/app',
+    'postgresql://u:p@/app?host=/tmp&port=5433',
+    'postgresql://u:p@db.example.invalid:5432/app_test',
+    'postgresql://u:p@db.example.invalid:5432/TestDb',
+  ]
+  const no = [
+    'postgresql://u:p@db.example.invalid:5432/app',
+    'postgresql://u:p@10.0.0.5:5432/app',
+    'postgresql://u:p@localhost.example.invalid:5432/app',
+    'postgresql://u:p@db.example.invalid/app?host=db.example.invalid',
+    'not a url',
+    'mysql://u:p@localhost/app',
+  ]
+  it.each(yes)('installs on %s', url => { expect(mayInstallHook(url)).toBe(true) })
+  it.each(no)('does not install on %s', url => { expect(mayInstallHook(url)).toBe(false) })
+})
+
+describe.skipIf(!canRun)('the guard on a database that is not local or test: nothing is installed (#4157)', () => {
+  it('sends no DDL, takes no lock, warns, tags nothing, and still compares by snapshot', async () => {
+    const real = new URL(process.env.DATABASE_URL as string)
+    if (/test/i.test(decodeURIComponent(real.pathname.slice(1)))) return // a test-named database counts as safe; the case needs a non-test name
+    const port = real.searchParams.get('port') ?? (real.port || '5432')
+    // 0.0.0.0 reaches the local server on Linux but is none of the hosts the guard trusts.
+    const url = `postgresql://${real.username}:${real.password}@0.0.0.0:${port}${real.pathname}`
+    expect(mayInstallHook(url)).toBe(false)
+
+    // The outer run has its own hook on this database, so absence cannot be read from the catalogue: read what the
+    // guard SENDS instead.
+    const sent: string[] = []
+    const origQuery = Client.prototype.query as (...a: unknown[]) => unknown
+    const spy = vi.spyOn(Client.prototype, 'query').mockImplementation(function (this: Client, ...args: unknown[]) {
+      const q = args[0]
+      sent.push(typeof q === 'string' ? q : (q as { text?: string })?.text ?? '')
+      return origQuery.apply(this, args)
+    } as never)
+    const saved = { url: process.env.DATABASE_URL, app: process.env.PGAPPNAME, opts: process.env.PGOPTIONS }
+    const writes: string[] = []
+    const realWrite = process.stderr.write.bind(process.stderr)
+    process.env.DATABASE_URL = url
+    process.stderr.write = ((chunk: string | Uint8Array) => { writes.push(String(chunk)); return true }) as typeof process.stderr.write
+    try {
+      const teardown = await guardSetup()
+      expect(typeof teardown).toBe('function')
+      expect(process.env.PGAPPNAME).toBe(saved.app) // nothing to tag: no hook
+      expect(process.env.PGOPTIONS).toBe(saved.opts)
+      await (teardown as () => Promise<void>)()
+    } finally {
+      process.stderr.write = realWrite
+      process.env.DATABASE_URL = saved.url
+      spy.mockRestore()
+    }
+    expect(writes.join('')).toContain('not a local or test database')
+    expect(sent.length).toBeGreaterThan(0)
+    expect(sent.filter(q => !/^\s*SELECT\s/i.test(q))).toEqual([]) // reads only
+    expect(sent.some(q => /advisory|LISTEN|CREATE|DROP/i.test(q))).toBe(false)
+  }, 30_000)
 })
