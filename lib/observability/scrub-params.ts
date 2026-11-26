@@ -30,38 +30,52 @@ function splitFrames(stack: string): { head: string; frames: string } {
 
 /**
  * The exact parameter text of a Drizzle query error, from `.params`, walking the cause chain:
- * `${params}` as Drizzle itself writes it into the message, and every string parameter long enough
- * to be a value rather than a SQL fragment. Parameters that cannot be read are skipped, never thrown on.
+ * `${params}` as Drizzle itself writes it into the message, and every string parameter. Parameters
+ * that cannot be read are skipped, never thrown on (a getter may throw).
  */
-function paramsOf(err: unknown): { tail: string; values: string[] }[] {
-  const out: { tail: string; values: string[] }[] = []
+function paramsOf(err: unknown): { tail: string; values: string[]; query: string }[] {
+  const out: { tail: string; values: string[]; query: string }[] = []
   const seen = new Set<unknown>()
   let cur: unknown = err
   for (let depth = 0; depth < 6 && cur && typeof cur === 'object' && !seen.has(cur); depth++) {
     seen.add(cur)
-    const params = (cur as { params?: unknown }).params
-    if (Array.isArray(params)) {
-      let tail = ''
-      try { tail = String(params) } catch { tail = '' }
-      const query = typeof (cur as { query?: unknown }).query === 'string' ? (cur as { query: string }).query : ''
-      const values: string[] = []
-      for (const p of params) {
-        let t = ''
-        try { t = typeof p === 'object' && p !== null && !(p instanceof Date) ? (Buffer.isBuffer(p) ? p.toString() : JSON.stringify(p) ?? '') : String(p) } catch { t = '' }
-        if (t.length >= 8 && !query.includes(t)) values.push(t)
+    try {
+      const params = (cur as { params?: unknown }).params
+      if (params !== undefined && params !== null) {
+        const q = (cur as { query?: unknown }).query
+        const query = typeof q === 'string' ? q : ''
+        let tail = ''
+        try { tail = String(params) } catch { tail = '' }
+        const values: string[] = []
+        // A `.params` that is not an array (a hand-built error) is still one value to remove.
+        for (const p of Array.isArray(params) ? params : [params]) {
+          let t = ''
+          try { t = typeof p === 'object' && p !== null && !(p instanceof Date) ? (Buffer.isBuffer(p) ? p.toString() : JSON.stringify(p) ?? '') : String(p) } catch { t = '' }
+          if (t.length > 0) values.push(t)
+        }
+        out.push({ tail, values, query })
       }
-      out.push({ tail, values })
+      cur = (cur as { cause?: unknown }).cause
+    } catch {
+      break
     }
-    cur = (cur as { cause?: unknown }).cause
   }
   return out
 }
 
+// A parameter this short is also a SQL fragment or a line number (`1`, `users`, `:10:5`), so it is
+// only removed where it can be told apart: right after `params:`. Anywhere else it must be this long.
+const MIN_FREE_PARAM_LENGTH = 8
+
 function removeExactParams(text: string, err: unknown): string {
   let t = text
-  for (const { tail, values } of paramsOf(err)) {
-    if (tail.length > 0) t = t.split(tail).join('[scrubbed]')
-    for (const v of values) t = t.split(v).join('[scrubbed]')
+  for (const { tail, values, query } of paramsOf(err)) {
+    // Drizzle writes `\nparams: ${params}`: the whole tail goes, whatever its length.
+    if (tail.length > 0) t = t.split(`params: ${tail}`).join(SCRUBBED_PARAMS)
+    if (tail.length >= MIN_FREE_PARAM_LENGTH) t = t.split(tail).join('[scrubbed]')
+    for (const v of values) {
+      if (v.length >= MIN_FREE_PARAM_LENGTH && !query.includes(v)) t = t.split(v).join('[scrubbed]')
+    }
   }
   return t
 }
