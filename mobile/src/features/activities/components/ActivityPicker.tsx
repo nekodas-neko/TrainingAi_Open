@@ -2,13 +2,12 @@ import {
   AppText,
   Notice,
   IconTileGrid,
-  Sheet,
   StableContent,
   StatusIndicator,
 } from '../../../shared/ui';
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { activityIcon, activityTypesSpec, type ActivityType } from '../data/models';
-/** The activity-type tiles and what goes with them; `exclude` drops types that have a place elsewhere. */
+/** The activity-type tiles and what goes with them; `filter` drops types that have a place elsewhere. Only the Start sheet shows them (#4100). */
 export function ActivityTypeTiles({
   visible,
   onSelect,
@@ -52,29 +51,5 @@ export function ActivityTypeTiles({
         {!state.connected && <AppText tone="muted">Sign in to log an activity.</AppText>}
       </StableContent>
     </>
-  );
-}
-
-export function ActivityPicker({
-  visible,
-  onClose,
-  onDismiss,
-  onSelect,
-  busy = false,
-  error = null,
-}: {
-  visible: boolean;
-  onClose: () => void;
-  /** The sheet has finished closing. */
-  onDismiss?: () => void;
-  onSelect: (type: ActivityType) => void;
-  busy?: boolean;
-  /** Why starting the chosen activity failed, shown where it was tapped. */
-  error?: string | null;
-}) {
-  return (
-    <Sheet visible={visible} title="Log Activity" onClose={onClose} onDismiss={onDismiss}>
-      <ActivityTypeTiles visible={visible} onSelect={onSelect} busy={busy} error={error} />
-    </Sheet>
   );
 }

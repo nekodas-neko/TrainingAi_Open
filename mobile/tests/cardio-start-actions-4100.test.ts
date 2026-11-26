@@ -12,6 +12,8 @@ function harness(hasSession: boolean) {
     select: (type: ActivityType) => void calls.push(`select:${type.id}`),
     recordTreadmill: (minutes, kind) => void calls.push(`record:${kind}:${minutes}`),
     openWalk: () => void calls.push('openWalk'),
+    openRunning: () => void calls.push('openRunning'),
+    openStart: (step) => void calls.push(`openStart:${step}`),
     showInProgress: () => void calls.push('inProgress'),
     afterSheet: (next) => {
       calls.push('afterSheet');
@@ -26,15 +28,19 @@ const sample = (actions: ReturnType<typeof startActions>) => ({
   guided: () => actions.kind('guided'),
   treadmillNow: () => actions.treadmillNow('walk'),
   treadmillLog: () => actions.treadmillLog('run', 30),
+  runningPlan: () => actions.runningPlan(),
+  logActivity: () => actions.startSheet('root'),
+  treadmillStep: () => actions.startSheet('treadmill'),
+  other: () => actions.startSheet('else'),
   type: () => actions.type({ id: 'cycle', label: 'Cycle', icon: 'x', isDistanceBased: true }),
 });
 
-test('every handler the actions expose answers "in progress" and starts nothing', () => {
+test('every handler the actions expose, in a sheet answers "in progress" and starts nothing', () => {
   const { calls, deps } = harness(true);
   const actions = startActions(deps, () => calls.push('closeSheet'));
   const every = sample(actions);
   // A handler added to `startActions` without a case here fails this count.
-  assert.equal(Object.keys(actions).length, 4);
+  assert.equal(Object.keys(actions).length, 6);
   for (const [name, press] of Object.entries(every)) {
     calls.length = 0;
     press();
@@ -57,4 +63,24 @@ test('without an activity open each handler starts what it names', () => {
   assert.deepEqual(ran.treadmillNow, ['select:treadmill']);
   assert.deepEqual(ran.treadmillLog, ['record:run:30']);
   assert.deepEqual(ran.type, ['select:cycle']);
+  assert.deepEqual(ran.runningPlan, ['afterSheet', 'openRunning', 'closeSheet']);
+  assert.deepEqual(ran.logActivity, ['afterSheet', 'openStart:root', 'closeSheet']);
+  assert.deepEqual(ran.treadmillStep, ['afterSheet', 'openStart:treadmill', 'closeSheet']);
+  assert.deepEqual(ran.other, ['afterSheet', 'openStart:else', 'closeSheet']);
+});
+
+test('a control on the page itself has no sheet to close: it acts at once, or names the open activity', () => {
+  for (const hasSession of [true, false]) {
+    const { calls, deps } = harness(hasSession);
+    const card = startActions(deps);
+    card.kind('guided');
+    card.startSheet('treadmill');
+    card.startSheet('else');
+    assert.deepEqual(
+      calls,
+      hasSession
+        ? ['inProgress', 'inProgress', 'inProgress']
+        : ['openWalk', 'openStart:treadmill', 'openStart:else'],
+    );
+  }
 });

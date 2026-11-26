@@ -31,6 +31,7 @@ import { ActivityTypeTiles } from './ActivityPicker';
  */
 export function StartActivitySheet({
   visible,
+  initialStep = 'root',
   busy,
   error,
   onClose,
@@ -41,6 +42,8 @@ export function StartActivitySheet({
   onType,
 }: {
   visible: boolean;
+  /** The step a fresh open starts at. */
+  initialStep?: StartStep;
   busy: boolean;
   error: string | null;
   onClose: () => void;
@@ -52,10 +55,10 @@ export function StartActivitySheet({
 }) {
   const [step, setStep] = useState<StartStep>('root');
   const [kind, setKind] = useState<TreadmillKind>('walk');
-  // A fresh open starts at the first step.
+  // A fresh open starts at `initialStep`.
   useEffect(() => {
-    if (visible) setStep('root');
-  }, [visible]);
+    if (visible) setStep(initialStep);
+  }, [visible, initialStep]);
   const back = startStepBack(step);
   return (
     <Sheet

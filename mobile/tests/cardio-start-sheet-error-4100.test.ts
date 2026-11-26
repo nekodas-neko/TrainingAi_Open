@@ -47,3 +47,16 @@ test('no error draws nothing', async () => {
   await mount(null);
   assert.doesNotMatch(document.body.textContent!, /Could not start/);
 });
+
+test('opened at the Treadmill step it shows that step, not the first one (the walking card\'s Treadmill)', async () => {
+  await dom.act(async () =>
+    dom.root.render(
+      dom.h(StartActivitySheet, {
+        visible: true, initialStep: 'treadmill', busy: false, error: null,
+        onClose: noop, onDismiss: noop, onKind: noop, onTreadmillNow: noop, onTreadmillLog: noop, onType: noop,
+      }),
+    ),
+  );
+  assert.match(document.body.textContent!, /Already done\? Log it/);
+  assert.doesNotMatch(document.body.textContent!, /Something else/);
+});

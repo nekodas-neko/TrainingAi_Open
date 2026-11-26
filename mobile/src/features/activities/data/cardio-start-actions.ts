@@ -3,6 +3,7 @@ import {
   WALK_TYPE,
   startOutcome,
   treadmillType,
+  type StartStep,
   type TreadmillKind,
 } from './cardio-start';
 import type { ActivityType } from './models';
@@ -18,6 +19,9 @@ export type StartDeps = {
   /** Record a finished treadmill session of this length, then open it. */
   recordTreadmill(minutes: number, kind: TreadmillKind): void;
   openWalk(): void;
+  openRunning(): void;
+  /** Open the Start sheet at this step. */
+  openStart(step: StartStep): void;
   /** The in-progress notice, with Resume and Discard. */
   showInProgress(): void;
   /** Runs `next` once the sheet that was open has closed. */
@@ -52,5 +56,10 @@ export function startActions(deps: StartDeps, closeSheet?: () => void) {
       deps.recordTreadmill(minutes, kind),
     ),
     type: guarded((type: ActivityType) => deps.select(type)),
+    // The running plan's own screen (the time picker's Run).
+    runningPlan: guarded(() => go(deps.openRunning)),
+    // The one Start sheet, at a step: the time picker's Log activity, the walking card's Treadmill
+    // and Other.
+    startSheet: guarded((step: StartStep) => go(() => deps.openStart(step))),
   };
 }
