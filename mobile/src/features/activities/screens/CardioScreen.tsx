@@ -3,7 +3,6 @@ import { openAfterClose, type AfterClose } from '../data/open-after-close';
 import { pickActivity } from '../data/pick-activity';
 import {
   zoneLabel,
-  ANY_ACTIVITY,
   CARD_TITLE,
   PROGRESS_LABEL,
   RATIONALE,
@@ -39,7 +38,15 @@ import {
   runningPlanSpec,
   type ActivityType,
 } from '../data/models';
-import { ActivityPicker } from '../components/ActivityPicker';
+import { StartActivitySheet } from '../components/StartActivitySheet';
+import { startActions } from '../data/cardio-start-actions';
+import {
+  startButtonTitle,
+  treadmillType,
+  type StartStep,
+  type TreadmillKind,
+} from '../data/cardio-start';
+import { ANY_ACTIVITY_COUNTS, floorLine, showWeekList } from '../data/cardio-week-view';
 import { InProgressSheet } from '../components/InProgressSheet';
 import {
   BaselinesRow,
@@ -77,12 +84,12 @@ export function CardioScreen({
     running = useWorkoutResource(runningPlanSpec(today));
   const baselines = useWorkoutResource(baselinesSpec);
   const activity = useActivities();
-  const [picker, setPicker] = useState(false),
-    [timePicker, setTimePicker] = useState(false),
+  const [timePicker, setTimePicker] = useState(false),
     [minutes, setMinutes] = useState(30);
   const [error, setError] = useState<string | null>(null),
     [busy, setBusy] = useState(false),
-    [choose, setChoose] = useState(false);
+    [startOpen, setStartOpen] = useState(false),
+    [startStep, setStartStep] = useState<StartStep>('root');
   // Why the last start failed, shown in the chooser itself; `error` only reaches the header.
   const [pickError, setPickError] = useState<string | null>(null);
   // An activity is already open: null, the notice, or the notice already asking to discard.
@@ -150,14 +157,12 @@ export function CardioScreen({
     later.current?.cancel();
     later.current = openAfterClose(next, undefined, undefined, settled, () => shown.current);
   }
-  function openPicker() {
+  function openStart(step: StartStep = 'root') {
     setError(null);
     setPickError(null);
-    setPicker(true);
+    setStartStep(step);
+    setStartOpen(true);
   }
-  // The one answer to a start control while an activity is open (#4099).
-  const startable = (start: () => void) => () =>
-    activity.session ? setInProgress('notice') : start();
   const resumeOpen = () => {
     afterSheet(openActivity);
     setInProgress(null);
@@ -168,12 +173,14 @@ export function CardioScreen({
       {
         store: activity.store,
         hasSession: !!activity.session,
-        closeSheet: () => setPicker(false),
+        closeSheet: () => {
+          setStartOpen(false);
+        },
         afterSheet,
         openActivity,
         inProgress: () => {
           afterSheet(() => setInProgress('notice'));
-          setPicker(false);
+          setStartOpen(false);
         },
         setBusy,
         setError: (message) => {
@@ -183,33 +190,46 @@ export function CardioScreen({
       },
       type,
     );
-  // The Treadmill walk buttons: record it, then open it, once.
-  function recordTreadmill(minutes: number) {
+  // Logging a finished treadmill session: record it, then open it, once. The lock is held until
+  // the sheet has closed and the screen has navigated (#4099).
+  function recordTreadmill(minutes: number, kind: TreadmillKind) {
     if (!activity.store || working.current) return;
     working.current = true;
     setBusy(true);
     setError(null);
+    setPickError(null);
+    const release = () => {
+      working.current = false;
+      setBusy(false);
+    };
     void activity.store
-      .recordCompleted(
-        {
-          id: 'treadmill',
-          label: 'Treadmill walk',
-          icon: 'PersonSimpleWalk',
-          isDistanceBased: false,
-        },
-        minutes,
-      )
+      .recordCompleted(treadmillType(kind), minutes)
       .then(() => {
-        if (shown.current) openActivity();
+        afterSheet(openActivity, release);
+        setStartOpen(false);
       })
-      .catch((cause) =>
-        setError(cause instanceof Error ? cause.message : 'Could not open the activity.'),
-      )
-      .finally(() => {
-        working.current = false;
-        setBusy(false);
+      .catch((cause) => {
+        const message = cause instanceof Error ? cause.message : 'Could not open the activity.';
+        setError(message);
+        setPickError(message);
+        release();
       });
   }
+  // What every start control does: the rule is in `startActions`, shared with its tests. One set
+  // per surface, because each closes the sheet it sits in (the card has none).
+  const startDeps = {
+    hasSession: !!activity.session,
+    select: (type: ActivityType) => void select(type),
+    recordTreadmill: (minutes: number, kind: TreadmillKind) => recordTreadmill(minutes, kind),
+    openWalk,
+    openRunning,
+    openStart,
+    showInProgress: () => setInProgress('notice'),
+    afterSheet: (next: () => void) => afterSheet(next),
+  };
+  const fromSheet = startActions(startDeps, () => setStartOpen(false));
+  const fromTimePicker = startActions(startDeps, () => setTimePicker(false));
+  const fromCard = startActions(startDeps);
   return (
     <PageLayout
       title="Cardio Hub"
@@ -263,11 +283,9 @@ export function CardioScreen({
                     <WalkingTodayCard
                       walking={walking}
                       busy={busy}
-                      onGuidedWalk={startable(openWalk)}
-                      onOther={startable(openPicker)}
-                      onTreadmill={startable(() =>
-                        recordTreadmill(walking.targets.activeMinutesPerDay),
-                      )}
+                      onGuidedWalk={() => fromCard.kind('guided')}
+                      onOther={() => fromCard.startSheet('else')}
+                      onTreadmill={() => fromCard.startSheet('treadmill')}
                     />
                   </>
                 )}
@@ -335,8 +353,16 @@ export function CardioScreen({
                       )}
                     </Stack>
                     <AppText variant="caption" tone="muted">
-                      {criterionLine(target ?? null)} · {ANY_ACTIVITY}
+                      {criterionLine(target ?? null)}
                     </AppText>
+                    <AppText variant="caption" tone="muted">
+                      {ANY_ACTIVITY_COUNTS}
+                    </AppText>
+                    {floorLine(plan.heartHealth?.floorBpm) && (
+                      <AppText variant="micro" tone="muted">
+                        {floorLine(plan.heartHealth?.floorBpm)}
+                      </AppText>
+                    )}
                     <AppText>{RATIONALE}</AppText>
                     <Stack direction="row" justify="space-between">
                       <AppText variant="caption">{PROGRESS_LABEL}</AppText>
@@ -367,61 +393,17 @@ export function CardioScreen({
                         No heart rate recorded during it, so it has no counted minutes yet.
                       </AppText>
                     )}
-                    {!day?.met && plan.run.status !== 'completed' && (
-                      <AppButton
-                        title={choose ? 'Back' : 'Start an activity'}
-                        variant="secondary"
-                        onPress={() => setChoose(!choose)}
-                      />
-                    )}
-                    {choose && (
-                      <>
-                        <HubCard
-                          title="Run"
-                          subtitle="Start a run"
-                          onPress={startable(
-                            () =>
-                              void select({
-                                id: 'run',
-                                label: 'Run',
-                                icon: 'PersonSimpleRun',
-                                isDistanceBased: true,
-                              }),
-                          )}
-                          icon="legs"
-                        />
-                        <HubCard
-                          title="Guided walk"
-                          subtitle="Fast and easy intervals"
-                          onPress={startable(openWalk)}
-                          icon="legs"
-                        />
-                        <Card>
-                          <AppText variant="label">Treadmill walk</AppText>
-                          <Stack direction="row">
-                            {[20, 30, 45].map((minutes) => (
-                              <AppButton
-                                key={minutes}
-                                title={`${minutes} min`}
-                                variant="surface"
-                                disabled={busy}
-                                style={{ flex: 1 }}
-                                onPress={startable(() => recordTreadmill(minutes))}
-                              />
-                            ))}
-                          </Stack>
-                        </Card>
-                        <HubCard
-                          title="Other activity"
-                          subtitle="Treadmill, cycle, anything logged"
-                          icon="activity"
-                          onPress={startable(openPicker)}
-                        />
-                      </>
-                    )}
+                    <AppButton
+                      title={startButtonTitle(!!activity.session)}
+                      variant={met ? 'secondary' : 'primary'}
+                      disabled={!activity.ready && !activity.session}
+                      onPress={() => fromCard.startSheet('root')}
+                    />
                   </Card>
                 )}
-                <WeekList days={plan?.heartHealth?.days ?? []} today={today} />
+                {showWeekList(plan) && (
+                  <WeekList days={plan?.heartHealth?.days ?? []} today={today} />
+                )}
               </>
             ) : (
               <StateCard
@@ -443,36 +425,16 @@ export function CardioScreen({
               onPress={() => setTimePicker(true)}
             />
           )}
-          {mode !== 'walking' && (
+          {mode === 'running' && data?.hasRunningPlan && (
             <HubCard
-              title="Run"
-              subtitle={data?.hasRunningPlan ? 'Your running plan' : 'Set up a running plan'}
-              badge={data?.hasRunningPlan ? 'Program' : undefined}
+              title="Your running plan"
+              subtitle="Today's run and the weeks ahead"
+              badge="Program"
               icon="legs"
-              tone="recovery"
+              tone="neutral"
               onPress={openRunning}
             />
           )}
-          <HubCard
-            title="Guided walk"
-            subtitle="Interval walk with fast and easy blocks"
-            icon="legs"
-            tone="brand"
-            onPress={openWalk}
-          />
-          <HubCard
-            title="Other activity"
-            subtitle="Treadmill, cycle, anything logged"
-            icon="activity"
-            tone="neutral"
-            onPress={
-              activity.session
-                ? () => setInProgress('notice')
-                : activity.ready
-                  ? openPicker
-                  : undefined
-            }
-          />
           {mode && (
             <HubCard
               title="Change plan"
@@ -485,13 +447,17 @@ export function CardioScreen({
           <CardioTrends />
         </>
       )}
-      <ActivityPicker
-        visible={picker}
+      <StartActivitySheet
+        visible={startOpen}
+        initialStep={startStep}
         busy={busy}
         error={pickError}
-        onClose={() => setPicker(false)}
+        onClose={() => setStartOpen(false)}
         onDismiss={() => later.current?.closed()}
-        onSelect={(type) => void select(type)}
+        onKind={fromSheet.kind}
+        onTreadmillNow={fromSheet.treadmillNow}
+        onTreadmillLog={fromSheet.treadmillLog}
+        onType={fromSheet.type}
       />
       <Sheet
         visible={timePicker}
@@ -525,28 +491,19 @@ export function CardioScreen({
             style={{ flex: 1 }}
             title="Run"
             variant="surface"
-            onPress={() => {
-              afterSheet(openRunning);
-              setTimePicker(false);
-            }}
+            onPress={() => fromTimePicker.runningPlan()}
           />
           <AppButton
             style={{ flex: 1 }}
             title="Walk"
             variant="surface"
-            onPress={() => {
-              afterSheet(openWalk);
-              setTimePicker(false);
-            }}
+            onPress={() => fromTimePicker.kind('guided')}
           />
         </Stack>
         <AppButton
           title="Log activity"
           disabled={!activity.ready}
-          onPress={() => {
-            afterSheet(activity.session ? () => setInProgress('notice') : openPicker);
-            setTimePicker(false);
-          }}
+          onPress={() => fromTimePicker.startSheet('root')}
         />
       </Sheet>
       <InProgressSheet

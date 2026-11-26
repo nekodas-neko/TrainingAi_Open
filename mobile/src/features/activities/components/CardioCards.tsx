@@ -9,12 +9,6 @@ import {
   restingHrSourceNote,
 } from '@trainingai/shared/health/hr-source-copy';
 import { formatDateDisplay } from '@trainingai/shared/date-utils';
-import {
-  OUTCOME_LABEL,
-  activityLine,
-  countedMinutesLine,
-  shownActivity,
-} from '@trainingai/shared/running/heart-health-copy';
 import { deviceHealthName } from '../../../integrations/device-health/platform';
 import {
   AppText,
@@ -29,7 +23,8 @@ import {
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import type { z } from 'zod';
 import { cardioWeekSpec } from '../data/models';
-import { weekDayOutcome, type FitnessTest, type HeartHealthDay } from '../data/cardio-view';
+import { weekRowView, weekRows } from '../data/cardio-week-view';
+import type { FitnessTest, HeartHealthDay } from '../data/cardio-view';
 type CardioWeek = z.infer<ReturnType<typeof cardioWeekSpec>['schema']>;
 export function HeartProfileCard({
   heart,
@@ -265,19 +260,17 @@ export function LazyDayCreditCard({ zone1Min }: { zone1Min: number }) {
   );
 }
 
-/** This week's days, oldest first: what each day counted, as the current app lists them. */
+/** Every day from Monday to today, oldest first: what each counted and why (#4100, #4158). */
 export function WeekList({ days, today }: { days: readonly HeartHealthDay[]; today: string }) {
   const { theme } = useTheme();
-  if (!days.length) return null;
   return (
     <Stack gap="xs">
       <AppText variant="eyebrow" tone="muted">
         This week
       </AppText>
-      {days.map((day) => {
-        const outcome = weekDayOutcome(day, today);
-        const shown = shownActivity(day.activities, day.creditedId);
-        const sub = countedMinutesLine(day.activities, day.countedMin);
+      {weekRows(days, today).map((row) => {
+        const { line, sub, label, outcome } = weekRowView(row, today);
+        const { date } = row;
         const color =
           outcome === 'counted'
             ? theme.progress.trendUp
@@ -285,14 +278,14 @@ export function WeekList({ days, today }: { days: readonly HeartHealthDay[]; tod
               ? theme.tones.checkin.foreground
               : theme.colors.muted;
         return (
-          <Card key={day.runId} style={{ padding: theme.spacing.sm }}>
+          <Card key={date} style={{ padding: theme.spacing.sm }}>
             <Stack direction="row" align="center">
               <AppText variant="caption" tone="muted" style={{ width: theme.spacing.xxxl }}>
-                {formatDateDisplay(day.date.replace(/\//g, '-'), 'weekday')}
+                {formatDateDisplay(date, 'weekday')}
               </AppText>
               <View style={{ flex: 1 }}>
                 <AppText variant="caption" numberOfLines={1}>
-                  {shown ? activityLine(shown) : 'No activity logged'}
+                  {line}
                 </AppText>
                 {sub !== '' && (
                   <AppText variant="micro" tone="muted">
@@ -300,9 +293,11 @@ export function WeekList({ days, today }: { days: readonly HeartHealthDay[]; tod
                   </AppText>
                 )}
               </View>
-              <AppText variant="caption" style={{ color, fontWeight: '600' }}>
-                {OUTCOME_LABEL[outcome]}
-              </AppText>
+              {label && (
+                <AppText variant="caption" style={{ color, fontWeight: '600' }}>
+                  {label}
+                </AppText>
+              )}
             </Stack>
           </Card>
         );

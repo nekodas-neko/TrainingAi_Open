@@ -1,0 +1,9 @@
+[
+  { "open": "cardio" },
+  { "wait": 1500 },
+  { "tap": "Start an activity" },
+  { "wait": 800 },
+  { "tap": "Something else" },
+  { "wait": 1200 },
+  { "capture": "start-5-something-else" }
+]
