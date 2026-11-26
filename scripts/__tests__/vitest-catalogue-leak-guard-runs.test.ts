@@ -69,14 +69,17 @@ function run(filter: string, env: Record<string, string> = {}): Promise<{ code: 
 }
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
 
-describe.skipIf(!canRun)('the catalogue leak guard, in real runs (#4109)', () => {
-  afterAll(async () => {
-    const c = new Client({ connectionString: process.env.DATABASE_URL })
-    await c.connect()
-    try { await c.query('DELETE FROM exercise_library WHERE name = ANY($1)', [names]) } finally { await c.end() }
-    for (const f of files) fs.rmSync(path.join(DIR, f), { force: true })
-  })
+// File level, not inside one describe: the cases in the later blocks leave rows too, and a hook in the first
+// block ran before them, so the outer run's own guard found their rows at its end (shard 4 of #4157).
+afterAll(async () => {
+  if (!canRun) return
+  const c = new Client({ connectionString: process.env.DATABASE_URL })
+  await c.connect()
+  try { await c.query('DELETE FROM exercise_library WHERE name = ANY($1)', [names]) } finally { await c.end() }
+  for (const f of files) fs.rmSync(path.join(DIR, f), { force: true })
+})
 
+describe.skipIf(!canRun)('the catalogue leak guard, in real runs (#4109)', () => {
   it('a run that leaves nothing passes', async () => {
     const r = await run(writeFixture(false, 300).file)
     expect(r.out).not.toContain('gained')
