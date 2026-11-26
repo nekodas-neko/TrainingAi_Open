@@ -11,6 +11,7 @@ import { FIELD_LABEL, type PatchChange } from '../patch'
 import type { Consequence, DomainHandler, Db, HandlerApplyResult, PreviewResult } from './types'
 import { driftAgainst } from './types'
 import { withBoundedLockWait, withDomainLock } from '../lock-wait'
+import { lockProgramRow, lockProgramOfSession } from '@/lib/data/postgres/program-row-lock'
 
 export interface TargetRow {
   id: string
@@ -341,6 +342,10 @@ export const sessionExerciseHandler: DomainHandler = {
     return withDomainLock<HandlerApplyResult>(db, userId, `session_exercise:${targetId}`, async t => {
       const row = await loadTarget(t, userId, targetId)
       if (!row) return { ok: false, reason: 'not_found' }
+      // #4096: the program row first, before any exercise row or library row is written, as the editor's save
+      // does (it holds the program and then deletes and re-inserts the exercises). Bounded like the domain lock:
+      // a miss is the usual `busy`, nothing written.
+      await withBoundedLockWait(t, () => lockProgramRow(t, row.programId))
 
       // `removed` carries plain booleans so the tool schema stays Gemini-compatible (see patch.ts),
       // which means "remove this" has to be checked here rather than by the type.
@@ -431,6 +436,8 @@ export const sessionExerciseHandler: DomainHandler = {
       // replacement would strand the original id, and the Coach addresses an exercise by id.
       // Ownership is already settled upstream: `undoCoachChange` loads the change record scoped
       // to the caller before it reaches any handler.
+      // #4096: the program row first, as in `apply`.
+      await withBoundedLockWait(db, () => lockProgramOfSession(db, r.sessionId as string))
       const [lifted] = await db.update(s.sessionExercises)
         .set({ deletedAt: null, updatedAt: new Date() })
         .where(and(eq(s.sessionExercises.id, targetId), isNotNull(s.sessionExercises.deletedAt)))
@@ -458,6 +465,7 @@ export const sessionExerciseHandler: DomainHandler = {
     // Re-verify ownership on the way back: the row may have been deleted or reassigned since.
     const row = await loadTarget(db, userId, targetId)
     if (!row) return { ok: false, reason: 'not_found' }
+    await withBoundedLockWait(db, () => lockProgramRow(db, row.programId))
 
     const set: Record<string, unknown> = { updatedAt: new Date() }
     if ('exerciseName' in before) {

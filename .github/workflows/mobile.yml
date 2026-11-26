@@ -8,6 +8,21 @@ name: Mobile client
 on:
   pull_request:
     branches: [main]
+  # #4118: a pull request can read only its own caches and main's. This workflow never ran on main, so the
+  # compile job's Gradle cache (which holds the test-only artifacts, Robolectric's) was written on a PR ref and
+  # no other PR could read it: every new PR downloaded Robolectric from Maven Central, and a 429 there failed
+  # the check on pull requests that never touched Android. A push to main that changes what decides the cache
+  # key (the same files `hashFiles` reads in the job below, this workflow and the shared Android actions) runs
+  # the job once on main, which saves the cache every PR then restores. `workflow_dispatch` on main warms it by
+  # hand (after the cache was evicted, or before the first push).
+  push:
+    branches: [main]
+    paths:
+      - mobile/package.json
+      - mobile/pnpm-lock.yaml
+      - mobile/modules/*/android/build.gradle
+      - .github/workflows/mobile.yml
+      - .github/actions/android-ndk/**
   workflow_dispatch:
 
 permissions:
@@ -111,7 +126,10 @@ jobs:
     needs: changes
     if: ${{ !cancelled() && needs.changes.outputs.native != 'false' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    # 45, not 35 (#4118): the retry below may wait up to 9 minutes (60 + 180 + 300 s) in each of the two Gradle
+    # steps, and the job has to fit those waits and a full build inside its limit, or a rate limit would end
+    # as a timeout with no message.
+    timeout-minutes: 45
     defaults:
       run:
         working-directory: mobile
@@ -119,6 +137,9 @@ jobs:
       CI: '1'
       EAS_BUILD_PROFILE: android-development
       EXPO_NO_DOTENV: '1'
+      # Waits before each retry of a failed DOWNLOAD (gradle-retry.sh): Maven Central's 429 can outlast one minute.
+      # Only a failed download is retried; a failing test or a compile error ends the job at once.
+      GRADLE_RETRY_WAITS: '60 180 300'
     steps:
       - uses: actions/checkout@v5
       - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320
@@ -145,20 +166,31 @@ jobs:
       # The key is built only from committed files that decide dependencies. Never from
       # mobile/android/**: prebuild generates it, with the minute-based ANDROID_VERSION_CODE in it,
       # so a key over it changes every run and saves a new entry each time.
-      # A new PR has no cache of its own and mobile.yml never runs on main, so the first run falls
-      # back to the cache the Preview build saves on main (restore-keys, second line). Most
-      # dependencies are shared; test-only ones (robolectric) still download once, which the retry
-      # covers.
+      # A new PR has no cache of its own: its first run restores the one a push to main saved (this
+      # workflow's `push` trigger, #4118; the key below is the same on main), else falls back to the cache the
+      # Preview build saves on main (restore-keys, second line), which has no test-only artifacts, so a cold
+      # run downloads Robolectric once, which the retry covers.
+      # ~/.m2/repository (#4118): Robolectric does not fetch its android-all jar through Gradle but at TEST
+      # time with its own client, into the local Maven repository (MavenDependencyResolver: maven.repo.local,
+      # else ~/.m2/repository), and treats a file already there as fetched. The cache did not hold that
+      # directory, so every run downloaded the jar from Maven Central however warm ~/.gradle was.
       - name: Restore the Gradle cache
+        id: gradle-cache
         uses: actions/cache@v4
         with:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
+            ~/.m2/repository
           key: gradle-${{ runner.os }}-compile-${{ hashFiles('mobile/pnpm-lock.yaml', 'mobile/package.json', 'mobile/modules/*/android/build.gradle') }}
           restore-keys: |
             gradle-${{ runner.os }}-compile-
             gradle-${{ runner.os }}-side-by-side-
+      - name: Say what the cache gave
+        run: |
+          echo "exact hit: '${{ steps.gradle-cache.outputs.cache-hit }}', restored from: '${{ steps.gradle-cache.outputs.cache-matched-key }}'"
+          echo "::notice::Gradle cache restored from '${{ steps.gradle-cache.outputs.cache-matched-key }}' (exact key hit: ${{ steps.gradle-cache.outputs.cache-hit }})"
+          ls "$HOME/.m2/repository/org/robolectric" 2>/dev/null | sed 's/^/m2 has: /' || true
 
       - name: Compile unpublished development APK
         run: $RUNNER_TEMP/gradle-retry.sh ./gradlew :app:assembleDebug --no-daemon
