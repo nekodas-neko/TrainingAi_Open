@@ -945,6 +945,14 @@ describe.skipIf(!canRun)('Coach lift_preference domain (#3896 step 5)', () => {
       expect(await minutesOf(ids.lower)).toBe(45)
     })
 
+    it('a plate step that replaces a pending +1 set takes the set\'s minutes off too', async () => {
+      await doApply([{ id: 's', field: 'setsDelta', from: null, to: 1 }])
+      expect(await minutesOf(ids.upper)).toBeGreaterThan(45)
+      await doApply([{ id: 'h', field: 'nextLoadStep', from: null, to: 'heavier' }])
+      expect((await row(ids.upper)).sets).toBe(3)
+      expect(await minutesOf(ids.upper)).toBe(45)
+    })
+
     it('a change that moves no row (the rest the plan already has) leaves the plan, minutes included, as it was', async () => {
       expect(await doApply([{ id: 'r', field: 'restSec', from: null, to: 120 }])).toMatchObject({ ok: true })
       expect(await minutesOf(ids.upper)).toBe(45)

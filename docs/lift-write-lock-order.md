@@ -160,7 +160,7 @@ inside one locked transaction, so the loop was deleted rather than patched: one 
   a dropped row that the stored minutes include is not re-priced. It adds no lock and no statement inside a lock: the store costs the
   rows with the `signals` the generation already built (no read); the Coach's apply reads the lift's two figure inputs
   (`loadLiftFigureSignals`: its measured time profile and its muscle credit) in `prepare`, before its transaction opens, with the basis
-  reads (a pool read never runs inside it), and only for a change that can move minutes (not a plate step alone); `restateSpentOneShot`
+  reads (a pool read never runs inside it); `restateSpentOneShot`
   reads them once on the pool before it writes any plan. The transition between exercises is not read: it is the same before and
   after, so it cancels in the shift. A first version read all four of `loadFigureSignals`' inputs for every apply and the #4082 stress
   test (50 rounds of 20 parallel writers) failed with pool connect timeouts; two reads passes it. A failed figure read stores the restate

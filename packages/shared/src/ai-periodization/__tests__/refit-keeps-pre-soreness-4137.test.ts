@@ -79,6 +79,14 @@ describe('a re-fit keeps the record a soreness-lightened model deload row clears
     })
   }
 
+  it('a second re-fit still restores the model\'s rest (the lightened rest never enters the saved baseline)', async () => {
+    for (const [first, second] of [['short', 'standard'], ['short', 'short'], ['long', 'short']] as const) {
+      const once = await refit(lightened(), first)
+      const twice = await refit(once, second)
+      expect(row(twice, P).preSoreness?.restSec, `${first} then ${second}`).toBe(90)
+    }
+  })
+
   it('a row with no record is re-fitted exactly as before: none is invented', async () => {
     const plan = lightened()
     delete (row(plan, P) as { preSoreness?: unknown }).preSoreness

@@ -701,11 +701,6 @@ export async function restateSpentOneShot(
   return rewritten
 }
 
-/** A change that can move a row's minutes: a rep range (work time), a rest, or ±1 set. A plate step alone moves the load only. */
-function changesMoveMinutes(changes: unknown): boolean {
-  return liftChanges(changes as never).some(c => c.field !== 'nextLoadStep')
-}
-
 // ── The handler ──────────────────────────────────────────────────────────────
 
 /** What `prepare` reads before the apply's transaction: the lift it read for, and its basis inputs. */
@@ -774,7 +769,7 @@ export function liftPreferenceHandler(
         ))
       const prepared: PreparedBasis = {
         exerciseName: target.exerciseName, basis,
-        figures: target.phaseMode === 'ai_dynamic' && changesMoveMinutes(patch.changes) ? await readFigureSignals(db, reads as Partial<FigureReads>, userId, target.exerciseName, holding.map(r => r.id)) : null,
+        figures: target.phaseMode === 'ai_dynamic' ? await readFigureSignals(db, reads as Partial<FigureReads>, userId, target.exerciseName, holding.map(r => r.id)) : null,
       }
       return prepared
     },

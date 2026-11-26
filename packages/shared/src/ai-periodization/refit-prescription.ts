@@ -128,6 +128,11 @@ export async function refitPrescriptionToBudget(
   const fullRest = Object.fromEntries(
     stored.exercises.map(ex => [ex.sessionExerciseId, baseline.restSec?.[ex.sessionExerciseId] ?? ex.restSec]),
   )
+  // #4137: the rest the baseline keeps for a soreness-lightened row is the model's own, never the lightened one, so a second
+  // re-fit (and the clear) cannot read the lightened rest back as the row's full rest.
+  const baselineRest = Object.fromEntries(
+    stored.exercises.map(ex => [ex.sessionExerciseId, baseline.restSec?.[ex.sessionExerciseId] ?? ex.preSoreness?.restSec ?? ex.restSec]),
+  )
   const restShortened = stored.exercises.some(ex =>
     (budget.restSec.get(ex.sessionExerciseId) ?? fullRest[ex.sessionExerciseId]) !== fullRest[ex.sessionExerciseId])
   // #4137: the rest a soreness-lightened row goes back to: the budget's when it shortened this row, else the model's own
@@ -152,13 +157,13 @@ export async function refitPrescriptionToBudget(
         // soreness (#4126) is kept, so clearing the soreness still puts the row's reps, load and note back (the
         // symptom was a row left lightened with its "still sore" note after the soreness cleared). Its sets and rest
         // are the re-fit's own, so the clear does not bring back a shape the picked length no longer allows.
-        ...(ex.preSoreness && { preSoreness: { ...ex.preSoreness, sets, restSec: shortenedRest(ex.sessionExerciseId) ?? baseline.restSec?.[ex.sessionExerciseId] ?? ex.preSoreness.restSec } }),
+        ...(ex.preSoreness && { preSoreness: { ...ex.preSoreness, sets, restSec: shortenedRest(ex.sessionExerciseId) ?? baselineRest[ex.sessionExerciseId] } }),
         ...(liftPreference && { liftPreference }),
       }
     }),
     refitBaseline: {
       ...baseline,
-      ...((baseline.restSec || restShortened) && { restSec: fullRest }),
+      ...((baseline.restSec || restShortened) && { restSec: baselineRest }),
     },
     estimatedSessionDurationMin: budget.estimatedSessionDurationMin,
     weeklyVolumeContribution: budget.weeklyVolumeContribution,
