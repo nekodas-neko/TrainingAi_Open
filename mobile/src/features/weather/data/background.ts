@@ -26,11 +26,8 @@ export function backgroundScene(
   if (detail === 'session-explain') return 'sessionExplain';
   return bucket === 'home' || bucket === 'workout' ? 'sky' : bucket;
 }
-export function backgroundPhase(
-  snapshot: WeatherSnapshot | null,
-  now: number,
-  anchors: SkyAnchors,
-) {
+const HOUR = 3600000;
+function daylightWindow(snapshot: WeatherSnapshot | null, now: number) {
   const day = 86400000;
   const windows = snapshot?.daylight
     .filter((row) => row.set > row.rise)
@@ -46,8 +43,34 @@ export function backgroundPhase(
   const fallback = new Date(now);
   fallback.setHours(6, 0, 0, 0);
   const rise = windows?.[0]?.rise ?? fallback.getTime();
-  const set = windows?.[0]?.set ?? rise + 12 * 3600000;
+  const set = windows?.[0]?.set ?? rise + 12 * HOUR;
+  return { rise, set };
+}
+export function backgroundPhase(
+  snapshot: WeatherSnapshot | null,
+  now: number,
+  anchors: SkyAnchors,
+) {
+  const { rise, set } = daylightWindow(snapshot, now);
   return computeDayPhase(new Date(now), new Date(rise), new Date(set), anchors);
+}
+export type SkyStep = 'night' | 'dawn' | 'day' | 'dusk';
+/** Which of the sky's four steps `now` is in. Colours move smoothly inside a step. */
+export function skyStep(snapshot: WeatherSnapshot | null, now: number): SkyStep {
+  const { rise, set } = daylightWindow(snapshot, now);
+  if (now < rise - HOUR || now >= set + 2 * HOUR) return 'night';
+  if (now < rise + 1.5 * HOUR) return 'dawn';
+  if (now < set - 1.5 * HOUR) return 'day';
+  return 'dusk';
+}
+/** The picture's identity: a change crossfades, anything else updates in place. */
+export function backgroundFadeKey(
+  scene: string,
+  mode: string,
+  condition: WeatherSnapshot['condition'],
+  step: SkyStep | null,
+) {
+  return `${scene}:${mode}:${condition}:${step ?? ''}`;
 }
 export function tintWeather(rgb: readonly number[], condition: WeatherSnapshot['condition']) {
   const adjustments = {
