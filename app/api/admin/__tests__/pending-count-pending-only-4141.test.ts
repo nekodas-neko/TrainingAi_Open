@@ -53,4 +53,30 @@ describe.skipIf(!canRun)('countPendingApprovalUsers (#4141)', () => {
     await pool.query('UPDATE users SET is_active = true WHERE id = $1', [NEW_SIGNUP])
     expect(await repo.countPendingApprovalUsers()).toBe(base)
   })
+
+  it('answers the same as the console split (inactive minus usersWithData) in two statements, no ids inlined', async () => {
+    await pool.query(
+      `INSERT INTO users (id, email, password_hash, timezone, is_admin, is_active) VALUES
+         ($1, 'badge-new-4141@example.com', 'x', 'Australia/Brisbane', false, false)
+       ON CONFLICT (id) DO UPDATE SET is_active = false`, [NEW_SIGNUP])
+    const { rows } = await pool.query('SELECT id::text AS id FROM users WHERE is_active = false')
+    const ids = rows.map(r => r.id as string)
+    const withData = await repo.usersWithData(ids)
+    const expected = ids.filter(id => !withData.has(id)).length
+
+    const seen: string[] = []
+    const original = pool.query.bind(pool)
+    ;(pool as unknown as { query: unknown }).query = (...args: unknown[]) => {
+      const first = args[0] as { text?: string } | string
+      seen.push(typeof first === 'string' ? first : first.text ?? '')
+      return (original as (...a: unknown[]) => unknown)(...args)
+    }
+    let count: number
+    try { count = await repo.countPendingApprovalUsers() } finally { (pool as unknown as { query: unknown }).query = original }
+
+    expect(count).toBe(expected)
+    expect(expected).toBeGreaterThan(0)
+    expect(seen.length).toBe(2) // was 3: the inactive-id read, the schema read, the data union
+    expect(seen.some(text => text.includes(NEW_SIGNUP))).toBe(false)
+  })
 })

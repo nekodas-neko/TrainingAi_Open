@@ -1,4 +1,4 @@
-import { sql } from 'drizzle-orm'
+import { sql, type SQL } from 'drizzle-orm'
 import type { getDb } from '../client'
 import { resolveClaudeRoOwner } from '../claude-ro-owner'
 import { judgeProtectedTarget, sameUserId } from '@/lib/admin-owner'
@@ -189,19 +189,44 @@ async function cascadeRoots(db: Db | Tx, who: string): Promise<CascadeRoot[]> {
   return fks
 }
 
-export async function usersWithData(db: Db | Tx, userIds: readonly string[]): Promise<Set<string>> {
-  if (userIds.length === 0) return new Set()
-  const fks = await cascadeRoots(db, 'usersWithData')
-  const ids = sql`ARRAY[${sql.join(userIds.map(u => sql`${u}`), sql`, `)}]::uuid[]`
-  const parts = fks.flatMap(({ tbl, col, bare }) => {
+/** One `SELECT <fk>::text AS uid` per cascade table that holds data; `filter` limits it to some accounts. */
+function dataParts(fks: CascadeRoot[], filter: (col: string) => SQL) {
+  return fks.flatMap(({ tbl, col, bare }) => {
     const seeded = SIGNUP_SEEDED_ROOTS.get(bare)
     if (seeded === null) return []
     // Identifiers come from the catalogue through format('%I'); the ids are bound parameters.
     const extra = seeded ? sql` AND ${sql.raw(seeded)}` : sql``
-    return [sql`SELECT ${sql.raw(col)}::text AS uid FROM ${sql.raw(tbl)} WHERE ${sql.raw(col)} = ANY(${ids})${extra}`]
+    return [sql`SELECT ${sql.raw(col)}::text AS uid FROM ${sql.raw(tbl)} WHERE ${filter(col)}${extra}`]
   })
+}
+
+export async function usersWithData(db: Db | Tx, userIds: readonly string[]): Promise<Set<string>> {
+  if (userIds.length === 0) return new Set()
+  const fks = await cascadeRoots(db, 'usersWithData')
+  const ids = sql`ARRAY[${sql.join(userIds.map(u => sql`${u}`), sql`, `)}]::uuid[]`
+  const parts = dataParts(fks, col => sql`${sql.raw(col)} = ANY(${ids})`)
   const { rows } = await db.execute<{ uid: string }>(sql`SELECT DISTINCT uid FROM (${sql.join(parts, sql` UNION ALL `)}) t`)
   return new Set(rows.map(r => r.uid))
+}
+
+/**
+ * #4141 — how many inactive accounts hold no data: the admin console's "Pending approval" group, the
+ * same `usersWithData` rule, counted in the database. Two statements (the live-schema read for the
+ * cascade tables, then one count) instead of three, and no account id travels in the query. The
+ * table list is read from the live schema on purpose, so it cannot be folded into one static statement.
+ */
+export async function countPendingApprovalUsers(db: Db | Tx): Promise<number> {
+  const fks = await cascadeRoots(db, 'countPendingApprovalUsers')
+  const parts = dataParts(fks, col => sql`${sql.raw(col)} IN (SELECT id FROM users WHERE is_active = false)`)
+  const held = parts.length > 0
+    ? sql`WITH held AS (SELECT DISTINCT uid FROM (${sql.join(parts, sql` UNION ALL `)}) t)`
+    : sql`WITH held AS (SELECT NULL::text AS uid WHERE false)`
+  const { rows: [row] } = await db.execute<{ n: number }>(sql`
+    ${held}
+    SELECT count(*)::int AS n FROM users u
+    LEFT JOIN held ON held.uid = u.id::text
+    WHERE u.is_active = false AND held.uid IS NULL`)
+  return row?.n ?? 0
 }
 
 /**
