@@ -29,3 +29,14 @@ describe('item 1: a short parameter does not mangle the SQL or the frames', () =
   })
 })
 
+describe('item 2: relation/type/function/schema/role names', () => {
+  for (const kind of ['relation', 'type', 'function', 'schema', 'role']) {
+    it(kind, () => {
+      expect(scrubPgMessage(`${kind} "CANARY\nname" does not exist`)).toBe(`${kind} "…" does not exist`)
+    })
+  }
+  it('a message that only mentions a relation is untouched', () => {
+    expect(scrubPgMessage('null value in column "n" of relation "t" violates not-null constraint')).toBe('null value in column "n" of relation "t" violates not-null constraint')
+  })
+})
+

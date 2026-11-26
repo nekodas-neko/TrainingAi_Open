@@ -207,6 +207,7 @@ export function scrubPgMessage(message: string, code?: unknown): string {
     .replace(/^"(?:[\s\S]*" is out of range for type|[\s\S]*)/, `"${SCRUBBED_VALUE}" is out of range for type`)
     .replace(/\btime zone "(?:[\s\S]*" not recognized|[\s\S]*)/, `time zone "${SCRUBBED_VALUE}" not recognized`)
     .replace(/\binvalid value "(?:[\s\S]*" for "[^"]*"|[\s\S]*)/, `invalid value "${SCRUBBED_VALUE}" for "${SCRUBBED_VALUE}"`)
+    .replace(/\b(relation|type|function|schema|role) "[\s\S]*" does not exist/, `$1 "${SCRUBBED_VALUE}" does not exist`)
 }
 
 // ── One entry point for any free text an error leaves behind ──────────────────────────────────
