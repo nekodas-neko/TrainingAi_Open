@@ -54,6 +54,12 @@ describe('the upload schema takes each set\'s answer, and only that (#4159)', ()
     expect(LogExercisePayloadSchema.safeParse({ ...base, setEfforts: [null, null, null] }).success).toBe(true)
   })
 
+  it('an empty list means no answers: it parses, never a 400', () => {
+    expect(LogExercisePayloadSchema.safeParse({ ...base, setEfforts: [] }).success).toBe(true)
+    // A list that is neither empty nor one per set is still refused.
+    expect(LogExercisePayloadSchema.safeParse({ ...base, setEfforts: [null] }).success).toBe(false)
+  })
+
   it('refuses a half pair, another value, another source, another key, a wrong length, and a non-list', () => {
     const one = { vsPlan: 1, source: 'tapped' }
     const bad: [string, unknown][] = [
@@ -70,7 +76,6 @@ describe('the upload schema takes each set\'s answer, and only that (#4159)', ()
       ['extra key', [{ vsPlan: 0, source: 'default', rpe: 8 }, one, one]],
       ['too short', [one, one]],
       ['too long', [one, one, one, one]],
-      ['empty', []],
       ['not a list', one],
       ['a number entry', [0, one, one]],
       ['21 entries', Array(21).fill(one)],

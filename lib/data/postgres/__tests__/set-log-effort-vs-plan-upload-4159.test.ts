@@ -190,6 +190,23 @@ describe.skipIf(!canRun)('set_logs effort_vs_plan through the upload (#4159)', (
     })
   })
 
+  it('an empty setEfforts list is "no answers": the route and the sync push save the sets and keep stored answers', async () => {
+    const { POST } = await import('@/app/api/log-exercise/route')
+    const viaRoute = ids()
+    const ok = await POST(new NextRequest('http://localhost/api/log-exercise', {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload(viaRoute, { setEfforts: [] })),
+    }))
+    expect(ok.status).toBe(200)
+    expect(await answers(viaRoute.exerciseLogId)).toEqual([[null, null], [null, null], [null, null]])
+    // On a re-upload it leaves the answers already stored, as an omitted list does.
+    const stored = ids()
+    await logExerciseFromPayload(USER, payload(stored, { setEfforts: [tapped(-1), dflt, tapped(1)] }), TZ)
+    const res = await repo.pushMutations(USER, [{ id: randomUUID(), domain: 'workout_log', date: '2026-11-26', payload: payload(stored, { reps: [8, 8, 7], setEfforts: [] }) }])
+    expect(res.errors).toEqual([])
+    expect((await sets(stored.exerciseLogId)).map(r => r.reps)).toEqual([8, 8, 7])
+    expect(await answers(stored.exerciseLogId)).toEqual([[-1, 'tapped'], [0, 'default'], [1, 'tapped']])
+  })
+
   it('only the caller\'s own workout\'s sets are written: another person\'s set id is refused and their row is untouched', async () => {
     const theirs = ids()
     await logExerciseFromPayload(OTHER, payload(theirs, { setEfforts: [tapped(1), tapped(1), tapped(1)] }), TZ)

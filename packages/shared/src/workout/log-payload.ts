@@ -51,7 +51,8 @@ export const LogExercisePayloadSchema = z.object({
   // #4159: "how did that set feel?", one entry per set (`null` where it was not asked). Stored with
   // the set; the server does not derive the exercise's answer from it and nothing reads it to decide.
   // Optional: every build in the field sends none, and the server then keeps any answer a set holds.
-  setEfforts:           z.array(SetEffortSchema.nullable()).min(1).max(20).optional(),
+  // An empty list means the same as none: an upload that answered nothing must not lose its weights.
+  setEfforts:           z.array(SetEffortSchema.nullable()).max(20).optional(),
   estimated1rm:         z.number().optional(),
   target80:             z.number().optional(),
   // Issue 2721: when the phone made this log (epoch ms), for the outbox push. A stale copy older than
@@ -66,7 +67,7 @@ export const LogExercisePayloadSchema = z.object({
  * Index-aligned with `weights`: a shorter or longer list would put an answer on the wrong set.
  */
 export const LogExerciseUploadSchema = LogExercisePayloadSchema.superRefine((p, ctx) => {
-  if (p.setEfforts && p.setEfforts.length !== p.weights.length) {
+  if (p.setEfforts && p.setEfforts.length > 0 && p.setEfforts.length !== p.weights.length) {
     ctx.addIssue({ code: 'custom', path: ['setEfforts'], message: 'setEfforts must have one entry per set' });
   }
 });
