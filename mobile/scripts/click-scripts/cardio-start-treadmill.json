@@ -10,7 +10,7 @@
   { "tap": "Treadmill" },
   { "wait": 600 },
   { "capture": "start-3-treadmill" },
-  { "tapLabel": "Back", "index": 1 },
+  { "tap": "Back" },
   { "wait": 600 },
   { "capture": "start-4-back-to-walk-or-run" }
 ]
