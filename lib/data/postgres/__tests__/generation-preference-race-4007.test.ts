@@ -259,7 +259,12 @@ describe.skipIf(!canRun)('a lift change made while a plan is generated survives 
     {
       title: 'a Coach rest change',
       opts: { change: async p => expect(await coach(p, [{ id: 'c1', field: 'restSec', from: null, to: 45 }])).toMatchObject({ ok: true }) },
-      moves: r => { expect(rowOf(r.after)!.restSec).toBe(45) },
+      moves: r => {
+        expect(rowOf(r.after)!.restSec).toBe(45)
+        // #4007: the restated plan is re-costed, so a shorter rest reads as fewer minutes than the plan as generated.
+        const minutes = (p: unknown) => (p as { estimatedSessionDurationMin: number }).estimatedSessionDurationMin
+        expect(minutes(r.after)).toBeLessThan(minutes(r.generated))
+      },
     },
     {
       title: 'a one-off "lighter next time" step',

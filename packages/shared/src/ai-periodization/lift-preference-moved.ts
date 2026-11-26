@@ -23,6 +23,7 @@ import type { AiPrescription, PeriodizationPhase } from '../types/ai-periodizati
 import type { LiftPreference } from './lift-preference'
 import { restatePlan } from './lift-preference-restate'
 import { holdStoredPrescription, type HoldRowCtx } from './checkin-plan-hold'
+import { recostRestated, type FigureSignals } from './prescription-figures'
 
 /**
  * What a plan was built from, for the lifts named: each lift's rep range, rest, one-off and whether the
@@ -65,6 +66,9 @@ export interface MovedPreferencesCtx {
   current: ReadonlyMap<string, LiftPreference>
   /** The working basis of a lift, by the resolver the workout screen uses. */
   basisKg: (name: string) => number | null
+  /** #4007: what a row is costed with. Given, a restated plan's minutes and volume follow its rows; left out, they
+   *  stay as generated (a caller that has no signals). Already in hand in a generation: no read. */
+  figures?: FigureSignals
 }
 
 /** The names of the session's lifts whose rep range, rest or one-off differ between `built` and `current`. */
@@ -96,6 +100,8 @@ export function restateForMovedPreferences(prescription: AiPrescription, ctx: Mo
       lastingOf(ctx.current.get(name)),
     )
   }
+  // #4007: the restate moved rows' sets, reps, load or rest, so the plan's minutes and weekly volume move with them.
+  if (ctx.figures) plan = recostRestated(prescription, plan, ctx.figures)
   if (liftsWithMovedHold(ctx).length > 0) {
     // The conditions `holdStoredPlanUnderCheckin` serves a stored plan under: not in a deload or a baseline,
     // and only a lift the check-in holds for this week with a bar to hold it to.

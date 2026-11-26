@@ -25,7 +25,7 @@ Code: `lib/coach/lock-wait.ts` (`lockLiftWrites`, `tryLiftWrites`, `withDomainLo
 
 | Writer (every statement that writes more than one row of the plan-row, preference or program tables) | Locks, in order | Why it cannot be one side of a cycle |
 |---|---|---|
-| Coach apply and undo, lift preference | lift lock → name/lift locks → preference row → plan rows → history | takes the lift lock first |
+| Coach apply and undo, lift preference | lift lock → name/lift locks → preference row → plan rows → history. The restated plans' figures (#4007) are costed from reads `prepare` made before the transaction opened; none is made inside it | takes the lift lock first |
 | Weekly check-in save, offer, undo | lift lock (whole transaction) → check-in row → each nested apply/undo (lift lock again, free) | same |
 | `setProgramPhase`, `realignProgramPhase`, `setProgramPendingTransition` | program lock → program's plan rows, id order (`setProgramPhase` with `unlessFinishedAfter`, #4137, then reads `workout_sessions` once, a plain select with no row lock, on the transaction's connection) | same |
 | `clearProgramPrescriptions` | program lock → one update | same |
@@ -152,8 +152,15 @@ inside one locked transaction, so the loop was deleted rather than patched: one 
   UPDATE. Counted with a mocked model: 1 model call with or without a change, 0 wasted.
 - **Not covered.** A workout log that consumes a one-off takes no lift lock (one statement). The log's own restate and
   the preferences read's retry (#4007) clean a stamp it leaves in a stored plan, so that case is healed by the
-  next preferences read, not by this store. The session's stated minutes are not re-costed after a restate (#4007 item 3, the same
-  as the Coach's own restate).
+  next preferences read, not by this store.
+- **A restated plan is re-costed (#4007).** Every restate of a stored plan for a lift's preference (this store's, the Coach's apply, and
+  `restateSpentOneShot` after a one-off is used up or expires) moves the plan's `estimatedSessionDurationMin`, its
+  `weeklyVolumeContribution` and its `fullSession` figures by the cost of the rows it changed (`recostRestated`, through
+  `prescriptionFigures`' own inputs): a pure function, shifted by the changed rows' cost after and before, so a budget-shortened rest or
+  a dropped row that the stored minutes include is not re-priced. It adds no lock and no statement inside a lock: the store costs the
+  rows with the `signals` the generation already built (no read); the Coach's apply reads the four figure inputs in `prepare`,
+  before its transaction opens, with the basis reads (a pool read never runs inside it); `restateSpentOneShot` reads them once on the
+  pool before it writes any plan. A failed figure read stores the restate as before (its minutes as stored) and logs one line.
 - **Not taken.** Plans for `automatic` and `manual` programs, a plan the model wrote as a whole deload (`deload: true`, its rows
   carry `modelDeload`), a deload phase, a baseline, and a session with no lifts store as before, with the plain store: they carry no
   preference the Coach restates (counted: 0 of them reach the check). A plan with some rows deloaded for soreness

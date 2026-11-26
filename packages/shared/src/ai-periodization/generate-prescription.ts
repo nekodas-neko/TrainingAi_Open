@@ -633,7 +633,8 @@ async function runPrescriptionGeneration(
       const ctx = { programSessionId, phase: storeFor.phase as PeriodizationPhase, trainingGoal: signals.trainingGoal, weekStart: checkinWeekStart, lifts, built: liftPreferences, current }
       const moved = new Set([...liftsWithMovedPreference(ctx), ...liftsWithMovedHold(ctx)])
       const bases = workingBasesFrom(reads, [...moved], reads.records)
-      return restateForMovedPreferences(p, { ...ctx, basisKg: name => bases.get(name) ?? null })
+      // #4007: the signals this plan was costed with also cost the rows the restate moved (no read; a pure function).
+      return restateForMovedPreferences(p, { ...ctx, basisKg: name => bases.get(name) ?? null, figures: signals })
     }
     try {
       const out = await repo.storePrescriptionForCurrentPreferences(

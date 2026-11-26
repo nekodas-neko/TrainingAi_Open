@@ -6,7 +6,7 @@
 // session `Full` actually trains when the lifter overrides a deload. A fourth copy of the loop is
 // how the figures drift, so all four read this.
 
-import { estimateSessionDurationMin } from '@trainingai/shared/workout/duration-model'
+import { estimateSessionDurationMin, estimateSessionDurationSec, type DurationExercise } from '@trainingai/shared/workout/duration-model'
 import { resolveMeasuredRestSec } from '@trainingai/shared/workout/time-profile'
 import type { ExerciseTimeProfile } from '@trainingai/shared/workout/time-profile'
 import type { AiPrescription, AiPrescriptionExercise, PrescriptionFigures } from '@trainingai/shared/types/ai-periodization'
@@ -40,25 +40,29 @@ export interface FigureRow {
  * muscle assignments to credit. Volume is keyed by `muscle.toLowerCase()`, the way every
  * consumer of `weeklyVolumeContribution` reads it.
  */
+/** The duration model's input for each row: the row's shape with its exercise's transition and measured time. */
+function durationInputs(rows: readonly FigureRow[], signals: FigureSignals): DurationExercise[] {
+  const sigById = new Map(signals.exercises.map(e => [e.sessionExerciseId, e]))
+  return rows.map(row => {
+    const sig = sigById.get(row.sessionExerciseId)
+    return {
+      sets: row.sets, reps: row.reps, restSec: row.restSec,
+      transitionSec: sig?.transitionSec ?? 240,
+      measuredSecPerRep: sig?.timeProfile?.secPerRep ?? null,
+      measuredRestSec: row.measuredRestSec !== undefined
+        ? row.measuredRestSec
+        : sig?.timeProfile ? resolveMeasuredRestSec(sig.timeProfile, row.pct) : null,
+    }
+  })
+}
+
 export function prescriptionFigures(
   rows: readonly FigureRow[],
   signals: FigureSignals,
 ): PrescriptionFigures {
   const sigById = new Map(signals.exercises.map(e => [e.sessionExerciseId, e]))
 
-  const estimatedSessionDurationMin = estimateSessionDurationMin(
-    rows.map(row => {
-      const sig = sigById.get(row.sessionExerciseId)
-      return {
-        sets: row.sets, reps: row.reps, restSec: row.restSec,
-        transitionSec: sig?.transitionSec ?? 240,
-        measuredSecPerRep: sig?.timeProfile?.secPerRep ?? null,
-        measuredRestSec: row.measuredRestSec !== undefined
-          ? row.measuredRestSec
-          : sig?.timeProfile ? resolveMeasuredRestSec(sig.timeProfile, row.pct) : null,
-      }
-    }),
-  )
+  const estimatedSessionDurationMin = estimateSessionDurationMin(durationInputs(rows, signals))
 
   const weeklyVolumeContribution: Record<string, number> = {}
   for (const row of rows) {
@@ -148,4 +152,38 @@ export function fullSessionAlongside(
     stored.estimatedSessionDurationMin + full.estimatedSessionDurationMin - asIs.estimatedSessionDurationMin)
   if (!Number.isFinite(estimatedSessionDurationMin) || estimatedSessionDurationMin <= 0) return null
   return { estimatedSessionDurationMin, weeklyVolumeContribution: volume }
+}
+
+/**
+ * #4007: a stored plan that a lift's preference restated (`restatePlan`: a rep range, a rest, a plate step or ±1 set) with its
+ * two whole-session figures moved by what the restate changed, and nothing else. The restate changes only the rows it touched;
+ * the plan's stored minutes may include a budget-shortened rest or a dropped row that a whole-session re-cost over `prescription.exercises`
+ * would price differently (`recostPrescription` re-costs everything). So the figures are shifted by the difference between the changed rows'
+ * cost after and before, both through `prescriptionFigures`' own inputs, and every untouched row keeps the cost it was stored with.
+ * `fullSession` (the figures `Full` trains) is shifted the same way over the rows as `Full` trains them. Returns `after` untouched
+ * when no row's numbers moved or the result is not a real number, so a bad input can never store a zero or NaN where a figure was.
+ */
+export function recostRestated(before: AiPrescription, after: AiPrescription, signals: FigureSignals): AiPrescription {
+  if (after === before) return after
+  const dropped = new Set(after.droppedExerciseIds ?? [])
+  const costed = (p: AiPrescription, asTrained: (e: AiPrescriptionExercise) => AiPrescriptionExercise) =>
+    p.exercises.filter(e => !dropped.has(e.sessionExerciseId)).map(asTrained)
+  if (!rowNumbersMoved(costed(before, e => e), costed(after, e => e))) return after
+  const shifted = (stored: PrescriptionFigures, asTrained: (e: AiPrescriptionExercise) => AiPrescriptionExercise): PrescriptionFigures | null => {
+    const was = costed(before, asTrained), now = costed(after, asTrained)
+    const deltaSec = estimateSessionDurationSec(durationInputs(now, signals)) - estimateSessionDurationSec(durationInputs(was, signals))
+    const minutes = Math.round(stored.estimatedSessionDurationMin + deltaSec / 60)
+    const volume: Record<string, number> = { ...stored.weeklyVolumeContribution }
+    const a = prescriptionFigures(was, signals).weeklyVolumeContribution
+    const b = prescriptionFigures(now, signals).weeklyVolumeContribution
+    for (const muscle of new Set([...Object.keys(a), ...Object.keys(b)])) {
+      const delta = (b[muscle] ?? 0) - (a[muscle] ?? 0)
+      if (delta !== 0) volume[muscle] = Math.max(0, (volume[muscle] ?? 0) + delta)
+    }
+    return Number.isFinite(minutes) && minutes > 0 ? { estimatedSessionDurationMin: minutes, weeklyVolumeContribution: volume } : null
+  }
+  const figures = shifted(after, e => e)
+  const full = after.fullSession ? shifted(after.fullSession, rowUnderFull) : null
+  if (!figures || (after.fullSession && !full)) return after
+  return { ...after, ...figures, ...(full && { fullSession: full }) }
 }

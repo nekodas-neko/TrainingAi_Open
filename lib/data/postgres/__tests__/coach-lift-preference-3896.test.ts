@@ -909,6 +909,48 @@ describe.skipIf(!canRun)('Coach lift_preference domain (#3896 step 5)', () => {
     })
   })
 
+  describe('#4007: a restated plan is re-costed', () => {
+    const minutesOf = async (session: string) => (await storedPlan(session)).estimatedSessionDurationMin as number
+    const row = async (session: string, name = LIFT) => (await storedPlan(session)).exercises.find((e: { name: string }) => e.name === name)
+
+    it('a rest change moves the stored minutes of every plan it restates, by the duration model\'s own difference', async () => {
+      expect([await minutesOf(ids.upper), await minutesOf(ids.lower)]).toEqual([45, 45])
+      expect(await doApply([{ id: 'r', field: 'restSec', from: null, to: 60 }])).toMatchObject({ ok: true })
+      // 3 sets, 120 s → 60 s: two rests charged, 2 minutes less on each plan; the anchor row is untouched.
+      expect([await minutesOf(ids.upper), await minutesOf(ids.lower)]).toEqual([43, 43])
+      expect((await storedPlan(ids.upper)).exercises[0]).toEqual(upperPlan().exercises[0])
+    })
+
+    it('undo puts the stored plan back exactly, minutes included', async () => {
+      const done = await doApply([{ id: 'r', field: 'restSec', from: null, to: 60 }]) as { changeId: string }
+      expect(await apply.undoCoachChange(db, A, done.changeId)).toMatchObject({ ok: true })
+      expect(await storedPlan(ids.upper)).toEqual(upperPlan())
+      expect(await storedPlan(ids.lower)).toEqual(lowerPlan())
+    })
+
+    it('one more set costs minutes, and the one-off used up by a log takes them off the other session\'s plan again', async () => {
+      await doApply([{ id: 's', field: 'setsDelta', from: null, to: 1 }])
+      const up = [await minutesOf(ids.upper), await minutesOf(ids.lower)]
+      expect(up[0]).toBeGreaterThan(45)
+      expect(up[1]).toBe(up[0])
+      expect((await row(ids.lower)).sets).toBe(4)
+      const stamp = (await row(ids.lower)).liftPreference.oneShotSetAt as string
+      const { logExerciseWithRepo } = await import('@trainingai/shared/workout/log-exercise-core')
+      await logExerciseWithRepo(repo, A, {
+        sessionName: 'Upper', exercise: LIFT, weights: [65, 65, 65], sets: 3, reps: [8, 8, 8],
+        exerciseLogId: crypto.randomUUID(), workoutSessionId: crypto.randomUUID(), setLogIds: [crypto.randomUUID(), crypto.randomUUID(), crypto.randomUUID()],
+        liftOneShotSetAt: stamp,
+      } as never, TZ)
+      expect((await row(ids.lower)).sets).toBe(3)
+      expect(await minutesOf(ids.lower)).toBe(45)
+    })
+
+    it('a change that moves no row (the rest the plan already has) leaves the plan, minutes included, as it was', async () => {
+      expect(await doApply([{ id: 'r', field: 'restSec', from: null, to: 120 }])).toMatchObject({ ok: true })
+      expect(await minutesOf(ids.upper)).toBe(45)
+    })
+  })
+
   // Last in the file, after every apply and undo above has run. The warning is raised on a later tick.
   it('never issues a query on a connection that is already running one (#4024)', async () => {
     await new Promise(resolve => setImmediate(resolve))
