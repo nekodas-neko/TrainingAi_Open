@@ -222,8 +222,21 @@ export function scrubErrorText(text: string, err?: unknown): string {
   return scrubPgMessage(scrubBoundParams(text, err), pgCodeOf(err))
 }
 
-/** The same for a stack: the frames stay, the values go. */
+/**
+ * The same for a stack: the frames stay, the values go. The message part of the stack is the
+ * error's own message, so it is rebuilt from the SCRUBBED message and the frames after it are kept
+ * as they are: a parameter that fakes a frame line (or a message that quotes another error's text)
+ * cannot end the cut early. Only when the message cannot be found in the stack does the frame
+ * heuristic decide.
+ */
 export function scrubErrorStack(stack: string, err?: unknown): string {
+  let message: unknown
+  try { message = err instanceof Error ? err.message : undefined } catch { message = undefined }
+  if (typeof message === 'string' && message.length > 0) {
+    const named = stack.indexOf(`: ${message}`)
+    const at = named !== -1 ? named + 2 : stack.startsWith(message) ? 0 : -1
+    if (at !== -1) return stack.slice(0, at) + scrubErrorText(message, err) + stack.slice(at + message.length)
+  }
   const { head, frames } = splitFrames(scrubBoundParamsInStack(stack, err))
   return scrubPgMessage(head, pgCodeOf(err)) + frames
 }
@@ -235,8 +248,10 @@ export function scrubErrorStack(stack: string, err?: unknown): string {
  */
 function pgCodeOf(err: unknown): string | undefined {
   if (!(err instanceof Error)) return undefined
-  const { code, severity } = err as { code?: unknown; severity?: unknown }
-  return typeof code === 'string' && /^[0-9A-Z]{5}$/.test(code) && typeof severity === 'string' ? code : undefined
+  try {
+    const { code, severity } = err as { code?: unknown; severity?: unknown }
+    return typeof code === 'string' && /^[0-9A-Z]{5}$/.test(code) && typeof severity === 'string' ? code : undefined
+  } catch { return undefined }
 }
 
 /** `err` as text that is safe to store or return: never the raw message of a Drizzle or pg error. */
