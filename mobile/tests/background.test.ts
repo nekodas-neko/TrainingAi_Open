@@ -4,6 +4,8 @@ import { computeDayPhase } from '@trainingai/shared/background/day-phase';
 import { PALETTES } from '@trainingai/shared/background/palettes';
 import {
   backgroundPhase,
+  backgroundFadeKey,
+  skyStep,
   backgroundScene,
   backgroundParticles,
   tintWeather,
@@ -160,4 +162,20 @@ test('moving backgrounds start switched off, and a saved choice is kept either w
   const turnedOff = open({ enabled: true, backgroundEnabled: false });
   await turnedOff.initialize();
   assert.equal(turnedOff.getSnapshot().settings.backgroundEnabled, false);
+});
+test('the fade key holds for 10 minutes of one scene and step, and changes on a step', () => {
+  const noon = rise + 6 * 3600000;
+  const keyAt = (at: number, condition: WeatherSnapshot['condition'] = 'clear') =>
+    backgroundFadeKey('sky', 'dark', condition, skyStep(snapshot, at));
+  const first = keyAt(noon);
+  for (let minute = 1; minute <= 10; minute++) assert.equal(keyAt(noon + minute * 60000), first);
+  assert.equal(skyStep(snapshot, rise - 2 * 3600000), 'night');
+  assert.equal(skyStep(snapshot, rise), 'dawn');
+  assert.equal(skyStep(snapshot, noon), 'day');
+  assert.equal(skyStep(snapshot, set), 'dusk');
+  assert.equal(skyStep(snapshot, set + 3 * 3600000), 'night');
+  assert.notEqual(keyAt(rise + 89 * 60000), keyAt(rise + 91 * 60000));
+  assert.notEqual(keyAt(noon), keyAt(noon, 'rain'));
+  assert.notEqual(first, backgroundFadeKey('sky', 'light', 'clear', 'day'));
+  assert.notEqual(first, backgroundFadeKey('more', 'dark', 'clear', null));
 });
