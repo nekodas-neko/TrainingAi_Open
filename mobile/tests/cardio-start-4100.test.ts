@@ -6,7 +6,6 @@ import {
   WALK_RUN_ROWS,
   somethingElseTypes,
   startButtonTitle,
-  startOutcome,
   startStepBack,
   startStepTitle,
   treadmillType,
@@ -52,13 +51,7 @@ test('Something else is the Log Activity grid without Treadmill, Walk and Run', 
   );
 });
 
-test('with an activity open every start answers "in progress", for every kind', () => {
-  for (const row of WALK_RUN_ROWS) assert.equal(startOutcome(true, row.key), 'in-progress');
-  for (const minutes of TREADMILL_LOG_MINUTES) {
-    assert.equal(startOutcome(true, minutes), 'in-progress');
-  }
-  assert.equal(startOutcome(true, 'else'), 'in-progress');
-  assert.equal(startOutcome(false, 'run'), 'run');
+test('the card button names an open activity instead of offering a second start', () => {
   assert.equal(startButtonTitle(true), 'Activity in progress');
   assert.equal(startButtonTitle(false), 'Start an activity');
 });

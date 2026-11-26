@@ -40,9 +40,8 @@ import {
 } from '../data/models';
 import { ActivityPicker } from '../components/ActivityPicker';
 import { StartActivitySheet } from '../components/StartActivitySheet';
+import { startActions } from '../data/cardio-start-actions';
 import {
-  RUN_TYPE,
-  WALK_TYPE,
   startButtonTitle,
   treadmillType,
   type TreadmillKind,
@@ -230,34 +229,18 @@ export function CardioScreen({
         release();
       });
   }
-  // What a choice in the start sheet does. An open activity is named, never started over (#4099).
-  function sheetInProgress() {
-    afterSheet(() => setInProgress('notice'));
-    setStartOpen(false);
-  }
-  const fromSheet = {
-    kind(kind: 'run' | 'walk' | 'guided') {
-      if (activity.session) return sheetInProgress();
-      if (kind === 'guided') {
-        afterSheet(openWalk);
-        setStartOpen(false);
-        return;
-      }
-      void select(kind === 'run' ? RUN_TYPE : WALK_TYPE);
+  // What a choice in the start sheet does: the rule is in `startActions`, shared with its tests.
+  const fromSheet = startActions(
+    {
+      hasSession: !!activity.session,
+      select: (type) => void select(type),
+      recordTreadmill: (minutes, kind) => recordTreadmill(minutes, kind, true),
+      openWalk,
+      showInProgress: () => setInProgress('notice'),
+      afterSheet: (next) => afterSheet(next),
     },
-    treadmillNow(kind: TreadmillKind) {
-      if (activity.session) return sheetInProgress();
-      void select(treadmillType(kind));
-    },
-    treadmillLog(kind: TreadmillKind, minutes: number) {
-      if (activity.session) return sheetInProgress();
-      recordTreadmill(minutes, kind, true);
-    },
-    type(type: ActivityType) {
-      if (activity.session) return sheetInProgress();
-      void select(type);
-    },
-  };
+    () => setStartOpen(false),
+  );
   return (
     <PageLayout
       title="Cardio Hub"
