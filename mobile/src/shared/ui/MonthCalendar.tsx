@@ -1,3 +1,4 @@
+import { formatDateDisplay } from '@trainingai/shared/date-utils';
 import { useState, type ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
 import { AppButton } from './AppButton';
@@ -188,7 +189,7 @@ export function MonthCalendar({
               {nativeStyle ? (
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel={`${date}${names.length ? ', ' + names.join(', ') : ''}`}
+                  accessibilityLabel={`${formatDateDisplay(date, 'weekday-date-long')}${names.length ? ', ' + names.join(', ') : ''}`}
                   accessibilityState={{ selected: date === selected }}
                   onPress={() => onSelect(date)}
                   style={({ pressed }) => ({
@@ -240,7 +241,7 @@ export function MonthCalendar({
               ) : (
                 <AppButton
                   title={String(day)}
-                  accessibilityLabel={`${date}${names.length ? ', ' + names.join(', ') : ''}`}
+                  accessibilityLabel={`${formatDateDisplay(date, 'weekday-date-long')}${names.length ? ', ' + names.join(', ') : ''}`}
                   variant={
                     date === selected || date === today
                       ? 'primary'

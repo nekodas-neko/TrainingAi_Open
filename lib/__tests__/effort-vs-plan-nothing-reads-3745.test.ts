@@ -35,17 +35,23 @@ const CARRIERS: Record<string, Carrier> = {
     ],
   },
   'lib/data/postgres/migrations/202611200539_exercise_log_effort_vs_plan.sql': { why: 'the columns (#3922)', lines: 11 },
+  'lib/data/postgres/migrations/202611252323_set_log_effort_vs_plan.sql': { why: 'the per-set columns (#4154)', lines: 13 },
   'lib/data/postgres/schema.ts': {
     why: 'the Drizzle columns',
     lines: [
       '// expected, +1 harder; NULL where the question was not shown. `effort_source` is \'tapped\' or',
       'effortVsPlan:         smallint(\'effort_vs_plan\'),',
       'effortSource:         text(\'effort_source\').$type<\'tapped\' | \'default\'>(),',
+      '// exercise_logs columns (#3892): -1 easier, 0 as expected, +1 harder; `effort_source` is \'tapped\'',
+      'effortVsPlan:  smallint(\'effort_vs_plan\'),',
+      'effortSource:  text(\'effort_source\').$type<\'tapped\' | \'default\'>(),',
     ],
   },
   'lib/data/postgres/claude-ro-views.sql': {
     why: 'the read-only view lists every column',
     lines: [
+      't.effort_vs_plan,',
+      't.effort_source',
       't.effort_vs_plan,',
       't.effort_source',
     ],

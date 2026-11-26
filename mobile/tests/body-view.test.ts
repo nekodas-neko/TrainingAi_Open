@@ -90,11 +90,11 @@ test('sleep chips cover every vital and hide a zero Awake', () => {
 });
 
 test('the weight pace line grades the weekly rate against the goal', () => {
-  assert.deepEqual(weightPaceLine(90, 80, -0.5), { text: 'On track · -0.5 kg/wk', cue: 'good' });
-  assert.equal(weightPaceLine(90, 80, -0.1)?.text, 'Slower than ideal pace · -0.1 kg/wk');
+  assert.deepEqual(weightPaceLine(90, 80, -0.5), { text: 'On track · -0.5 kg/wk over 14 days', cue: 'good' });
+  assert.equal(weightPaceLine(90, 80, -0.1)?.text, 'Slower than ideal pace · -0.1 kg/wk over 14 days');
   assert.equal(weightPaceLine(90, 80, -1.4)?.cue, 'watch');
   assert.deepEqual(weightPaceLine(90, 80, 0.3), {
-    text: 'Trending away from goal · +0.3 kg/wk',
+    text: 'Trending away from goal · +0.3 kg/wk over 14 days',
     cue: 'bad',
   });
   assert.equal(weightPaceLine(80, 80, -0.5), null);

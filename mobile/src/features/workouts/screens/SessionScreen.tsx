@@ -225,7 +225,7 @@ export function SessionScreen({
                   ...(selected.secondaryMuscles ?? []),
                 ].some((muscle) => injuredMuscles.includes(normalizeMuscle(muscle))) && (
                   <Notice
-                    title="Recorded injury"
+                    title="Injury"
                     message="This exercise involves an injured muscle. You can choose a safe alternative from its preparation screen."
                   />
                 )}

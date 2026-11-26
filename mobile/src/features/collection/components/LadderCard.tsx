@@ -12,7 +12,7 @@ export function LadderCard({ ladder }: { ladder: LadderModel }) {
           {ladder.title}
           {ladder.provisional && (
             <AppText variant="micro" tone="muted" style={{ fontWeight: '400' }}>
-              {'  '}provisional
+              {'  '}early numbers
             </AppText>
           )}
         </AppText>

@@ -1713,7 +1713,9 @@ SELECT
   t.planned_rest_sec,
   t.planned_reps,
   t.planned_weight_kg,
-  t.rpe_source
+  t.rpe_source,
+  t.effort_vs_plan,
+  t.effort_source
 FROM public.set_logs t
 WHERE EXISTS (SELECT 1 FROM public.exercise_logs e JOIN public.workout_sessions p ON p.id = e.workout_session_id WHERE e.id = t.exercise_log_id AND p.user_id = current_setting('app.claude_ro_owner', true)::uuid);
 

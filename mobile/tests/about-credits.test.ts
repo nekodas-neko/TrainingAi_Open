@@ -18,7 +18,7 @@ test('About renders the shared Open Food Facts credit, not its own copy of the w
 });
 
 test('About lists the latest changelog entry', () => {
-  assert.match(about, /CHANGELOG\[0\]\.changes\.map/);
+  assert.match(about, /changelogPreview\(CHANGELOG\[0\]\.changes\)/);
 });
 
 test('the hand-off test card shows only in the Dev build', () => {

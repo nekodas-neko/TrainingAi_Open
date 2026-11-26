@@ -1,3 +1,4 @@
+import { plural } from '@trainingai/shared/format/plural';
 import { useState } from 'react';
 import {
   AppText,
@@ -78,7 +79,7 @@ export function ExerciseLibraryScreen({ onBack }: { onBack: () => void }) {
         />
       </Stack>
       <AppText variant="caption" tone="muted">
-        {exercises.length} exercises
+        {plural(exercises.length, 'exercise', 'exercises')}
       </AppText>
       {exercises.map((exercise) => (
         <ListRow

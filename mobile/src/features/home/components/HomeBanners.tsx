@@ -41,6 +41,7 @@ import {
 } from '../data/detected-walks';
 import { GoalRecommendation } from '../../nutrition/components/GoalRecommendation';
 import { failureNotice, reportError } from '../../../core/reporting/index.ts';
+import { updatesStripLabel } from '../data/updates-strip';
 
 export function HomeBanners({
   openWeek,
@@ -354,7 +355,7 @@ export function HomeBanners({
                 />
               ))}
               <AppText variant="label" style={{ flex: 1 }}>
-                {entries.length} ready
+                {updatesStripLabel(entries)}
               </AppText>
               <Icon
                 name={expanded ? 'expand' : 'forward'}

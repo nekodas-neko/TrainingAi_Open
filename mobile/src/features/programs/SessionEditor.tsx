@@ -1,3 +1,4 @@
+import { plural } from '@trainingai/shared/format/plural';
 import { capitalize } from '@trainingai/shared/format/capitalize';
 import { useEffect, useState, type ReactNode } from 'react';
 import { ExerciseChooser } from './ExerciseChooser';
@@ -291,7 +292,7 @@ export function SessionEditor({
                 <Card tone="brand" style={{ padding: theme.spacing.sm, gap: theme.spacing.xs }}>
                   <Stack direction="row" align="center" gap="xs">
                     {exerciseHandle}
-                    <AppText variant="label">Superset · {block.exercises.length} exercises</AppText>
+                    <AppText variant="label">Superset · {plural(block.exercises.length, 'exercise', 'exercises')}</AppText>
                   </Stack>
                   <SortableStack
                     gap={theme.spacing.xs}

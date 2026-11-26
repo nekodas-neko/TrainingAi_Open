@@ -20,6 +20,8 @@ export const STRENGTH_BAR_MARKERS = [60, 70, 80] as const;
 
 /** The guides that carry a number. 60 / 70 / 80 sit 11 px apart, closer than a label is wide, so only the outer two are named; 70 still has its dashed guide. */
 export const STRENGTH_BAR_LABELLED_MARKERS = [60, 80] as const;
+/** The one line that explains the strength bars and their 60 and 80 marks (#4143). */
+export const STRENGTH_BAR_CAPTION = `Bar: today's lift as a share of your best. Marks at ${STRENGTH_BAR_LABELLED_MARKERS.join('% and ')}%.`;
 
 /** Fills below this still show a sliver, so a low lift never reads as an empty bar. */
 export const STRENGTH_BAR_MIN_PCT = 4;

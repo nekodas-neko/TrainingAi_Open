@@ -142,9 +142,9 @@ export function WarmupTimer({ workout }: { workout: WorkoutRecord }) {
         {workout.warmupGoalSource === 'selected'
           ? 'Your selected timer duration.'
           : workout.warmupGoalSource === 'budget'
-            ? 'Planning allowance: 15% of the session budget.'
+            ? '15% of your session time.'
             : 'Default 10-minute guide; no session time limit was chosen.'}{' '}
-        Time alone does not complete a warm-up. Adjust or hide it in Workout options.
+        The warm-up is done when you finish it, not when the time runs out. Change or hide this timer in Workout options.
       </AppText>
     </Stack>
   );

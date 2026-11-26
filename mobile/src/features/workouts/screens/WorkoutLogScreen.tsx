@@ -1,3 +1,4 @@
+import { plural } from '@trainingai/shared/format/plural';
 import { formatVolumeKg } from '@trainingai/shared/format/number';
 import { useEffect, useRef } from 'react';
 import { feedback } from '../../../integrations/feedback/haptics';
@@ -148,7 +149,7 @@ export function WorkoutLogScreen({
   const shareWorkout = () => {
     void Share.share({
       message: [
-        `Workout complete! ${workout.sessionName} · ${result.exercises} exercises · ${result.sets} sets · ${duration} · ${Math.round(result.loadVolume)} kg volume`,
+        `Workout complete! ${workout.sessionName} · ${plural(result.exercises, 'exercise', 'exercises')} · ${plural(result.sets, 'set', 'sets')} · ${duration} · ${Math.round(result.loadVolume)} kg volume`,
         personalRecordsLine(records),
       ]
         .filter(Boolean)

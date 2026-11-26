@@ -1,3 +1,5 @@
+import { plural } from '@trainingai/shared/format/plural';
+import { formatDateDisplay } from '@trainingai/shared/date-utils';
 import { useState } from 'react';
 import {
   AppButton,
@@ -48,7 +50,7 @@ export function PreviousSession({
         {exercise.lastDate?.replace(/\//g, '-') === workout.date
           ? 'Earlier today'
           : 'Previous session'}
-        {exercise.lastDate ? ` - ${exercise.lastDate}` : ''}
+        {exercise.lastDate ? ` - ${formatDateDisplay(exercise.lastDate, 'short')}` : ''}
       </AppText>
       <Stack direction="row" align="center" gap="md">
         <Stack direction="row" wrap gap="xs" style={{ flex: 1 }}>
@@ -57,7 +59,7 @@ export function PreviousSession({
               const weight = exercise.lastWeights[index];
               const label =
                 weight === undefined
-                  ? `${reps} reps - load unavailable`
+                  ? `${plural(reps, 'rep', 'reps')} - load unavailable`
                   : formatSetLoad(exercise, {
                       weight: String(weight),
                       reps: String(reps),
@@ -107,7 +109,7 @@ export function PreviousSession({
         onClose={() => setPreview(null)}
       >
         <AppText variant="caption" tone="muted">
-          Source: {exercise.lastDate}. {source?.isDeload ? 'Deload session. ' : ''}
+          Source: {formatDateDisplay(exercise.lastDate ?? '', 'short')}. {source?.isDeload ? 'Deload session. ' : ''}
           {workout.isBaseline ? 'Current workout is a baseline. ' : ''}
           {exercise.deloaded ? 'Current exercise is deloaded. ' : ''}
           {exercise.lastReps.length !== exercise.sets.length

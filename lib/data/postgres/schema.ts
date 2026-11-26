@@ -310,6 +310,12 @@ export const setLogs = pgTable('set_logs', {
   // #2450: 'rated' (tapped on the picker) | 'expected' (the untouched pre-fill). CHECK-constrained
   // in migration 202610061516. NULL on a set with no RPE and on every row logged before it existed.
   rpeSource:     text('rpe_source').$type<import('@trainingai/shared/workout/rpe-source').RpeSource>(),
+  // #4154: the per-set answer to "how did that set feel against the plan?" — same values as the
+  // exercise_logs columns (#3892): -1 easier, 0 as expected, +1 harder; `effort_source` is 'tapped'
+  // or 'default'. Both NULL where the question was not shown, never one without the other
+  // (CHECKs in migration 202611252323). Nothing reads or writes them yet (#4155).
+  effortVsPlan:  smallint('effort_vs_plan'),
+  effortSource:  text('effort_source').$type<'tapped' | 'default'>(),
   updatedAt:     timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   deletedAt:     timestamp('deleted_at', { withTimezone: true }),
 }, t => [unique().on(t.exerciseLogId, t.setNumber)])
