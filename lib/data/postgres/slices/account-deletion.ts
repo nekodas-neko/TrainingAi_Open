@@ -327,6 +327,15 @@ function eraseInTransaction(db: Db, userId: string, opts: EraseOpts): Promise<Ac
     // fails the whole deletion — closed, never by deleting their row.
     await tx.execute(sql`SET CONSTRAINTS ALL DEFERRED`)
 
+    // #4157: the person's programs, in id order, before the cascade deletes them in the scan's order. An exercise
+    // rename locks every program that holds the old name in id order (#4096); a cascade that reached the higher
+    // program first and then wanted the lower met it crosswise (40P01, reproduced gated in
+    // `account-deletion-rename-lock-order-4157.test.ts`). Taking them here puts the deletion on the same ladder,
+    // so whichever side comes second waits at the first program holding nothing the other wants. Waits like the
+    // cascade did (the 120 s statement timeout above, no `lock_timeout`): this path is not given a busy refusal
+    // (#4105).
+    await tx.execute(sql`SELECT id FROM programs WHERE user_id = ${userId} ORDER BY id FOR NO KEY UPDATE`)
+
     const id = userId.toLowerCase()
     const email = me.email.trim().toLowerCase()
     const subjects = opts.auditSubjectIds
