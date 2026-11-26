@@ -57,6 +57,8 @@ export async function getSessionReadLogs(db: Db, userId: string, from: Date, to:
       plannedRestSec: s.setLogs.plannedRestSec,
       rpe: s.setLogs.rpe,
       rpeSource: s.setLogs.rpeSource,
+      setEffortVsPlan: s.setLogs.effortVsPlan,
+      setEffortSource: s.setLogs.effortSource,
       hrSetLogId: s.setHrStats.setLogId,
       recoveredPreset: s.setHrStats.recoveredPreset,
       restAdequate: s.setHrStats.restAdequate,
@@ -81,6 +83,8 @@ export async function getSessionReadLogs(db: Db, userId: string, from: Date, to:
       plannedRestSec: row.plannedRestSec,
       rpe: row.rpe,
       rpeSource: row.rpeSource,
+      setEffortVsPlan: row.setEffortVsPlan,
+      setEffortSource: row.setEffortSource,
       hr: row.hrSetLogId
         ? { recoveredPreset: row.recoveredPreset, restAdequate: row.restAdequate, coverageOk: row.coverageOk ?? false }
         : null,

@@ -16,7 +16,7 @@ import type { EditStamp } from '@trainingai/shared/sync/edited-at';
 import type { WorkoutRepository } from '@/lib/data/repository';
 import { logMayConsumeOneShot } from '@trainingai/shared/ai-periodization/lift-preference';
 
-export { LogExercisePayloadSchema } from './log-payload';
+export { LogExercisePayloadSchema, LogExerciseUploadSchema } from './log-payload';
 import type { LogExercisePayload } from './log-payload';
 export type { LogExercisePayload } from './log-payload';
 
@@ -64,7 +64,7 @@ export async function logExerciseWithRepo(
     localDate, timeToCompleteSet, setTimes, restTimes,
     setStartTimes, setEndTimes, interExerciseRestSec, prepTimeSec,
     progressionStyle, plannedWeights, prescriptionBasisKg, styleName, styleId, muscleGroups, workoutStartedAt, warmupEndedAtMs,
-    rpeValues, rpeSources, intensityMode, wasOverride, exerciseDeloaded, effort,
+    rpeValues, rpeSources, intensityMode, wasOverride, exerciseDeloaded, effort, setEfforts,
   } = payload;
 
   // Issue 2721: a stale copy is decided before anything is written, so a superseded push leaves the
@@ -278,6 +278,9 @@ export async function logExerciseWithRepo(
       rpe: rpeValues?.[i],
       // #2450: a source with no RPE beside it would describe nothing, so it is dropped.
       rpeSource: rpeValues?.[i] != null ? (rpeSources?.[i] ?? undefined) : undefined,
+      // #4159: the set's own answer, from the validated pair. Absent writes nothing over a stored one.
+      effortVsPlan: setEfforts?.[i]?.vsPlan,
+      effortSource: setEfforts?.[i]?.source,
       // Q-14: a bodyweight movement is never prescribed a %1RM — resolveBodyweightStyle turns the
       // style's pct into a rep target instead. Storing that pct here put it alongside a
       // BW_REF-relative intensity_pct on a different basis, so every bodyweight set recorded a

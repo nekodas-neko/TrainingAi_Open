@@ -13,10 +13,11 @@ import { settleWalkingPlanSoon } from '@/lib/health/walking-plan-service';
 
 /**
  * The envelope caps the batch at 100 mutations, and the largest bounded domain — `workout_log`,
- * whose every array caps at 20 and every string at 200 — measures 6,010 bytes at its own limits, so
- * a full batch of the worst case is 0.57 MB. 4 MB is seven times that.
+ * whose every array caps at 20 and every string at 200 — measures 18,450 bytes at its own limits
+ * (including the per-set answers of #4159), so a full batch of the worst case is 1.8 MB. 4 MB is
+ * twice that.
  *
- * Stated honestly: 0.57 MB is measured for that one domain. `MutationSchema.payload` is
+ * Stated honestly: 1.8 MB is measured for that one domain. `MutationSchema.payload` is
  * `z.record(z.string(), z.unknown())`, so the envelope does not bound the other eighteen — their
  * per-domain schemas do, inside `pushMutations`, after this parse. The headroom is what covers them.
  * **Do not lower this without re-measuring**: this is the outbox, and a rejected batch is the

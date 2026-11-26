@@ -186,6 +186,10 @@ export async function editExerciseLogWithRepo(
            weight_kg = EXCLUDED.weight_kg,
            reps = EXCLUDED.reps,
            intensity_pct = EXCLUDED.intensity_pct,
+           -- A set the edit brings back is a new set: it must not return with the answer it held
+           -- before it was removed (#4159). A live set keeps its answer through a weight/rep edit.
+           effort_vs_plan = CASE WHEN set_logs.deleted_at IS NULL THEN set_logs.effort_vs_plan END,
+           effort_source = CASE WHEN set_logs.deleted_at IS NULL THEN set_logs.effort_source END,
            deleted_at = NULL`,
         [exerciseLogId, i + 1, weights[i], reps[i], intensityPct],
       )
@@ -196,7 +200,8 @@ export async function editExerciseLogWithRepo(
     // (sqlite-backend.ts applyDelta) already handles it. Re-adding the set later
     // resurrects the same row via the ON CONFLICT arm above.
     await client.query(
-      'UPDATE set_logs SET deleted_at = now() WHERE exercise_log_id = $1 AND set_number > $2 AND deleted_at IS NULL',
+      `UPDATE set_logs SET deleted_at = now(), effort_vs_plan = NULL, effort_source = NULL
+       WHERE exercise_log_id = $1 AND set_number > $2 AND deleted_at IS NULL`,
       [exerciseLogId, weights.length],
     )
 

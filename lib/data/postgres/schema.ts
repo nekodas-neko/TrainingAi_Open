@@ -313,7 +313,8 @@ export const setLogs = pgTable('set_logs', {
   // #4154: the per-set answer to "how did that set feel against the plan?" — same values as the
   // exercise_logs columns (#3892): -1 easier, 0 as expected, +1 harder; `effort_source` is 'tapped'
   // or 'default'. Both NULL where the question was not shown, never one without the other
-  // (CHECKs in migration 202611252323). Nothing reads or writes them yet (#4155).
+  // (CHECKs in migration 202611252323). Written by the workout upload (#4159) and carried to the session read;
+  // no plan, score or note reads them.
   effortVsPlan:  smallint('effort_vs_plan'),
   effortSource:  text('effort_source').$type<'tapped' | 'default'>(),
   updatedAt:     timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

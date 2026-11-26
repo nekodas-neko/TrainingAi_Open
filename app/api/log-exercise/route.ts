@@ -3,13 +3,15 @@ import { isNotFoundError } from '@trainingai/shared/errors';
 import { routeErrorResponse } from '@/lib/api/route-errors';
 import { auth } from "@/auth";
 import { rateLimit } from "@/lib/rate-limit";
-import { LogExercisePayloadSchema, logExerciseFromPayload } from "@trainingai/shared/workout/log-exercise";
+import { LogExerciseUploadSchema, logExerciseFromPayload } from "@trainingai/shared/workout/log-exercise";
 import { reportServerError } from "@/lib/observability";
 import { DEFAULT_TZ } from "@trainingai/shared/date-utils";
 import { readJsonLimited } from "@trainingai/shared/http/request-guards";
 
-// Measured against LogExercisePayloadSchema at its own limits — every array caps at 20 and every
-// string at 200 — a maximal payload is 6,010 bytes. 64 KB is ten times that.
+// Measured against LogExerciseUploadSchema at its own limits — every array at 20 entries, every
+// string at 200 characters, every number at its largest — a maximal payload is 18,450 bytes, of
+// which the per-set answers (#4159) are 676. 64 KB is 3.5 times that. The figure is pinned by
+// __tests__/body-cap-comment-4159.test.ts: re-measure before adding a field.
 const MAX_BODY_BYTES = 64 * 1024;
 
 export async function POST(req: NextRequest) {
@@ -27,7 +29,7 @@ export async function POST(req: NextRequest) {
       : NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const parsed = LogExercisePayloadSchema.safeParse(read.body);
+  const parsed = LogExerciseUploadSchema.safeParse(read.body);
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid request", details: parsed.error.flatten() }, { status: 400 });
   }

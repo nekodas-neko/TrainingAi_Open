@@ -1527,6 +1527,9 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
           plannedRestSec: set.plannedRestSec ?? null,
           plannedWeightKg: set.plannedWeightKg ?? null,
           rpeSource: set.rpeSource ?? null,
+          // #4159: both halves or neither, so a half-pair can never reach the table's CHECK.
+          effortVsPlan: set.effortVsPlan != null && set.effortSource != null ? set.effortVsPlan : null,
+          effortSource: set.effortVsPlan != null && set.effortSource != null ? set.effortSource : null,
         })))
         .onConflictDoUpdate({
           target: s.setLogs.id,
@@ -1547,6 +1550,10 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
             plannedRestSec: sql`EXCLUDED.planned_rest_sec`,
             plannedWeightKg: sql`EXCLUDED.planned_weight_kg`,
             rpeSource: sql`EXCLUDED.rpe_source`,
+            // #4159: as the exercise's own pair (#3745): a re-upload without an answer keeps the
+            // stored one; one with an answer replaces both halves together.
+            effortVsPlan: sql`CASE WHEN EXCLUDED.effort_vs_plan IS NULL THEN ${s.setLogs.effortVsPlan} ELSE EXCLUDED.effort_vs_plan END`,
+            effortSource: sql`CASE WHEN EXCLUDED.effort_vs_plan IS NULL THEN ${s.setLogs.effortSource} ELSE EXCLUDED.effort_source END`,
           },
         })
         .returning()
@@ -6662,8 +6669,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
           // #3916: the `*-core` modules take this repository and never import `@/lib/data`, so the
           // data layer does not reach back into itself (the guard is data-layer-readiness-cycle.test.ts).
           const { logExerciseWithRepo } = await import('@trainingai/shared/workout/log-exercise-core')
-          const { LogExercisePayloadSchema } = await import('@trainingai/shared/workout/log-payload')
-          const parsed = LogExercisePayloadSchema.safeParse(mut.payload)
+          const { LogExerciseUploadSchema } = await import('@trainingai/shared/workout/log-payload')
+          const parsed = LogExerciseUploadSchema.safeParse(mut.payload)
           if (!parsed.success) {
             console.error('[pushMutations] workout_log safeParse failed:', JSON.stringify(parsed.error.flatten()))
             errors.push({ id: mut.id, domain: mut.domain, date: mut.date, error: 'Invalid workout_log payload' })
