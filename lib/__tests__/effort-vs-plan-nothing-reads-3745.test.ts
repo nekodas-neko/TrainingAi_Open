@@ -132,10 +132,6 @@ const CARRIERS: Record<string, Carrier> = {
       "getLatestExerciseEfforts?(userId: string, workoutSessionIds: string[], exerciseNames: string[]): Promise<Map<string, import('@trainingai/shared/ai-periodization/autoregulation').LatestEffortAnswer>>",
     ],
   },
-  'lib/workout/exercise-log-edits-core.ts': {
-    why: 'an edit keeps a live set\'s answer and clears it when the set is removed or brought back (#4159); writes NULL or its own value, reads nothing',
-    lines: 3,
-  },
   'lib/data/postgres/slices/session-read.ts': {
     why: 'selects it, the lift\'s and each set\'s (#4159), for the session read (#3893), read only',
     lines: [
