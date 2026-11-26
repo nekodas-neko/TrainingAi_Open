@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { daysBetweenDateStrs } from '@trainingai/shared/date-utils';
+import { daysBetweenDateStrs, formatDateDisplay } from '@trainingai/shared/date-utils';
 import {
   AppButton,
   AppText,
@@ -87,7 +87,7 @@ export function MuscleStatusCard() {
             }}
           />
           <AppButton
-            title="+ Add injury"
+            title="Add injury"
             variant="ghost"
             onPress={() => {
               setEditing('new');
@@ -129,7 +129,7 @@ export function MuscleStatusCard() {
           <Disclosure title={`Resolved (${resolved.length})`}>
             {resolved.map((injury) => (
               <AppText key={injury.id} variant="caption" tone="muted">
-                {titleCaseWords(injury.muscleName)} · Resolved {injury.resolvedDate}
+                {titleCaseWords(injury.muscleName)} · Resolved {formatDateDisplay(injury.resolvedDate ?? '', 'short')}
               </AppText>
             ))}
           </Disclosure>
@@ -138,7 +138,7 @@ export function MuscleStatusCard() {
       </Card>
       <Sheet
         visible={editing !== null}
-        title={editing === 'new' ? 'Record Injury' : 'Edit Injury'}
+        title={editing === 'new' ? 'Add injury' : 'Edit Injury'}
         onClose={() => setEditing(null)}
       >
         {editing && (

@@ -331,7 +331,14 @@ function AppShell() {
         );
       case 'programs':
         return (
-          <ProgramsScreen onBack={back} openBuilder={() => open({ screen: 'program-builder' })} />
+          <ProgramsScreen
+            onBack={back}
+            openBuilder={() => open({ screen: 'program-builder' })}
+            openInjuries={() => {
+              selectTab('Health');
+              setHealthPanel('body');
+            }}
+          />
         );
       case 'program-builder':
         return <AIProgramBuilder onBack={back} onSaved={back} />;

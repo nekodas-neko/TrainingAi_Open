@@ -1,3 +1,4 @@
+import { formatDateDisplay } from '@trainingai/shared/date-utils';
 import {
   deadLettered,
   failedItem,
@@ -51,7 +52,7 @@ export function failedHeading(count: number) {
   return `${count} change${count > 1 ? 's' : ''} failed to sync`;
 }
 export function itemTitle(item: FailedItem) {
-  return item.date ? `${item.label} — ${item.date}` : item.label;
+  return item.date ? `${item.label} — ${formatDateDisplay(item.date, 'short')}` : item.label;
 }
 export function itemDetail(item: FailedItem) {
   return `${item.error || 'Unknown error'} (${item.attempts} attempts)`;

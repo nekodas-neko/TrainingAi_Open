@@ -1,3 +1,4 @@
+import { safeErrorText, scrubErrorText } from '@/lib/observability/scrub-params'
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { getPool } from '@/lib/data/postgres/client'
@@ -90,7 +91,7 @@ async function logSnapshot(entry: { tables: string[]; bulk: string | null; ip: s
     await getPool().query(
       `INSERT INTO db_query_log (sql_text, row_count, duration_ms, truncated, ok, error, caller_ip)
        VALUES ($1, NULL, 0, false, $2, $3, $4)`,
-      [`SNAPSHOT tables=${entry.tables.join(',')} bulk=${entry.bulk ?? '0'}`, entry.ok, entry.error, entry.ip],
+      [`SNAPSHOT tables=${entry.tables.join(',')} bulk=${entry.bulk ?? '0'}`, entry.ok, entry.error == null ? null : scrubErrorText(entry.error), entry.ip],
     )
   } catch (err) {
     console.error('[admin/db-snapshot] audit log write failed:', err)
@@ -124,7 +125,7 @@ export async function GET(req: NextRequest) {
     cols = await readTableColumns(pool)
     checkDrift(cols)
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err)
+    const message = safeErrorText(err)
     reportServerError(err, { url: '/api/admin/db-snapshot' })
     await logSnapshot({ tables: [], bulk, ip, ok: false, error: message })
     return NextResponse.json({
@@ -203,7 +204,7 @@ export async function GET(req: NextRequest) {
           // The status and headers are already sent, so an error line is the only place a failure
           // can be said. `scripts/local-db/snapshot.js` rolls back on it.
           finished = true
-          const message = err instanceof Error ? err.message : String(err)
+          const message = safeErrorText(err)
           reportServerError(err, { url: '/api/admin/db-snapshot' })
           await logSnapshot({ tables: toExport, bulk, ip, ok: false, error: message })
           controller.enqueue(encode({ error: 'Snapshot failed part-way through — see server logs' }))

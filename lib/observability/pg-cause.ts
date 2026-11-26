@@ -6,7 +6,7 @@
 // from Next's `onRequestError`) can never import that module. Keeping the logic here is what lets
 // both callers share one implementation instead of growing a second, drifting copy.
 
-import { scrubPgDetail, scrubPgMessage } from './scrub-params'
+import { scrubBoundParams, scrubPgDetail, scrubPgMessage } from './scrub-params'
 
 // A `pg` driver error, as Drizzle hands it back on `err.cause`. Every field is optional
 // because a cause can also be a plain Error (or a pool acquisition timeout, which carries
@@ -25,9 +25,17 @@ type PgCause = {
 
 function readCause(err: unknown): PgCause | null {
   if (!(err instanceof Error)) return null
-  const cause = (err as { cause?: unknown }).cause
-  if (!cause || typeof cause !== 'object') return null
-  return cause as PgCause
+  const first = (err as { cause?: unknown }).cause
+  if (!first || typeof first !== 'object') return null
+  // #3673: a wrapper (`new Error('save failed', { cause: drizzleError })`) puts the Drizzle error
+  // first and the pg error under it. Prefer the pg error when there is one, so its code and
+  // constraint reach the row; otherwise keep the first cause (its text is scrubbed by the caller).
+  let cause: unknown = first
+  for (let depth = 0; depth < 5 && cause instanceof Error; depth++) {
+    if (isPgError(cause)) return cause
+    cause = (cause as { cause?: unknown }).cause
+  }
+  return first as PgCause
 }
 
 const str = (v: unknown): string | null => (typeof v === 'string' && v.length > 0 ? v : null)
@@ -47,7 +55,7 @@ function isPgError(v: unknown): v is PgCause & { message: string } {
  */
 export function scrubOwnPgMessage(err: unknown, text: string): string {
   if (!isPgError(err) || err.message.length === 0) return text
-  const clean = scrubPgMessage(err.message)
+  const clean = scrubPgMessage(err.message, err.code)
   return clean === err.message ? text : text.split(err.message).join(clean)
 }
 
@@ -70,9 +78,10 @@ export function summariseCause(err: unknown): { prefix: string; block: string | 
   // and the code/severity/constraint/table stay, which is what makes the row diagnosable.
   const code = str(cause.code)
   const rawMessage = str(cause.message)
-  const causeMessage = rawMessage && scrubPgMessage(rawMessage)
+  // A cause that is not a pg error can still be a Drizzle error whose message ends in `params:`.
+  const causeMessage = rawMessage && scrubPgMessage(scrubBoundParams(rawMessage, cause), isPgError(cause) ? code : undefined)
   const rawDetail = str(cause.detail)
-  const detail = rawDetail && scrubPgDetail(rawDetail)
+  const detail = rawDetail && scrubPgDetail(rawDetail, isPgError(cause) ? code : undefined)
   const prefix = code
     ? `[pg ${code}] `
     : causeMessage

@@ -32,13 +32,31 @@ test('the week range reads "5 Oct – 11 Oct 2026"', () => {
   assert.equal(weekRangeLabel('2026-10-05', undefined), '5 Oct 2026');
 });
 
-test('the range prints the web\'s "d MMM" in every month', () => {
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  months.forEach((name, i) => {
-    const mm = String(i + 1).padStart(2, '0');
-    assert.equal(weekRangeLabel(`2026-${mm}-07`, `2026-${mm}-13`), `7 ${name} – 13 ${name} 2026`);
-  });
+test('the range names each of the twelve months, with the strings written out by hand', () => {
+  // en-AU spells June, July and Sept out; these are typed, not computed, so a wrong month fails.
+  const expected = [
+    ['01', '7 Jan – 13 Jan 2026'],
+    ['02', '7 Feb – 13 Feb 2026'],
+    ['03', '7 Mar – 13 Mar 2026'],
+    ['04', '7 Apr – 13 Apr 2026'],
+    ['05', '7 May – 13 May 2026'],
+    ['06', '7 June – 13 June 2026'],
+    ['07', '7 July – 13 July 2026'],
+    ['08', '7 Aug – 13 Aug 2026'],
+    ['09', '7 Sept – 13 Sept 2026'],
+    ['10', '7 Oct – 13 Oct 2026'],
+    ['11', '7 Nov – 13 Nov 2026'],
+    ['12', '7 Dec – 13 Dec 2026'],
+  ];
+  for (const [mm, text] of expected) {
+    assert.equal(weekRangeLabel(`2026-${mm}-07`, `2026-${mm}-13`), text);
+  }
+});
+
+test('a range crossing a year end carries the end year, and a month change names both months', () => {
   assert.equal(weekRangeLabel('2026-12-28', '2027-01-03'), '28 Dec – 3 Jan 2027');
+  assert.equal(weekRangeLabel('2026-08-31', '2026-09-06'), '31 Aug – 6 Sept 2026');
+  assert.equal(weekRangeLabel('2026-06-29', '2026-07-05'), '29 June – 5 July 2026');
 });
 
 test('bars are labelled M T W T F S S from their dates', () => {

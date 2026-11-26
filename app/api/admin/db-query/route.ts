@@ -7,6 +7,7 @@ import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 import { clientIp } from '@trainingai/shared/http/client-ip'
 import { isUuid } from '@trainingai/shared/validation/uuid'
 import { z } from 'zod'
+import { safeErrorText, scrubErrorText } from '@/lib/observability/scrub-params'
 
 // One SQL statement. The audit log truncates it at 20,000 characters, so 64 KB is generous past
 // anything that is meaningfully recorded.
@@ -66,7 +67,7 @@ async function logQuery(entry: {
     await getPool().query(
       `INSERT INTO db_query_log (sql_text, row_count, duration_ms, truncated, ok, error, caller_ip, scoped_user_id)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-      [entry.sql.slice(0, 20_000), entry.rowCount, entry.durationMs, entry.truncated, entry.ok, entry.error, entry.ip, entry.scopedUserId ?? null],
+      [entry.sql.slice(0, 20_000), entry.rowCount, entry.durationMs, entry.truncated, entry.ok, entry.error == null ? null : scrubErrorText(entry.error), entry.ip, entry.scopedUserId ?? null],
     )
   } catch (err) {
     console.error('[admin/db-query] audit log write failed:', err)
@@ -97,7 +98,7 @@ async function finishScopedLog(id: string | null, outcome: {
   try {
     await getPool().query(
       `UPDATE db_query_log SET row_count = $2, duration_ms = $3, truncated = $4, ok = $5, error = $6 WHERE id = $1`,
-      [id, outcome.rowCount, outcome.durationMs, outcome.truncated, outcome.ok, outcome.error],
+      [id, outcome.rowCount, outcome.durationMs, outcome.truncated, outcome.ok, outcome.error == null ? null : scrubErrorText(outcome.error)],
     )
   } catch (err) {
     console.error('[admin/db-query] audit log update failed:', err)
@@ -227,7 +228,7 @@ export async function POST(req: NextRequest) {
       fields: result.fields?.map(f => f.name) ?? [],
     })
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err)
+    const message = safeErrorText(err)
     await record({ sql, rowCount: null, durationMs: Date.now() - started, truncated: false, ok: false, error: message, ip, scopedUserId })
     // The DB error text is the useful part (permission denied, syntax, timeout) and this route is
     // admin-only, so it is surfaced rather than swallowed.
@@ -264,7 +265,7 @@ export async function GET(req: NextRequest) {
     reportServerError(err, { url: '/api/admin/db-query' })
     console.error('[admin/db-query] schema read failed:', err)
     return NextResponse.json({
-      error: err instanceof Error ? err.message : String(err),
+      error: safeErrorText(err),
       // Which connection was actually attempted — no password, just the identity — so a bad
       // CLAUDE_DB_READONLY_URL is diagnosable without another deploy.
       connection: describeReadonlyConnection(),

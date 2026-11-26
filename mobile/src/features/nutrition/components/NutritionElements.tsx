@@ -14,7 +14,7 @@ import {
   TargetBars,
   TextField,
 } from '../../../shared/ui';
-import type { Food, FoodLog } from '../data/models';
+import type { Food } from '../data/models';
 import { useNutrition } from '../data/NutritionProvider';
 export const macroKeys = ['calories', 'proteinG', 'carbsG', 'fatG'] as const;
 export function MacroComparison({
@@ -249,7 +249,4 @@ export function foodFields(food: Partial<Food>): NutritionFields {
       'sodiumMg',
     ].map((key) => [key, food[key] == null ? '' : String(food[key])]),
   );
-}
-export function foodAmount(log: FoodLog) {
-  return `${Math.round(log.quantityMultiplier * 100) / 100} servings · ${Math.round(log.foodItem.servingSizeG * log.quantityMultiplier)} g`;
 }

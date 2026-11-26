@@ -9,6 +9,7 @@ import { buildDayAudit } from '@trainingai/shared/health/score-audit/build-day-a
 import type { DayAudit } from '@trainingai/shared/health/score-audit/types'
 import { reportServerError } from '@/lib/observability'
 import { clientIp } from '@trainingai/shared/http/client-ip'
+import { safeErrorText } from '@/lib/observability/scrub-params'
 
 /**
  * Admin day-review: everything that fed each scored pillar on a day, in one payload — the raw
@@ -152,7 +153,7 @@ export async function GET(req: NextRequest) {
     reportServerError(err, { userId, url: '/api/admin/day-review' })
     console.error('[admin/day-review] failed:', err)
     return NextResponse.json(
-      { error: 'Failed to assemble the day audit', detail: err instanceof Error ? err.message : String(err) },
+      { error: 'Failed to assemble the day audit', detail: safeErrorText(err) },
       { status: 500 },
     )
   }

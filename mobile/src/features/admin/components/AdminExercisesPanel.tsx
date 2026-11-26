@@ -1,3 +1,4 @@
+import { plural } from '@trainingai/shared/format/plural';
 import { useState } from 'react';
 import { View } from 'react-native';
 import { Pressable } from '../../../shared/ui/Pressable';
@@ -280,7 +281,7 @@ export function AdminExercisesPanel({ exercises }: { exercises: readonly AdminEx
         />
       )}
       <AppText variant="caption" tone="muted">
-        {shown.length} exercises
+        {plural(shown.length, 'exercise', 'exercises')}
         {cover.merged > 0 ? ` · ${cover.merged} merged, not counted in coverage` : ''}
       </AppText>
       {shown.map((ex) => {

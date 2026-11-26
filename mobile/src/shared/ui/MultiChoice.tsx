@@ -1,5 +1,6 @@
 import { feedback } from '../../integrations/feedback/haptics';
-import { Pressable } from 'react-native';
+import { choiceSpokenLabel } from './choice-label';
+import { Pressable, View } from 'react-native';
 import { AppText } from './AppText';
 import { Icon } from './Icon';
 import { Stack } from './Stack';
@@ -8,12 +9,23 @@ export function MultiChoice({
   label,
   value,
   options,
+  flagLabel,
   onChange,
 }: {
   label: string;
   value: string[];
-  /** `marked` draws the refresh icon after the label and says "suggested" to a screen reader. */
-  options: readonly { value: string; label: string; marked?: boolean }[];
+  /**
+   * `marked` draws the refresh icon after the label and says "suggested" to a screen reader.
+   * `flagged` draws a small dot and says `flagLabel` (what the dot means, kept in the caller's
+   * words, e.g. "in today's session"); the screen that uses it prints the same words as a caption.
+   */
+  options: readonly {
+    value: string;
+    label: string;
+    marked?: boolean;
+    flagged?: boolean;
+  }[];
+  flagLabel?: string;
   onChange: (value: string[]) => void;
 }) {
   const { theme } = useTheme();
@@ -27,7 +39,7 @@ export function MultiChoice({
             accessibilityRole="checkbox"
             accessibilityState={{ checked: value.includes(option.value) }}
             aria-checked={value.includes(option.value)}
-            accessibilityLabel={option.marked ? `${option.label}, suggested` : undefined}
+            accessibilityLabel={choiceSpokenLabel(option, flagLabel)}
             onPress={() => {
               feedback();
               onChange(
@@ -56,6 +68,18 @@ export function MultiChoice({
             <AppText variant="caption" tone={value.includes(option.value) ? 'brand' : 'muted'}>
               {option.label}
             </AppText>
+            {option.flagged && (
+              <View
+                style={{
+                  width: theme.spacing.sm,
+                  height: theme.spacing.sm,
+                  borderRadius: theme.radii.pill,
+                  backgroundColor: value.includes(option.value)
+                    ? theme.colors.brand
+                    : theme.colors.muted,
+                }}
+              />
+            )}
             {option.marked && (
               <Icon
                 name="refresh"

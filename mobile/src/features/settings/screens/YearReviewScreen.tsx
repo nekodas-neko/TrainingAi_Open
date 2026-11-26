@@ -107,7 +107,7 @@ export function YearReviewScreen({ onBack }: { onBack: () => void }) {
                   data.topExercises.map((row) => (
                     <Stack key={row.exerciseName}>
                       <AppText variant="label">
-                        {row.exerciseName} · {formatCount(row.setCount)} sets
+                        {row.exerciseName} · {formatCount(row.setCount)} {row.setCount === 1 ? 'set' : 'sets'}
                       </AppText>
                       <AppText variant="caption" tone="muted">
                         {row.first1rm?.toFixed(1) ?? '—'} → {row.last1rm?.toFixed(1) ?? '—'}{' '}

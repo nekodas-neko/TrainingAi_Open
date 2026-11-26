@@ -1,3 +1,4 @@
+import { formatDateDisplay } from '@trainingai/shared/date-utils';
 import { FITNESS_TEST_PROTOCOLS } from '@trainingai/shared/fitness-tests/protocols';
 import {
   AppText,
@@ -93,7 +94,7 @@ export function BaselinesScreen({
               />
               {value != null && (
                 <AppText variant="caption" tone="brand">
-                  Last: {value} {protocol.vo2Equation ? 'VO₂max' : 'HRR bpm'} · {last!.date}
+                  Last: {value} {protocol.vo2Equation ? 'VO₂max' : 'HRR bpm'} · {formatDateDisplay(last!.date, 'short')}
                 </AppText>
               )}
               {records.some((row) => row.testType === protocol.id) && (

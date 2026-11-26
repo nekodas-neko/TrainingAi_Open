@@ -31,6 +31,7 @@ import { RestPrescriptionSummary } from './RestPrescriptionSummary';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { bandColor } from '../../../shared/theme/tokens';
 import {
+  STRENGTH_BAR_CAPTION,
   STRENGTH_BAR_LABELLED_MARKERS,
   STRENGTH_BAR_MARKERS,
   STRENGTH_BAR_WIDTH,
@@ -62,6 +63,7 @@ function TrendsCard() {
   const label = views.find((option) => option.value === view)?.label ?? 'Trend';
   const series = data?.series ?? [];
   const sufficient = data !== null && (data.hasSufficientData || series.length > 0);
+  const framed = data === null || sufficient;
   return (
     <Card accent={theme.progress.trends}>
       <HealthResourceHeader title={'Trends'} state={state} refresh={state.refresh} />
@@ -74,10 +76,15 @@ function TrendsCard() {
         value={view}
         onChange={(next) => next && setView(next)}
       />
+      {/* The frame is sized for a chart only while there is one (or while it is still unknown);
+          "Not enough data yet" takes its own height. Keyed so a view's earlier height is not kept. */}
       <StableContent
+        key={framed ? 'chart' : 'empty'}
         loading={data === null && state.loading}
         frameHeight={
-          theme.sizes.chartHeight + theme.sizes.touchTarget * 3 + theme.spacing.md * 3
+          framed
+            ? theme.sizes.chartHeight + theme.sizes.touchTarget * 3 + theme.spacing.md * 3
+            : undefined
         }
       >
         {data && !sufficient && (
@@ -251,6 +258,11 @@ function StrengthWorkingCard() {
             </AppText>
           )}
         </Stack>
+      )}
+      {groups.length > 0 && (
+        <AppText variant="micro" tone="muted">
+          {STRENGTH_BAR_CAPTION}
+        </AppText>
       )}
       {/* strength-progress-card.tsx: groups space-y-5 (xl), heading mb-3 (md), rows space-y-4 (lg). */}
       <Stack gap="xl">

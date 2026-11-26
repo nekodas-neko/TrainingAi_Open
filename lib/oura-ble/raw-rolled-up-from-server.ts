@@ -1,4 +1,5 @@
 import type { OuraBlePlugin, OuraRawRow } from '@/lib/oura-ble/plugin'
+import { safeErrorText } from '@/lib/observability/scrub-params'
 
 /**
  * #2579 — mark the device's raw rows `rolled_up` from the SERVER's rollup watermark, so the
@@ -200,7 +201,7 @@ export async function runRawRolledUpMaintenance(deps: RawMaintenanceDeps): Promi
     if (w?.rolledThroughMs != null && rolledThroughMs == null) throw new Error('malformed watermark')
   } catch (err) {
     result.outcome = 'watermark-error'
-    result.error = err instanceof Error ? err.message : String(err)
+    result.error = safeErrorText(err)
     deps.log(`watermark read failed (${result.error}) — nothing marked, nothing pruned`)
     return result
   }
@@ -266,7 +267,7 @@ export async function runRawRolledUpMaintenance(deps: RawMaintenanceDeps): Promi
   } catch (err) {
     // A failed page leaves every earlier page's marks in place (each was its own transaction) and
     // no partial mark of this one. The prune below still runs only over rows that ARE marked.
-    result.error = `mark: ${err instanceof Error ? err.message : String(err)}`
+    result.error = `mark: ${safeErrorText(err)}`
   }
 
   // ── count, or prune ──
@@ -285,7 +286,7 @@ export async function runRawRolledUpMaintenance(deps: RawMaintenanceDeps): Promi
       // server never got them, which this side cannot see). Drop them so the estimate stays honest.
       for (const k of Object.keys(histogram)) if (Number(k) + DAY_MS <= olderThan) delete histogram[k]
     } catch (err) {
-      result.error = [result.error, `prune: ${err instanceof Error ? err.message : String(err)}`].filter(Boolean).join('; ')
+      result.error = [result.error, `prune: ${safeErrorText(err)}`].filter(Boolean).join('; ')
     }
   }
 

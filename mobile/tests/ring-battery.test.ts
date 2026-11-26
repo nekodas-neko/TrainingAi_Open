@@ -131,12 +131,12 @@ test('the Settings “Live workout status” row is information only, with no Co
   assert.doesNotMatch(src, /FeatureRow|Coming soon/);
 });
 
-test('the Health “Devices & integrations” row opens Devices and no row says the ring is deferred', () => {
+test('the Health “Connected devices” row opens Devices and no row says the ring is deferred', () => {
   const src = readFileSync(
     new URL('../src/features/health/components/BodyPanel.tsx', import.meta.url),
     'utf8',
   );
-  assert.match(src, /title="Devices & integrations"[^>]*onPress=\{openDevices\}/s);
+  assert.match(src, /title="Connected devices"[^>]*onPress=\{openDevices\}/s);
   assert.doesNotMatch(src, /remain deferred/);
 });
 

@@ -1,3 +1,4 @@
+import { plural } from '@trainingai/shared/format/plural';
 import { daysBetweenDateStrs, formatDateDisplay } from '@trainingai/shared/date-utils';
 import type { IconName } from '../../../shared/ui/Icon.tsx';
 
@@ -27,7 +28,7 @@ export function sessionFacts(
   const facts: SessionFact[] = [];
   if (session.durationMinutes !== null)
     facts.push({ icon: 'history', text: `~${Math.round(session.durationMinutes)} min` });
-  facts.push({ icon: 'workout', text: `${session.exercises.length} exercises` });
+  facts.push({ icon: 'workout', text: plural(session.exercises.length, 'exercise', 'exercises') });
   facts.push({
     icon: 'calendarPlain',
     text: `Last: ${lastTrainedLabel(session.lastTrained, today)}`,

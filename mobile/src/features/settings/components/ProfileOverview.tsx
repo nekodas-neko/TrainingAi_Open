@@ -1,3 +1,4 @@
+import { plural } from '@trainingai/shared/format/plural';
 import { deviceHealthName } from '../../../integrations/device-health/platform';
 import { useEffect } from 'react';
 import { displayBodyFat } from '@trainingai/shared/health/body-fat-display';
@@ -143,7 +144,7 @@ export function ProfileOverview({
       {sleep && (
         <Card>
           <AppText variant="eyebrow" tone="muted">
-            Sleep · average of {sleep.nights} nights
+            Sleep · average of {plural(sleep.nights, 'night', 'nights')}
           </AppText>
           {[
             [

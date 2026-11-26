@@ -1,8 +1,9 @@
+import { parseMarkdown } from '../src/shared/ui/markdown-model.ts';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { trendCardTitle } from '../src/features/health/data/heart-view.ts';
 import {
-  flowDigest,
+  digestLines,
   trainingHeadline,
   volumeTickLabel,
 } from '../src/features/health/data/week-view.ts';
@@ -25,16 +26,17 @@ test('the training chart writes thousands as 4k / 2k over a bare 0', () => {
   assert.equal(volumeTickLabel(1000), '1k');
 });
 
-test('the digest flows bullets and headings into one paragraph, keeping the "•" between points', () => {
+test('the digest prints one line per point, never a "•" in the middle of a line', () => {
   assert.equal(
-    flowDigest('## Week\n- You trained **5** times.\n\n* Sleep held at 7 h.\n• HRV rose.'),
-    '• You trained **5** times. • Sleep held at 7 h. • HRV rose.',
+    digestLines('## Week\n- You trained **5** times.\n\n* Sleep held at 7 h.\n• HRV rose.'),
+    '- You trained **5** times.\n- Sleep held at 7 h.\n- HRV rose.',
   );
-  // Four points: a separator before each, none after the last.
-  const flowed = flowDigest('• One.\n• Two.\n• Three.\n• Four.');
-  assert.equal(flowed, '• One. • Two. • Three. • Four.');
-  assert.equal(flowed.split('•').length - 1, 4);
-  assert.ok(!flowed.endsWith('•'));
-  assert.equal(flowDigest('One line.'), 'One line.');
-  assert.equal(flowDigest(''), '');
+  const lines = digestLines('• One.\n• Two.\n• Three.\n• Four.').split('\n');
+  assert.equal(lines.length, 4);
+  assert.ok(lines.every((line) => line.startsWith('- ') && !line.slice(2).includes('•')));
+  assert.equal(digestLines('One line.'), 'One line.');
+  assert.equal(digestLines(''), '');
+  // And the view draws each as its own bullet row.
+  const blocks = parseMarkdown(digestLines('• One.\n• Two.\n• Three.'));
+  assert.deepEqual(blocks.map((block) => block.type), ['bullet', 'bullet', 'bullet']);
 });

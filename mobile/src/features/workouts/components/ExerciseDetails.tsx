@@ -1,3 +1,4 @@
+import { plural } from '@trainingai/shared/format/plural';
 import { AppButton, AppText, Card, Stack } from '../../../shared/ui';
 import { barShareOfOneRm } from '@trainingai/shared/1rm';
 import { plateBreakdown } from '@trainingai/shared/workout/plate-loading';
@@ -110,7 +111,7 @@ export function ExerciseDetails({
               </AppText>
               <AppText variant="label">
                 {roundLoad((weight * x.pct) / 100, weightStep(exercise.equipment))} kg ×{' '}
-                {x.reps} reps
+                {plural(x.reps, 'rep', 'reps')}
               </AppText>
             </Stack>
           ))}

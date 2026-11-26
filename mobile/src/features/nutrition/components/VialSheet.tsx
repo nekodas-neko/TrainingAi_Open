@@ -1,3 +1,4 @@
+import { plural } from '@trainingai/shared/format/plural';
 import { daysBetweenDateStrs, isCalendarDate } from '@trainingai/shared/date-utils';
 import { useEffect, useMemo, useState } from 'react';
 import { z } from 'zod';
@@ -275,7 +276,7 @@ export function VialSheet({
             </AppText>
           )}
           {plan?.dosesInVial != null && (
-            <AppText variant="caption">{plan.dosesInVial} doses this size in the vial.</AppText>
+            <AppText variant="caption">{plural(plan.dosesInVial, 'dose', 'doses')} this size in the vial.</AppText>
           )}
         </Card>
         <VialResponses supplement={supplement} since={current?.openedOn ?? null} />
@@ -462,7 +463,8 @@ function VialResponses({
         {result && (
           <AppText variant="caption" tone="muted">
             Your band is {result.bandLoKgPerWeek.toFixed(2)}–{result.bandHiKgPerWeek.toFixed(2)}{' '}
-            kg/wk. {result.weighIns} weigh-ins over {Math.round(result.spanDays)} days. A range
+            kg/wk. {plural(result.weighIns, 'weigh-in', 'weigh-ins')} over{' '}
+            {plural(Math.round(result.spanDays), 'day', 'days')}. A range
             crossing a boundary is not called either way.
           </AppText>
         )}

@@ -28,6 +28,7 @@ import { sourceRank } from '@trainingai/shared/health/source-rank'
 import { aestMidnight, toAestDay, shiftDateStr, secondsSinceLocalMidnight } from '@trainingai/shared/date-utils'
 import type { RollupIO } from './io'
 import type { ModelRuntime } from '@/lib/oura-models/inference/runtime'
+import { safeErrorText } from '@/lib/observability/scrub-params'
 
 export interface RollupOptions {
   debugDate?: string
@@ -649,7 +650,7 @@ export async function runOuraRollup(
   }
   const step = async (name: string, fn: () => Promise<void>) => {
     try { await fn() } catch (err) {
-      const msg = `${name}: ${err instanceof Error ? err.message : String(err)}`
+      const msg = `${name}: ${safeErrorText(err)}`
       stepErrors.push(msg)
       console.error('[oura-ble] aggregate step failed —', msg)
     }

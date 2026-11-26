@@ -1,3 +1,4 @@
+import { formatDateDisplay } from '@trainingai/shared/date-utils';
 import { formatCount, waterParts } from '@trainingai/shared/format/number';
 import { balanceProvenance, budgetLine } from '../../nutrition/data/budget-line';
 import { useRecordedIntake } from '../../nutrition/data/useRecordedIntake';
@@ -619,7 +620,7 @@ function HomeWidgetBody({
             {rows.map((row, index) => (
               <View
                 key={row.date}
-                accessibilityLabel={`${row.date}: ${row.steps ?? 'not recorded'} steps`}
+                accessibilityLabel={`${formatDateDisplay(row.date, 'weekday-date-long')}: ${row.steps ?? 'not recorded'} steps`}
                 style={{
                   flex: 1,
                   height:

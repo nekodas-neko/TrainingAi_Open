@@ -170,6 +170,20 @@ async function defaultResolve(hostname: string): Promise<string[]> {
   return results.map((r) => r.address)
 }
 
+/** Rejects with `{ deadline: true }` when `signal` fires before `work` settles; never leaves `work` unhandled. */
+function withDeadline<T>(work: Promise<T>, signal: AbortSignal): Promise<T> {
+  work.catch(() => {})
+  if (signal.aborted) return Promise.reject({ deadline: true })
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => reject({ deadline: true })
+    signal.addEventListener('abort', onAbort, { once: true })
+    work.then(
+      v => { signal.removeEventListener('abort', onAbort); resolve(v) },
+      e => { signal.removeEventListener('abort', onAbort); reject(e) },
+    )
+  })
+}
+
 /**
  * Validate one hop: https only, no credentials, port 443, and every address the hostname
  * resolves to must be globally routable. Rejecting on the hostname alone is not enough —
@@ -178,6 +192,7 @@ async function defaultResolve(hostname: string): Promise<string[]> {
 async function validateHop(
   raw: string,
   resolve: (h: string) => Promise<string[]>,
+  deadline: AbortSignal,
 ): Promise<{ ok: true; url: URL } | { ok: false; reason: SafeFetchFailure }> {
   let url: URL
   try {
@@ -195,11 +210,13 @@ async function validateHop(
     return isPublicAddress(host) ? { ok: true, url } : { ok: false, reason: 'private_address' }
   }
 
+  // The lookup has no timeout of its own, so a resolver that never answers would hold the request
+  // past the limit that bounds the fetch. It shares the fetch's deadline and ends in `timeout`.
   let addresses: string[]
   try {
-    addresses = await resolve(host)
-  } catch {
-    return { ok: false, reason: 'dns_failed' }
+    addresses = await withDeadline(resolve(host), deadline)
+  } catch (err) {
+    return { ok: false, reason: (err as { deadline?: true })?.deadline ? 'timeout' : 'dns_failed' }
   }
   if (addresses.length === 0) return { ok: false, reason: 'dns_failed' }
   if (!addresses.every(isPublicAddress)) return { ok: false, reason: 'private_address' }
@@ -213,8 +230,9 @@ async function validateHop(
  *
  * Residual risk, stated rather than hidden: the address is validated and then the hostname is
  * connected to by name, so a resolver that returns a public address on the check and a private
- * one on the connect (DNS rebinding) is not closed out. Closing it needs connecting to the
- * pinned IP with the Host header preserved, which undici does not expose here.
+ * one on the connect (DNS rebinding) is not closed out. Closing it is possible, by connecting to the
+ * address that was checked with the Host header and TLS server name kept (a custom undici
+ * dispatcher or a `lookup` hook), and is tracked in #4149; it is not built here.
  */
 export async function fetchPublicUrl(raw: string, opts: SafeFetchOptions = {}): Promise<SafeFetchResult> {
   const maxBytes = opts.maxBytes ?? DEFAULTS.maxBytes
@@ -228,7 +246,7 @@ export async function fetchPublicUrl(raw: string, opts: SafeFetchOptions = {}): 
   let current = raw
 
   for (let hop = 0; hop <= maxRedirects; hop++) {
-    const checked = await validateHop(current, resolve)
+    const checked = await validateHop(current, resolve, deadline)
     if (!checked.ok) return { ok: false, reason: checked.reason }
 
     let res: Response
@@ -246,7 +264,13 @@ export async function fetchPublicUrl(raw: string, opts: SafeFetchOptions = {}): 
       const location = res.headers.get('location')
       await res.body?.cancel().catch(() => {})
       if (!location) return { ok: false, reason: 'http_error', status: res.status }
-      current = new URL(location, checked.url).toString()
+      // A Location the URL parser refuses (`https://`, `http://[`) is the remote's fault, not ours: it
+      // used to throw out of this function and surface as a 502 from the caller.
+      try {
+        current = new URL(location, checked.url).toString()
+      } catch {
+        return { ok: false, reason: 'bad_url' }
+      }
       continue
     }
 
